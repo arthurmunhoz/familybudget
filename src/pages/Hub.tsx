@@ -15,7 +15,7 @@ export default function Hub() {
       <BeachBackdrop />
       <header className="flex items-center justify-between pt-6 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-(--text)">Family Hub</h1>
+          <h1 className="text-2xl font-bold text-(--text)">One Roof</h1>
           <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
         </div>
         <button

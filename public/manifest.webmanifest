@@ -1,7 +1,7 @@
 {
-  "name": "Family Hub",
-  "short_name": "Family Hub",
-  "description": "Arthur & Patricia's family apps: budget, shopping list, and more",
+  "name": "One Roof",
+  "short_name": "One Roof",
+  "description": "Everything your family runs on — budget, shopping, pets, and documents under one roof",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0c0a09",

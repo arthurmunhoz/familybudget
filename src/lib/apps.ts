@@ -1,5 +1,5 @@
 /**
- * Registry of the apps available in the Family Hub. Adding a new app is one
+ * Registry of the apps available in One Roof. Adding a new app is one
  * entry here plus a folder under src/apps/ and a route in App.tsx.
  */
 export interface HubApp {
