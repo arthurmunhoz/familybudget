@@ -4,7 +4,7 @@
  * horizon, modern stilt beach house, and a TAMPA road sign. Rendered at low
  * opacity, lifted above the bottom action button.
  */
-export default function BeachBackdrop() {
+export default function BeachBackdrop({ photoUrl }: { photoUrl: string | null }) {
   return (
     <div
       aria-hidden
@@ -84,28 +84,31 @@ export default function BeachBackdrop() {
           opacity="0.7"
         />
 
-        {/* family polaroid planted in the sand */}
-        <g transform="rotate(3 512 230)">
-          <rect
-            x="436"
-            y="90"
-            width="152"
-            height="272"
-            rx="6"
-            fill="#fdfcf9"
-            stroke="#d6d3d1"
-            strokeWidth="2"
-          />
-          <image
-            href="/family.jpg"
-            x="446"
-            y="100"
-            width="132"
-            height="240"
-            preserveAspectRatio="xMidYMid slice"
-            clipPath="url(#bb-photo-clip)"
-          />
-        </g>
+        {/* family polaroid planted in the sand — the photo is private, loaded
+            via a household-scoped signed URL; hidden until it resolves */}
+        {photoUrl && (
+          <g transform="rotate(3 512 230)">
+            <rect
+              x="436"
+              y="90"
+              width="152"
+              height="272"
+              rx="6"
+              fill="#fdfcf9"
+              stroke="#d6d3d1"
+              strokeWidth="2"
+            />
+            <image
+              href={photoUrl}
+              x="446"
+              y="100"
+              width="132"
+              height="240"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#bb-photo-clip)"
+            />
+          </g>
+        )}
 
         {/* palm silhouettes */}
         <g id="bb-palm" fill="#334155">

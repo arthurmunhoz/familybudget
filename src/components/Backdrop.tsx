@@ -16,15 +16,23 @@ export default function Backdrop() {
   const { household } = useHousehold()
   const path = household?.backdrop_path ?? null
 
+  // The beach scene's polaroid photo also lives in private storage, under a
+  // well-known name in the household's backdrop folder.
+  const storagePath = !household
+    ? null
+    : path === 'builtin:beach'
+      ? `${household.id}/backdrop/beach-photo.jpg`
+      : path
+
   const [url, setUrl] = useState<string | null>(() => {
-    if (!path) return null
-    const cached = urlCache.get(path)
+    if (!storagePath) return null
+    const cached = urlCache.get(storagePath)
     return cached && cached.expires > Date.now() ? cached.url : null
   })
 
   useEffect(() => {
-    if (!path || path === 'builtin:beach') return
-    const cached = urlCache.get(path)
+    if (!storagePath) return
+    const cached = urlCache.get(storagePath)
     if (cached && cached.expires > Date.now()) {
       setUrl(cached.url)
       return
@@ -32,19 +40,22 @@ export default function Backdrop() {
     let cancelled = false
     supabase.storage
       .from('documents')
-      .createSignedUrl(path, 3600)
+      .createSignedUrl(storagePath, 3600)
       .then(({ data }) => {
         if (cancelled || !data) return
-        urlCache.set(path, { url: data.signedUrl, expires: Date.now() + 3_300_000 })
+        urlCache.set(storagePath, {
+          url: data.signedUrl,
+          expires: Date.now() + 3_300_000,
+        })
         setUrl(data.signedUrl)
       })
     return () => {
       cancelled = true
     }
-  }, [path])
+  }, [storagePath])
 
   if (!path) return null
-  if (path === 'builtin:beach') return <BeachBackdrop />
+  if (path === 'builtin:beach') return <BeachBackdrop photoUrl={url} />
   if (!url) return null
 
   return (
