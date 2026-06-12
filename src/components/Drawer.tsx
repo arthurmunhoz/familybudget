@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react'
+import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { notifyHouseholdChanged, useHousehold } from '../hooks/useHousehold'
 import { useTheme } from '../hooks/useTheme'
+import { APPS } from '../lib/apps'
 import { fileToResizedBase64 } from '../lib/image'
 import { supabase } from '../lib/supabase'
 
@@ -15,6 +17,7 @@ export default function Drawer({
   const { profile, session, signOut } = useAuth()
   const { household } = useHousehold()
   const { theme, setTheme } = useTheme()
+  const { hidden, toggleApp } = useAppPrefs()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -81,7 +84,7 @@ export default function Drawer({
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div
-        className="absolute right-0 top-0 flex h-full w-72 flex-col bg-(--card) p-5"
+        className="absolute right-0 top-0 flex h-full w-72 flex-col overflow-y-auto bg-(--card) p-5"
         style={{
           paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)',
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)',
@@ -117,6 +120,47 @@ export default function Drawer({
                 {t === 'light' ? '🌞 Light' : '🌙 Dark'}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <span className="text-sm text-(--text-muted)">My apps</span>
+          <p className="mt-1 text-xs text-(--text-faint)">
+            Choose what shows on your home screen — just for you.
+          </p>
+          <div className="mt-2 space-y-1 rounded-xl bg-(--surface) p-1">
+            {APPS.map((app) => {
+              const on = !hidden.includes(app.id)
+              return (
+                <button
+                  key={app.id}
+                  onClick={() => toggleApp(app.id)}
+                  role="switch"
+                  aria-checked={on}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left"
+                >
+                  <span className={on ? '' : 'opacity-40 grayscale'}>{app.icon}</span>
+                  <span
+                    className={`flex-1 text-sm font-semibold ${
+                      on ? 'text-(--text)' : 'text-(--text-faint) line-through'
+                    }`}
+                  >
+                    {app.name}
+                  </span>
+                  <span
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                      on ? 'bg-(--accent)' : 'bg-(--surface-2)'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                        on ? 'left-4.5' : 'left-0.5'
+                      }`}
+                    />
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
 

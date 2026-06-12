@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
+import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { useHousehold } from '../hooks/useHousehold'
 import { ADMIN_APP, APPS } from '../lib/apps'
@@ -11,8 +12,15 @@ export default function Hub() {
   // Header shows the family's own name ("Munhoz Family"); the hook caches it
   // locally so it doesn't flash "One Roof" on every open.
   const { household } = useHousehold()
+  // Each user picks their own tiles; the Admin tile is always shown to admins.
+  const { hidden } = useAppPrefs()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const tiles = [
+    ...APPS.filter((app) => !hidden.includes(app.id)),
+    ...(profile?.is_admin ? [ADMIN_APP] : []),
+  ]
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
@@ -33,21 +41,31 @@ export default function Hub() {
         </button>
       </header>
 
-      <div className="grid grid-cols-2 gap-3">
-        {[...APPS, ...(profile?.is_admin ? [ADMIN_APP] : [])].map((app) => (
-          <button
-            key={app.id}
-            onClick={() => navigate(app.route)}
-            className="flex flex-col items-start gap-1.5 rounded-2xl bg-(--card) p-5 text-left active:bg-(--card-active) transition-colors"
-          >
-            <span className="text-3xl">{app.icon}</span>
-            <span className="mt-1 font-bold text-(--text)">{app.name}</span>
-            <span className="text-xs leading-snug text-(--text-faint)">
-              {app.description}
-            </span>
-          </button>
-        ))}
-      </div>
+      {tiles.length === 0 ? (
+        <div className="mt-16 text-center text-(--text-muted)">
+          <div className="text-5xl">🫥</div>
+          <p className="mt-4">All apps are hidden.</p>
+          <p className="text-sm text-(--text-faint)">
+            Open ☰ Settings → My apps to bring them back.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {tiles.map((app) => (
+            <button
+              key={app.id}
+              onClick={() => navigate(app.route)}
+              className="flex flex-col items-start gap-1.5 rounded-2xl bg-(--card) p-5 text-left active:bg-(--card-active) transition-colors"
+            >
+              <span className="text-3xl">{app.icon}</span>
+              <span className="mt-1 font-bold text-(--text)">{app.name}</span>
+              <span className="text-xs leading-snug text-(--text-faint)">
+                {app.description}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
