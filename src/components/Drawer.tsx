@@ -128,24 +128,6 @@ export default function Drawer({
           <p className="mt-1 text-xs text-(--text-faint)">
             Choose what shows on your home screen — just for you.
           </p>
-          <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-(--surface) p-1">
-            {(
-              [
-                { id: 'large', label: '🔲 Large' },
-                { id: 'compact', label: '▪️ Compact' },
-              ] as const
-            ).map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setTileStyle(s.id)}
-                className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
-                  tileStyle === s.id ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
           <div className="mt-2 space-y-1 rounded-xl bg-(--surface) p-1">
             {APPS.map((app) => {
               const on = !hidden.includes(app.id)
@@ -179,6 +161,27 @@ export default function Drawer({
                 </button>
               )
             })}
+          </div>
+          <p className="mt-3 text-xs text-(--text-faint)">
+            Choose how the app icons look.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-(--surface) p-1">
+            {(
+              [
+                { id: 'large', label: '🔲 Large' },
+                { id: 'compact', label: '▪️ Compact' },
+              ] as const
+            ).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setTileStyle(s.id)}
+                className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
+                  tileStyle === s.id ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
         </div>
 
