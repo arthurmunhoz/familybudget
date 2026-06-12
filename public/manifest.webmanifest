@@ -7,7 +7,7 @@
   "background_color": "#0c0a09",
   "theme_color": "#0c0a09",
   "icons": [
-    { "src": "/hub-icon-180.png", "sizes": "180x180", "type": "image/png" },
-    { "src": "/hub-icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/roof-icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/roof-icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
