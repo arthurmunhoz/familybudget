@@ -15,6 +15,7 @@ const CATEGORIES = [
   'travel',
   'subscriptions',
   'gifts',
+  'pets',
   'other',
 ] as const
 
@@ -107,8 +108,28 @@ export default async function handler(req: any, res: any) {
     }
     return res.status(200).json(JSON.parse(text.text))
   } catch (err: any) {
-    return res
-      .status(502)
-      .json({ error: err?.message ?? 'Receipt scanning failed.' })
+    // Map raw API failures to messages that make sense in the app's UI.
+    if (err instanceof Anthropic.APIError) {
+      const msg = err.message ?? ''
+      if (/credit balance|billing/i.test(msg)) {
+        return res.status(502).json({
+          error:
+            'Receipt scanning is paused — the AI account is out of credits. Add credits at console.anthropic.com and try again.',
+        })
+      }
+      if (err.status === 401 || err.status === 403) {
+        return res.status(502).json({
+          error: 'Receipt scanning is misconfigured — the API key is invalid.',
+        })
+      }
+      if (err.status === 429 || err.status === 529) {
+        return res.status(502).json({
+          error: 'The scanner is busy right now — try again in a minute.',
+        })
+      }
+    }
+    return res.status(502).json({
+      error: "Couldn't read that receipt — try a clearer, well-lit photo.",
+    })
   }
 }

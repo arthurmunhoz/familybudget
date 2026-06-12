@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import BeachBackdrop from '../components/BeachBackdrop'
 import Drawer from '../components/Drawer'
 import { daysInMonth, formatMoney, monthLabel } from '../lib/format'
 import type { Entry, Month } from '../lib/types'
@@ -97,9 +98,10 @@ export default function Months() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
+      <BeachBackdrop />
       <header className="flex items-center justify-between pt-6 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-(--text)">Our Budget</h1>
+          <h1 className="text-2xl font-bold text-(--text)">Our Home Budget</h1>
           <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
         </div>
         <button

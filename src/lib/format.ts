@@ -32,6 +32,16 @@ export function formatDay(isoDate: string): string {
   })
 }
 
+/** "Mon, Jun 9" from "2026-06-09" — used for day section headers */
+export function formatDayHeading(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 export function todayISO(): string {
   const now = new Date()
   const m = String(now.getMonth() + 1).padStart(2, '0')

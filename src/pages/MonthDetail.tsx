@@ -5,11 +5,12 @@ import { fileToResizedBase64 } from '../lib/image'
 import SummaryChart from '../components/SummaryChart'
 import { useAuth } from '../hooks/useAuth'
 import { categoryById } from '../lib/categories'
-import { formatDay, formatMoney, monthName } from '../lib/format'
+import { formatDay, formatDayHeading, formatMoney, monthName } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { CategoryRule, Entry, Month, Profile } from '../lib/types'
 
 type SortBy = 'date' | 'amount'
+type SortDir = 'asc' | 'desc'
 type View = 'list' | 'split'
 
 export default function MonthDetail() {
@@ -24,6 +25,7 @@ export default function MonthDetail() {
 
   const [person, setPerson] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortBy>('date')
+  const [dateDir, setDateDir] = useState<SortDir>('asc')
   const [view, setView] = useState<View>('list')
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Entry | null>(null)
@@ -55,12 +57,14 @@ export default function MonthDetail() {
 
   const sortEntries = useCallback(
     (list: Entry[]) =>
-      [...list].sort((a, b) =>
-        sortBy === 'date'
-          ? a.entry_date.localeCompare(b.entry_date) || a.created_at.localeCompare(b.created_at)
-          : Number(b.amount) - Number(a.amount),
-      ),
-    [sortBy],
+      [...list].sort((a, b) => {
+        if (sortBy === 'amount') return Number(b.amount) - Number(a.amount)
+        const cmp =
+          a.entry_date.localeCompare(b.entry_date) ||
+          a.created_at.localeCompare(b.created_at)
+        return dateDir === 'asc' ? cmp : -cmp
+      }),
+    [sortBy, dateDir],
   )
 
   const nameOf = (email: string) =>
@@ -144,17 +148,26 @@ export default function MonthDetail() {
       {/* List controls */}
       <div className="mt-5 flex items-center justify-between">
         <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
-          {(['date', 'amount'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setSortBy(s)}
-              className={`rounded-md px-3 py-1.5 capitalize ${
-                sortBy === s ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
-              }`}
-            >
-              By {s}
-            </button>
-          ))}
+          <button
+            onClick={() =>
+              sortBy === 'date'
+                ? setDateDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                : setSortBy('date')
+            }
+            className={`rounded-md px-3 py-1.5 ${
+              sortBy === 'date' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
+            }`}
+          >
+            By date {dateDir === 'asc' ? '↑' : '↓'}
+          </button>
+          <button
+            onClick={() => setSortBy('amount')}
+            className={`rounded-md px-3 py-1.5 ${
+              sortBy === 'amount' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
+            }`}
+          >
+            By amount
+          </button>
         </div>
         <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
           {(['list', 'split'] as const).map((v) => (
@@ -177,6 +190,7 @@ export default function MonthDetail() {
           entries={sortEntries(filtered)}
           nameOf={nameOf}
           showPerson={person === 'all'}
+          groupByDay={sortBy === 'date'}
           onSelect={(e) => {
             setEditing(e)
             setFormOpen(true)
@@ -193,6 +207,7 @@ export default function MonthDetail() {
                 entries={sortEntries(entries.filter((e) => e.person_email === p.email))}
                 nameOf={nameOf}
                 showPerson={false}
+                groupByDay={sortBy === 'date'}
                 compact
                 onSelect={(e) => {
                   setEditing(e)
@@ -280,12 +295,14 @@ function EntryColumn({
   entries,
   nameOf,
   showPerson,
+  groupByDay = false,
   compact = false,
   onSelect,
 }: {
   entries: Entry[]
   nameOf: (email: string) => string
   showPerson: boolean
+  groupByDay?: boolean
   compact?: boolean
   onSelect: (e: Entry) => void
 }) {
@@ -294,48 +311,118 @@ function EntryColumn({
       <p className="mt-6 text-center text-sm text-(--text-faint)">No entries yet.</p>
     )
   }
-  return (
-    <ul className="mt-3 space-y-2">
-      {entries.map((e) => {
-        const cat = categoryById(e.category)
-        const isIncome = e.type === 'income'
-        return (
-          <li key={e.id}>
-            <button
-              onClick={() => onSelect(e)}
-              className={`flex w-full items-center gap-2 rounded-xl bg-(--card) text-left active:bg-(--card-active) transition-colors ${
-                compact ? 'px-2.5 py-2' : 'px-4 py-3'
+
+  if (groupByDay) {
+    // Preserve the incoming sort order; just insert a heading whenever the day changes.
+    const groups: { date: string; items: Entry[] }[] = []
+    for (const e of entries) {
+      const last = groups[groups.length - 1]
+      if (last && last.date === e.entry_date) last.items.push(e)
+      else groups.push({ date: e.entry_date, items: [e] })
+    }
+    return (
+      <div className="mt-3 space-y-4">
+        {groups.map((g) => (
+          <section key={g.date}>
+            <h4
+              className={`mb-1.5 font-semibold uppercase tracking-wide text-(--text-faint) ${
+                compact ? 'text-[9px]' : 'text-[11px]'
               }`}
             >
-              <span className={compact ? 'text-base' : 'text-xl'}>
-                {isIncome ? '💵' : cat.icon}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div
-                  className={`truncate font-medium text-(--text) ${
-                    compact ? 'text-xs' : 'text-sm'
-                  }`}
-                >
-                  {e.label}
-                  {e.recurring && <span className="ml-1 text-(--text-faint)">↻</span>}
-                </div>
-                <div className="text-[10px] text-(--text-faint)">
-                  {formatDay(e.entry_date)}
-                  {showPerson && ` · ${nameOf(e.person_email)}`}
-                </div>
-              </div>
-              <span
-                className={`tabular-nums font-semibold ${
-                  compact ? 'text-xs' : 'text-sm'
-                } ${isIncome ? 'text-(--income)' : 'text-(--text-muted)'}`}
-              >
-                {isIncome ? '+' : '−'}
-                {formatMoney(Number(e.amount))}
-              </span>
-            </button>
-          </li>
-        )
-      })}
+              {formatDayHeading(g.date)}
+            </h4>
+            <ul className="space-y-2">
+              {g.items.map((e) => (
+                <EntryRow
+                  key={e.id}
+                  entry={e}
+                  nameOf={nameOf}
+                  showPerson={showPerson}
+                  showDate={false}
+                  compact={compact}
+                  onSelect={onSelect}
+                />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <ul className="mt-3 space-y-2">
+      {entries.map((e) => (
+        <EntryRow
+          key={e.id}
+          entry={e}
+          nameOf={nameOf}
+          showPerson={showPerson}
+          showDate
+          compact={compact}
+          onSelect={onSelect}
+        />
+      ))}
     </ul>
+  )
+}
+
+function EntryRow({
+  entry: e,
+  nameOf,
+  showPerson,
+  showDate,
+  compact,
+  onSelect,
+}: {
+  entry: Entry
+  nameOf: (email: string) => string
+  showPerson: boolean
+  showDate: boolean
+  compact: boolean
+  onSelect: (e: Entry) => void
+}) {
+  const cat = categoryById(e.category)
+  const isIncome = e.type === 'income'
+  const secondary = [
+    showDate ? formatDay(e.entry_date) : null,
+    showPerson ? nameOf(e.person_email) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <li>
+      <button
+        onClick={() => onSelect(e)}
+        className={`flex w-full items-center gap-2 rounded-xl bg-(--card) text-left active:bg-(--card-active) transition-colors ${
+          compact ? 'px-2.5 py-2' : 'px-4 py-3'
+        }`}
+      >
+        <span className={compact ? 'text-base' : 'text-xl'}>
+          {isIncome ? '💵' : cat.icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div
+            className={`truncate font-medium text-(--text) ${
+              compact ? 'text-xs' : 'text-sm'
+            }`}
+          >
+            {e.label}
+            {e.recurring && <span className="ml-1 text-(--text-faint)">↻</span>}
+          </div>
+          {secondary && (
+            <div className="text-[10px] text-(--text-faint)">{secondary}</div>
+          )}
+        </div>
+        <span
+          className={`tabular-nums font-semibold ${
+            compact ? 'text-xs' : 'text-sm'
+          } ${isIncome ? 'text-(--income)' : 'text-(--text-muted)'}`}
+        >
+          {isIncome ? '+' : '−'}
+          {formatMoney(Number(e.amount))}
+        </span>
+      </button>
+    </li>
   )
 }
