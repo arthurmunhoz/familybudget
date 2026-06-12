@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
@@ -6,6 +6,7 @@ import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { useHousehold } from '../hooks/useHousehold'
 import { ADMIN_APP, APPS } from '../lib/apps'
+import { supabase } from '../lib/supabase'
 
 export default function Hub() {
   const { profile } = useAuth()
@@ -17,10 +18,48 @@ export default function Hub() {
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  // Open (unchecked) shopping items, shown as a badge on the tile. Live via
+  // the same Realtime table the list itself uses, so the badge updates while
+  // the other phone is shopping.
+  const [shoppingCount, setShoppingCount] = useState(0)
+  const loadShoppingCount = useCallback(async () => {
+    const { count } = await supabase
+      .from('shopping_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('checked', false)
+    setShoppingCount(count ?? 0)
+  }, [])
+  useEffect(() => {
+    loadShoppingCount()
+    const channel = supabase
+      .channel('hub_shopping_badge')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shopping_items' },
+        () => loadShoppingCount(),
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [loadShoppingCount])
+
+  const badges: Record<string, number> = { shopping: shoppingCount }
+
   const tiles = [
     ...APPS.filter((app) => !hidden.includes(app.id)),
     ...(profile?.is_admin ? [ADMIN_APP] : []),
   ]
+
+  const badgeFor = (appId: string) => {
+    const n = badges[appId] ?? 0
+    if (n === 0) return null
+    return (
+      <span className="absolute right-2 top-2 min-w-5 rounded-full bg-(--accent) px-1.5 py-0.5 text-center text-[11px] font-bold leading-tight text-white">
+        {n > 99 ? '99+' : n}
+      </span>
+    )
+  }
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
@@ -55,8 +94,9 @@ export default function Hub() {
             <button
               key={app.id}
               onClick={() => navigate(app.route)}
-              className="flex flex-col items-center gap-1.5 rounded-xl bg-(--card) px-2 py-3.5 active:bg-(--card-active) transition-colors"
+              className="relative flex flex-col items-center gap-1.5 rounded-xl bg-(--card) px-2 py-3.5 active:bg-(--card-active) transition-colors"
             >
+              {badgeFor(app.id)}
               <span className="text-2xl">{app.icon}</span>
               <span className="w-full truncate text-center text-xs font-semibold text-(--text)">
                 {app.name}
@@ -70,8 +110,9 @@ export default function Hub() {
             <button
               key={app.id}
               onClick={() => navigate(app.route)}
-              className="flex flex-col items-start gap-1.5 rounded-2xl bg-(--card) p-5 text-left active:bg-(--card-active) transition-colors"
+              className="relative flex flex-col items-start gap-1.5 rounded-2xl bg-(--card) p-5 text-left active:bg-(--card-active) transition-colors"
             >
+              {badgeFor(app.id)}
               <span className="text-3xl">{app.icon}</span>
               <span className="mt-1 font-bold text-(--text)">{app.name}</span>
               <span className="text-xs leading-snug text-(--text-faint)">
