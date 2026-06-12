@@ -105,6 +105,13 @@ compare them lexicographically, don't construct `Date` objects for that.
     don't re-litigate this without testing on a real device.
   - Inputs need `font-size: 16px` minimum or iOS zooms the viewport on focus.
   - `input[type=date]` needs the flex centering fix in `index.css`.
+- **NEVER rename/move storage files via SQL** (`update storage.objects set
+  name = ...`). The file bytes live in S3 under keys tied to the original
+  path; a SQL rename only changes metadata, leaving pointers at locations
+  with no bytes — uploads/list keep working but every download 400s. Use the
+  Storage `move()` API (service role via an edge function for bulk moves —
+  see the `fix-doc-paths` function, which repaired exactly this incident on
+  2026-06-12).
 - **Don't trust the client for tenancy** — never rely on a `.eq('household_id',
   ...)` filter for security; RLS does that. Client filters are for UX only.
 - **The `months` table is misleadingly named** — a row is one budget *period*
