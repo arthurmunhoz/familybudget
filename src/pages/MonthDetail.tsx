@@ -402,7 +402,13 @@ function EntryRow({
   const REVEAL = compact ? 64 : 84
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const touchStart = useRef<{ x: number; y: number; base: number } | null>(null)
+
+  const cancel = () => {
+    setConfirming(false)
+    setDx(0)
+  }
 
   const cat = categoryById(e.category)
   const isIncome = e.type === 'income'
@@ -416,21 +422,11 @@ function EntryRow({
     <li className="relative overflow-hidden rounded-xl">
       <button
         onClick={() => {
-          setDx(0)
-          onDelete(e)
-        }}
-        tabIndex={dx === 0 ? -1 : 0}
-        className="absolute inset-y-0 right-0 flex items-center justify-center bg-(--expense) text-sm font-bold text-white"
-        style={{ width: REVEAL }}
-      >
-        Delete
-      </button>
-      <button
-        onClick={() => {
-          if (dx !== 0) setDx(0)
+          if (confirming) cancel()
           else onSelect(e)
         }}
         onTouchStart={(t) => {
+          if (confirming) return
           const p = t.touches[0]
           touchStart.current = { x: p.clientX, y: p.clientY, base: dx }
           setDragging(true)
@@ -446,7 +442,13 @@ function EntryRow({
         onTouchEnd={() => {
           setDragging(false)
           touchStart.current = null
-          setDx((d) => (d < -REVEAL / 2 ? -REVEAL : 0))
+          setDx((d) => {
+            if (d < -REVEAL / 2) {
+              setConfirming(true)
+              return -REVEAL
+            }
+            return 0
+          })
         }}
         style={{
           transform: `translateX(${dx}px)`,
@@ -482,6 +484,42 @@ function EntryRow({
           {formatMoney(Number(e.amount))}
         </span>
       </button>
+
+      {/* red delete layer: tracks the swipe, then fills the row to confirm */}
+      <div
+        onClick={cancel}
+        className="absolute inset-y-0 right-0 flex items-center overflow-hidden rounded-xl bg-(--expense)"
+        style={{
+          width: confirming ? '100%' : Math.max(0, -dx),
+          transition: dragging ? 'none' : 'width 0.25s ease',
+          pointerEvents: confirming ? 'auto' : 'none',
+        }}
+      >
+        {confirming ? (
+          <div className="flex w-full items-center justify-between gap-2 px-3 whitespace-nowrap">
+            <span className={`font-semibold text-white ${compact ? 'text-[11px]' : 'text-sm'}`}>
+              {compact ? 'Delete?' : 'Confirm delete entry?'}
+            </span>
+            <button
+              onClick={(ev) => {
+                ev.stopPropagation()
+                onDelete(e)
+              }}
+              className={`rounded-lg bg-white/25 font-bold text-white active:bg-white/40 ${
+                compact ? 'px-2 py-1 text-[11px]' : 'px-4 py-1.5 text-sm'
+              }`}
+            >
+              YES
+            </button>
+          </div>
+        ) : (
+          <span
+            className={`mx-auto font-bold text-white ${compact ? 'text-[11px]' : 'text-xs'}`}
+          >
+            Delete
+          </span>
+        )}
+      </div>
     </li>
   )
 }

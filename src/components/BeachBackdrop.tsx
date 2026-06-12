@@ -8,14 +8,11 @@ export default function BeachBackdrop() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-x-0 -z-10 mx-auto max-w-md select-none"
-      style={{
-        bottom: 'calc(env(safe-area-inset-bottom) + 6.5rem)',
-        opacity: 0.25,
-      }}
+      className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 mx-auto max-w-md select-none"
+      style={{ opacity: 0.25 }}
     >
       <svg
-        viewBox="0 0 800 460"
+        viewBox="0 0 800 600"
         width="100%"
         xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMidYMax meet"
@@ -74,8 +71,8 @@ export default function BeachBackdrop() {
           <line x1="660" y1="305" x2="730" y2="305" />
         </g>
 
-        {/* sand with foam line */}
-        <path d="M0 330 C 180 312 420 318 800 326 L800 460 L0 460 Z" fill="url(#bb-sand)" />
+        {/* sand with foam line — tall enough that the bottom action button sits on it */}
+        <path d="M0 330 C 180 312 420 318 800 326 L800 600 L0 600 Z" fill="url(#bb-sand)" />
         <path
           d="M0 330 C 180 312 420 318 800 326"
           stroke="#f8fafc"
