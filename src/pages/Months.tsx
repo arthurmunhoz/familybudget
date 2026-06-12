@@ -1,36 +1,41 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../hooks/useAuth'
 import BeachBackdrop from '../components/BeachBackdrop'
-import Drawer from '../components/Drawer'
 import { daysInMonth, formatMoney, monthLabel } from '../lib/format'
-import type { Entry, Month } from '../lib/types'
+import type { Budget, Entry, Month } from '../lib/types'
 
 export default function Months() {
-  const { profile } = useAuth()
+  const { budgetId } = useParams<{ budgetId: string }>()
   const navigate = useNavigate()
+  const [budget, setBudget] = useState<Budget | null>(null)
   const [months, setMonths] = useState<Month[]>([])
   const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
 
-  useEffect(() => {
-    Promise.all([
+  const load = useCallback(async () => {
+    if (!budgetId) return
+    const [b, m, e] = await Promise.all([
+      supabase.from('budgets').select('*').eq('id', budgetId).single(),
       supabase
         .from('months')
         .select('*')
+        .eq('budget_id', budgetId)
         .order('year', { ascending: false })
         .order('month', { ascending: false }),
       supabase.from('entries').select('month_id, type, amount'),
-    ]).then(([m, e]) => {
-      setMonths(m.data ?? [])
-      setEntries(e.data ?? [])
-      setLoading(false)
-    })
-  }, [])
+    ])
+    setBudget(b.data)
+    setMonths(m.data ?? [])
+    setEntries(e.data ?? [])
+    setLoading(false)
+  }, [budgetId])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const balances = useMemo(() => {
     const map = new Map<string, number>()
@@ -56,16 +61,17 @@ export default function Months() {
   }, [months])
 
   async function createMonth() {
+    if (!budgetId) return
     setCreating(true)
     try {
       const { data: created, error } = await supabase
         .from('months')
-        .insert({ year: nextMonth.year, month: nextMonth.month })
+        .insert({ budget_id: budgetId, year: nextMonth.year, month: nextMonth.month })
         .select()
         .single()
       if (error || !created) throw error
 
-      // Copy recurring entries from the most recent existing month.
+      // Copy recurring entries from this budget's most recent existing month.
       const source = months[0]
       if (source) {
         const { data: recurring } = await supabase
@@ -97,20 +103,18 @@ export default function Months() {
   }
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
+    <div className="mx-auto min-h-full max-w-md px-4 pb-28">
       <BeachBackdrop />
-      <header className="flex items-center justify-between pt-6 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-(--text)">Our Home Budget</h1>
-          <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
-        </div>
+      <header className="flex items-center gap-2 pt-6 pb-4">
         <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open settings"
-          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+          onClick={() => navigate('/')}
+          className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
         >
-          ☰
+          ‹
         </button>
+        <h1 className="truncate text-2xl font-bold text-(--text)">
+          {budget?.name ?? '…'}
+        </h1>
       </header>
 
       {loading ? (
@@ -159,21 +163,19 @@ export default function Months() {
       )}
 
       <div
-        className="fixed inset-x-0 bottom-0 mx-auto max-w-md px-4 pb-6 pt-3"
+        className="fixed inset-x-0 bottom-0 mx-auto max-w-md px-4 pt-3"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
           onClick={() => setConfirmOpen(true)}
           disabled={creating || loading}
-          className="w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+          className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
           {creating
             ? 'Creating…'
             : `＋ Start ${monthLabel(nextMonth.year, nextMonth.month)}`}
         </button>
       </div>
-
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
@@ -187,7 +189,7 @@ export default function Months() {
                     months[0].year,
                     months[0].month,
                   )} will be copied over automatically.`
-                : 'This creates your first month.'}
+                : 'This creates the first month of this budget.'}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button

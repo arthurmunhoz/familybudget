@@ -5,7 +5,13 @@ import { fileToResizedBase64 } from '../lib/image'
 import SummaryChart from '../components/SummaryChart'
 import { useAuth } from '../hooks/useAuth'
 import { categoryById } from '../lib/categories'
-import { formatDay, formatDayHeading, formatMoney, monthName } from '../lib/format'
+import {
+  formatDay,
+  formatDayHeading,
+  formatMoney,
+  monthName,
+  todayISO,
+} from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { CategoryRule, Entry, Month, Profile } from '../lib/types'
 
@@ -31,6 +37,7 @@ export default function MonthDetail() {
   const [editing, setEditing] = useState<Entry | null>(null)
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
   const [scanning, setScanning] = useState(false)
+  const [showFuture, setShowFuture] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -54,6 +61,18 @@ export default function MonthDetail() {
     () => (person === 'all' ? entries : entries.filter((e) => e.person_email === person)),
     [entries, person],
   )
+
+  // Future-dated entries (e.g. upcoming recurring bills) are hidden from the
+  // lists by default so today's activity is immediately visible. Charts and
+  // balances still include them.
+  const today = todayISO()
+  const futureCount = useMemo(
+    () => filtered.filter((e) => e.entry_date > today).length,
+    [filtered, today],
+  )
+  const hideFuture = !showFuture && futureCount > 0
+  const listVisible = (list: Entry[]) =>
+    hideFuture ? list.filter((e) => e.entry_date <= today) : list
 
   const sortEntries = useCallback(
     (list: Entry[]) =>
@@ -112,17 +131,17 @@ export default function MonthDetail() {
 
   if (loading || !month) {
     return (
-      <div className="flex min-h-dvh items-center justify-center">
+      <div className="flex min-h-full items-center justify-center">
         <p className="animate-pulse text-(--text-faint)">Loading…</p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
+    <div className="mx-auto min-h-full max-w-md px-4 pb-32">
       <header className="flex items-center gap-3 pt-6 pb-4">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(`/budget/${month.budget_id}`)}
           className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
         >
           ‹
@@ -193,10 +212,22 @@ export default function MonthDetail() {
         </div>
       </div>
 
+      {/* Future entries are collapsed behind a subtle toggle */}
+      {futureCount > 0 && (
+        <button
+          onClick={() => setShowFuture((s) => !s)}
+          className="mx-auto mt-3 block text-xs font-medium text-(--text-faint) underline decoration-dotted underline-offset-4 active:text-(--text-muted)"
+        >
+          {showFuture
+            ? 'Hide future entries'
+            : `Show ${futureCount} future ${futureCount === 1 ? 'entry' : 'entries'}`}
+        </button>
+      )}
+
       {/* Entries */}
       {view === 'list' ? (
         <EntryColumn
-          entries={sortEntries(filtered)}
+          entries={sortEntries(listVisible(filtered))}
           nameOf={nameOf}
           showPerson={person === 'all'}
           groupByDay={sortBy === 'date'}
@@ -214,7 +245,9 @@ export default function MonthDetail() {
                 {p.display_name}
               </h3>
               <EntryColumn
-                entries={sortEntries(entries.filter((e) => e.person_email === p.email))}
+                entries={sortEntries(
+                  listVisible(entries.filter((e) => e.person_email === p.email)),
+                )}
                 nameOf={nameOf}
                 showPerson={false}
                 groupByDay={sortBy === 'date'}

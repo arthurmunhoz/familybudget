@@ -4,7 +4,7 @@ export default function Login() {
   const { signIn } = useAuth()
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
+    <div className="flex min-h-full flex-col items-center justify-center gap-8 p-6">
       <div className="text-center">
         <div className="text-6xl">💙</div>
         <h1 className="mt-4 text-3xl font-bold text-(--text)">Our Budget</h1>

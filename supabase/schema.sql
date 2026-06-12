@@ -13,12 +13,23 @@ insert into allowed_users (email, display_name) values
   ('paty_almeida@live.com', 'Patricia')
 on conflict (email) do nothing;
 
+create table if not exists budgets (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
+insert into budgets (name)
+select 'Our Home Budget'
+where not exists (select 1 from budgets);
+
 create table if not exists months (
   id uuid primary key default gen_random_uuid(),
+  budget_id uuid not null references budgets(id) on delete cascade,
   year int not null,
   month int not null check (month between 1 and 12),
   created_at timestamptz not null default now(),
-  unique (year, month)
+  unique (budget_id, year, month)
 );
 
 create table if not exists entries (
@@ -57,9 +68,14 @@ as $$
 $$;
 
 alter table allowed_users enable row level security;
+alter table budgets enable row level security;
 alter table months enable row level security;
 alter table entries enable row level security;
 alter table category_rules enable row level security;
+
+drop policy if exists budgets_rw on budgets;
+create policy budgets_rw on budgets
+  for all using (public.is_allowed()) with check (public.is_allowed());
 
 drop policy if exists allowed_users_rw on allowed_users;
 create policy allowed_users_rw on allowed_users

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { isConfigured } from './lib/supabase'
 import Login from './pages/Login'
+import Budgets from './pages/Budgets'
 import Months from './pages/Months'
 import MonthDetail from './pages/MonthDetail'
 
@@ -51,7 +52,8 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Months />} />
+      <Route path="/" element={<Budgets />} />
+      <Route path="/budget/:budgetId" element={<Months />} />
       <Route path="/month/:id" element={<MonthDetail />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -60,7 +62,7 @@ export default function App() {
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center p-6">
+    <div className="flex min-h-full items-center justify-center p-6">
       <div className="max-w-sm text-center">{children}</div>
     </div>
   )

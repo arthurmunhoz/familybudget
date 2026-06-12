@@ -5,8 +5,15 @@ export interface Profile {
   display_name: string
 }
 
+export interface Budget {
+  id: string
+  name: string
+  created_at: string
+}
+
 export interface Month {
   id: string
+  budget_id: string
   year: number
   month: number
   created_at: string
