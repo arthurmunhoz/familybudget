@@ -220,7 +220,8 @@ export default function Drawer({
 
         <div className="flex-1" />
 
-        <div className="mt-6 mb-2 h-px shrink-0 bg-(--surface-2) opacity-60" />
+        {/* --text-faint is grey in BOTH themes; --surface-2 is white in light mode */}
+        <div className="mt-4 mb-1 h-px shrink-0 bg-(--text-faint) opacity-40" />
 
         <button
           onClick={signOut}
