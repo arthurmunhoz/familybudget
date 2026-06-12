@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import AnalyticsTracker from './components/AnalyticsTracker'
 import { useAuth } from './hooks/useAuth'
 import { isConfigured } from './lib/supabase'
 import Login from './pages/Login'
@@ -66,6 +67,7 @@ export default function App() {
         </Centered>
       }
     >
+      <AnalyticsTracker />
       <Routes>
         <Route path="/" element={<Hub />} />
         <Route path="/budget" element={<Budgets />} />

@@ -171,3 +171,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-005-pets.sql       (pet care log)
 --   migration-006-documents.sql  (document vault + storage bucket)
 --   migration-007-households.sql (multi-tenancy: households, admin, RLS rewrite)
+--   migration-008-backdrop.sql   (household backdrop columns — applied, unused yet)
+--   migration-009-web-events.sql (behavioral analytics + admin aggregates)

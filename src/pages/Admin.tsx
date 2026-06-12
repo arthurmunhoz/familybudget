@@ -2,8 +2,30 @@ import { useCallback, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
+import { timeAgo } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { Household, Profile } from '../lib/types'
+
+interface UserActivity {
+  user_email: string
+  last_seen: string
+  events_7d: number
+}
+
+interface AppUsage {
+  root: string
+  views: number
+}
+
+const APP_LABELS: Record<string, string> = {
+  '': '🏠 Hub',
+  budget: '💰 Budget',
+  month: '💰 Budget',
+  shopping: '🛒 Shopping List',
+  pets: '🐕 Pet Care',
+  docs: '📄 Documents',
+  admin: '🛠️ Admin',
+}
 
 /** Admin-only: create households and manage which Google accounts belong to
  *  each. Members sign in with Google using the exact email added here. */
@@ -12,6 +34,8 @@ export default function Admin() {
   const { profile } = useAuth()
   const [households, setHouseholds] = useState<Household[]>([])
   const [users, setUsers] = useState<Profile[]>([])
+  const [activity, setActivity] = useState<Record<string, UserActivity>>({})
+  const [usage, setUsage] = useState<AppUsage[]>([])
   const [loading, setLoading] = useState(true)
 
   const [newHousehold, setNewHousehold] = useState('')
@@ -20,12 +44,30 @@ export default function Admin() {
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(async () => {
-    const [h, u] = await Promise.all([
+    const [h, u, act, use] = await Promise.all([
       supabase.from('households').select('*').order('created_at'),
       supabase.from('allowed_users').select('email, display_name, household_id, is_admin'),
+      supabase.rpc('admin_user_activity'),
+      supabase.rpc('admin_app_usage', { days: 7 }),
     ])
     setHouseholds(h.data ?? [])
     setUsers(u.data ?? [])
+    setActivity(
+      Object.fromEntries(
+        ((act.data ?? []) as UserActivity[]).map((a) => [a.user_email, a]),
+      ),
+    )
+    // 'month' pages are budget-period details — fold them into Budget.
+    const merged = new Map<string, number>()
+    for (const row of (use.data ?? []) as AppUsage[]) {
+      const label = APP_LABELS[row.root] ?? row.root
+      merged.set(label, (merged.get(label) ?? 0) + Number(row.views))
+    }
+    setUsage(
+      [...merged.entries()]
+        .map(([root, views]) => ({ root, views }))
+        .sort((a, b) => b.views - a.views),
+    )
     setLoading(false)
   }, [])
 
@@ -141,6 +183,25 @@ export default function Admin() {
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
       ) : (
         <div className="space-y-4">
+          {usage.length > 0 && (
+            <section className="rounded-2xl bg-(--card) p-4">
+              <h2 className="font-bold text-(--text)">📊 App usage · last 7 days</h2>
+              <ul className="mt-3 space-y-1.5">
+                {usage.map((u) => (
+                  <li
+                    key={u.root}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="text-(--text)">{u.root}</span>
+                    <span className="font-semibold text-(--text-muted)">
+                      {u.views} {u.views === 1 ? 'view' : 'views'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {households.map((h) => {
             const members = users.filter((u) => u.household_id === h.id)
             const d = draft(h.id)
@@ -175,6 +236,11 @@ export default function Admin() {
                           )}
                         </p>
                         <p className="truncate text-xs text-(--text-faint)">{u.email}</p>
+                        <p className="text-xs text-(--text-faint)">
+                          {activity[u.email]
+                            ? `Active ${timeAgo(activity[u.email].last_seen)} · ${activity[u.email].events_7d} events this week`
+                            : 'Never accessed'}
+                        </p>
                       </div>
                       {!u.is_admin && (
                         <button
