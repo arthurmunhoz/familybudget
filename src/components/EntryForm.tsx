@@ -115,7 +115,7 @@ export default function EntryForm({
   }
 
   return (
-    <div className="fixed inset-x-0 top-0 z-50 h-screen-real flex items-end justify-center bg-black/60">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60">
       <div
         className="w-full max-w-md rounded-t-3xl bg-(--card) p-5 max-h-[92dvh] overflow-y-auto"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}

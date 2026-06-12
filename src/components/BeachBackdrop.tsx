@@ -8,7 +8,7 @@ export default function BeachBackdrop() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-x-0 pin-bottom -z-10 mx-auto max-w-md select-none"
+      className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 mx-auto max-w-md select-none"
       style={{ opacity: 0.25 }}
     >
       <svg

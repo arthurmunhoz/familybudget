@@ -136,14 +136,14 @@ export default function MonthDetail() {
 
   if (loading || !month) {
     return (
-      <div className="flex min-h-full items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center">
         <p className="animate-pulse text-(--text-faint)">Loading…</p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto min-h-full max-w-md px-4 pb-32">
+    <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
       <header className="flex items-center gap-3 pt-6 pb-4">
         <button
           onClick={() => navigate(`/budget/${month.budget_id}`)}
@@ -270,7 +270,7 @@ export default function MonthDetail() {
 
       {/* Add + scan buttons */}
       <div
-        className="fixed inset-x-0 pin-bottom mx-auto flex max-w-md gap-3 px-4 pt-3"
+        className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md gap-3 px-4 pt-3"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
@@ -307,7 +307,7 @@ export default function MonthDetail() {
       />
 
       {scanning && (
-        <div className="fixed inset-x-0 top-0 z-50 h-screen-real flex items-center justify-center bg-black/60">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="rounded-2xl bg-(--card) px-6 py-5 text-center">
             <div className="text-3xl">🧾</div>
             <p className="mt-2 animate-pulse font-semibold text-(--text)">
