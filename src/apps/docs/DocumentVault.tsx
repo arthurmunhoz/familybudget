@@ -81,6 +81,23 @@ export default function DocumentVault() {
       ? 'Shared'
       : (profiles.find((p) => p.email === email)?.display_name ?? email)
 
+  /** With "Everyone" selected, the list splits into per-owner subsections:
+   *  each member in order, then Shared, then any leftover owners (e.g. a
+   *  removed member's docs). A specific person selected = flat list. */
+  const sections = useMemo(() => {
+    if (person !== 'all') return null
+    const order = [...profiles.map((p) => p.email), 'shared']
+    const byOwner = new Map<string, FamilyDocument[]>()
+    for (const key of order) byOwner.set(key, [])
+    for (const d of visible) {
+      if (!byOwner.has(d.owner_email)) byOwner.set(d.owner_email, [])
+      byOwner.get(d.owner_email)!.push(d)
+    }
+    return [...byOwner.entries()]
+      .filter(([, list]) => list.length > 0)
+      .map(([owner, list]) => ({ owner, docs: list }))
+  }, [person, profiles, visible])
+
   const ownerOptions = [
     ...profiles.map((p) => ({ key: p.email, label: p.display_name })),
     { key: 'shared', label: '🏠 Shared' },
@@ -178,6 +195,47 @@ export default function DocumentVault() {
     await supabase.from('documents').delete().eq('id', doc.id)
   }
 
+  // Shared row markup for both the flat list and the per-owner sections.
+  // The owner isn't repeated in the subtitle: it's in the section header
+  // (Everyone view) or implied by the active person filter.
+  const renderDoc = (doc: FamilyDocument) => (
+    <li key={doc.id}>
+      <div className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3">
+        <button
+          onClick={() => open(doc)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <span className="text-2xl">
+            {doc.mime_type.startsWith('image/') ? '🖼️' : '📄'}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-(--text)">
+              {doc.title}
+            </span>
+            <span className="block text-xs text-(--text-faint)">
+              {CAT_META[doc.category].icon} {CAT_META[doc.category].label} ·{' '}
+              {formatDay(doc.created_at.slice(0, 10))} · {formatBytes(doc.size_bytes)}
+            </span>
+          </span>
+        </button>
+        <button
+          onClick={() => openEdit(doc)}
+          aria-label={`Edit ${doc.title}`}
+          className="px-1 text-(--text-faint) active:text-(--accent)"
+        >
+          ✎
+        </button>
+        <button
+          onClick={() => remove(doc)}
+          aria-label={`Delete ${doc.title}`}
+          className="px-1 text-(--text-faint) active:text-(--expense)"
+        >
+          ✕
+        </button>
+      </div>
+    </li>
+  )
+
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
       <header className="flex items-center gap-2 pt-6 pb-4">
@@ -258,47 +316,24 @@ export default function DocumentVault() {
             safe here when you need them.
           </p>
         </div>
+      ) : sections ? (
+        sections.map((section) => (
+          <section key={section.owner}>
+            {/* owner subsection header with separator line */}
+            <div className="mt-5 mb-2 flex items-center gap-3 first:mt-0">
+              <h3 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
+                {section.owner === 'shared' ? '🏠 Shared' : nameOf(section.owner)}
+              </h3>
+              <div className="h-px flex-1 bg-(--surface-2) opacity-60" />
+              <span className="shrink-0 text-xs text-(--text-faint)">
+                {section.docs.length}
+              </span>
+            </div>
+            <ul className="space-y-2">{section.docs.map(renderDoc)}</ul>
+          </section>
+        ))
       ) : (
-        <ul className="space-y-2">
-          {visible.map((doc) => (
-            <li key={doc.id}>
-              <div className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3">
-                <button
-                  onClick={() => open(doc)}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                >
-                  <span className="text-2xl">
-                    {doc.mime_type.startsWith('image/') ? '🖼️' : '📄'}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium text-(--text)">
-                      {doc.title}
-                    </span>
-                    <span className="block text-xs text-(--text-faint)">
-                      {CAT_META[doc.category].icon} {CAT_META[doc.category].label} ·{' '}
-                      {nameOf(doc.owner_email)} · {formatDay(doc.created_at.slice(0, 10))} ·{' '}
-                      {formatBytes(doc.size_bytes)}
-                    </span>
-                  </span>
-                </button>
-                <button
-                  onClick={() => openEdit(doc)}
-                  aria-label={`Edit ${doc.title}`}
-                  className="px-1 text-(--text-faint) active:text-(--accent)"
-                >
-                  ✎
-                </button>
-                <button
-                  onClick={() => remove(doc)}
-                  aria-label={`Delete ${doc.title}`}
-                  className="px-1 text-(--text-faint) active:text-(--expense)"
-                >
-                  ✕
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <ul className="space-y-2">{visible.map(renderDoc)}</ul>
       )}
 
       {/* hidden picker — accepts camera, photo library, and files on iOS */}
