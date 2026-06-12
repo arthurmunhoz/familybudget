@@ -95,6 +95,9 @@ export interface FamilyDocument {
   file_path: string
   mime_type: string
   size_bytes: number
+  /** Who the document belongs to (person filter uses this) */
+  owner_email: string
+  /** Who uploaded it */
   added_by: string
   created_at: string
 }

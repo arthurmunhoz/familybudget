@@ -173,3 +173,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-007-households.sql (multi-tenancy: households, admin, RLS rewrite)
 --   migration-008-backdrop.sql   (household backdrop columns — applied, unused yet)
 --   migration-009-web-events.sql (behavioral analytics + admin aggregates)
+--   migration-010-document-owner.sql (documents.owner_email)

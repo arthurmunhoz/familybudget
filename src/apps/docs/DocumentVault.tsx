@@ -41,7 +41,15 @@ export default function DocumentVault() {
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [fTitle, setFTitle] = useState('')
   const [fCategory, setFCategory] = useState<DocCategory>('other')
+  const [fOwner, setFOwner] = useState('')
   const [uploading, setUploading] = useState(false)
+
+  // edit sheet state
+  const [editing, setEditing] = useState<FamilyDocument | null>(null)
+  const [eTitle, setETitle] = useState('')
+  const [eCategory, setECategory] = useState<DocCategory>('other')
+  const [eOwner, setEOwner] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   // in-app preview
   const [preview, setPreview] = useState<{ doc: FamilyDocument; url: string } | null>(null)
@@ -63,12 +71,20 @@ export default function DocumentVault() {
     () =>
       docs
         .filter((d) => filter === 'all' || d.category === filter)
-        .filter((d) => person === 'all' || d.added_by === person),
+        .filter((d) => person === 'all' || d.owner_email === person),
     [docs, filter, person],
   )
 
+  // 'shared' is a sentinel owner for documents that belong to the whole family
   const nameOf = (email: string) =>
-    profiles.find((p) => p.email === email)?.display_name ?? email
+    email === 'shared'
+      ? 'Shared'
+      : (profiles.find((p) => p.email === email)?.display_name ?? email)
+
+  const ownerOptions = [
+    ...profiles.map((p) => ({ key: p.email, label: p.display_name })),
+    { key: 'shared', label: '🏠 Shared' },
+  ]
 
   function pickFile() {
     fileInput.current?.click()
@@ -85,6 +101,7 @@ export default function DocumentVault() {
     setPendingFile(file)
     setFTitle(file.name.replace(/\.[^.]+$/, ''))
     setFCategory(filter !== 'all' ? filter : 'other')
+    setFOwner(person !== 'all' ? person : (profile?.email ?? ''))
   }
 
   async function upload() {
@@ -107,6 +124,7 @@ export default function DocumentVault() {
       file_path: path,
       mime_type: pendingFile.type || 'application/octet-stream',
       size_bytes: pendingFile.size,
+      owner_email: fOwner || profile.email,
       added_by: profile.email,
     })
     setUploading(false)
@@ -128,6 +146,29 @@ export default function DocumentVault() {
       return
     }
     setPreview({ doc, url: data.signedUrl })
+  }
+
+  function openEdit(doc: FamilyDocument) {
+    setEditing(doc)
+    setETitle(doc.title)
+    setECategory(doc.category)
+    setEOwner(doc.owner_email)
+  }
+
+  async function saveEdit() {
+    if (!editing || !eTitle.trim() || savingEdit) return
+    setSavingEdit(true)
+    const { error } = await supabase
+      .from('documents')
+      .update({ title: eTitle.trim(), category: eCategory, owner_email: eOwner })
+      .eq('id', editing.id)
+    setSavingEdit(false)
+    if (error) {
+      alert('Could not save the changes — please try again.')
+      return
+    }
+    setEditing(null)
+    load()
   }
 
   async function remove(doc: FamilyDocument) {
@@ -172,6 +213,7 @@ export default function DocumentVault() {
                     key: p.email,
                     label: p.display_name,
                   })),
+                  { key: 'shared', label: 'Shared' },
                 ].map((opt) => (
                   <button
                     key={opt.key}
@@ -234,9 +276,17 @@ export default function DocumentVault() {
                     </span>
                     <span className="block text-xs text-(--text-faint)">
                       {CAT_META[doc.category].icon} {CAT_META[doc.category].label} ·{' '}
-                      {formatDay(doc.created_at.slice(0, 10))} · {formatBytes(doc.size_bytes)}
+                      {nameOf(doc.owner_email)} · {formatDay(doc.created_at.slice(0, 10))} ·{' '}
+                      {formatBytes(doc.size_bytes)}
                     </span>
                   </span>
+                </button>
+                <button
+                  onClick={() => openEdit(doc)}
+                  aria-label={`Edit ${doc.title}`}
+                  className="px-1 text-(--text-faint) active:text-(--accent)"
+                >
+                  ✎
                 </button>
                 <button
                   onClick={() => remove(doc)}
@@ -295,12 +345,85 @@ export default function DocumentVault() {
               ))}
             </div>
 
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
+              Belongs to
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {ownerOptions.map((o) => (
+                <CatChip
+                  key={o.key}
+                  active={fOwner === o.key}
+                  onClick={() => setFOwner(o.key)}
+                >
+                  {o.label}
+                </CatChip>
+              ))}
+            </div>
+
             <button
               onClick={upload}
               disabled={!fTitle.trim() || uploading}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
               {uploading ? 'Uploading…' : 'Save document'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* edit sheet */}
+      {editing && (
+        <div
+          className="fixed inset-0 z-20 flex items-end bg-black/50"
+          onClick={() => !savingEdit && setEditing(null)}
+        >
+          <div
+            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-4 text-lg font-bold text-(--text)">Edit document</h2>
+
+            <input
+              value={eTitle}
+              onChange={(e) => setETitle(e.target.value)}
+              placeholder="Title"
+              className="w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+            />
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => (
+                <CatChip
+                  key={c.id}
+                  active={eCategory === c.id}
+                  onClick={() => setECategory(c.id)}
+                >
+                  {c.icon} {c.label}
+                </CatChip>
+              ))}
+            </div>
+
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
+              Belongs to
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {ownerOptions.map((o) => (
+                <CatChip
+                  key={o.key}
+                  active={eOwner === o.key}
+                  onClick={() => setEOwner(o.key)}
+                >
+                  {o.label}
+                </CatChip>
+              ))}
+            </div>
+
+            <button
+              onClick={saveEdit}
+              disabled={!eTitle.trim() || savingEdit}
+              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {savingEdit ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         </div>
@@ -350,7 +473,7 @@ export default function DocumentVault() {
       )}
 
       {/* add button */}
-      {!pendingFile && !preview && (
+      {!pendingFile && !preview && !editing && (
         <div
           className="fixed inset-x-0 bottom-0 mx-auto max-w-md px-4 pt-3"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
