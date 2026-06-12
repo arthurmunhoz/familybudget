@@ -12,7 +12,7 @@ export default function BeachBackdrop() {
       style={{ opacity: 0.25 }}
     >
       <svg
-        viewBox="0 0 800 600"
+        viewBox="0 0 800 700"
         width="100%"
         xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="xMidYMax meet"
@@ -72,7 +72,7 @@ export default function BeachBackdrop() {
         </g>
 
         {/* sand with foam line — tall enough that the bottom action button sits on it */}
-        <path d="M0 330 C 180 312 420 318 800 326 L800 600 L0 600 Z" fill="url(#bb-sand)" />
+        <path d="M0 330 C 180 312 420 318 800 326 L800 700 L0 700 Z" fill="url(#bb-sand)" />
         <path
           d="M0 330 C 180 312 420 318 800 326"
           stroke="#f8fafc"

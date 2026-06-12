@@ -137,13 +137,18 @@ export default function Months() {
                     {monthLabel(m.year, m.month)}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`text-lg font-semibold tabular-nums ${
-                        balance >= 0 ? 'text-(--income)' : 'text-(--expense)'
-                      }`}
-                    >
-                      {formatMoney(balance)}
-                    </span>
+                    <div className="text-right">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-(--text-faint)">
+                        Balance
+                      </div>
+                      <div
+                        className={`text-lg font-semibold tabular-nums ${
+                          balance >= 0 ? 'text-(--income)' : 'text-(--expense)'
+                        }`}
+                      >
+                        {formatMoney(balance)}
+                      </div>
+                    </div>
                     <span className="text-(--text-faint)">›</span>
                   </div>
                 </button>

@@ -40,10 +40,24 @@ html {
   background: var(--bg);
 }
 
+/* Scrolling happens inside #root, never on the body — this stops iOS from
+   rubber-banding pages whose content already fits the screen. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   color: var(--text);
-  overscroll-behavior-y: none;
+  overflow: hidden;
   -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  overflow-y: auto;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {

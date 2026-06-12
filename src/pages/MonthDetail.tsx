@@ -25,7 +25,7 @@ export default function MonthDetail() {
 
   const [person, setPerson] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortBy>('date')
-  const [dateDir, setDateDir] = useState<SortDir>('asc')
+  const [dateDir, setDateDir] = useState<SortDir>('desc')
   const [view, setView] = useState<View>('list')
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Entry | null>(null)
