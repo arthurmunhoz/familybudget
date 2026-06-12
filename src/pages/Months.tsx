@@ -2,16 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 import { daysInMonth, formatMoney, monthLabel } from '../lib/format'
 import type { Entry, Month } from '../lib/types'
 
 export default function Months() {
   const { profile, signOut } = useAuth()
+  const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const [months, setMonths] = useState<Month[]>([])
   const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -96,24 +99,33 @@ export default function Months() {
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
       <header className="flex items-center justify-between pt-6 pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-100">Our Budget</h1>
-          <p className="text-sm text-stone-400">Hi, {profile?.display_name} 👋</p>
+          <h1 className="text-2xl font-bold text-(--text)">Our Budget</h1>
+          <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
         </div>
-        <button
-          onClick={signOut}
-          className="rounded-lg px-3 py-2 text-sm text-stone-500 active:text-stone-300"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggle}
+            aria-label="Toggle light/dark theme"
+            className="rounded-lg px-2 py-2 text-lg"
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button
+            onClick={signOut}
+            className="rounded-lg px-3 py-2 text-sm text-(--text-faint) active:text-(--text-muted)"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       {loading ? (
-        <p className="mt-12 text-center text-stone-500 animate-pulse">Loading…</p>
+        <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
       ) : months.length === 0 ? (
-        <div className="mt-16 text-center text-stone-400">
+        <div className="mt-16 text-center text-(--text-muted)">
           <div className="text-5xl">🗓️</div>
           <p className="mt-4">No months yet.</p>
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-(--text-faint)">
             Start your first one below to begin tracking.
           </p>
         </div>
@@ -125,20 +137,20 @@ export default function Months() {
               <li key={m.id}>
                 <button
                   onClick={() => navigate(`/month/${m.id}`)}
-                  className="flex w-full items-center justify-between rounded-2xl bg-stone-900 px-5 py-4 active:bg-stone-800 transition-colors"
+                  className="flex w-full items-center justify-between rounded-2xl bg-(--card) px-5 py-4 active:bg-(--card-active) transition-colors"
                 >
-                  <div className="text-lg font-bold text-stone-100">
+                  <div className="text-lg font-bold text-(--text)">
                     {monthLabel(m.year, m.month)}
                   </div>
                   <div className="flex items-center gap-3">
                     <span
                       className={`text-lg font-semibold tabular-nums ${
-                        balance >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                        balance >= 0 ? 'text-(--income)' : 'text-(--expense)'
                       }`}
                     >
                       {formatMoney(balance)}
                     </span>
-                    <span className="text-stone-600">›</span>
+                    <span className="text-(--text-faint)">›</span>
                   </div>
                 </button>
               </li>
@@ -152,15 +164,50 @@ export default function Months() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
-          onClick={createMonth}
+          onClick={() => setConfirmOpen(true)}
           disabled={creating || loading}
-          className="w-full rounded-2xl bg-amber-400 py-4 text-lg font-bold text-stone-900 active:scale-[0.98] transition-transform disabled:opacity-50"
+          className="w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
         >
           {creating
             ? 'Creating…'
             : `＋ Start ${monthLabel(nextMonth.year, nextMonth.month)}`}
         </button>
       </div>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
+            <h2 className="text-lg font-bold text-(--text)">
+              Start {monthLabel(nextMonth.year, nextMonth.month)}?
+            </h2>
+            <p className="mt-2 text-sm text-(--text-muted)">
+              {months.length > 0
+                ? `Recurring entries from ${monthLabel(
+                    months[0].year,
+                    months[0].month,
+                  )} will be copied over automatically.`
+                : 'This creates your first month.'}
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmOpen(false)
+                  createMonth()
+                }}
+                className="rounded-xl bg-(--accent) py-3 font-semibold text-white"
+              >
+                Start month
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

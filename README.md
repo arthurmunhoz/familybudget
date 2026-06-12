@@ -1,4 +1,4 @@
-# Our Budget 💛
+# Our Budget 💙
 
 A private budgeting app for Arthur & Patricia. Track monthly income and
 spending from one shared pot — no bill splitting, just one household.

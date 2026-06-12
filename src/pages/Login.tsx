@@ -6,13 +6,13 @@ export default function Login() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
       <div className="text-center">
-        <div className="text-6xl">💛</div>
-        <h1 className="mt-4 text-3xl font-bold text-stone-100">Our Budget</h1>
-        <p className="mt-2 text-stone-400">Arthur &amp; Patricia</p>
+        <div className="text-6xl">💙</div>
+        <h1 className="mt-4 text-3xl font-bold text-(--text)">Our Budget</h1>
+        <p className="mt-2 text-(--text-muted)">Arthur &amp; Patricia</p>
       </div>
       <button
         onClick={signIn}
-        className="flex items-center gap-3 rounded-2xl bg-stone-100 px-6 py-4 text-lg font-semibold text-stone-900 active:scale-95 transition-transform"
+        className="flex items-center gap-3 rounded-2xl bg-(--card) px-6 py-4 text-lg font-semibold text-(--text) shadow-lg active:scale-95 transition-transform"
       >
         <GoogleLogo />
         Sign in with Google

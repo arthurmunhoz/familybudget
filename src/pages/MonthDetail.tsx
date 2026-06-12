@@ -65,7 +65,7 @@ export default function MonthDetail() {
   if (loading || !month) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <p className="animate-pulse text-stone-500">Loading…</p>
+        <p className="animate-pulse text-(--text-faint)">Loading…</p>
       </div>
     )
   }
@@ -75,17 +75,17 @@ export default function MonthDetail() {
       <header className="flex items-center gap-3 pt-6 pb-4">
         <button
           onClick={() => navigate('/')}
-          className="rounded-lg px-2 py-1 text-xl text-stone-400 active:text-stone-200"
+          className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
         >
           ‹
         </button>
-        <h1 className="text-xl font-bold text-stone-100">
+        <h1 className="text-xl font-bold text-(--text)">
           {monthName(month.year, month.month)}
         </h1>
       </header>
 
       {/* Person filter — charts and lists below react to it */}
-      <div className="grid grid-cols-3 gap-2 rounded-xl bg-stone-800 p-1">
+      <div className="grid grid-cols-3 gap-2 rounded-xl bg-(--surface) p-1">
         {[
           { key: 'all', label: 'Both' },
           ...profiles.map((p: Profile) => ({ key: p.email, label: p.display_name })),
@@ -94,7 +94,7 @@ export default function MonthDetail() {
             key={opt.key}
             onClick={() => setPerson(opt.key)}
             className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
-              person === opt.key ? 'bg-amber-400 text-stone-900' : 'text-stone-400'
+              person === opt.key ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
             }`}
           >
             {opt.label}
@@ -108,26 +108,26 @@ export default function MonthDetail() {
 
       {/* List controls */}
       <div className="mt-5 flex items-center justify-between">
-        <div className="flex gap-1 rounded-lg bg-stone-800 p-1 text-xs font-semibold">
+        <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
           {(['date', 'amount'] as const).map((s) => (
             <button
               key={s}
               onClick={() => setSortBy(s)}
               className={`rounded-md px-3 py-1.5 capitalize ${
-                sortBy === s ? 'bg-stone-700 text-stone-100' : 'text-stone-500'
+                sortBy === s ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
               }`}
             >
               By {s}
             </button>
           ))}
         </div>
-        <div className="flex gap-1 rounded-lg bg-stone-800 p-1 text-xs font-semibold">
+        <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
           {(['list', 'split'] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
               className={`rounded-md px-3 py-1.5 capitalize ${
-                view === v ? 'bg-stone-700 text-stone-100' : 'text-stone-500'
+                view === v ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
               }`}
             >
               {v === 'list' ? '☰ List' : '◫ Split'}
@@ -151,7 +151,7 @@ export default function MonthDetail() {
         <div className="mt-3 grid grid-cols-2 gap-3">
           {profiles.map((p) => (
             <div key={p.email}>
-              <h3 className="mb-2 text-center text-sm font-bold text-stone-300">
+              <h3 className="mb-2 text-center text-sm font-bold text-(--text-muted)">
                 {p.display_name}
               </h3>
               <EntryColumn
@@ -179,7 +179,7 @@ export default function MonthDetail() {
             setEditing(null)
             setFormOpen(true)
           }}
-          className="w-full rounded-2xl bg-amber-400 py-4 text-lg font-bold text-stone-900 active:scale-[0.98] transition-transform"
+          className="w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform"
         >
           ＋ Add entry
         </button>
@@ -218,7 +218,7 @@ function EntryColumn({
 }) {
   if (entries.length === 0) {
     return (
-      <p className="mt-6 text-center text-sm text-stone-600">No entries yet.</p>
+      <p className="mt-6 text-center text-sm text-(--text-faint)">No entries yet.</p>
     )
   }
   return (
@@ -230,7 +230,7 @@ function EntryColumn({
           <li key={e.id}>
             <button
               onClick={() => onSelect(e)}
-              className={`flex w-full items-center gap-2 rounded-xl bg-stone-900 text-left active:bg-stone-800 transition-colors ${
+              className={`flex w-full items-center gap-2 rounded-xl bg-(--card) text-left active:bg-(--card-active) transition-colors ${
                 compact ? 'px-2.5 py-2' : 'px-4 py-3'
               }`}
             >
@@ -239,14 +239,14 @@ function EntryColumn({
               </span>
               <div className="min-w-0 flex-1">
                 <div
-                  className={`truncate font-medium text-stone-100 ${
+                  className={`truncate font-medium text-(--text) ${
                     compact ? 'text-xs' : 'text-sm'
                   }`}
                 >
                   {e.label}
-                  {e.recurring && <span className="ml-1 text-stone-500">↻</span>}
+                  {e.recurring && <span className="ml-1 text-(--text-faint)">↻</span>}
                 </div>
-                <div className="text-[10px] text-stone-500">
+                <div className="text-[10px] text-(--text-faint)">
                   {formatDay(e.entry_date)}
                   {showPerson && ` · ${nameOf(e.person_email)}`}
                 </div>
@@ -254,7 +254,7 @@ function EntryColumn({
               <span
                 className={`tabular-nums font-semibold ${
                   compact ? 'text-xs' : 'text-sm'
-                } ${isIncome ? 'text-emerald-400' : 'text-stone-300'}`}
+                } ${isIncome ? 'text-(--income)' : 'text-(--text-muted)'}`}
               >
                 {isIncome ? '+' : '−'}
                 {formatMoney(Number(e.amount))}

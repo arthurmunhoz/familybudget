@@ -92,19 +92,19 @@ export default function EntryForm({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60">
       <div
-        className="w-full max-w-md rounded-t-3xl bg-stone-900 p-5 max-h-[92dvh] overflow-y-auto"
+        className="w-full max-w-md rounded-t-3xl bg-(--card) p-5 max-h-[92dvh] overflow-y-auto"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-stone-100">
+          <h2 className="text-lg font-bold text-(--text)">
             {entry ? 'Edit entry' : 'New entry'}
           </h2>
-          <button onClick={onClose} className="px-2 py-1 text-stone-400">
+          <button onClick={onClose} className="px-2 py-1 text-(--text-muted)">
             ✕
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-stone-800 p-1">
+        <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-(--surface) p-1">
           {(['expense', 'income'] as const).map((t) => (
             <button
               key={t}
@@ -114,7 +114,7 @@ export default function EntryForm({
                   ? t === 'expense'
                     ? 'bg-rose-500/90 text-white'
                     : 'bg-emerald-500/90 text-white'
-                  : 'text-stone-400'
+                  : 'text-(--text-muted)'
               }`}
             >
               {t === 'expense' ? '− Expense' : '＋ Income'}
@@ -122,31 +122,31 @@ export default function EntryForm({
           ))}
         </div>
 
-        <label className="mt-4 block text-sm text-stone-400">
+        <label className="mt-4 block text-sm text-(--text-muted)">
           Label
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder={type === 'expense' ? 'e.g. Groceries at Safeway' : 'e.g. Paycheck'}
-            className="mt-1 w-full rounded-xl bg-stone-800 px-4 py-3 text-stone-100 outline-none focus:ring-2 focus:ring-amber-400"
+            className="mt-1 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             autoFocus={!entry}
           />
         </label>
 
-        <label className="mt-3 block text-sm text-stone-400">
+        <label className="mt-3 block text-sm text-(--text-muted)">
           Amount (USD)
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             inputMode="decimal"
             placeholder="0.00"
-            className="mt-1 w-full rounded-xl bg-stone-800 px-4 py-3 text-stone-100 outline-none focus:ring-2 focus:ring-amber-400"
+            className="mt-1 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
           />
         </label>
 
         {type === 'expense' && (
           <div className="mt-3">
-            <span className="text-sm text-stone-400">Category</span>
+            <span className="text-sm text-(--text-muted)">Category</span>
             <div className="mt-1 grid grid-cols-4 gap-2">
               {CATEGORIES.filter((c) => c.id !== 'salary').map((c) => (
                 <button
@@ -157,12 +157,12 @@ export default function EntryForm({
                   }}
                   className={`flex flex-col items-center rounded-xl py-2 transition-colors ${
                     category === c.id
-                      ? 'bg-amber-400/20 ring-2 ring-amber-400'
-                      : 'bg-stone-800'
+                      ? 'bg-(--accent-soft) ring-2 ring-(--accent)'
+                      : 'bg-(--surface)'
                   }`}
                 >
                   <span className="text-xl">{c.icon}</span>
-                  <span className="mt-0.5 text-[10px] text-stone-400">{c.name}</span>
+                  <span className="mt-0.5 text-[10px] text-(--text-muted)">{c.name}</span>
                 </button>
               ))}
             </div>
@@ -170,21 +170,21 @@ export default function EntryForm({
         )}
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <label className="block text-sm text-stone-400">
+          <label className="block text-sm text-(--text-muted)">
             Date
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-stone-800 px-3 py-3 text-stone-100 outline-none focus:ring-2 focus:ring-amber-400"
+              className="mt-1 w-full rounded-xl bg-(--surface) px-3 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
           </label>
-          <label className="block text-sm text-stone-400">
+          <label className="block text-sm text-(--text-muted)">
             Who
             <select
               value={personEmail}
               onChange={(e) => setPersonEmail(e.target.value)}
-              className="mt-1 w-full appearance-none rounded-xl bg-stone-800 px-3 py-3 text-stone-100 outline-none focus:ring-2 focus:ring-amber-400"
+              className="mt-1 w-full appearance-none rounded-xl bg-(--surface) px-3 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             >
               {profiles.map((p) => (
                 <option key={p.email} value={p.email}>
@@ -195,25 +195,25 @@ export default function EntryForm({
           </label>
         </div>
 
-        <label className="mt-4 flex items-center justify-between rounded-xl bg-stone-800 px-4 py-3">
-          <span className="text-stone-200">
+        <label className="mt-4 flex items-center justify-between rounded-xl bg-(--surface) px-4 py-3">
+          <span className="text-(--text)">
             ↻ Recurring{' '}
-            <span className="text-xs text-stone-500">(auto-added to new months)</span>
+            <span className="text-xs text-(--text-faint)">(auto-added to new months)</span>
           </span>
           <input
             type="checkbox"
             checked={recurring}
             onChange={(e) => setRecurring(e.target.checked)}
-            className="h-5 w-5 accent-amber-400"
+            className="h-5 w-5 accent-(--accent)"
           />
         </label>
 
-        {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-(--expense)">{error}</p>}
 
         <button
           onClick={save}
           disabled={saving}
-          className="mt-5 w-full rounded-2xl bg-amber-400 py-4 text-lg font-bold text-stone-900 active:scale-[0.98] transition-transform disabled:opacity-50"
+          className="mt-5 w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
         >
           {saving ? 'Saving…' : entry ? 'Save changes' : 'Add entry'}
         </button>
@@ -222,7 +222,7 @@ export default function EntryForm({
           <button
             onClick={remove}
             disabled={saving}
-            className="mt-3 w-full rounded-2xl py-3 font-semibold text-rose-400 active:bg-rose-400/10"
+            className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
           >
             Delete entry
           </button>

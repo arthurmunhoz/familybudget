@@ -8,9 +8,15 @@ import {
 } from 'recharts'
 import { categoryById } from '../lib/categories'
 import { formatMoney } from '../lib/format'
+import { useTheme } from '../hooks/useTheme'
 import type { Entry } from '../lib/types'
 
 export default function SummaryChart({ entries }: { entries: Entry[] }) {
+  const { theme } = useTheme()
+  const incomeColor = theme === 'dark' ? '#34d399' : '#059669'
+  const expenseColor = theme === 'dark' ? '#fb7185' : '#e11d48'
+  const barLabelColor = theme === 'dark' ? '#0c0a09' : '#ffffff'
+  const tickColor = theme === 'dark' ? '#a8a29e' : '#57534e'
   const income = entries
     .filter((e) => e.type === 'income')
     .reduce((s, e) => s + Number(e.amount), 0)
@@ -20,8 +26,8 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
   const balance = income - spent
 
   const data = [
-    { name: 'Received', value: income, color: '#34d399' },
-    { name: 'Spent', value: spent, color: '#fb7185' },
+    { name: 'Received', value: income, color: incomeColor },
+    { name: 'Spent', value: spent, color: expenseColor },
   ]
 
   const byCategory = new Map<string, number>()
@@ -33,12 +39,12 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
   const maxCat = categories[0]?.[1] ?? 0
 
   return (
-    <div className="rounded-2xl bg-stone-900 p-4">
+    <div className="rounded-2xl bg-(--card) p-4">
       <div className="flex items-baseline justify-between">
-        <span className="text-sm text-stone-400">Balance</span>
+        <span className="text-sm text-(--text-muted)">Balance</span>
         <span
           className={`text-2xl font-bold tabular-nums ${
-            balance >= 0 ? 'text-emerald-400' : 'text-rose-400'
+            balance >= 0 ? 'text-(--income)' : 'text-(--expense)'
           }`}
         >
           {formatMoney(balance)}
@@ -55,12 +61,12 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
               width={72}
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#a8a29e', fontSize: 13 }}
+              tick={{ fill: tickColor, fontSize: 13 }}
             />
             <Bar dataKey="value" radius={[6, 6, 6, 6]} barSize={26} isAnimationActive={false}
               label={{
                 position: 'insideRight',
-                fill: '#0c0a09',
+                fill: barLabelColor,
                 fontSize: 12,
                 fontWeight: 700,
                 formatter: (v) => (Number(v) > 0 ? formatMoney(Number(v)) : ''),
@@ -81,13 +87,13 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
             return (
               <div key={catId} className="flex items-center gap-2">
                 <span className="w-6 text-center">{cat.icon}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-800">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-(--surface)">
                   <div
-                    className="h-full rounded-full bg-amber-400"
+                    className="h-full rounded-full bg-(--accent)"
                     style={{ width: `${(amount / maxCat) * 100}%` }}
                   />
                 </div>
-                <span className="w-20 text-right text-xs tabular-nums text-stone-400">
+                <span className="w-20 text-right text-xs tabular-nums text-(--text-muted)">
                   {formatMoney(amount)}
                 </span>
               </div>

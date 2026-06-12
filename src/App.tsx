@@ -11,8 +11,8 @@ export default function App() {
   if (!isConfigured) {
     return (
       <Centered>
-        <h1 className="text-xl font-bold text-stone-100">Almost there</h1>
-        <p className="mt-2 text-stone-400">
+        <h1 className="text-xl font-bold text-(--text)">Almost there</h1>
+        <p className="mt-2 text-(--text-muted)">
           Missing Supabase config. Copy <code>.env.example</code> to{' '}
           <code>.env.local</code> and fill in your project URL and anon key,
           then restart the dev server.
@@ -24,7 +24,7 @@ export default function App() {
   if (loading) {
     return (
       <Centered>
-        <p className="animate-pulse text-stone-400">Loading…</p>
+        <p className="animate-pulse text-(--text-muted)">Loading…</p>
       </Centered>
     )
   }
@@ -34,14 +34,14 @@ export default function App() {
   if (!profile) {
     return (
       <Centered>
-        <h1 className="text-xl font-bold text-stone-100">Not authorized</h1>
-        <p className="mt-2 text-stone-400">
+        <h1 className="text-xl font-bold text-(--text)">Not authorized</h1>
+        <p className="mt-2 text-(--text-muted)">
           {session.user.email} is not in the allowed users list. Add it to the{' '}
           <code>allowed_users</code> table in Supabase.
         </p>
         <button
           onClick={signOut}
-          className="mt-6 rounded-xl bg-stone-800 px-5 py-3 font-medium text-stone-200"
+          className="mt-6 rounded-xl bg-(--surface) px-5 py-3 font-medium text-(--text)"
         >
           Sign out
         </button>
