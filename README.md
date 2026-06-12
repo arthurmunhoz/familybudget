@@ -1,64 +1,81 @@
-# Our Budget 💙
+# One Roof 🏠
 
-A private budgeting app for Arthur & Patricia. Track monthly income and
-spending from one shared pot — no bill splitting, just one household.
+*Your family, under one roof.*
 
-**Stack:** React + TypeScript (Vite) · Tailwind CSS · Supabase (Postgres +
-Google auth) · Recharts · deployed on Vercel · installable as a PWA on iPhone.
+A multi-household PWA that bundles the little apps a family runs on: shared
+budget, live grocery list, pet care log, and a private document vault. Built
+for Arthur & Patricia, now multi-tenant so friend families get their own
+private hub — same apps, completely separate data.
 
-## Features
+**Live:** https://one-roof-app.vercel.app (installable on iPhone via Safari →
+Share → Add to Home Screen)
 
-- **Months** — manual "Start MM/YY" button creates the next month and
-  auto-copies all recurring entries (rent, subscriptions…) into it. Months are
-  listed latest-first with their running balance.
-- **Month view** — total received vs. spent with charts, filterable by person
-  (Both / Arthur / Patricia — everything reacts to the filter).
-- **Entries** — label, USD amount, category with icons (auto-suggested from
-  the label and learned from your corrections), date, who, recurring flag.
-- **Lists** — sorted by date (default) or amount; split view shows each
-  person's spending side by side.
-- **Private** — Google sign-in + Postgres row-level security; only the two
-  emails in `allowed_users` can read or write anything.
+## The apps
 
-## Setup (one time, ~15 min)
+| App | What it does |
+| --- | --- |
+| 💰 **Budget** | Shared-pot budgets with daily/weekly/monthly periods, per-person filters, charts, recurring entries, and AI receipt scanning (photo → parsed entry via Claude vision) |
+| 🛒 **Shopping List** | One shared list, live-synced between phones (Supabase Realtime) |
+| 🐕 **Pet Care** | Vet visits, vaccines, meds per pet — with "next due" reminders that retire automatically when you re-log a recurring treatment |
+| 📄 **Documents** | Photos/PDFs of IDs, insurance cards, records in a private storage bucket, filterable by category and person |
+| 🛠️ **Admin** | (Admins only) Create households, manage members, see last-access and app-usage analytics |
 
-### 1. Supabase project
+## Architecture in one paragraph
+
+React SPA (Vite + TypeScript + Tailwind v4) on Vercel, with one serverless
+function (`api/scan-receipt.ts`) for receipt OCR. All data lives in Supabase:
+Postgres with row-level security doing the real access control, Google OAuth
+for sign-in, Storage for documents, Realtime for the shopping list.
+Multi-tenancy is enforced in the database — every table is scoped to a
+`household_id` and RLS policies guarantee a family can only ever see its own
+rows, no matter what the client sends. The hub is a launcher grid; each app is
+a lazy-loaded folder under `src/apps/`.
+
+**Working on this repo? Read [`CLAUDE.md`](CLAUDE.md)** — file map, patterns,
+and the iOS/PWA pitfalls that cost us real debugging hours.
+
+## Setup from scratch (~20 min)
+
+### 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com) (free tier).
-2. Open **SQL Editor**, paste the contents of [`supabase/schema.sql`](supabase/schema.sql),
-   **edit the two placeholder emails** in the `allowed_users` insert to the
-   Google emails you and Patricia will sign in with, and run it.
+2. SQL Editor → run [`supabase/schema.sql`](supabase/schema.sql) **after
+   editing the placeholder emails**, then run `migration-004` … `migration-009`
+   in order (see the note at the bottom of schema.sql).
+3. Make the first user an admin:
+   `update allowed_users set is_admin = true where email = '<you>';`
 
 ### 2. Google sign-in
 
-1. In [Google Cloud Console](https://console.cloud.google.com), create a new
-   project (top-bar project picker → **New Project**).
-2. Open [Google Auth Platform](https://console.cloud.google.com/auth/overview)
-   → **Get started**: app name, support email, Audience: **External**, finish.
-3. In **Audience → Test users**, add both Google account emails (while the
-   app stays in Testing mode, only test users can sign in — ideal here).
-4. In **Clients** → **Create client**: type **Web application**, and under
-   **Authorized redirect URIs** add
-   `https://<your-project-ref>.supabase.co/auth/v1/callback`.
-5. Copy the Client ID and Client secret into Supabase →
-   **Authentication → Sign In / Up → Google** (enable + save).
+1. [Google Cloud Console](https://console.cloud.google.com) → new project.
+2. [Auth Platform](https://console.cloud.google.com/auth/overview) → Get
+   started → Audience **External** → add your emails as **Test users**.
+3. Clients → Create client (**Web application**) with redirect URI
+   `https://<project-ref>.supabase.co/auth/v1/callback`.
+4. Paste Client ID + secret into Supabase → Authentication → Google.
 
-### 3. Local run
+### 3. Run locally
 
 ```sh
-cp .env.example .env.local   # fill in URL + anon key from Supabase → Settings → API
+cp .env.example .env.local   # VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
 npm install
 npm run dev
 ```
 
-### 4. Deploy to Vercel
+### 4. Deploy
 
-1. Push this folder to a GitHub repo and import it in Vercel (defaults are fine).
-2. Add the two `VITE_SUPABASE_*` environment variables in Vercel project settings.
-3. In Supabase → **Authentication → URL Configuration**: set the Site URL to
-   your Vercel URL and add it to the redirect allow-list.
+```sh
+npx vercel deploy --prod --yes
+```
 
-### 5. iPhone
+There is **no git-push auto-deploy** — deploys are manual via the CLI. Set
+`VITE_SUPABASE_*` (and `ANTHROPIC_API_KEY` for receipt scanning) in the Vercel
+project env vars. Then in Supabase → Authentication → URL Configuration, set
+the Site URL to the production domain and add it to the redirect allow-list.
 
-Open the Vercel URL in Safari → Share → **Add to Home Screen**. It runs
-full-screen like a native app.
+## Adding a family
+
+As an admin, open 🛠️ Admin in the app: create a household, add members by
+display name + Google email. That's it — they sign in and get an empty hub of
+their own. (Heads-up: receipt scanning bills the `ANTHROPIC_API_KEY` owner for
+every household.)

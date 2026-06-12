@@ -1,4 +1,4 @@
--- Our Budget — Supabase schema
+-- One Roof — Supabase schema (original bootstrap; see footer for later migrations)
 -- Run this in the Supabase SQL Editor (Dashboard → SQL Editor → New query).
 
 -- Who is allowed to use the app. Add both of your Google account emails here.
