@@ -5,7 +5,13 @@ import Drawer from '../components/Drawer'
 import { useAuth } from '../hooks/useAuth'
 import { formatMoney } from '../lib/format'
 import { supabase } from '../lib/supabase'
-import type { Budget, Entry, Month } from '../lib/types'
+import type { Budget, Entry, Month, Period } from '../lib/types'
+
+const PERIOD_OPTIONS: { id: Period; label: string }[] = [
+  { id: 'monthly', label: 'Monthly' },
+  { id: 'weekly', label: 'Weekly' },
+  { id: 'daily', label: 'Daily' },
+]
 
 export default function Budgets() {
   const { profile } = useAuth()
@@ -16,10 +22,9 @@ export default function Budgets() {
   const [loading, setLoading] = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // create / rename modal state
-  const [editing, setEditing] = useState<Budget | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
+  const [period, setPeriod] = useState<Period>('monthly')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -50,38 +55,17 @@ export default function Budgets() {
     return map
   }, [months, entries])
 
-  async function save() {
+  async function create() {
     const trimmed = name.trim()
     if (!trimmed) return
     setSaving(true)
-    if (editing) {
-      await supabase.from('budgets').update({ name: trimmed }).eq('id', editing.id)
-    } else {
-      await supabase.from('budgets').insert({ name: trimmed })
-    }
+    await supabase.from('budgets').insert({ name: trimmed, period })
     setSaving(false)
-    setEditing(null)
     setCreateOpen(false)
     setName('')
+    setPeriod('monthly')
     load()
   }
-
-  async function removeBudget(b: Budget) {
-    if (
-      !confirm(
-        `Delete "${b.name}" and ALL of its months and entries? This cannot be undone.`,
-      )
-    )
-      return
-    setSaving(true)
-    await supabase.from('budgets').delete().eq('id', b.id)
-    setSaving(false)
-    setEditing(null)
-    setName('')
-    load()
-  }
-
-  const modalOpen = createOpen || editing !== null
 
   return (
     <div className="mx-auto min-h-full max-w-md px-4 pb-28">
@@ -112,28 +96,18 @@ export default function Budgets() {
         <ul className="space-y-3">
           {budgets.map((b) => {
             const balance = balances.get(b.id) ?? 0
+            const periodName = PERIOD_OPTIONS.find((p) => p.id === b.period)?.label
             return (
               <li key={b.id}>
                 <button
                   onClick={() => navigate(`/budget/${b.id}`)}
                   className="flex w-full items-center justify-between gap-2 rounded-2xl bg-(--card) px-5 py-4 active:bg-(--card-active) transition-colors"
                 >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-lg font-bold text-(--text)">
+                  <div className="min-w-0 text-left">
+                    <div className="truncate text-lg font-bold text-(--text)">
                       {b.name}
-                    </span>
-                    <span
-                      role="button"
-                      aria-label={`Rename ${b.name}`}
-                      onClick={(ev) => {
-                        ev.stopPropagation()
-                        setEditing(b)
-                        setName(b.name)
-                      }}
-                      className="px-1.5 py-1 text-sm text-(--text-faint) active:text-(--text)"
-                    >
-                      ✎
-                    </span>
+                    </div>
+                    <div className="text-xs text-(--text-faint)">{periodName}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <div className="text-right">
@@ -164,6 +138,7 @@ export default function Budgets() {
         <button
           onClick={() => {
             setName('')
+            setPeriod('monthly')
             setCreateOpen(true)
           }}
           disabled={loading}
@@ -175,12 +150,10 @@ export default function Budgets() {
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
-      {modalOpen && (
+      {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
-            <h2 className="text-lg font-bold text-(--text)">
-              {editing ? 'Rename budget' : 'New budget'}
-            </h2>
+            <h2 className="text-lg font-bold text-(--text)">New budget</h2>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -188,10 +161,25 @@ export default function Budgets() {
               autoFocus
               className="mt-4 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
+            <div className="mt-4">
+              <span className="text-sm text-(--text-muted)">Entries grouped by</span>
+              <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-(--surface) p-1">
+                {PERIOD_OPTIONS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPeriod(p.id)}
+                    className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
+                      period === p.id ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
                 onClick={() => {
-                  setEditing(null)
                   setCreateOpen(false)
                   setName('')
                 }}
@@ -200,22 +188,13 @@ export default function Budgets() {
                 Cancel
               </button>
               <button
-                onClick={save}
+                onClick={create}
                 disabled={saving || !name.trim()}
                 className="rounded-xl bg-(--accent) py-3 font-semibold text-white disabled:opacity-50"
               >
-                {editing ? 'Save' : 'Create'}
+                Create
               </button>
             </div>
-            {editing && (
-              <button
-                onClick={() => removeBudget(editing)}
-                disabled={saving}
-                className="mt-3 w-full rounded-xl py-2.5 text-sm font-semibold text-(--expense) active:bg-(--expense)/10"
-              >
-                Delete budget
-              </button>
-            )}
           </div>
         </div>
       )}

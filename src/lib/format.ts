@@ -1,3 +1,5 @@
+import type { Period } from './types'
+
 const usd = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -7,19 +9,84 @@ export function formatMoney(amount: number): string {
   return usd.format(amount)
 }
 
-/** "Jun 2026" for June 2026 */
-export function monthLabel(year: number, month: number): string {
-  return new Date(year, month - 1, 1).toLocaleDateString('en-US', {
+function parseISO(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function toISO(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+export function addDaysISO(iso: string, n: number): string {
+  const d = parseISO(iso)
+  d.setDate(d.getDate() + n)
+  return toISO(d)
+}
+
+/** Whole days from a to b (positive when b is later) */
+export function daysBetweenISO(a: string, b: string): number {
+  return Math.round((parseISO(b).getTime() - parseISO(a).getTime()) / 86_400_000)
+}
+
+/** Inclusive last day of a period starting at startISO */
+export function periodEndISO(period: Period, startISO: string): string {
+  if (period === 'daily') return startISO
+  if (period === 'weekly') return addDaysISO(startISO, 6)
+  const d = parseISO(startISO)
+  return toISO(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+}
+
+export function periodLengthDays(period: Period, startISO: string): number {
+  return daysBetweenISO(startISO, periodEndISO(period, startISO)) + 1
+}
+
+/** Short list label: "Jun 2026" / "Jun 8 – Jun 14, 2026" / "Jun 11, 2026" */
+export function periodLabel(period: Period, startISO: string): string {
+  const start = parseISO(startISO)
+  if (period === 'monthly') {
+    return start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  }
+  if (period === 'weekly') {
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return `${startStr} – ${formatDay(periodEndISO('weekly', startISO))}`
+  }
+  return formatDay(startISO)
+}
+
+/** Long detail-page title: "June 2026" / "Week of Jun 8, 2026" / "Thursday, Jun 11, 2026" */
+export function periodTitle(period: Period, startISO: string): string {
+  const start = parseISO(startISO)
+  if (period === 'monthly') {
+    return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+  if (period === 'weekly') return `Week of ${formatDay(startISO)}`
+  return start.toLocaleDateString('en-US', {
+    weekday: 'long',
     month: 'short',
+    day: 'numeric',
     year: 'numeric',
   })
 }
 
-export function monthName(year: number, month: number): string {
-  return new Date(year, month - 1, 1).toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  })
+/** Start of the period containing today (weeks start on Sunday) */
+export function currentPeriodStart(period: Period): string {
+  const now = new Date()
+  if (period === 'daily') return todayISO()
+  if (period === 'weekly') {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+    return toISO(d)
+  }
+  return toISO(new Date(now.getFullYear(), now.getMonth(), 1))
+}
+
+export function nextPeriodStart(period: Period, startISO: string): string {
+  if (period === 'daily') return addDaysISO(startISO, 1)
+  if (period === 'weekly') return addDaysISO(startISO, 7)
+  const d = parseISO(startISO)
+  return toISO(new Date(d.getFullYear(), d.getMonth() + 1, 1))
 }
 
 /** "Jun 9, 2026" from "2026-06-09" */

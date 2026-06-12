@@ -5,17 +5,21 @@ export interface Profile {
   display_name: string
 }
 
+export type Period = 'daily' | 'weekly' | 'monthly'
+
 export interface Budget {
   id: string
   name: string
+  period: Period
   created_at: string
 }
 
+/** One budget period (named "months" historically): monthly = 1st of month,
+ *  weekly = week start (Sunday), daily = the day itself. */
 export interface Month {
   id: string
   budget_id: string
-  year: number
-  month: number
+  start_date: string
   created_at: string
 }
 

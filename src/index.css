@@ -54,15 +54,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The scroll container spans the full screen; safe-area insets are padding
+   inside it so content clears the notch but still reaches the bottom edge. */
 #root {
   overflow-y: auto;
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-}
-
-body {
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
@@ -77,4 +75,16 @@ button {
 input,
 select {
   font-size: 16px;
+}
+
+/* iOS renders date inputs top-aligned when given a fixed height */
+input[type='date'] {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
 }

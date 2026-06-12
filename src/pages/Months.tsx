@@ -2,7 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import BeachBackdrop from '../components/BeachBackdrop'
-import { daysInMonth, formatMoney, monthLabel } from '../lib/format'
+import {
+  addDaysISO,
+  currentPeriodStart,
+  daysBetweenISO,
+  formatMoney,
+  nextPeriodStart,
+  periodLabel,
+  periodLengthDays,
+} from '../lib/format'
 import type { Budget, Entry, Month } from '../lib/types'
 
 export default function Months() {
@@ -15,6 +23,12 @@ export default function Months() {
   const [creating, setCreating] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
+  // budget menu (rename / delete)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+
   const load = useCallback(async () => {
     if (!budgetId) return
     const [b, m, e] = await Promise.all([
@@ -23,8 +37,7 @@ export default function Months() {
         .from('months')
         .select('*')
         .eq('budget_id', budgetId)
-        .order('year', { ascending: false })
-        .order('month', { ascending: false }),
+        .order('start_date', { ascending: false }),
       supabase.from('entries').select('month_id, type, amount'),
     ])
     setBudget(b.data)
@@ -37,6 +50,8 @@ export default function Months() {
     load()
   }, [load])
 
+  const period = budget?.period ?? 'monthly'
+
   const balances = useMemo(() => {
     const map = new Map<string, number>()
     for (const e of entries) {
@@ -46,19 +61,13 @@ export default function Months() {
     return map
   }, [entries])
 
-  // Next month to create: current calendar month if missing, else the month
-  // right after the latest one.
-  const nextMonth = useMemo(() => {
-    const now = new Date()
-    const cur = { year: now.getFullYear(), month: now.getMonth() + 1 }
-    const has = (y: number, m: number) =>
-      months.some((x) => x.year === y && x.month === m)
-    if (!has(cur.year, cur.month)) return cur
-    const latest = months[0]
-    return latest.month === 12
-      ? { year: latest.year + 1, month: 1 }
-      : { year: latest.year, month: latest.month + 1 }
-  }, [months])
+  // Next period to create: the current calendar period if missing, else the
+  // one right after the latest existing period.
+  const nextStart = useMemo(() => {
+    const current = currentPeriodStart(period)
+    if (!months.some((m) => m.start_date === current)) return current
+    return nextPeriodStart(period, months[0].start_date)
+  }, [months, period])
 
   async function createMonth() {
     if (!budgetId) return
@@ -66,12 +75,13 @@ export default function Months() {
     try {
       const { data: created, error } = await supabase
         .from('months')
-        .insert({ budget_id: budgetId, year: nextMonth.year, month: nextMonth.month })
+        .insert({ budget_id: budgetId, start_date: nextStart })
         .select()
         .single()
       if (error || !created) throw error
 
-      // Copy recurring entries from this budget's most recent existing month.
+      // Copy recurring entries from this budget's most recent period, keeping
+      // each entry's day offset within the period (clamped to its length).
       const source = months[0]
       if (source) {
         const { data: recurring } = await supabase
@@ -80,19 +90,20 @@ export default function Months() {
           .eq('month_id', source.id)
           .eq('recurring', true)
         if (recurring && recurring.length > 0) {
-          const maxDay = daysInMonth(created.year, created.month)
-          const copies = recurring.map((e: Entry) => ({
-            month_id: created.id,
-            type: e.type,
-            label: e.label,
-            amount: e.amount,
-            category: e.category,
-            person_email: e.person_email,
-            recurring: true,
-            entry_date: `${created.year}-${String(created.month).padStart(2, '0')}-${String(
-              Math.min(Number(e.entry_date.split('-')[2]), maxDay),
-            ).padStart(2, '0')}`,
-          }))
+          const len = periodLengthDays(period, created.start_date)
+          const copies = recurring.map((e: Entry) => {
+            const offset = Math.max(0, daysBetweenISO(source.start_date, e.entry_date))
+            return {
+              month_id: created.id,
+              type: e.type,
+              label: e.label,
+              amount: e.amount,
+              category: e.category,
+              person_email: e.person_email,
+              recurring: true,
+              entry_date: addDaysISO(created.start_date, Math.min(offset, len - 1)),
+            }
+          })
           await supabase.from('entries').insert(copies)
         }
       }
@@ -100,6 +111,28 @@ export default function Months() {
     } finally {
       setCreating(false)
     }
+  }
+
+  async function renameBudget() {
+    const trimmed = name.trim()
+    if (!trimmed || !budgetId) return
+    setSaving(true)
+    await supabase.from('budgets').update({ name: trimmed }).eq('id', budgetId)
+    setSaving(false)
+    setRenameOpen(false)
+    load()
+  }
+
+  async function deleteBudget() {
+    if (!budget) return
+    if (
+      !confirm(
+        `Delete "${budget.name}" and ALL of its periods and entries? This cannot be undone.`,
+      )
+    )
+      return
+    await supabase.from('budgets').delete().eq('id', budget.id)
+    navigate('/')
   }
 
   return (
@@ -112,9 +145,16 @@ export default function Months() {
         >
           ‹
         </button>
-        <h1 className="truncate text-2xl font-bold text-(--text)">
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
           {budget?.name ?? '…'}
         </h1>
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Budget options"
+          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+        >
+          ⋯
+        </button>
       </header>
 
       {loading ? (
@@ -122,9 +162,10 @@ export default function Months() {
       ) : months.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
           <div className="text-5xl">🗓️</div>
-          <p className="mt-4">No months yet.</p>
+          <p className="mt-4">Nothing here yet.</p>
           <p className="text-sm text-(--text-faint)">
-            Start your first one below to begin tracking.
+            Start your first {period === 'monthly' ? 'month' : period === 'weekly' ? 'week' : 'day'}{' '}
+            below to begin tracking.
           </p>
         </div>
       ) : (
@@ -138,7 +179,7 @@ export default function Months() {
                   className="flex w-full items-center justify-between rounded-2xl bg-(--card) px-5 py-4 active:bg-(--card-active) transition-colors"
                 >
                   <div className="text-lg font-bold text-(--text)">
-                    {monthLabel(m.year, m.month)}
+                    {periodLabel(period, m.start_date)}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
@@ -171,25 +212,93 @@ export default function Months() {
           disabled={creating || loading}
           className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {creating
-            ? 'Creating…'
-            : `＋ Start ${monthLabel(nextMonth.year, nextMonth.month)}`}
+          {creating ? 'Creating…' : `＋ Start ${periodLabel(period, nextStart)}`}
         </button>
       </div>
+
+      {/* budget options menu */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
+          onClick={() => setMenuOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-(--card) p-4"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setMenuOpen(false)
+                setName(budget?.name ?? '')
+                setRenameOpen(true)
+              }}
+              className="w-full rounded-xl px-4 py-3.5 text-left font-semibold text-(--text) active:bg-(--surface)"
+            >
+              ✏️ Rename budget
+            </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false)
+                deleteBudget()
+              }}
+              className="w-full rounded-xl px-4 py-3.5 text-left font-semibold text-(--expense) active:bg-(--surface)"
+            >
+              🗑️ Delete budget
+            </button>
+            <button
+              onClick={() => setMenuOpen(false)}
+              className="mt-2 w-full rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* rename modal */}
+      {renameOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
+            <h2 className="text-lg font-bold text-(--text)">Rename budget</h2>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              className="mt-4 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+            />
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setRenameOpen(false)}
+                className="rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={renameBudget}
+                disabled={saving || !name.trim()}
+                className="rounded-xl bg-(--accent) py-3 font-semibold text-white disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
             <h2 className="text-lg font-bold text-(--text)">
-              Start {monthLabel(nextMonth.year, nextMonth.month)}?
+              Start {periodLabel(period, nextStart)}?
             </h2>
             <p className="mt-2 text-sm text-(--text-muted)">
               {months.length > 0
-                ? `Recurring entries from ${monthLabel(
-                    months[0].year,
-                    months[0].month,
+                ? `Recurring entries from ${periodLabel(
+                    period,
+                    months[0].start_date,
                   )} will be copied over automatically.`
-                : 'This creates the first month of this budget.'}
+                : 'This creates the first period of this budget.'}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
@@ -205,7 +314,7 @@ export default function Months() {
                 }}
                 className="rounded-xl bg-(--accent) py-3 font-semibold text-white"
               >
-                Start month
+                Start
               </button>
             </div>
           </div>

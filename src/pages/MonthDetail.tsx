@@ -9,11 +9,16 @@ import {
   formatDay,
   formatDayHeading,
   formatMoney,
-  monthName,
+  periodEndISO,
+  periodTitle,
   todayISO,
 } from '../lib/format'
 import { supabase } from '../lib/supabase'
-import type { CategoryRule, Entry, Month, Profile } from '../lib/types'
+import type { CategoryRule, Entry, Month, Period, Profile } from '../lib/types'
+
+type MonthWithBudget = Month & {
+  budgets: { name: string; period: Period } | null
+}
 
 type SortBy = 'date' | 'amount'
 type SortDir = 'asc' | 'desc'
@@ -24,7 +29,7 @@ export default function MonthDetail() {
   const navigate = useNavigate()
   const { profile, profiles } = useAuth()
 
-  const [month, setMonth] = useState<Month | null>(null)
+  const [month, setMonth] = useState<MonthWithBudget | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [rules, setRules] = useState<CategoryRule[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +48,7 @@ export default function MonthDetail() {
   const load = useCallback(async () => {
     if (!id) return
     const [m, e, r] = await Promise.all([
-      supabase.from('months').select('*').eq('id', id).single(),
+      supabase.from('months').select('*, budgets(name, period)').eq('id', id).single(),
       supabase.from('entries').select('*').eq('month_id', id),
       supabase.from('category_rules').select('keyword, category'),
     ])
@@ -147,7 +152,7 @@ export default function MonthDetail() {
           ‹
         </button>
         <h1 className="text-xl font-bold text-(--text)">
-          {monthName(month.year, month.month)}
+          {periodTitle(month.budgets?.period ?? 'monthly', month.start_date)}
         </h1>
       </header>
 
@@ -314,7 +319,9 @@ export default function MonthDetail() {
 
       {formOpen && profile && (
         <EntryForm
-          month={month}
+          monthId={month.id}
+          periodStart={month.start_date}
+          periodEnd={periodEndISO(month.budgets?.period ?? 'monthly', month.start_date)}
           profiles={profiles}
           myEmail={profile.email}
           rules={rules}

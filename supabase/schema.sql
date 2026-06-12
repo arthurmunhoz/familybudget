@@ -16,6 +16,7 @@ on conflict (email) do nothing;
 create table if not exists budgets (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  period text not null default 'monthly' check (period in ('daily', 'weekly', 'monthly')),
   created_at timestamptz not null default now()
 );
 
@@ -23,13 +24,14 @@ insert into budgets (name)
 select 'Our Home Budget'
 where not exists (select 1 from budgets);
 
+-- A "month" row is one budget period: monthly = 1st of the month,
+-- weekly = the week's start day, daily = the day itself.
 create table if not exists months (
   id uuid primary key default gen_random_uuid(),
   budget_id uuid not null references budgets(id) on delete cascade,
-  year int not null,
-  month int not null check (month between 1 and 12),
+  start_date date not null,
   created_at timestamptz not null default now(),
-  unique (budget_id, year, month)
+  unique (budget_id, start_date)
 );
 
 create table if not exists entries (

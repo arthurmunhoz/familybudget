@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { CATEGORIES, normalizeLabel, suggestCategory } from '../lib/categories'
 import { todayISO } from '../lib/format'
 import { supabase } from '../lib/supabase'
-import type { CategoryRule, Entry, EntryType, Month, Profile } from '../lib/types'
+import type { CategoryRule, Entry, EntryType, Profile } from '../lib/types'
 
 export interface EntryPrefill {
   label?: string
@@ -12,7 +12,10 @@ export interface EntryPrefill {
 }
 
 interface Props {
-  month: Month
+  monthId: string
+  /** Inclusive ISO date bounds of the budget period this entry belongs to */
+  periodStart: string
+  periodEnd: string
   profiles: Profile[]
   myEmail: string
   rules: CategoryRule[]
@@ -25,7 +28,9 @@ interface Props {
 }
 
 export default function EntryForm({
-  month,
+  monthId,
+  periodStart,
+  periodEnd,
   profiles,
   myEmail,
   rules,
@@ -34,13 +39,12 @@ export default function EntryForm({
   onClose,
   onSaved,
 }: Props) {
-  const monthPrefix = `${month.year}-${String(month.month).padStart(2, '0')}`
-  const defaultDate = todayISO().startsWith(monthPrefix)
-    ? todayISO()
-    : `${monthPrefix}-01`
-  // Only keep a prefilled date if it actually falls inside this month.
+  const today = todayISO()
+  const inPeriod = (iso: string) => iso >= periodStart && iso <= periodEnd
+  const defaultDate = inPeriod(today) ? today : periodStart
+  // Only keep a prefilled date if it actually falls inside this period.
   const initialDate =
-    initial?.entry_date && initial.entry_date.startsWith(monthPrefix)
+    initial?.entry_date && inPeriod(initial.entry_date)
       ? initial.entry_date
       : undefined
 
@@ -76,7 +80,7 @@ export default function EntryForm({
     setSaving(true)
     setError(null)
     const payload = {
-      month_id: month.id,
+      month_id: monthId,
       type,
       label: label.trim(),
       amount: value,
