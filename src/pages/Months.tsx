@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { daysInMonth, formatMoney, monthLabel, monthName } from '../lib/format'
+import { daysInMonth, formatMoney, monthLabel } from '../lib/format'
 import type { Entry, Month } from '../lib/types'
 
 export default function Months() {
@@ -127,13 +127,8 @@ export default function Months() {
                   onClick={() => navigate(`/month/${m.id}`)}
                   className="flex w-full items-center justify-between rounded-2xl bg-stone-900 px-5 py-4 active:bg-stone-800 transition-colors"
                 >
-                  <div className="text-left">
-                    <div className="text-lg font-bold text-stone-100">
-                      {monthLabel(m.year, m.month)}
-                    </div>
-                    <div className="text-xs text-stone-500">
-                      {monthName(m.year, m.month)}
-                    </div>
+                  <div className="text-lg font-bold text-stone-100">
+                    {monthLabel(m.year, m.month)}
                   </div>
                   <div className="flex items-center gap-3">
                     <span
