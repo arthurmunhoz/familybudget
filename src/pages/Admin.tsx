@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
 import { formatDuration, timeAgo } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { Household, Profile } from '../lib/types'
-
-interface UserActivity {
-  user_email: string
-  last_seen: string
-  events: number
-}
 
 interface AppStat {
   label: string
@@ -42,6 +36,7 @@ const SORTS: { key: SortKey; label: string }[] = [
 /** Admin-only: usage analytics plus household/member management. */
 export default function Admin() {
   const back = useBack()
+  const navigate = useNavigate()
   const { profile } = useAuth()
   const [tab, setTab] = useState<Tab>('analytics')
 
@@ -53,7 +48,6 @@ export default function Admin() {
 
   // analytics (reload when the period changes)
   const [days, setDays] = useState(30)
-  const [activity, setActivity] = useState<Record<string, UserActivity>>({})
   const [stats, setStats] = useState<AppStat[]>([])
   const [errors, setErrors] = useState<
     { id: number; user_email: string; target: string | null; path: string | null; created_at: string }[]
@@ -64,8 +58,6 @@ export default function Admin() {
   const [sortKey, setSortKey] = useState<SortKey>('name')
 
   const [newHousehold, setNewHousehold] = useState('')
-  // per-household "add member" drafts, keyed by household id
-  const [drafts, setDrafts] = useState<Record<string, { name: string; email: string }>>({})
   const [busy, setBusy] = useState(false)
 
   const loadBase = useCallback(async () => {
@@ -88,8 +80,7 @@ export default function Admin() {
   }, [])
 
   const loadAnalytics = useCallback(async (d: number) => {
-    const [act, use, time, errs] = await Promise.all([
-      supabase.rpc('admin_user_activity', { days: d }),
+    const [use, time, errs] = await Promise.all([
       supabase.rpc('admin_app_usage', { days: d }),
       supabase.rpc('admin_app_time', { days: d }),
       supabase
@@ -100,11 +91,6 @@ export default function Admin() {
         .limit(10),
     ])
     setErrors(errs.data ?? [])
-    setActivity(
-      Object.fromEntries(
-        ((act.data ?? []) as UserActivity[]).map((a) => [a.user_email, a]),
-      ),
-    )
     // 'month' pages are budget-period details — fold them into Budget.
     const merged = new Map<string, AppStat>()
     for (const row of (use.data ?? []) as { root: string; views: number }[]) {
@@ -157,14 +143,6 @@ export default function Admin() {
 
   if (!profile?.is_admin) return <Navigate to="/" replace />
 
-  function draft(id: string) {
-    return drafts[id] ?? { name: '', email: '' }
-  }
-
-  function setDraft(id: string, d: { name: string; email: string }) {
-    setDrafts((all) => ({ ...all, [id]: d }))
-  }
-
   async function createHousehold() {
     const name = newHousehold.trim()
     if (!name || busy) return
@@ -176,69 +154,6 @@ export default function Admin() {
       return
     }
     setNewHousehold('')
-    loadBase()
-  }
-
-  async function addMember(householdId: string) {
-    const d = draft(householdId)
-    const email = d.email.trim().toLowerCase()
-    const name = d.name.trim()
-    if (!email || !name || busy) return
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      alert('That doesn’t look like a valid email.')
-      return
-    }
-    setBusy(true)
-    const { error } = await supabase.from('allowed_users').insert({
-      email,
-      display_name: name,
-      household_id: householdId,
-    })
-    setBusy(false)
-    if (error) {
-      alert(
-        error.code === '23505'
-          ? 'That email is already a member of a household.'
-          : 'Could not add the member — please try again.',
-      )
-      return
-    }
-    setDraft(householdId, { name: '', email: '' })
-    loadBase()
-  }
-
-  async function removeMember(user: Profile) {
-    if (user.email === profile?.email) {
-      alert('You can’t remove yourself.')
-      return
-    }
-    if (!confirm(`Remove ${user.display_name} (${user.email})? They will lose access.`))
-      return
-    const { error } = await supabase
-      .from('allowed_users')
-      .delete()
-      .eq('email', user.email)
-    if (error) {
-      alert(
-        'Could not remove this member — they still have budget entries or other data attached.',
-      )
-      return
-    }
-    loadBase()
-  }
-
-  async function removeHousehold(h: Household) {
-    const members = users.filter((u) => u.household_id === h.id)
-    if (members.length > 0) {
-      alert('Remove all members first.')
-      return
-    }
-    if (!confirm(`Delete household "${h.name}"?`)) return
-    const { error } = await supabase.from('households').delete().eq('id', h.id)
-    if (error) {
-      alert('Could not delete — the household still has data attached.')
-      return
-    }
     loadBase()
   }
 
@@ -345,13 +260,49 @@ export default function Admin() {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* create — bordered so it reads as an action card, not a list item */}
+          <section className="rounded-2xl border border-(--accent-soft) bg-(--card) p-4">
+            <h2 className="text-sm font-semibold text-(--text-muted)">
+              ➕ New household
+            </h2>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={newHousehold}
+                onChange={(e) => setNewHousehold(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') createHousehold()
+                }}
+                placeholder="Family name…"
+                className="min-w-0 flex-1 rounded-xl bg-(--surface) px-4 py-2.5 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+              />
+              <button
+                onClick={createHousehold}
+                disabled={!newHousehold.trim() || busy}
+                className="rounded-xl bg-(--accent) px-4 font-bold text-white disabled:opacity-50"
+              >
+                Create
+              </button>
+            </div>
+          </section>
+
           {/* search + sort */}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search households or members…"
-            className="w-full rounded-xl bg-(--card) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
-          />
+          <div className="relative">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search households or members…"
+              className="w-full rounded-xl bg-(--card) px-4 py-3 pr-11 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-(--text-faint) active:text-(--text)"
+              >
+                ✕
+              </button>
+            )}
+          </div>
           <div className="flex gap-2">
             {SORTS.map((s) => (
               <button
@@ -374,111 +325,30 @@ export default function Admin() {
             </p>
           )}
 
-          {visibleHouseholds.map((h) => {
-            const members = users.filter((u) => u.household_id === h.id)
-            const d = draft(h.id)
-            return (
-              <section key={h.id} className="rounded-2xl bg-(--card) p-4">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <h2 className="truncate font-bold text-(--text)">🏠 {h.name}</h2>
-                    <p className="text-xs text-(--text-faint)">
-                      {hhLastSeen[h.id]
-                        ? `Last active ${timeAgo(hhLastSeen[h.id])}`
-                        : 'No activity yet'}
-                    </p>
-                  </div>
-                  {members.length === 0 && (
-                    <button
-                      onClick={() => removeHousehold(h)}
-                      className="px-1 text-(--text-faint) active:text-(--expense)"
-                      aria-label={`Delete ${h.name}`}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
-                <ul className="mt-3 space-y-2">
-                  {members.map((u) => (
-                    <li
-                      key={u.email}
-                      className="flex items-center gap-3 rounded-xl bg-(--surface) px-3 py-2.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-(--text)">
-                          {u.display_name}
-                          {u.is_admin && (
-                            <span className="ml-2 rounded-full bg-(--accent-soft) px-2 py-0.5 text-[10px] font-bold text-(--accent)">
-                              ADMIN
-                            </span>
-                          )}
-                        </p>
-                        <p className="truncate text-xs text-(--text-faint)">{u.email}</p>
-                        <p className="text-xs text-(--text-faint)">
-                          {activity[u.email]
-                            ? `Active ${timeAgo(activity[u.email].last_seen)} · ${activity[u.email].events} events / ${days}d`
-                            : 'Never accessed'}
-                        </p>
-                      </div>
-                      {!u.is_admin && (
-                        <button
-                          onClick={() => removeMember(u)}
-                          aria-label={`Remove ${u.display_name}`}
-                          className="px-1 text-(--text-faint) active:text-(--expense)"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-3 flex gap-2">
-                  <input
-                    value={d.name}
-                    onChange={(e) => setDraft(h.id, { ...d, name: e.target.value })}
-                    placeholder="Name"
-                    className="w-24 min-w-0 rounded-xl bg-(--surface) px-3 py-2.5 text-sm text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
-                  />
-                  <input
-                    value={d.email}
-                    onChange={(e) => setDraft(h.id, { ...d, email: e.target.value })}
-                    placeholder="Google email"
-                    type="email"
-                    autoCapitalize="none"
-                    className="min-w-0 flex-1 rounded-xl bg-(--surface) px-3 py-2.5 text-sm text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
-                  />
+          <ul className="space-y-2">
+            {visibleHouseholds.map((h) => {
+              const memberCount = users.filter((u) => u.household_id === h.id).length
+              return (
+                <li key={h.id}>
                   <button
-                    onClick={() => addMember(h.id)}
-                    disabled={!d.name.trim() || !d.email.trim() || busy}
-                    className="rounded-xl bg-(--accent) px-3.5 text-sm font-bold text-white disabled:opacity-50"
+                    onClick={() => navigate(`/admin/household/${h.id}`)}
+                    className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3 text-left active:bg-(--card-active) transition-colors"
                   >
-                    Add
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate font-bold text-(--text)">🏠 {h.name}</h2>
+                      <p className="text-xs text-(--text-faint)">
+                        {memberCount} {memberCount === 1 ? 'member' : 'members'} ·{' '}
+                        {hhLastSeen[h.id]
+                          ? `active ${timeAgo(hhLastSeen[h.id])}`
+                          : 'no activity yet'}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-(--text-faint)">›</span>
                   </button>
-                </div>
-              </section>
-            )
-          })}
-
-          <div className="flex gap-2">
-            <input
-              value={newHousehold}
-              onChange={(e) => setNewHousehold(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') createHousehold()
-              }}
-              placeholder="New household name…"
-              className="min-w-0 flex-1 rounded-2xl bg-(--card) px-4 py-3.5 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
-            />
-            <button
-              onClick={createHousehold}
-              disabled={!newHousehold.trim() || busy}
-              className="rounded-2xl bg-(--accent) px-5 font-bold text-white disabled:opacity-50"
-            >
-              Create
-            </button>
-          </div>
+                </li>
+              )
+            })}
+          </ul>
         </div>
       )}
     </div>

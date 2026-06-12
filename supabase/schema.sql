@@ -179,3 +179,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-013-storage-constraints.sql (bucket size/mime limits)
 --   migration-014-user-settings.sql (per-user hidden apps)
 --   migration-015-tile-style.sql (hub tile density per user)
+--   migration-016-member-limit.sql (max 6 members per household)

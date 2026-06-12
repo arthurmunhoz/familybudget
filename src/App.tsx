@@ -15,6 +15,7 @@ const ShoppingList = lazy(() => import('./apps/shopping/ShoppingList'))
 const PetCare = lazy(() => import('./apps/pets/PetCare'))
 const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
 const Admin = lazy(() => import('./pages/Admin'))
+const AdminHousehold = lazy(() => import('./pages/AdminHousehold'))
 
 export default function App() {
   const { session, profile, loading, signOut } = useAuth()
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="/pets" element={<PetCare />} />
           <Route path="/docs" element={<DocumentVault />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/household/:id" element={<AdminHousehold />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
