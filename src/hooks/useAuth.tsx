@@ -1,0 +1,88 @@
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
+import type { Profile } from '../lib/types'
+
+interface AuthState {
+  session: Session | null
+  /** The signed-in user's profile, null if signed in but not in allowed_users */
+  profile: Profile | null
+  /** Both household members, for name lookups and person filters */
+  profiles: Profile[]
+  loading: boolean
+  signIn: () => Promise<void>
+  signOut: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthState | null>(null)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null)
+  const [profiles, setProfiles] = useState<Profile[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      if (!data.session) setLoading(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s)
+      if (!s) {
+        setProfiles([])
+        setLoading(false)
+      }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+    supabase
+      .from('allowed_users')
+      .select('email, display_name')
+      .then(({ data }) => {
+        if (cancelled) return
+        setProfiles(data ?? [])
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session])
+
+  const profile =
+    profiles.find((p) => p.email === session?.user.email) ?? null
+
+  const signIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{ session, profile, profiles, loading, signIn, signOut }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth(): AuthState {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
+}

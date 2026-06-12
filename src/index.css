@@ -1,0 +1,31 @@
+@import 'tailwindcss';
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0c0a09;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+/* iOS zooms into inputs under 16px font size */
+input,
+select {
+  font-size: 16px;
+}
