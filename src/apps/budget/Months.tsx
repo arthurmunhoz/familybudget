@@ -23,7 +23,9 @@ export default function Months() {
   const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  // YYYY-MM for monthly budgets (month input), YYYY-MM-DD otherwise
+  const [pickValue, setPickValue] = useState('')
 
   // budget menu (rename / delete)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -63,28 +65,63 @@ export default function Months() {
     return map
   }, [entries])
 
-  // Next period to create: the current calendar period if missing, else the
-  // one right after the latest existing period.
+  const noun = period === 'monthly' ? 'Month' : period === 'weekly' ? 'Week' : 'Day'
+
+  // Suggested default: the current calendar period if missing, else the one
+  // right after the latest existing period.
   const nextStart = useMemo(() => {
     const current = currentPeriodStart(period)
     if (!months.some((m) => m.start_date === current)) return current
     return nextPeriodStart(period, months[0].start_date)
   }, [months, period])
 
-  async function createMonth() {
+  /** Normalize whatever the picker holds to the period's start date:
+   *  monthly = 1st of the month, weekly = that week's Sunday, daily = as is. */
+  const pickedStart = useMemo(() => {
+    if (!pickValue) return null
+    if (period === 'monthly') return `${pickValue}-01`
+    if (period === 'weekly') {
+      const [y, m, d] = pickValue.split('-').map(Number)
+      return addDaysISO(pickValue, -new Date(y, m - 1, d).getDay())
+    }
+    return pickValue
+  }, [pickValue, period])
+
+  const alreadyExists = Boolean(
+    pickedStart && months.some((m) => m.start_date === pickedStart),
+  )
+  // Recurring entries only roll forward into the newest period; periods
+  // added behind existing ones (backfill) start empty.
+  const willCopyRecurring = Boolean(
+    pickedStart && months.length > 0 && pickedStart > months[0].start_date,
+  )
+
+  function openCreate() {
+    setPickValue(period === 'monthly' ? nextStart.slice(0, 7) : nextStart)
+    setCreateOpen(true)
+  }
+
+  async function createMonth(startDate: string, copyRecurring: boolean) {
     if (!budgetId) return
     setCreating(true)
     try {
       const { data: created, error } = await supabase
         .from('months')
-        .insert({ budget_id: budgetId, start_date: nextStart })
+        .insert({ budget_id: budgetId, start_date: startDate })
         .select()
         .single()
-      if (error || !created) throw error
+      if (error || !created) {
+        alert(
+          error?.code === '23505'
+            ? `That ${noun.toLowerCase()} already exists.`
+            : 'Could not create it — please try again.',
+        )
+        return
+      }
 
       // Copy recurring entries from this budget's most recent period, keeping
       // each entry's day offset within the period (clamped to its length).
-      const source = months[0]
+      const source = copyRecurring ? months[0] : null
       if (source) {
         const { data: recurring } = await supabase
           .from('entries')
@@ -210,11 +247,11 @@ export default function Months() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
-          onClick={() => setConfirmOpen(true)}
+          onClick={openCreate}
           disabled={creating || loading}
           className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {creating ? 'Creating…' : `＋ Start ${periodLabel(period, nextStart)}`}
+          {creating ? 'Creating…' : `＋ New ${noun}`}
         </button>
       </div>
 
@@ -288,35 +325,55 @@ export default function Months() {
         </div>
       )}
 
-      {confirmOpen && (
+      {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
-            <h2 className="text-lg font-bold text-(--text)">
-              Start {periodLabel(period, nextStart)}?
-            </h2>
-            <p className="mt-2 text-sm text-(--text-muted)">
-              {months.length > 0
-                ? `Recurring entries from ${periodLabel(
-                    period,
-                    months[0].start_date,
-                  )} will be copied over automatically.`
-                : 'This creates the first period of this budget.'}
-            </p>
+            <h2 className="text-lg font-bold text-(--text)">New {noun.toLowerCase()}</h2>
+            <label className="mt-4 block text-sm text-(--text-muted)">
+              {period === 'monthly'
+                ? 'Which month? Past months work too.'
+                : period === 'weekly'
+                  ? 'Pick any day — the week starts on its Sunday.'
+                  : 'Which day? Past days work too.'}
+            </label>
+            <input
+              type={period === 'monthly' ? 'month' : 'date'}
+              value={pickValue}
+              onChange={(e) => setPickValue(e.target.value)}
+              className="mt-2 flex h-12 w-full items-center rounded-xl bg-(--surface) px-4 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+            />
+            {pickedStart && (
+              <p className="mt-3 text-sm text-(--text-muted)">
+                {alreadyExists ? (
+                  <span className="text-(--expense)">
+                    {periodLabel(period, pickedStart)} already exists.
+                  </span>
+                ) : willCopyRecurring ? (
+                  `${periodLabel(period, pickedStart)} — recurring entries from ${periodLabel(period, months[0].start_date)} will be copied over.`
+                ) : months.length > 0 ? (
+                  `${periodLabel(period, pickedStart)} — added behind your latest ${noun.toLowerCase()}, so it starts empty.`
+                ) : (
+                  `${periodLabel(period, pickedStart)} will be the first ${noun.toLowerCase()} of this budget.`
+                )}
+              </p>
+            )}
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
-                onClick={() => setConfirmOpen(false)}
+                onClick={() => setCreateOpen(false)}
                 className="rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
               >
                 Cancel
               </button>
               <button
                 onClick={() => {
-                  setConfirmOpen(false)
-                  createMonth()
+                  if (!pickedStart) return
+                  setCreateOpen(false)
+                  createMonth(pickedStart, willCopyRecurring)
                 }}
-                className="rounded-xl bg-(--accent) py-3 font-semibold text-white"
+                disabled={!pickedStart || alreadyExists || creating}
+                className="rounded-xl bg-(--accent) py-3 font-semibold text-white disabled:opacity-50"
               >
-                Start
+                Create
               </button>
             </div>
           </div>

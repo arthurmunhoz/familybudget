@@ -90,6 +90,16 @@ export function trackPageView(path: string) {
   track('page_view', { path })
 }
 
+/** Report a crash/error. Flushes immediately — the page may be about to die. */
+export function trackError(error: unknown, extra: Record<string, unknown> = {}) {
+  const err = error instanceof Error ? error : new Error(String(error))
+  track('error', {
+    target: err.message.slice(0, 200),
+    meta: { stack: err.stack?.slice(0, 2000), ...extra },
+  })
+  flush(true)
+}
+
 export function initAnalytics(userEmail: string) {
   email = userEmail
   if (listenersInstalled) return
