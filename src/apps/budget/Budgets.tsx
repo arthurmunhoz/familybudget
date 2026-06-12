@@ -64,7 +64,7 @@ export default function Budgets() {
   }
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
+    <div className="mx-auto min-h-page max-w-md px-4 pb-28">
       <BeachBackdrop />
       <header className="flex items-center gap-2 pt-6 pb-4">
         <button

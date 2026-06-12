@@ -31,6 +31,9 @@ export default function BeachBackdrop() {
             <stop offset="0.55" stopColor="#fbbf24" stopOpacity="0.85" />
             <stop offset="1" stopColor="#fbbf24" stopOpacity="0" />
           </radialGradient>
+          <clipPath id="bb-photo-clip">
+            <rect x="446" y="100" width="132" height="240" rx="4" />
+          </clipPath>
         </defs>
 
         {/* setting sun */}
@@ -81,18 +84,27 @@ export default function BeachBackdrop() {
           opacity="0.7"
         />
 
-        {/* modern stilt beach house */}
-        <g>
-          <rect x="436" y="316" width="6" height="24" fill="#64748b" />
-          <rect x="470" y="316" width="6" height="24" fill="#64748b" />
-          <rect x="540" y="316" width="6" height="24" fill="#64748b" />
-          <rect x="574" y="316" width="6" height="24" fill="#64748b" />
-          <rect x="428" y="310" width="160" height="8" rx="2" fill="#94a3b8" />
-          <rect x="432" y="258" width="152" height="52" rx="2" fill="#f1f5f9" />
-          <rect x="424" y="248" width="168" height="10" rx="3" fill="#475569" />
-          <rect x="446" y="268" width="32" height="30" rx="1" fill="#7cc7d8" />
-          <rect x="492" y="268" width="32" height="30" rx="1" fill="#7cc7d8" />
-          <rect x="544" y="268" width="22" height="42" rx="1" fill="#64748b" />
+        {/* family polaroid planted in the sand */}
+        <g transform="rotate(3 512 230)">
+          <rect
+            x="436"
+            y="90"
+            width="152"
+            height="272"
+            rx="6"
+            fill="#fdfcf9"
+            stroke="#d6d3d1"
+            strokeWidth="2"
+          />
+          <image
+            href="/family.jpg"
+            x="446"
+            y="100"
+            width="132"
+            height="240"
+            preserveAspectRatio="xMidYMid slice"
+            clipPath="url(#bb-photo-clip)"
+          />
         </g>
 
         {/* palm silhouettes */}

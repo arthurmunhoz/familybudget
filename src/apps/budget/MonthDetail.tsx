@@ -137,14 +137,14 @@ export default function MonthDetail() {
 
   if (loading || !month) {
     return (
-      <div className="flex min-h-dvh items-center justify-center">
+      <div className="flex min-h-page items-center justify-center">
         <p className="animate-pulse text-(--text-faint)">Loading…</p>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
+    <div className="mx-auto min-h-page max-w-md px-4 pb-32">
       <header className="flex items-center gap-3 pt-6 pb-4">
         <button
           onClick={() => navigate(`/budget/${month.budget_id}`)}

@@ -50,6 +50,13 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+/* Fills the visible area inside the safe-area padding exactly. Plain 100dvh
+   would overflow by the padding amount, letting short pages scroll up under
+   the status bar / camera area. */
+.min-h-page {
+  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
 input,
 select,
 button {
