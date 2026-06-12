@@ -4,8 +4,8 @@
   "description": "Everything your family runs on — budget, shopping, pets, and documents under one roof",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0c0a09",
-  "theme_color": "#0c0a09",
+  "background_color": "#f5f5f4",
+  "theme_color": "#f5f5f4",
   "icons": [
     { "src": "/roof-icon-180.png", "sizes": "180x180", "type": "image/png" },
     { "src": "/roof-icon-512.png", "sizes": "512x512", "type": "image/png" }

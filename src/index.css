@@ -1,23 +1,8 @@
 @import 'tailwindcss';
 
-/* Theme tokens — components reference these via bg-(--card) etc. */
+/* Theme tokens — components reference these via bg-(--card) etc.
+   Bare :root defaults to LIGHT so first paint matches the app default. */
 :root,
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #0c0a09;
-  --card: #1c1917;
-  --card-active: #292524;
-  --surface: #292524;
-  --surface-2: #44403c;
-  --text: #f5f5f4;
-  --text-muted: #a8a29e;
-  --text-faint: #78716c;
-  --accent: #2563eb;
-  --accent-soft: rgb(37 99 235 / 0.25);
-  --income: #34d399;
-  --expense: #fb7185;
-}
-
 :root[data-theme='light'] {
   color-scheme: light;
   --bg: #f5f5f4;
@@ -32,6 +17,22 @@
   --accent-soft: rgb(37 99 235 / 0.15);
   --income: #059669;
   --expense: #e11d48;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0c0a09;
+  --card: #1c1917;
+  --card-active: #292524;
+  --surface: #292524;
+  --surface-2: #44403c;
+  --text: #f5f5f4;
+  --text-muted: #a8a29e;
+  --text-faint: #78716c;
+  --accent: #2563eb;
+  --accent-soft: rgb(37 99 235 / 0.25);
+  --income: #34d399;
+  --expense: #fb7185;
 }
 
 /* Background lives on html only: if body also had one, it would paint over
