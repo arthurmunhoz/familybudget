@@ -14,7 +14,7 @@ export default function Drawer({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-x-0 top-0 z-50 h-dvh">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div
         className="absolute right-0 top-0 flex h-full w-72 flex-col bg-(--card) p-5"

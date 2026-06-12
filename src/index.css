@@ -48,6 +48,14 @@ body,
   height: 100%;
 }
 
+/* iOS standalone PWAs can report the plain 100% viewport short by the
+   status-bar height, leaving a dead band at the bottom. 100dvh is measured
+   correctly, so prefer it where supported. */
+body,
+#root {
+  height: 100dvh;
+}
+
 body {
   color: var(--text);
   overflow: hidden;

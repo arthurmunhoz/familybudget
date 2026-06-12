@@ -132,7 +132,7 @@ export default function Budgets() {
       )}
 
       <div
-        className="fixed inset-x-0 bottom-0 mx-auto max-w-md px-4 pt-3"
+        className="fixed inset-x-0 top-[100dvh] -translate-y-full mx-auto max-w-md px-4 pt-3"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
@@ -151,7 +151,7 @@ export default function Budgets() {
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+        <div className="fixed inset-x-0 top-0 z-50 h-dvh flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
             <h2 className="text-lg font-bold text-(--text)">New budget</h2>
             <input
