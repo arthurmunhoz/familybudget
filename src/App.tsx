@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AnalyticsTracker from './components/AnalyticsTracker'
+import ErrorBoundary from './components/ErrorBoundary'
 import { useAuth } from './hooks/useAuth'
 import { isConfigured } from './lib/supabase'
 import Login from './pages/Login'
@@ -60,26 +61,28 @@ export default function App() {
   }
 
   return (
-    <Suspense
-      fallback={
-        <Centered>
-          <p className="animate-pulse text-(--text-muted)">Loading…</p>
-        </Centered>
-      }
-    >
-      <AnalyticsTracker />
-      <Routes>
-        <Route path="/" element={<Hub />} />
-        <Route path="/budget" element={<Budgets />} />
-        <Route path="/budget/:budgetId" element={<Months />} />
-        <Route path="/month/:id" element={<MonthDetail />} />
-        <Route path="/shopping" element={<ShoppingList />} />
-        <Route path="/pets" element={<PetCare />} />
-        <Route path="/docs" element={<DocumentVault />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense
+        fallback={
+          <Centered>
+            <p className="animate-pulse text-(--text-muted)">Loading…</p>
+          </Centered>
+        }
+      >
+        <AnalyticsTracker />
+        <Routes>
+          <Route path="/" element={<Hub />} />
+          <Route path="/budget" element={<Budgets />} />
+          <Route path="/budget/:budgetId" element={<Months />} />
+          <Route path="/month/:id" element={<MonthDetail />} />
+          <Route path="/shopping" element={<ShoppingList />} />
+          <Route path="/pets" element={<PetCare />} />
+          <Route path="/docs" element={<DocumentVault />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   )
 }
 

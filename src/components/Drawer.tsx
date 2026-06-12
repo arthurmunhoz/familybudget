@@ -220,6 +220,8 @@ export default function Drawer({
 
         <div className="flex-1" />
 
+        <div className="mt-6 mb-2 h-px shrink-0 bg-(--surface-2) opacity-60" />
+
         <button
           onClick={signOut}
           className="w-full rounded-xl py-3 font-semibold text-(--expense) active:bg-(--surface)"

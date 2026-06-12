@@ -132,4 +132,12 @@ export function initAnalytics(userEmail: string) {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flush(true)
   })
+
+  // Crashes outside React's render path (async handlers, promises).
+  window.addEventListener('error', (e) =>
+    trackError(e.error ?? e.message, { source: 'window' }),
+  )
+  window.addEventListener('unhandledrejection', (e) =>
+    trackError(e.reason, { source: 'promise' }),
+  )
 }

@@ -55,6 +55,9 @@ export default function Admin() {
   const [days, setDays] = useState(30)
   const [activity, setActivity] = useState<Record<string, UserActivity>>({})
   const [stats, setStats] = useState<AppStat[]>([])
+  const [errors, setErrors] = useState<
+    { id: number; user_email: string; target: string | null; path: string | null; created_at: string }[]
+  >([])
 
   // households tab controls
   const [search, setSearch] = useState('')
@@ -85,11 +88,18 @@ export default function Admin() {
   }, [])
 
   const loadAnalytics = useCallback(async (d: number) => {
-    const [act, use, time] = await Promise.all([
+    const [act, use, time, errs] = await Promise.all([
       supabase.rpc('admin_user_activity', { days: d }),
       supabase.rpc('admin_app_usage', { days: d }),
       supabase.rpc('admin_app_time', { days: d }),
+      supabase
+        .from('web_events')
+        .select('id, user_email, target, path, created_at')
+        .eq('type', 'error')
+        .order('created_at', { ascending: false })
+        .limit(10),
     ])
+    setErrors(errs.data ?? [])
     setActivity(
       Object.fromEntries(
         ((act.data ?? []) as UserActivity[]).map((a) => [a.user_email, a]),
@@ -141,6 +151,9 @@ export default function Admin() {
       return (hhLastSeen[b.id] ?? '').localeCompare(hhLastSeen[a.id] ?? '')
     })
   }, [households, users, search, sortKey, hhLastSeen])
+
+  const profileName = (email: string) =>
+    users.find((u) => u.email === email)?.display_name ?? email
 
   if (!profile?.is_admin) return <Navigate to="/" replace />
 
@@ -305,6 +318,29 @@ export default function Admin() {
               Admin accounts are excluded. Time is estimated from activity gaps
               (idle capped at 5 min).
             </p>
+          </section>
+
+          <section className="rounded-2xl bg-(--card) p-4">
+            <h2 className="font-bold text-(--text)">🐞 Recent errors</h2>
+            {errors.length === 0 ? (
+              <p className="mt-3 text-sm text-(--text-faint)">
+                No errors reported. 🎉
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2.5">
+                {errors.map((e) => (
+                  <li key={e.id} className="text-sm">
+                    <p className="break-words font-medium text-(--expense)">
+                      {e.target ?? 'Unknown error'}
+                    </p>
+                    <p className="text-xs text-(--text-faint)">
+                      {e.path ?? '?'} · {profileName(e.user_email)} ·{' '}
+                      {timeAgo(e.created_at)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       ) : (
