@@ -65,20 +65,6 @@ body,
   height: 100dvh;
 }
 
-/* iOS standalone PWAs report the layout viewport short by the status-bar
-   height (browser tabs are unaffected), leaving a dead band at the bottom of
-   the screen. Compensate by the top safe-area inset in standalone mode only. */
-@media all and (display-mode: standalone) {
-  body,
-  #root,
-  .h-screen-real {
-    height: calc(100dvh + env(safe-area-inset-top));
-  }
-
-  .pin-bottom {
-    top: calc(100dvh + env(safe-area-inset-top));
-  }
-}
 
 body {
   color: var(--text);
