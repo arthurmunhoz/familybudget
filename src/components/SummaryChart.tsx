@@ -37,41 +37,6 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
   return (
     <div className="rounded-2xl bg-(--card) p-4">
       <div className="flex items-center gap-4">
-        {/* received vs spent pie with legend */}
-        <div className="shrink-0">
-          <PieChart width={124} height={124}>
-            <Pie
-              data={pieData}
-              dataKey="value"
-              cx="50%"
-              cy="50%"
-              outerRadius={58}
-              strokeWidth={0}
-              isAnimationActive={false}
-            >
-              {pieData.map((d) => (
-                <Cell key={d.name} fill={d.color} />
-              ))}
-            </Pie>
-          </PieChart>
-          <div className="mt-1.5 flex justify-center gap-3 text-[11px] text-(--text-muted)">
-            <span className="flex items-center gap-1">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ background: incomeColor }}
-              />
-              Received
-            </span>
-            <span className="flex items-center gap-1">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ background: expenseColor }}
-              />
-              Spent
-            </span>
-          </div>
-        </div>
-
         {/* balance */}
         <div className="flex flex-1 flex-col items-center justify-center">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-(--text-faint)">
@@ -83,6 +48,47 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
             }`}
           >
             {formatMoney(balance)}
+          </div>
+        </div>
+
+        {/* received vs spent pie with legend */}
+        <div className="flex shrink-0 flex-col items-center">
+          <PieChart width={88} height={88}>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              cx="50%"
+              cy="50%"
+              outerRadius={42}
+              strokeWidth={0}
+              isAnimationActive={false}
+            >
+              {pieData.map((d) => (
+                <Cell key={d.name} fill={d.color} />
+              ))}
+            </Pie>
+          </PieChart>
+          <div className="mt-1.5 space-y-0.5 text-[11px] text-(--text-muted)">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-2 w-2 shrink-0 rounded-full"
+                style={{ background: incomeColor }}
+              />
+              Received
+              <span className="ml-auto pl-2 font-semibold tabular-nums">
+                {formatMoney(income)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-2 w-2 shrink-0 rounded-full"
+                style={{ background: expenseColor }}
+              />
+              Spent
+              <span className="ml-auto pl-2 font-semibold tabular-nums">
+                {formatMoney(spent)}
+              </span>
+            </div>
           </div>
         </div>
       </div>

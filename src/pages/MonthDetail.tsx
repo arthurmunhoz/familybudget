@@ -35,6 +35,7 @@ export default function MonthDetail() {
   const [loading, setLoading] = useState(true)
 
   const [person, setPerson] = useState<string>('all')
+  const [personMenuOpen, setPersonMenuOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [dateDir, setDateDir] = useState<SortDir>('desc')
   const [view, setView] = useState<View>('list')
@@ -151,30 +152,54 @@ export default function MonthDetail() {
         >
           ‹
         </button>
-        <h1 className="text-xl font-bold text-(--text)">
+        <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-(--text)">
           {periodTitle(month.budgets?.period ?? 'monthly', month.start_date)}
         </h1>
+
+        {/* Person filter chip — charts and lists react to it */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setPersonMenuOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface) px-3.5 py-1.5 text-sm font-semibold text-(--text)"
+          >
+            {person === 'all' ? 'Both' : nameOf(person)}
+            <span className="text-[9px] text-(--text-faint)">▼</span>
+          </button>
+          {personMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setPersonMenuOpen(false)}
+              />
+              <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-(--surface) bg-(--card) shadow-xl">
+                {[
+                  { key: 'all', label: 'Both' },
+                  ...profiles.map((p: Profile) => ({
+                    key: p.email,
+                    label: p.display_name,
+                  })),
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => {
+                      setPerson(opt.key)
+                      setPersonMenuOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium active:bg-(--surface) ${
+                      person === opt.key ? 'text-(--accent)' : 'text-(--text)'
+                    }`}
+                  >
+                    {opt.label}
+                    {person === opt.key && <span>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
-      {/* Person filter — charts and lists below react to it */}
-      <div className="grid grid-cols-3 gap-2 rounded-xl bg-(--surface) p-1">
-        {[
-          { key: 'all', label: 'Both' },
-          ...profiles.map((p: Profile) => ({ key: p.email, label: p.display_name })),
-        ].map((opt) => (
-          <button
-            key={opt.key}
-            onClick={() => setPerson(opt.key)}
-            className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
-              person === opt.key ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4">
+      <div className="mt-1">
         <SummaryChart entries={filtered} />
       </div>
 
