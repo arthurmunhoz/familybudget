@@ -2,19 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { useTheme } from '../hooks/useTheme'
+import Drawer from '../components/Drawer'
 import { daysInMonth, formatMoney, monthLabel } from '../lib/format'
 import type { Entry, Month } from '../lib/types'
 
 export default function Months() {
-  const { profile, signOut } = useAuth()
-  const { theme, toggle } = useTheme()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const [months, setMonths] = useState<Month[]>([])
   const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -102,21 +102,13 @@ export default function Months() {
           <h1 className="text-2xl font-bold text-(--text)">Our Budget</h1>
           <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={toggle}
-            aria-label="Toggle light/dark theme"
-            className="rounded-lg px-2 py-2 text-lg"
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <button
-            onClick={signOut}
-            className="rounded-lg px-3 py-2 text-sm text-(--text-faint) active:text-(--text-muted)"
-          >
-            Sign out
-          </button>
-        </div>
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open settings"
+          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+        >
+          ☰
+        </button>
       </header>
 
       {loading ? (
@@ -173,6 +165,8 @@ export default function Months() {
             : `＋ Start ${monthLabel(nextMonth.year, nextMonth.month)}`}
         </button>
       </div>
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">

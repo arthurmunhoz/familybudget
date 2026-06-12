@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import EntryForm from '../components/EntryForm'
+import EntryForm, { type EntryPrefill } from '../components/EntryForm'
+import { fileToResizedBase64 } from '../lib/image'
 import SummaryChart from '../components/SummaryChart'
 import { useAuth } from '../hooks/useAuth'
 import { categoryById } from '../lib/categories'
@@ -26,6 +27,9 @@ export default function MonthDetail() {
   const [view, setView] = useState<View>('list')
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Entry | null>(null)
+  const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
+  const [scanning, setScanning] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -61,6 +65,37 @@ export default function MonthDetail() {
 
   const nameOf = (email: string) =>
     profiles.find((p) => p.email === email)?.display_name ?? email
+
+  async function scanReceipt(file: File) {
+    setScanning(true)
+    try {
+      const { data, mediaType } = await fileToResizedBase64(file)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch('/api/scan-receipt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ image: data, media_type: mediaType }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error ?? 'Scan failed')
+      setEditing(null)
+      setPrefill({
+        label: result.label,
+        amount: result.amount,
+        category: result.category,
+        entry_date: result.date,
+      })
+      setFormOpen(true)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not read the receipt.')
+    } finally {
+      setScanning(false)
+    }
+  }
 
   if (loading || !month) {
     return (
@@ -169,21 +204,54 @@ export default function MonthDetail() {
         </div>
       )}
 
-      {/* Add button */}
+      {/* Add + scan buttons */}
       <div
-        className="fixed inset-x-0 bottom-0 mx-auto max-w-md px-4 pt-3"
+        className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md gap-3 px-4 pt-3"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={scanning}
+          aria-label="Scan a receipt"
+          className="rounded-2xl bg-(--surface) px-5 text-2xl active:scale-[0.98] transition-transform disabled:opacity-50"
+        >
+          📷
+        </button>
+        <button
           onClick={() => {
             setEditing(null)
+            setPrefill(undefined)
             setFormOpen(true)
           }}
-          className="w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform"
+          className="flex-1 rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform"
         >
           ＋ Add entry
         </button>
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) scanReceipt(file)
+        }}
+      />
+
+      {scanning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="rounded-2xl bg-(--card) px-6 py-5 text-center">
+            <div className="text-3xl">🧾</div>
+            <p className="mt-2 animate-pulse font-semibold text-(--text)">
+              Reading receipt…
+            </p>
+          </div>
+        </div>
+      )}
 
       {formOpen && profile && (
         <EntryForm
@@ -192,9 +260,14 @@ export default function MonthDetail() {
           myEmail={profile.email}
           rules={rules}
           entry={editing}
-          onClose={() => setFormOpen(false)}
+          initial={prefill}
+          onClose={() => {
+            setFormOpen(false)
+            setPrefill(undefined)
+          }}
           onSaved={() => {
             setFormOpen(false)
+            setPrefill(undefined)
             load()
           }}
         />

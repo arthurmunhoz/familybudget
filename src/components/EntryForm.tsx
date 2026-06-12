@@ -4,6 +4,13 @@ import { todayISO } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { CategoryRule, Entry, EntryType, Month, Profile } from '../lib/types'
 
+export interface EntryPrefill {
+  label?: string
+  amount?: number
+  category?: string
+  entry_date?: string | null
+}
+
 interface Props {
   month: Month
   profiles: Profile[]
@@ -11,6 +18,8 @@ interface Props {
   rules: CategoryRule[]
   /** null = creating a new entry */
   entry: Entry | null
+  /** Prefilled values for a new entry (e.g. from a scanned receipt) */
+  initial?: EntryPrefill
   onClose: () => void
   onSaved: () => void
 }
@@ -21,6 +30,7 @@ export default function EntryForm({
   myEmail,
   rules,
   entry,
+  initial,
   onClose,
   onSaved,
 }: Props) {
@@ -28,13 +38,24 @@ export default function EntryForm({
   const defaultDate = todayISO().startsWith(monthPrefix)
     ? todayISO()
     : `${monthPrefix}-01`
+  // Only keep a prefilled date if it actually falls inside this month.
+  const initialDate =
+    initial?.entry_date && initial.entry_date.startsWith(monthPrefix)
+      ? initial.entry_date
+      : undefined
 
   const [type, setType] = useState<EntryType>(entry?.type ?? 'expense')
-  const [label, setLabel] = useState(entry?.label ?? '')
-  const [amount, setAmount] = useState(entry ? String(entry.amount) : '')
-  const [category, setCategory] = useState(entry?.category ?? 'other')
-  const [categoryTouched, setCategoryTouched] = useState(Boolean(entry))
-  const [date, setDate] = useState(entry?.entry_date ?? defaultDate)
+  const [label, setLabel] = useState(entry?.label ?? initial?.label ?? '')
+  const [amount, setAmount] = useState(
+    entry ? String(entry.amount) : initial?.amount ? String(initial.amount) : '',
+  )
+  const [category, setCategory] = useState(
+    entry?.category ?? initial?.category ?? 'other',
+  )
+  const [categoryTouched, setCategoryTouched] = useState(
+    Boolean(entry) || Boolean(initial?.category),
+  )
+  const [date, setDate] = useState(entry?.entry_date ?? initialDate ?? defaultDate)
   const [recurring, setRecurring] = useState(entry?.recurring ?? false)
   const [personEmail, setPersonEmail] = useState(entry?.person_email ?? myEmail)
   const [saving, setSaving] = useState(false)
