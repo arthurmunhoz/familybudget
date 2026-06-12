@@ -94,6 +94,10 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
       </div>
 
       {categories.length > 0 && (
+        <hr className="mt-4 border-t border-(--surface)" />
+      )}
+
+      {categories.length > 0 && (
         <div className="mt-4 space-y-2">
           {categories.map(([catId, amount]) => {
             const cat = categoryById(catId)
