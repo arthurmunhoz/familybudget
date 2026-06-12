@@ -40,3 +40,12 @@ export const APPS: HubApp[] = [
     description: 'IDs, insurance & records',
   },
 ]
+
+/** Shown on the hub only for admins (profile.is_admin). */
+export const ADMIN_APP: HubApp = {
+  id: 'admin',
+  name: 'Admin',
+  icon: '🛠️',
+  route: '/admin',
+  description: 'Households & members',
+}

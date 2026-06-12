@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     supabase
       .from('allowed_users')
-      .select('email, display_name')
+      .select('email, display_name, household_id, is_admin')
       .then(({ data }) => {
         if (cancelled) return
         setProfiles(data ?? [])
@@ -58,8 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [session])
 
-  const profile =
+  const self =
     profiles.find((p) => p.email === session?.user.email) ?? null
+  // Admins can read every household's users (for the Admin page), but person
+  // filters and name lookups should only ever show the user's own household.
+  const householdProfiles = self
+    ? profiles.filter((p) => p.household_id === self.household_id)
+    : []
 
   const signIn = async () => {
     await supabase.auth.signInWithOAuth({
@@ -74,7 +79,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, profiles, loading, signIn, signOut }}
+      value={{
+        session,
+        profile: self,
+        profiles: householdProfiles,
+        loading,
+        signIn,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

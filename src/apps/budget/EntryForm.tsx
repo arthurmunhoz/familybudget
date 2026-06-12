@@ -98,10 +98,14 @@ export default function EntryForm({
       return
     }
     // Learn this label → category choice for future auto-categorization.
-    if (type === 'expense') {
+    const householdId = profiles[0]?.household_id
+    if (type === 'expense' && householdId) {
       await supabase
         .from('category_rules')
-        .upsert({ keyword: normalizeLabel(label), category })
+        .upsert(
+          { household_id: householdId, keyword: normalizeLabel(label), category },
+          { onConflict: 'household_id,keyword' },
+        )
     }
     onSaved()
   }

@@ -163,3 +163,11 @@ create policy documents_storage_rw on storage.objects
   for all to authenticated
   using (bucket_id = 'documents' and public.is_allowed())
   with check (bucket_id = 'documents' and public.is_allowed());
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- NOTE: this file is the original bootstrap and is no longer a complete,
+-- standalone setup. Later changes live in their own files — apply in order:
+--   migration-004-shopping.sql   (shopping_items + realtime)
+--   migration-005-pets.sql       (pet care log)
+--   migration-006-documents.sql  (document vault + storage bucket)
+--   migration-007-households.sql (multi-tenancy: households, admin, RLS rewrite)

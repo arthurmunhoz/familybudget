@@ -29,11 +29,13 @@ function formatBytes(n: number): string {
 
 export default function DocumentVault() {
   const back = useBack()
-  const { profile } = useAuth()
+  const { profile, profiles } = useAuth()
   const fileInput = useRef<HTMLInputElement>(null)
   const [docs, setDocs] = useState<FamilyDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<DocCategory | 'all'>('all')
+  const [person, setPerson] = useState<string>('all')
+  const [personMenuOpen, setPersonMenuOpen] = useState(false)
 
   // upload form state — appears after a file is picked
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -58,9 +60,15 @@ export default function DocumentVault() {
   }, [load])
 
   const visible = useMemo(
-    () => (filter === 'all' ? docs : docs.filter((d) => d.category === filter)),
-    [docs, filter],
+    () =>
+      docs
+        .filter((d) => filter === 'all' || d.category === filter)
+        .filter((d) => person === 'all' || d.added_by === person),
+    [docs, filter, person],
   )
+
+  const nameOf = (email: string) =>
+    profiles.find((p) => p.email === email)?.display_name ?? email
 
   function pickFile() {
     fileInput.current?.click()
@@ -83,7 +91,8 @@ export default function DocumentVault() {
     if (!pendingFile || !fTitle.trim() || !profile || uploading) return
     setUploading(true)
     const ext = pendingFile.name.split('.').pop()?.toLowerCase() ?? 'bin'
-    const path = `${fCategory}/${crypto.randomUUID()}.${ext}`
+    // Storage RLS only allows paths inside the user's own household folder.
+    const path = `${profile.household_id}/${fCategory}/${crypto.randomUUID()}.${ext}`
     const { error: storageError } = await supabase.storage
       .from('documents')
       .upload(path, pendingFile, { contentType: pendingFile.type || 'application/octet-stream' })
@@ -137,7 +146,51 @@ export default function DocumentVault() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">📄 Documents</h1>
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
+          📄 Documents
+        </h1>
+
+        {/* Person filter chip — same pattern as the budget entries list */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setPersonMenuOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface) px-3.5 py-1.5 text-sm font-semibold text-(--text)"
+          >
+            {person === 'all' ? 'Everyone' : nameOf(person)}
+            <span className="text-[9px] text-(--text-faint)">▼</span>
+          </button>
+          {personMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setPersonMenuOpen(false)}
+              />
+              <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-(--surface) bg-(--card) shadow-xl">
+                {[
+                  { key: 'all', label: 'Everyone' },
+                  ...profiles.map((p) => ({
+                    key: p.email,
+                    label: p.display_name,
+                  })),
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => {
+                      setPerson(opt.key)
+                      setPersonMenuOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium active:bg-(--surface) ${
+                      person === opt.key ? 'text-(--accent)' : 'text-(--text)'
+                    }`}
+                  >
+                    {opt.label}
+                    {person === opt.key && <span>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       {/* category filter */}

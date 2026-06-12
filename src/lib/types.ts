@@ -3,6 +3,14 @@ export type EntryType = 'expense' | 'income'
 export interface Profile {
   email: string
   display_name: string
+  household_id: string
+  is_admin: boolean
+}
+
+export interface Household {
+  id: string
+  name: string
+  created_at: string
 }
 
 export type Period = 'daily' | 'weekly' | 'monthly'

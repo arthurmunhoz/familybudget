@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import BeachBackdrop from '../components/BeachBackdrop'
 import Drawer from '../components/Drawer'
 import { useAuth } from '../hooks/useAuth'
-import { APPS } from '../lib/apps'
+import { ADMIN_APP, APPS } from '../lib/apps'
 
 export default function Hub() {
   const { profile } = useAuth()
@@ -28,7 +28,7 @@ export default function Hub() {
       </header>
 
       <div className="grid grid-cols-2 gap-3">
-        {APPS.map((app) => (
+        {[...APPS, ...(profile?.is_admin ? [ADMIN_APP] : [])].map((app) => (
           <button
             key={app.id}
             onClick={() => navigate(app.route)}

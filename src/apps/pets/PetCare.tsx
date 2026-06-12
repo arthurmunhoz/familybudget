@@ -31,6 +31,11 @@ export default function PetCare() {
   const [fNotes, setFNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [showPetForm, setShowPetForm] = useState(false)
+  const [pName, setPName] = useState('')
+  const [pEmoji, setPEmoji] = useState('🐶')
+  const [savingPet, setSavingPet] = useState(false)
+
   const load = useCallback(async () => {
     const [petsRes, eventsRes] = await Promise.all([
       supabase.from('pets').select('*').order('name'),
@@ -108,6 +113,23 @@ export default function PetCare() {
     load()
   }
 
+  async function savePet() {
+    if (!pName.trim() || savingPet) return
+    setSavingPet(true)
+    const { error } = await supabase
+      .from('pets')
+      .insert({ name: pName.trim(), emoji: pEmoji.trim() || '🐶' })
+    setSavingPet(false)
+    if (error) {
+      alert('Could not add the pet — please try again.')
+      return
+    }
+    setShowPetForm(false)
+    setPName('')
+    setPEmoji('🐶')
+    load()
+  }
+
   async function remove(event: PetEvent) {
     const pet = petById[event.pet_id]
     if (!confirm(`Delete "${event.title}" for ${pet?.name ?? 'this pet'}?`)) return
@@ -141,6 +163,9 @@ export default function PetCare() {
             {p.emoji} {p.name}
           </FilterChip>
         ))}
+        <FilterChip active={false} onClick={() => setShowPetForm(true)}>
+          +
+        </FilterChip>
       </div>
 
       {loading ? (
@@ -184,7 +209,16 @@ export default function PetCare() {
             </section>
           )}
 
-          {visible.length === 0 ? (
+          {pets.length === 0 ? (
+            <div className="mt-16 text-center text-(--text-muted)">
+              <div className="text-5xl">🐾</div>
+              <p className="mt-4">No pets yet.</p>
+              <p className="text-sm text-(--text-faint)">
+                Add your pets with the + above, then start logging vet visits,
+                vaccines and meds.
+              </p>
+            </div>
+          ) : visible.length === 0 ? (
             <div className="mt-16 text-center text-(--text-muted)">
               <div className="text-5xl">🐾</div>
               <p className="mt-4">No events yet.</p>
@@ -307,11 +341,48 @@ export default function PetCare() {
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
         >
           <button
-            onClick={openForm}
+            onClick={() => (pets.length === 0 ? setShowPetForm(true) : openForm())}
             className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 font-bold text-white shadow-lg active:scale-[0.98] transition-transform"
           >
-            + New event
+            {pets.length === 0 ? '+ Add pet' : '+ New event'}
           </button>
+        </div>
+      )}
+
+      {/* add pet sheet */}
+      {showPetForm && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/50"
+          onClick={() => setShowPetForm(false)}
+        >
+          <div
+            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-4 text-lg font-bold text-(--text)">Add pet</h2>
+            <div className="flex gap-3">
+              <input
+                value={pEmoji}
+                onChange={(e) => setPEmoji(e.target.value)}
+                aria-label="Pet emoji"
+                className="w-16 rounded-xl bg-(--surface) px-0 py-3 text-center text-xl outline-none focus:ring-2 focus:ring-(--accent)"
+              />
+              <input
+                value={pName}
+                onChange={(e) => setPName(e.target.value)}
+                placeholder="Name"
+                className="min-w-0 flex-1 rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+              />
+            </div>
+            <button
+              onClick={savePet}
+              disabled={!pName.trim() || savingPet}
+              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {savingPet ? 'Saving…' : 'Add pet'}
+            </button>
+          </div>
         </div>
       )}
     </div>
