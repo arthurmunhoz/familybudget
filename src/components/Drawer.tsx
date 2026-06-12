@@ -51,8 +51,8 @@ export default function Drawer({
     }
     setBusy(true)
     try {
-      // Downscale to keep storage small; backdrop renders at low opacity anyway.
-      const { data } = await fileToResizedBase64(file, 1200)
+      // Downscale to keep storage small — 1800px holds up at full-screen cover.
+      const { data } = await fileToResizedBase64(file, 1800)
       const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0))
       const blob = new Blob([bytes], { type: 'image/jpeg' })
       const path = `${profile.household_id}/backdrop/${crypto.randomUUID()}.jpg`

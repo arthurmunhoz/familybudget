@@ -65,17 +65,29 @@ export default function Backdrop() {
 
   if (path === 'builtin:beach') return <BeachBackdrop photoUrl={url} />
 
-  // No custom image → the bundled, theme-matched One Roof default.
-  const src = !path ? DEFAULT_BACKDROP[theme] : url
-  if (!src) return null
+  // Uploaded family photo: fill the whole screen. object-cover preserves the
+  // aspect ratio (crops the overflow edges, never stretches or distorts).
+  if (path) {
+    if (!url) return null
+    return (
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 mx-auto max-w-md select-none"
+        style={{ opacity: 0.25 }}
+      >
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      </div>
+    )
+  }
 
+  // No custom image → the bundled One Roof art, a band along the bottom.
   return (
     <div
       aria-hidden
       className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 mx-auto max-w-md select-none"
       style={{ opacity: 0.25 }}
     >
-      <img src={src} alt="" className="w-full" />
+      <img src={DEFAULT_BACKDROP[theme]} alt="" className="w-full" />
     </div>
   )
 }
