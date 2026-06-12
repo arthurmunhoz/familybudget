@@ -1,13 +1,22 @@
+import { DEFAULT_BACKDROP } from '../components/Backdrop'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 
 export default function Login() {
   const { signIn } = useAuth()
+  const { theme } = useTheme()
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
+      {/* One Roof default art, full strength — this is the branding moment */}
+      <img
+        aria-hidden
+        src={DEFAULT_BACKDROP[theme]}
+        alt=""
+        className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 mx-auto w-full max-w-md select-none"
+      />
       <div className="text-center">
-        <div className="text-6xl">🏠</div>
-        <h1 className="mt-4 text-3xl font-bold text-(--text)">One Roof</h1>
+        <h1 className="text-3xl font-bold text-(--text)">One Roof</h1>
         <p className="mt-2 text-(--text-muted)">Your family, under one roof.</p>
       </div>
       <button

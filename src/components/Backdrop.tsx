@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useHousehold } from '../hooks/useHousehold'
+import { useTheme } from '../hooks/useTheme'
 import { supabase } from '../lib/supabase'
 import BeachBackdrop from './BeachBackdrop'
+
+/** Bundled One Roof default art, per theme. Not stored in the database, so it
+ *  can never be deleted — households without a custom image always get it. */
+export const DEFAULT_BACKDROP = {
+  light: '/default-backdrop-light.png',
+  dark: '/default-backdrop-dark.png',
+}
 
 // Signed URLs live ~1h; cache them per path so navigating between pages
 // doesn't re-request one on every mount.
@@ -14,6 +22,7 @@ const urlCache = new Map<string, { url: string; expires: number }>()
  */
 export default function Backdrop() {
   const { household } = useHousehold()
+  const { theme } = useTheme()
   const path = household?.backdrop_path ?? null
 
   // The beach scene's polaroid photo also lives in private storage, under a
@@ -54,9 +63,11 @@ export default function Backdrop() {
     }
   }, [storagePath])
 
-  if (!path) return null
   if (path === 'builtin:beach') return <BeachBackdrop photoUrl={url} />
-  if (!url) return null
+
+  // No custom image → the bundled, theme-matched One Roof default.
+  const src = !path ? DEFAULT_BACKDROP[theme] : url
+  if (!src) return null
 
   return (
     <div
@@ -64,7 +75,7 @@ export default function Backdrop() {
       className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 mx-auto max-w-md select-none"
       style={{ opacity: 0.25 }}
     >
-      <img src={url} alt="" className="w-full" />
+      <img src={src} alt="" className="w-full" />
     </div>
   )
 }
