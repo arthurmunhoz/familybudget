@@ -34,9 +34,13 @@
   --expense: #e11d48;
 }
 
-html,
-body {
+/* Background lives on html only: if body also had one, it would paint over
+   fixed elements with negative z-index (like the home-screen backdrop). */
+html {
   background: var(--bg);
+}
+
+body {
   color: var(--text);
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
