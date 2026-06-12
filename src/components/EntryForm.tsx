@@ -190,14 +190,14 @@ export default function EntryForm({
           </div>
         )}
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-4">
           <label className="block text-sm text-(--text-muted)">
             Date
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full rounded-xl bg-(--surface) px-3 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+              className="mt-1 block h-12 w-full appearance-none rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
           </label>
           <label className="block text-sm text-(--text-muted)">
@@ -205,7 +205,7 @@ export default function EntryForm({
             <select
               value={personEmail}
               onChange={(e) => setPersonEmail(e.target.value)}
-              className="mt-1 w-full appearance-none rounded-xl bg-(--surface) px-3 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+              className="mt-1 block h-12 w-full appearance-none rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             >
               {profiles.map((p) => (
                 <option key={p.email} value={p.email}>

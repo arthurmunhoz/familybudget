@@ -70,6 +70,15 @@ export default function MonthDetail() {
   const nameOf = (email: string) =>
     profiles.find((p) => p.email === email)?.display_name ?? email
 
+  async function removeEntry(e: Entry) {
+    setEntries((list) => list.filter((x) => x.id !== e.id))
+    const { error } = await supabase.from('entries').delete().eq('id', e.id)
+    if (error) {
+      alert('Could not delete the entry — please try again.')
+      load()
+    }
+  }
+
   async function scanReceipt(file: File) {
     setScanning(true)
     try {
@@ -195,6 +204,7 @@ export default function MonthDetail() {
             setEditing(e)
             setFormOpen(true)
           }}
+          onDelete={removeEntry}
         />
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-3">
@@ -213,6 +223,7 @@ export default function MonthDetail() {
                   setEditing(e)
                   setFormOpen(true)
                 }}
+                onDelete={removeEntry}
               />
             </div>
           ))}
@@ -228,7 +239,7 @@ export default function MonthDetail() {
           onClick={() => fileInputRef.current?.click()}
           disabled={scanning}
           aria-label="Scan a receipt"
-          className="rounded-2xl bg-(--surface) px-5 text-2xl active:scale-[0.98] transition-transform disabled:opacity-50"
+          className="rounded-2xl border border-white/30 bg-(--surface) px-5 text-2xl shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
           📷
         </button>
@@ -238,9 +249,9 @@ export default function MonthDetail() {
             setPrefill(undefined)
             setFormOpen(true)
           }}
-          className="flex-1 rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform"
+          className="flex-1 rounded-2xl border border-white/30 bg-(--accent) py-4 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform"
         >
-          ＋ Add entry
+          ＋ New Entry
         </button>
       </div>
 
@@ -298,6 +309,7 @@ function EntryColumn({
   groupByDay = false,
   compact = false,
   onSelect,
+  onDelete,
 }: {
   entries: Entry[]
   nameOf: (email: string) => string
@@ -305,6 +317,7 @@ function EntryColumn({
   groupByDay?: boolean
   compact?: boolean
   onSelect: (e: Entry) => void
+  onDelete: (e: Entry) => void
 }) {
   if (entries.length === 0) {
     return (
@@ -341,6 +354,7 @@ function EntryColumn({
                   showDate={false}
                   compact={compact}
                   onSelect={onSelect}
+                  onDelete={onDelete}
                 />
               ))}
             </ul>
@@ -361,6 +375,7 @@ function EntryColumn({
           showDate
           compact={compact}
           onSelect={onSelect}
+          onDelete={onDelete}
         />
       ))}
     </ul>
@@ -374,6 +389,7 @@ function EntryRow({
   showDate,
   compact,
   onSelect,
+  onDelete,
 }: {
   entry: Entry
   nameOf: (email: string) => string
@@ -381,7 +397,13 @@ function EntryRow({
   showDate: boolean
   compact: boolean
   onSelect: (e: Entry) => void
+  onDelete: (e: Entry) => void
 }) {
+  const REVEAL = compact ? 64 : 84
+  const [dx, setDx] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const touchStart = useRef<{ x: number; y: number; base: number } | null>(null)
+
   const cat = categoryById(e.category)
   const isIncome = e.type === 'income'
   const secondary = [
@@ -391,10 +413,47 @@ function EntryRow({
     .filter(Boolean)
     .join(' · ')
   return (
-    <li>
+    <li className="relative overflow-hidden rounded-xl">
       <button
-        onClick={() => onSelect(e)}
-        className={`flex w-full items-center gap-2 rounded-xl bg-(--card) text-left active:bg-(--card-active) transition-colors ${
+        onClick={() => {
+          setDx(0)
+          onDelete(e)
+        }}
+        tabIndex={dx === 0 ? -1 : 0}
+        className="absolute inset-y-0 right-0 flex items-center justify-center bg-(--expense) text-sm font-bold text-white"
+        style={{ width: REVEAL }}
+      >
+        Delete
+      </button>
+      <button
+        onClick={() => {
+          if (dx !== 0) setDx(0)
+          else onSelect(e)
+        }}
+        onTouchStart={(t) => {
+          const p = t.touches[0]
+          touchStart.current = { x: p.clientX, y: p.clientY, base: dx }
+          setDragging(true)
+        }}
+        onTouchMove={(t) => {
+          const s = touchStart.current
+          if (!s) return
+          const p = t.touches[0]
+          const moveX = p.clientX - s.x
+          if (Math.abs(moveX) < Math.abs(p.clientY - s.y)) return
+          setDx(Math.min(0, Math.max(-REVEAL, s.base + moveX)))
+        }}
+        onTouchEnd={() => {
+          setDragging(false)
+          touchStart.current = null
+          setDx((d) => (d < -REVEAL / 2 ? -REVEAL : 0))
+        }}
+        style={{
+          transform: `translateX(${dx}px)`,
+          transition: dragging ? 'none' : 'transform 0.2s ease',
+          touchAction: 'pan-y',
+        }}
+        className={`relative flex w-full items-center gap-2 rounded-xl bg-(--card) text-left active:bg-(--card-active) ${
           compact ? 'px-2.5 py-2' : 'px-4 py-3'
         }`}
       >
