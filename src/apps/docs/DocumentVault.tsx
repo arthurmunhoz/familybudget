@@ -1,0 +1,336 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAuth } from '../../hooks/useAuth'
+import { useBack } from '../../hooks/useBack'
+import { formatDay } from '../../lib/format'
+import { supabase } from '../../lib/supabase'
+import type { DocCategory, FamilyDocument } from '../../lib/types'
+
+const CATEGORIES: { id: DocCategory; icon: string; label: string }[] = [
+  { id: 'ids', icon: '🪪', label: 'IDs' },
+  { id: 'insurance', icon: '🛡️', label: 'Insurance' },
+  { id: 'medical', icon: '🏥', label: 'Medical' },
+  { id: 'pets', icon: '🐾', label: 'Pets' },
+  { id: 'home', icon: '🏠', label: 'Home' },
+  { id: 'receipts', icon: '🧾', label: 'Receipts' },
+  { id: 'other', icon: '📦', label: 'Other' },
+]
+const CAT_META = Object.fromEntries(CATEGORIES.map((c) => [c.id, c])) as Record<
+  DocCategory,
+  (typeof CATEGORIES)[number]
+>
+
+const MAX_SIZE = 20 * 1024 * 1024 // storage free tier is small — keep files reasonable
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export default function DocumentVault() {
+  const back = useBack()
+  const { profile } = useAuth()
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [docs, setDocs] = useState<FamilyDocument[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<DocCategory | 'all'>('all')
+
+  // upload form state — appears after a file is picked
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [fTitle, setFTitle] = useState('')
+  const [fCategory, setFCategory] = useState<DocCategory>('other')
+  const [uploading, setUploading] = useState(false)
+
+  // in-app preview
+  const [preview, setPreview] = useState<{ doc: FamilyDocument; url: string } | null>(null)
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from('documents')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setDocs(data ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const visible = useMemo(
+    () => (filter === 'all' ? docs : docs.filter((d) => d.category === filter)),
+    [docs, filter],
+  )
+
+  function pickFile() {
+    fileInput.current?.click()
+  }
+
+  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file later
+    if (!file) return
+    if (file.size > MAX_SIZE) {
+      alert(`That file is ${formatBytes(file.size)} — the limit is 20 MB.`)
+      return
+    }
+    setPendingFile(file)
+    setFTitle(file.name.replace(/\.[^.]+$/, ''))
+    setFCategory(filter !== 'all' ? filter : 'other')
+  }
+
+  async function upload() {
+    if (!pendingFile || !fTitle.trim() || !profile || uploading) return
+    setUploading(true)
+    const ext = pendingFile.name.split('.').pop()?.toLowerCase() ?? 'bin'
+    const path = `${fCategory}/${crypto.randomUUID()}.${ext}`
+    const { error: storageError } = await supabase.storage
+      .from('documents')
+      .upload(path, pendingFile, { contentType: pendingFile.type || 'application/octet-stream' })
+    if (storageError) {
+      setUploading(false)
+      alert('Upload failed — please try again.')
+      return
+    }
+    const { error: dbError } = await supabase.from('documents').insert({
+      title: fTitle.trim(),
+      category: fCategory,
+      file_path: path,
+      mime_type: pendingFile.type || 'application/octet-stream',
+      size_bytes: pendingFile.size,
+      added_by: profile.email,
+    })
+    setUploading(false)
+    if (dbError) {
+      await supabase.storage.from('documents').remove([path])
+      alert('Could not save the document — please try again.')
+      return
+    }
+    setPendingFile(null)
+    load()
+  }
+
+  async function open(doc: FamilyDocument) {
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(doc.file_path, 3600)
+    if (error || !data) {
+      alert('Could not open the document — please try again.')
+      return
+    }
+    setPreview({ doc, url: data.signedUrl })
+  }
+
+  async function remove(doc: FamilyDocument) {
+    if (!confirm(`Delete "${doc.title}"? This can't be undone.`)) return
+    setDocs((list) => list.filter((d) => d.id !== doc.id))
+    await supabase.storage.from('documents').remove([doc.file_path])
+    await supabase.from('documents').delete().eq('id', doc.id)
+  }
+
+  return (
+    <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
+      <header className="flex items-center gap-2 pt-6 pb-4">
+        <button
+          onClick={() => back('/')}
+          className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
+        >
+          ‹
+        </button>
+        <h1 className="flex-1 text-2xl font-bold text-(--text)">📄 Documents</h1>
+      </header>
+
+      {/* category filter */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-4">
+        <CatChip active={filter === 'all'} onClick={() => setFilter('all')}>
+          All
+        </CatChip>
+        {CATEGORIES.map((c) => (
+          <CatChip key={c.id} active={filter === c.id} onClick={() => setFilter(c.id)}>
+            {c.icon} {c.label}
+          </CatChip>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
+      ) : visible.length === 0 ? (
+        <div className="mt-16 text-center text-(--text-muted)">
+          <div className="text-5xl">🗂️</div>
+          <p className="mt-4">Nothing here yet.</p>
+          <p className="text-sm text-(--text-faint)">
+            Snap photos of IDs, insurance cards, vaccine records — they'll be
+            safe here when you need them.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {visible.map((doc) => (
+            <li key={doc.id}>
+              <div className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3">
+                <button
+                  onClick={() => open(doc)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <span className="text-2xl">
+                    {doc.mime_type.startsWith('image/') ? '🖼️' : '📄'}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-(--text)">
+                      {doc.title}
+                    </span>
+                    <span className="block text-xs text-(--text-faint)">
+                      {CAT_META[doc.category].icon} {CAT_META[doc.category].label} ·{' '}
+                      {formatDay(doc.created_at.slice(0, 10))} · {formatBytes(doc.size_bytes)}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => remove(doc)}
+                  aria-label={`Delete ${doc.title}`}
+                  className="px-1 text-(--text-faint) active:text-(--expense)"
+                >
+                  ✕
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* hidden picker — accepts camera, photo library, and files on iOS */}
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*,application/pdf"
+        onChange={onFilePicked}
+        className="hidden"
+      />
+
+      {/* upload form */}
+      {pendingFile && (
+        <div
+          className="fixed inset-0 z-20 flex items-end bg-black/50"
+          onClick={() => !uploading && setPendingFile(null)}
+        >
+          <div
+            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-1 text-lg font-bold text-(--text)">Add document</h2>
+            <p className="mb-4 text-xs text-(--text-faint)">
+              {pendingFile.name} · {formatBytes(pendingFile.size)}
+            </p>
+
+            <input
+              value={fTitle}
+              onChange={(e) => setFTitle(e.target.value)}
+              placeholder="Title"
+              className="w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+            />
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => (
+                <CatChip
+                  key={c.id}
+                  active={fCategory === c.id}
+                  onClick={() => setFCategory(c.id)}
+                >
+                  {c.icon} {c.label}
+                </CatChip>
+              ))}
+            </div>
+
+            <button
+              onClick={upload}
+              disabled={!fTitle.trim() || uploading}
+              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+            >
+              {uploading ? 'Uploading…' : 'Save document'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* full-screen preview */}
+      {preview && (
+        <div className="fixed inset-0 z-30 flex flex-col bg-black/90">
+          <header
+            className="flex items-center gap-3 px-4 pb-3"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
+          >
+            <button
+              onClick={() => setPreview(null)}
+              className="rounded-lg px-2 py-1 text-xl text-white/70 active:text-white"
+            >
+              ✕
+            </button>
+            <h2 className="min-w-0 flex-1 truncate font-semibold text-white">
+              {preview.doc.title}
+            </h2>
+            <a
+              href={preview.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-semibold text-(--accent)"
+            >
+              Open ↗
+            </a>
+          </header>
+          {preview.doc.mime_type.startsWith('image/') ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+              <img
+                src={preview.url}
+                alt={preview.doc.title}
+                className="max-h-full max-w-full rounded-lg object-contain"
+              />
+            </div>
+          ) : (
+            <iframe
+              src={preview.url}
+              title={preview.doc.title}
+              className="min-h-0 flex-1 bg-white"
+            />
+          )}
+        </div>
+      )}
+
+      {/* add button */}
+      {!pendingFile && !preview && (
+        <div
+          className="fixed inset-x-0 bottom-0 mx-auto max-w-md px-4 pt-3"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
+        >
+          <button
+            onClick={pickFile}
+            className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 font-bold text-white shadow-lg active:scale-[0.98] transition-transform"
+          >
+            + Add document
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CatChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+        active ? 'bg-(--accent) text-white' : 'bg-(--surface) text-(--text-muted)'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}

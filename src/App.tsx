@@ -10,6 +10,8 @@ const Budgets = lazy(() => import('./apps/budget/Budgets'))
 const Months = lazy(() => import('./apps/budget/Months'))
 const MonthDetail = lazy(() => import('./apps/budget/MonthDetail'))
 const ShoppingList = lazy(() => import('./apps/shopping/ShoppingList'))
+const PetCare = lazy(() => import('./apps/pets/PetCare'))
+const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
 
 export default function App() {
   const { session, profile, loading, signOut } = useAuth()
@@ -69,6 +71,8 @@ export default function App() {
         <Route path="/budget/:budgetId" element={<Months />} />
         <Route path="/month/:id" element={<MonthDetail />} />
         <Route path="/shopping" element={<ShoppingList />} />
+        <Route path="/pets" element={<PetCare />} />
+        <Route path="/docs" element={<DocumentVault />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

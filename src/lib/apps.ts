@@ -25,4 +25,18 @@ export const APPS: HubApp[] = [
     route: '/shopping',
     description: 'Shared grocery list, live sync',
   },
+  {
+    id: 'pets',
+    name: 'Pet Care',
+    icon: '🐕',
+    route: '/pets',
+    description: 'Vet visits, meds & due dates',
+  },
+  {
+    id: 'docs',
+    name: 'Documents',
+    icon: '📄',
+    route: '/docs',
+    description: 'IDs, insurance & records',
+  },
 ]

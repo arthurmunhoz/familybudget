@@ -49,3 +49,44 @@ export interface ShoppingItem {
   created_at: string
   checked_at: string | null
 }
+
+export type PetEventType = 'vet' | 'vaccine' | 'medication' | 'grooming' | 'other'
+
+export interface Pet {
+  id: string
+  name: string
+  emoji: string
+  created_at: string
+}
+
+export interface PetEvent {
+  id: string
+  pet_id: string
+  type: PetEventType
+  title: string
+  notes: string | null
+  event_date: string
+  next_due: string | null
+  added_by: string
+  created_at: string
+}
+
+export type DocCategory =
+  | 'ids'
+  | 'insurance'
+  | 'medical'
+  | 'pets'
+  | 'home'
+  | 'receipts'
+  | 'other'
+
+export interface FamilyDocument {
+  id: string
+  title: string
+  category: DocCategory
+  file_path: string
+  mime_type: string
+  size_bytes: number
+  added_by: string
+  created_at: string
+}
