@@ -120,6 +120,14 @@ export function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate()
 }
 
+/** "<1m" / "45m" / "2h 15m" from a number of seconds */
+export function formatDuration(totalSeconds: number): string {
+  const minutes = Math.round(totalSeconds / 60)
+  if (minutes < 1) return '<1m'
+  if (minutes < 60) return `${minutes}m`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
 /** "just now" / "5m ago" / "3h ago" / "2d ago" from a timestamptz */
 export function timeAgo(iso: string): string {
   const seconds = (Date.now() - new Date(iso).getTime()) / 1000
