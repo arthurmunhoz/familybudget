@@ -8,7 +8,7 @@ export default function Login() {
       <div className="text-center">
         <div className="text-6xl">🏠</div>
         <h1 className="mt-4 text-3xl font-bold text-(--text)">One Roof</h1>
-        <p className="mt-2 text-(--text-muted)">Everything your family runs on</p>
+        <p className="mt-2 text-(--text-muted)">Your family, under one roof.</p>
       </div>
       <button
         onClick={signIn}
