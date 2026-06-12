@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { useBack } from '../../hooks/useBack'
 import { supabase } from '../../lib/supabase'
 import type { ShoppingItem } from '../../lib/types'
 
 export default function ShoppingList() {
-  const navigate = useNavigate()
+  const back = useBack()
   const { profile } = useAuth()
   const [items, setItems] = useState<ShoppingItem[]>([])
   const [label, setLabel] = useState('')
@@ -81,10 +81,10 @@ export default function ShoppingList() {
   const done = items.filter((i) => i.checked)
 
   return (
-    <div className="mx-auto min-h-page max-w-md px-4 pb-32">
+    <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
       <header className="flex items-center gap-2 pt-6 pb-4">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => back('/')}
           className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
         >
           ‹

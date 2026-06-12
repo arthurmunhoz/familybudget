@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BeachBackdrop from '../../components/BeachBackdrop'
+import { useBack } from '../../hooks/useBack'
 import { formatMoney } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import type { Budget, Entry, Month, Period } from '../../lib/types'
@@ -13,6 +14,7 @@ const PERIOD_OPTIONS: { id: Period; label: string }[] = [
 
 export default function Budgets() {
   const navigate = useNavigate()
+  const back = useBack()
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [months, setMonths] = useState<Pick<Month, 'id' | 'budget_id'>[]>([])
   const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
@@ -64,11 +66,11 @@ export default function Budgets() {
   }
 
   return (
-    <div className="mx-auto min-h-page max-w-md px-4 pb-28">
+    <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
       <BeachBackdrop />
       <header className="flex items-center gap-2 pt-6 pb-4">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => back('/')}
           className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
         >
           ‹

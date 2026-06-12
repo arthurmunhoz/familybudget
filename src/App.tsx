@@ -77,7 +77,7 @@ export default function App() {
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-page items-center justify-center p-6">
+    <div className="flex min-h-dvh items-center justify-center p-6">
       <div className="max-w-sm text-center">{children}</div>
     </div>
   )
