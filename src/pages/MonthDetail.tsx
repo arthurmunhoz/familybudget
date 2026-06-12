@@ -270,7 +270,7 @@ export default function MonthDetail() {
 
       {/* Add + scan buttons */}
       <div
-        className="fixed inset-x-0 top-[100dvh] -translate-y-full mx-auto flex max-w-md gap-3 px-4 pt-3"
+        className="fixed inset-x-0 pin-bottom mx-auto flex max-w-md gap-3 px-4 pt-3"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
@@ -307,7 +307,7 @@ export default function MonthDetail() {
       />
 
       {scanning && (
-        <div className="fixed inset-x-0 top-0 z-50 h-dvh flex items-center justify-center bg-black/60">
+        <div className="fixed inset-x-0 top-0 z-50 h-screen-real flex items-center justify-center bg-black/60">
           <div className="rounded-2xl bg-(--card) px-6 py-5 text-center">
             <div className="text-3xl">🧾</div>
             <p className="mt-2 animate-pulse font-semibold text-(--text)">

@@ -1,11 +1,4 @@
-import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Cell, Pie, PieChart } from 'recharts'
 import { categoryById } from '../lib/categories'
 import { formatMoney } from '../lib/format'
 import { useTheme } from '../hooks/useTheme'
@@ -15,8 +8,8 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
   const { theme } = useTheme()
   const incomeColor = theme === 'dark' ? '#34d399' : '#059669'
   const expenseColor = theme === 'dark' ? '#fb7185' : '#e11d48'
-  const barLabelColor = theme === 'dark' ? '#0c0a09' : '#ffffff'
-  const tickColor = theme === 'dark' ? '#a8a29e' : '#57534e'
+  const emptyColor = theme === 'dark' ? '#44403c' : '#e7e5e4'
+
   const income = entries
     .filter((e) => e.type === 'income')
     .reduce((s, e) => s + Number(e.amount), 0)
@@ -25,10 +18,13 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
     .reduce((s, e) => s + Number(e.amount), 0)
   const balance = income - spent
 
-  const data = [
-    { name: 'Received', value: income, color: incomeColor },
-    { name: 'Spent', value: spent, color: expenseColor },
-  ]
+  const hasData = income > 0 || spent > 0
+  const pieData = hasData
+    ? [
+        { name: 'Received', value: income, color: incomeColor },
+        { name: 'Spent', value: spent, color: expenseColor },
+      ].filter((d) => d.value > 0)
+    : [{ name: 'No entries', value: 1, color: emptyColor }]
 
   const byCategory = new Map<string, number>()
   for (const e of entries) {
@@ -40,48 +36,59 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
 
   return (
     <div className="rounded-2xl bg-(--card) p-4">
-      <div className="flex items-baseline justify-between">
-        <span className="text-sm text-(--text-muted)">Balance</span>
-        <span
-          className={`text-2xl font-bold tabular-nums ${
-            balance >= 0 ? 'text-(--income)' : 'text-(--expense)'
-          }`}
-        >
-          {formatMoney(balance)}
-        </span>
-      </div>
-
-      <div className="mt-2 h-32">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout="vertical" margin={{ left: 0, right: 8 }}>
-            <XAxis type="number" hide />
-            <YAxis
-              type="category"
-              dataKey="name"
-              width={72}
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: tickColor, fontSize: 13 }}
-            />
-            <Bar dataKey="value" radius={[6, 6, 6, 6]} barSize={26} isAnimationActive={false}
-              label={{
-                position: 'insideRight',
-                fill: barLabelColor,
-                fontSize: 12,
-                fontWeight: 700,
-                formatter: (v) => (Number(v) > 0 ? formatMoney(Number(v)) : ''),
-              }}
+      <div className="flex items-center gap-4">
+        {/* received vs spent pie with legend */}
+        <div className="shrink-0">
+          <PieChart width={124} height={124}>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              cx="50%"
+              cy="50%"
+              outerRadius={58}
+              strokeWidth={0}
+              isAnimationActive={false}
             >
-              {data.map((d) => (
+              {pieData.map((d) => (
                 <Cell key={d.name} fill={d.color} />
               ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+            </Pie>
+          </PieChart>
+          <div className="mt-1.5 flex justify-center gap-3 text-[11px] text-(--text-muted)">
+            <span className="flex items-center gap-1">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ background: incomeColor }}
+              />
+              Received
+            </span>
+            <span className="flex items-center gap-1">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ background: expenseColor }}
+              />
+              Spent
+            </span>
+          </div>
+        </div>
+
+        {/* balance */}
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-(--text-faint)">
+            Balance
+          </div>
+          <div
+            className={`mt-1 text-2xl font-bold tabular-nums ${
+              balance >= 0 ? 'text-(--income)' : 'text-(--expense)'
+            }`}
+          >
+            {formatMoney(balance)}
+          </div>
+        </div>
       </div>
 
       {categories.length > 0 && (
-        <div className="mt-3 space-y-2">
+        <div className="mt-4 space-y-2">
           {categories.map(([catId, amount]) => {
             const cat = categoryById(catId)
             return (

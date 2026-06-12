@@ -48,12 +48,36 @@ body,
   height: 100%;
 }
 
-/* iOS standalone PWAs can report the plain 100% viewport short by the
-   status-bar height, leaving a dead band at the bottom. 100dvh is measured
-   correctly, so prefer it where supported. */
 body,
 #root {
   height: 100dvh;
+}
+
+/* Bottom-anchored UI (action bars, sheets, backdrop). Anchoring to 100dvh is
+   equivalent to bottom: 0 when the viewport is reported correctly. */
+.pin-bottom {
+  top: 100dvh;
+  transform: translateY(-100%);
+}
+
+/* Full-screen overlays */
+.h-screen-real {
+  height: 100dvh;
+}
+
+/* iOS standalone PWAs report the layout viewport short by the status-bar
+   height (browser tabs are unaffected), leaving a dead band at the bottom of
+   the screen. Compensate by the top safe-area inset in standalone mode only. */
+@media all and (display-mode: standalone) {
+  body,
+  #root,
+  .h-screen-real {
+    height: calc(100dvh + env(safe-area-inset-top));
+  }
+
+  .pin-bottom {
+    top: calc(100dvh + env(safe-area-inset-top));
+  }
 }
 
 body {
