@@ -1,46 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import BeachBackdrop from '../components/BeachBackdrop'
+import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
 import { useAuth } from '../hooks/useAuth'
+import { useHousehold } from '../hooks/useHousehold'
 import { ADMIN_APP, APPS } from '../lib/apps'
-import { supabase } from '../lib/supabase'
 
 export default function Hub() {
   const { profile } = useAuth()
+  // Header shows the family's own name ("Munhoz Family"); the hook caches it
+  // locally so it doesn't flash "One Roof" on every open.
+  const { household } = useHousehold()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // Header shows the family's own name ("Munhoz Family"), cached locally so
-  // it doesn't flash "One Roof" on every open.
-  const [householdName, setHouseholdName] = useState<string | null>(() =>
-    profile ? localStorage.getItem(`household-name:${profile.household_id}`) : null,
-  )
-  useEffect(() => {
-    if (!profile) return
-    let cancelled = false
-    supabase
-      .from('households')
-      .select('name')
-      .eq('id', profile.household_id)
-      .single()
-      .then(({ data }) => {
-        if (cancelled || !data) return
-        localStorage.setItem(`household-name:${profile.household_id}`, data.name)
-        setHouseholdName(data.name)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [profile])
-
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
-      <BeachBackdrop />
+      <Backdrop />
       <header className="flex items-center justify-between pt-6 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-(--text)">
-            {householdName ?? 'One Roof'}
+            {household?.name ?? 'One Roof'}
           </h1>
           <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
         </div>

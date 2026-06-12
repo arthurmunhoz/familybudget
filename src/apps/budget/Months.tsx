@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import BeachBackdrop from '../../components/BeachBackdrop'
+import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
 import {
   addDaysISO,
@@ -139,7 +139,7 @@ export default function Months() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
-      <BeachBackdrop />
+      <Backdrop />
       <header className="flex items-center gap-2 pt-6 pb-4">
         <button
           onClick={() => back('/budget')}

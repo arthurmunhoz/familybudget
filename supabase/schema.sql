@@ -175,3 +175,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-009-web-events.sql (behavioral analytics + admin aggregates)
 --   migration-010-document-owner.sql (documents.owner_email)
 --   migration-011-admin-analytics-v2.sql (period param, admin exclusion, time spent)
+--   migration-012-backdrop-v2.sql (households.backdrop_path: null / builtin:beach / upload)
+--   migration-013-storage-constraints.sql (bucket size/mime limits)

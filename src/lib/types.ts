@@ -10,6 +10,9 @@ export interface Profile {
 export interface Household {
   id: string
   name: string
+  /** null = no backdrop · 'builtin:beach' = original beach scene ·
+   *  anything else = uploaded image path in the documents bucket */
+  backdrop_path: string | null
   created_at: string
 }
 

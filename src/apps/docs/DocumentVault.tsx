@@ -125,11 +125,15 @@ export default function DocumentVault() {
     if (!pendingFile || !fTitle.trim() || !profile || uploading) return
     setUploading(true)
     const ext = pendingFile.name.split('.').pop()?.toLowerCase() ?? 'bin'
+    // The bucket only accepts image/* and application/pdf (migration 013), so
+    // when the picker doesn't report a type, infer it from the extension.
+    const mime =
+      pendingFile.type || (ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`)
     // Storage RLS only allows paths inside the user's own household folder.
     const path = `${profile.household_id}/${fCategory}/${crypto.randomUUID()}.${ext}`
     const { error: storageError } = await supabase.storage
       .from('documents')
-      .upload(path, pendingFile, { contentType: pendingFile.type || 'application/octet-stream' })
+      .upload(path, pendingFile, { contentType: mime })
     if (storageError) {
       setUploading(false)
       alert('Upload failed — please try again.')
@@ -139,7 +143,7 @@ export default function DocumentVault() {
       title: fTitle.trim(),
       category: fCategory,
       file_path: path,
-      mime_type: pendingFile.type || 'application/octet-stream',
+      mime_type: mime,
       size_bytes: pendingFile.size,
       owner_email: fOwner || profile.email,
       added_by: profile.email,

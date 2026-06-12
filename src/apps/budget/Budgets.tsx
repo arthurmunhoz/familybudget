@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import BeachBackdrop from '../../components/BeachBackdrop'
+import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
 import { formatMoney } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
@@ -67,7 +67,7 @@ export default function Budgets() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
-      <BeachBackdrop />
+      <Backdrop />
       <header className="flex items-center gap-2 pt-6 pb-4">
         <button
           onClick={() => back('/')}
