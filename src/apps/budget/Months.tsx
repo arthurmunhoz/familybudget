@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import BeachBackdrop from '../components/BeachBackdrop'
+import { supabase } from '../../lib/supabase'
+import BeachBackdrop from '../../components/BeachBackdrop'
 import {
   addDaysISO,
   currentPeriodStart,
@@ -10,8 +10,8 @@ import {
   nextPeriodStart,
   periodLabel,
   periodLengthDays,
-} from '../lib/format'
-import type { Budget, Entry, Month } from '../lib/types'
+} from '../../lib/format'
+import type { Budget, Entry, Month } from '../../lib/types'
 
 export default function Months() {
   const { budgetId } = useParams<{ budgetId: string }>()
@@ -132,7 +132,7 @@ export default function Months() {
     )
       return
     await supabase.from('budgets').delete().eq('id', budget.id)
-    navigate('/')
+    navigate('/budget')
   }
 
   return (
@@ -140,7 +140,7 @@ export default function Months() {
       <BeachBackdrop />
       <header className="flex items-center gap-2 pt-6 pb-4">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/budget')}
           className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
         >
           ‹

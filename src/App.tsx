@@ -1,10 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { isConfigured } from './lib/supabase'
 import Login from './pages/Login'
-import Budgets from './pages/Budgets'
-import Months from './pages/Months'
-import MonthDetail from './pages/MonthDetail'
+import Hub from './pages/Hub'
+
+// Hub apps are lazy-loaded so the bundle stays light as the family adds more.
+const Budgets = lazy(() => import('./apps/budget/Budgets'))
+const Months = lazy(() => import('./apps/budget/Months'))
+const MonthDetail = lazy(() => import('./apps/budget/MonthDetail'))
+const ShoppingList = lazy(() => import('./apps/shopping/ShoppingList'))
 
 export default function App() {
   const { session, profile, loading, signOut } = useAuth()
@@ -51,12 +56,22 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Budgets />} />
-      <Route path="/budget/:budgetId" element={<Months />} />
-      <Route path="/month/:id" element={<MonthDetail />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense
+      fallback={
+        <Centered>
+          <p className="animate-pulse text-(--text-muted)">Loading…</p>
+        </Centered>
+      }
+    >
+      <Routes>
+        <Route path="/" element={<Hub />} />
+        <Route path="/budget" element={<Budgets />} />
+        <Route path="/budget/:budgetId" element={<Months />} />
+        <Route path="/month/:id" element={<MonthDetail />} />
+        <Route path="/shopping" element={<ShoppingList />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 

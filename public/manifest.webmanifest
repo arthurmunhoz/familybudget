@@ -1,7 +1,7 @@
 {
-  "name": "Our Budget",
-  "short_name": "Budget",
-  "description": "Arthur & Patricia's budget and spending tracker",
+  "name": "Family Hub",
+  "short_name": "Family Hub",
+  "description": "Arthur & Patricia's family apps: budget, shopping list, and more",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0c0a09",

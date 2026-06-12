@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import EntryForm, { type EntryPrefill } from '../components/EntryForm'
-import { fileToResizedBase64 } from '../lib/image'
-import SummaryChart from '../components/SummaryChart'
-import { useAuth } from '../hooks/useAuth'
-import { categoryById } from '../lib/categories'
+import EntryForm, { type EntryPrefill } from './EntryForm'
+import { fileToResizedBase64 } from '../../lib/image'
+import SummaryChart from './SummaryChart'
+import { useAuth } from '../../hooks/useAuth'
+import { categoryById } from '../../lib/categories'
 import {
   formatDay,
   formatDayHeading,
@@ -12,9 +12,9 @@ import {
   periodEndISO,
   periodTitle,
   todayISO,
-} from '../lib/format'
-import { supabase } from '../lib/supabase'
-import type { CategoryRule, Entry, Month, Period, Profile } from '../lib/types'
+} from '../../lib/format'
+import { supabase } from '../../lib/supabase'
+import type { CategoryRule, Entry, Month, Period, Profile } from '../../lib/types'
 
 type MonthWithBudget = Month & {
   budgets: { name: string; period: Period } | null

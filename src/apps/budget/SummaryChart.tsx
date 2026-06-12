@@ -1,8 +1,8 @@
 import { Cell, Pie, PieChart } from 'recharts'
-import { categoryById } from '../lib/categories'
-import { formatMoney } from '../lib/format'
-import { useTheme } from '../hooks/useTheme'
-import type { Entry } from '../lib/types'
+import { categoryById } from '../../lib/categories'
+import { formatMoney } from '../../lib/format'
+import { useTheme } from '../../hooks/useTheme'
+import type { Entry } from '../../lib/types'
 
 export default function SummaryChart({ entries }: { entries: Entry[] }) {
   const { theme } = useTheme()

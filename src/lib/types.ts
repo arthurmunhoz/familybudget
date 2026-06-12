@@ -40,3 +40,12 @@ export interface CategoryRule {
   keyword: string
   category: string
 }
+
+export interface ShoppingItem {
+  id: string
+  label: string
+  checked: boolean
+  added_by: string
+  created_at: string
+  checked_at: string | null
+}

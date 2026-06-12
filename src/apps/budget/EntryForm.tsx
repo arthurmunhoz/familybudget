@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { CATEGORIES, normalizeLabel, suggestCategory } from '../lib/categories'
-import { todayISO } from '../lib/format'
-import { supabase } from '../lib/supabase'
-import type { CategoryRule, Entry, EntryType, Profile } from '../lib/types'
+import { CATEGORIES, normalizeLabel, suggestCategory } from '../../lib/categories'
+import { todayISO } from '../../lib/format'
+import { supabase } from '../../lib/supabase'
+import type { CategoryRule, Entry, EntryType, Profile } from '../../lib/types'
 
 export interface EntryPrefill {
   label?: string

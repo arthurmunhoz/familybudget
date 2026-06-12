@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import BeachBackdrop from '../components/BeachBackdrop'
-import Drawer from '../components/Drawer'
-import { useAuth } from '../hooks/useAuth'
-import { formatMoney } from '../lib/format'
-import { supabase } from '../lib/supabase'
-import type { Budget, Entry, Month, Period } from '../lib/types'
+import BeachBackdrop from '../../components/BeachBackdrop'
+import { formatMoney } from '../../lib/format'
+import { supabase } from '../../lib/supabase'
+import type { Budget, Entry, Month, Period } from '../../lib/types'
 
 const PERIOD_OPTIONS: { id: Period; label: string }[] = [
   { id: 'monthly', label: 'Monthly' },
@@ -14,13 +12,11 @@ const PERIOD_OPTIONS: { id: Period; label: string }[] = [
 ]
 
 export default function Budgets() {
-  const { profile } = useAuth()
   const navigate = useNavigate()
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [months, setMonths] = useState<Pick<Month, 'id' | 'budget_id'>[]>([])
   const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
   const [loading, setLoading] = useState(true)
-  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
@@ -70,18 +66,14 @@ export default function Budgets() {
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
       <BeachBackdrop />
-      <header className="flex items-center justify-between pt-6 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-(--text)">Our Budgets</h1>
-          <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
-        </div>
+      <header className="flex items-center gap-2 pt-6 pb-4">
         <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open settings"
-          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+          onClick={() => navigate('/')}
+          className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
         >
-          ☰
+          ‹
         </button>
+        <h1 className="text-2xl font-bold text-(--text)">💰 Budgets</h1>
       </header>
 
       {loading ? (
@@ -147,8 +139,6 @@ export default function Budgets() {
           ＋ New budget
         </button>
       </div>
-
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
