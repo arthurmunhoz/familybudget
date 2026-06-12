@@ -322,9 +322,9 @@ export default function DocumentVault() {
         </div>
       ) : sections ? (
         sections.map((section) => (
-          <section key={section.owner}>
+          <section key={section.owner} className="mt-8 first:mt-0">
             {/* owner subsection header with separator line */}
-            <div className="mt-5 mb-2 flex items-center gap-3 first:mt-0">
+            <div className="mb-2 flex items-center gap-3">
               <h3 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
                 {section.owner === 'shared' ? '🏠 Shared' : nameOf(section.owner)}
               </h3>
