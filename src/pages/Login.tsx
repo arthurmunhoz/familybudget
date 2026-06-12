@@ -7,7 +7,8 @@ export default function Login() {
   const { theme } = useTheme()
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
+    // extra bottom padding (pb-44) lifts the centered content clear of the artwork
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6 pb-44">
       {/* One Roof default art, full strength — this is the branding moment */}
       <img
         aria-hidden
