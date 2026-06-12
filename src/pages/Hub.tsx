@@ -12,8 +12,8 @@ export default function Hub() {
   // Header shows the family's own name ("Munhoz Family"); the hook caches it
   // locally so it doesn't flash "One Roof" on every open.
   const { household } = useHousehold()
-  // Each user picks their own tiles; the Admin tile is always shown to admins.
-  const { hidden } = useAppPrefs()
+  // Each user picks their own tiles and density; Admin is always shown to admins.
+  const { hidden, tileStyle } = useAppPrefs()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -48,6 +48,21 @@ export default function Hub() {
           <p className="text-sm text-(--text-faint)">
             Open ☰ Settings → My apps to bring them back.
           </p>
+        </div>
+      ) : tileStyle === 'compact' ? (
+        <div className="grid grid-cols-3 gap-2.5">
+          {tiles.map((app) => (
+            <button
+              key={app.id}
+              onClick={() => navigate(app.route)}
+              className="flex flex-col items-center gap-1.5 rounded-xl bg-(--card) px-2 py-3.5 active:bg-(--card-active) transition-colors"
+            >
+              <span className="text-2xl">{app.icon}</span>
+              <span className="w-full truncate text-center text-xs font-semibold text-(--text)">
+                {app.name}
+              </span>
+            </button>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">

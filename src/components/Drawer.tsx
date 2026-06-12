@@ -17,7 +17,7 @@ export default function Drawer({
   const { profile, session, signOut } = useAuth()
   const { household } = useHousehold()
   const { theme, setTheme } = useTheme()
-  const { hidden, toggleApp } = useAppPrefs()
+  const { hidden, toggleApp, tileStyle, setTileStyle } = useAppPrefs()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -128,6 +128,24 @@ export default function Drawer({
           <p className="mt-1 text-xs text-(--text-faint)">
             Choose what shows on your home screen — just for you.
           </p>
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-(--surface) p-1">
+            {(
+              [
+                { id: 'large', label: '🔲 Large' },
+                { id: 'compact', label: '▪️ Compact' },
+              ] as const
+            ).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setTileStyle(s.id)}
+                className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
+                  tileStyle === s.id ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
           <div className="mt-2 space-y-1 rounded-xl bg-(--surface) p-1">
             {APPS.map((app) => {
               const on = !hidden.includes(app.id)
@@ -168,7 +186,7 @@ export default function Drawer({
           <span className="text-sm text-(--text-muted)">Backdrop</span>
           <p className="mt-1 text-xs text-(--text-faint)">
             A photo shown softly behind the home screen, visible only to your
-            family.
+            family. Removing it brings back the One Roof default.
           </p>
           <div className="mt-2 flex gap-2">
             <button

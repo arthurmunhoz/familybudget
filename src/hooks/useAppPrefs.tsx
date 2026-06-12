@@ -4,29 +4,38 @@ import { useAuth } from './useAuth'
 
 const EVT = 'oneroof-app-prefs-changed'
 
-/** Per-user hub customization: which apps are hidden from the homepage.
- *  Stored in user_settings (follows the user across devices) and cached in
- *  localStorage so the grid renders instantly. Hide-only model: new apps are
- *  visible until explicitly hidden. Every instance refreshes on toggle via a
- *  window event (same pattern as useHousehold). */
+export type TileStyle = 'large' | 'compact'
+
+interface AppPrefs {
+  hidden: string[]
+  tileStyle: TileStyle
+}
+
+const DEFAULTS: AppPrefs = { hidden: [], tileStyle: 'large' }
+
+/** Per-user hub customization: which apps are hidden and how dense the tile
+ *  grid is. Stored in user_settings (follows the user across devices) and
+ *  cached in localStorage so the grid renders instantly. Hide-only model:
+ *  new apps are visible until explicitly hidden. Every instance refreshes on
+ *  change via a window event (same pattern as useHousehold). */
 export function useAppPrefs() {
   const { profile } = useAuth()
   const email = profile?.email ?? null
-  const cacheKey = email ? `hidden-apps:${email}` : null
+  const cacheKey = email ? `app-prefs:${email}` : null
 
-  const [hidden, setHidden] = useState<string[]>(() => {
-    if (!cacheKey) return []
+  const [prefs, setPrefs] = useState<AppPrefs>(() => {
+    if (!cacheKey) return DEFAULTS
     try {
-      return JSON.parse(localStorage.getItem(cacheKey) ?? '[]')
+      return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(cacheKey) ?? '{}') }
     } catch {
-      return []
+      return DEFAULTS
     }
   })
 
   const apply = useCallback(
-    (apps: string[]) => {
-      setHidden(apps)
-      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(apps))
+    (next: AppPrefs) => {
+      setPrefs(next)
+      if (cacheKey) localStorage.setItem(cacheKey, JSON.stringify(next))
     },
     [cacheKey],
   )
@@ -35,10 +44,13 @@ export function useAppPrefs() {
     if (!email) return
     const { data } = await supabase
       .from('user_settings')
-      .select('hidden_apps')
+      .select('hidden_apps, tile_style')
       .eq('email', email)
       .maybeSingle()
-    apply(data?.hidden_apps ?? [])
+    apply({
+      hidden: data?.hidden_apps ?? [],
+      tileStyle: (data?.tile_style as TileStyle) ?? 'large',
+    })
   }, [email, apply])
 
   useEffect(() => {
@@ -47,26 +59,42 @@ export function useAppPrefs() {
     return () => window.removeEventListener(EVT, load)
   }, [load])
 
-  const toggleApp = useCallback(
-    async (appId: string) => {
+  // Optimistic save of the full prefs row; rolls back if the write fails.
+  const save = useCallback(
+    async (next: AppPrefs) => {
       if (!email) return
-      const next = hidden.includes(appId)
-        ? hidden.filter((a) => a !== appId)
-        : [...hidden, appId]
-      apply(next) // optimistic — the grid updates immediately
+      const prev = prefs
+      apply(next)
       const { error } = await supabase.from('user_settings').upsert({
         email,
-        hidden_apps: next,
+        hidden_apps: next.hidden,
+        tile_style: next.tileStyle,
         updated_at: new Date().toISOString(),
       })
       if (error) {
-        apply(hidden) // roll back; the toggle visibly snaps back
+        apply(prev)
         return
       }
       window.dispatchEvent(new Event(EVT))
     },
-    [email, hidden, apply],
+    [email, prefs, apply],
   )
 
-  return { hidden, toggleApp }
+  const toggleApp = useCallback(
+    (appId: string) =>
+      save({
+        ...prefs,
+        hidden: prefs.hidden.includes(appId)
+          ? prefs.hidden.filter((a) => a !== appId)
+          : [...prefs.hidden, appId],
+      }),
+    [prefs, save],
+  )
+
+  const setTileStyle = useCallback(
+    (tileStyle: TileStyle) => save({ ...prefs, tileStyle }),
+    [prefs, save],
+  )
+
+  return { hidden: prefs.hidden, tileStyle: prefs.tileStyle, toggleApp, setTileStyle }
 }

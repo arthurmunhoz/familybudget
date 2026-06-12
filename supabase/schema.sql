@@ -178,3 +178,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-012-backdrop-v2.sql (households.backdrop_path: null / builtin:beach / upload)
 --   migration-013-storage-constraints.sql (bucket size/mime limits)
 --   migration-014-user-settings.sql (per-user hidden apps)
+--   migration-015-tile-style.sql (hub tile density per user)
