@@ -18,7 +18,7 @@ export const CATEGORIES: Category[] = [
   { id: 'travel', name: 'Travel', icon: '✈️' },
   { id: 'subscriptions', name: 'Subscriptions', icon: '📺' },
   { id: 'gifts', name: 'Gifts', icon: '🎁' },
-  { id: 'pets', name: 'Dogs', icon: '🐶' },
+  { id: 'pets', name: 'Pets', icon: '🐾' },
   { id: 'salary', name: 'Salary', icon: '💼' },
   { id: 'other', name: 'Other', icon: '📦' },
 ]
