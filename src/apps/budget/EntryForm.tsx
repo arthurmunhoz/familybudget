@@ -229,6 +229,32 @@ export default function EntryForm({
                 ))}
               </datalist>
             </label>
+
+            {/* Quick-pick chips of subcategories already used in this category —
+               native <datalist> autocomplete is invisible/flaky on iOS, so the
+               suggestions appear as tappable chips the moment a category is
+               picked. Tap to fill, tap again to clear. */}
+            {(subcategorySuggestions[category]?.length ?? 0) > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {subcategorySuggestions[category].map((s) => {
+                  const active = subcategory.trim().toLowerCase() === s.toLowerCase()
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSubcategory(active ? '' : s)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        active
+                          ? 'bg-(--accent) text-white'
+                          : 'bg-(--surface) text-(--text-muted) active:bg-(--surface-2)'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
