@@ -22,7 +22,7 @@ export const es: Record<keyof typeof en, string> = {
   'app.shopping.desc': 'Lista compartida, en tiempo real',
   'app.pets.name': 'Mascotas',
   'app.pets.desc': 'Veterinario, medicinas y fechas',
-  'app.docs.name': 'Documentos',
+  'app.docs.name': 'Bóveda de documentos',
   'app.docs.desc': 'Identificaciones, seguros y más',
   'app.admin.name': 'Administración',
   'app.admin.desc': 'Hogares y miembros',
@@ -232,8 +232,12 @@ export const es: Record<keyof typeof en, string> = {
   'docCat.receipts': 'Recibos',
   'docCat.other': 'Otros',
 
-  'docs.title': 'Documentos',
+  'docs.title': 'Bóveda de documentos',
   'docs.shared': 'Compartido',
+  'vault.locked': 'Bloqueado — verifica tu identidad para abrirlo.',
+  'vault.unlock': '🔓 Desbloquear',
+  'vault.unlocking': 'Verificando…',
+  'vault.failed': 'No se pudo verificar — inténtalo de nuevo.',
   'docs.empty': 'Aún no hay nada aquí.',
   'docs.emptyHint':
     'Toma fotos de identificaciones, tarjetas de seguro y carnés de vacunas — estarán seguros aquí cuando los necesites.',

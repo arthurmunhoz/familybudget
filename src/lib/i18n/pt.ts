@@ -22,7 +22,7 @@ export const pt: Record<keyof typeof en, string> = {
   'app.shopping.desc': 'Lista compartilhada, em tempo real',
   'app.pets.name': 'Pets',
   'app.pets.desc': 'Veterinário, remédios e vencimentos',
-  'app.docs.name': 'Documentos',
+  'app.docs.name': 'Cofre de documentos',
   'app.docs.desc': 'Identidades, seguros e registros',
   'app.admin.name': 'Administração',
   'app.admin.desc': 'Famílias e membros',
@@ -232,8 +232,12 @@ export const pt: Record<keyof typeof en, string> = {
   'docCat.receipts': 'Recibos',
   'docCat.other': 'Outros',
 
-  'docs.title': 'Documentos',
+  'docs.title': 'Cofre de documentos',
   'docs.shared': 'Compartilhado',
+  'vault.locked': 'Bloqueado — confirme sua identidade para abrir.',
+  'vault.unlock': '🔓 Desbloquear',
+  'vault.unlocking': 'Verificando…',
+  'vault.failed': 'Não foi possível verificar — tente novamente.',
   'docs.empty': 'Nada por aqui ainda.',
   'docs.emptyHint':
     'Tire fotos de identidades, carteirinhas de seguro e cartões de vacina — ficarão seguros aqui quando você precisar.',

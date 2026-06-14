@@ -22,7 +22,7 @@ export const en = {
   'app.shopping.desc': 'Shared grocery list, live sync',
   'app.pets.name': 'Pet Care',
   'app.pets.desc': 'Vet visits, meds & due dates',
-  'app.docs.name': 'Documents',
+  'app.docs.name': 'Document Vault',
   'app.docs.desc': 'IDs, insurance & records',
   'app.admin.name': 'Admin',
   'app.admin.desc': 'Households & members',
@@ -232,8 +232,12 @@ export const en = {
   'docCat.receipts': 'Receipts',
   'docCat.other': 'Other',
 
-  'docs.title': 'Documents',
+  'docs.title': 'Document Vault',
   'docs.shared': 'Shared',
+  'vault.locked': 'Locked — verify it’s you to open it.',
+  'vault.unlock': '🔓 Unlock',
+  'vault.unlocking': 'Verifying…',
+  'vault.failed': 'Couldn’t verify — try again.',
   'docs.empty': 'Nothing here yet.',
   'docs.emptyHint':
     "Snap photos of IDs, insurance cards, vaccine records — they'll be safe here when you need them.",
