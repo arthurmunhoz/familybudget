@@ -1,5 +1,7 @@
 import { categoryById } from '../../lib/categories'
 import { formatMoney } from '../../lib/format'
+import { useI18n } from '../../hooks/useI18n'
+import type { TKey } from '../../lib/i18n'
 import type { Entry, Profile } from '../../lib/types'
 
 // Distinct, saturated hues that read well on both the dark and light card.
@@ -25,6 +27,7 @@ export default function MemberCategoryChart({
   entries: Entry[]
   profiles: Profile[]
 }) {
+  const { t } = useI18n()
   // Stable color assignment regardless of the order profiles arrive in.
   const members = [...profiles].sort((a, b) => a.email.localeCompare(b.email))
   const colorOf = (email: string) => {
@@ -58,7 +61,7 @@ export default function MemberCategoryChart({
   if (cats.length === 0) {
     return (
       <p className="mt-6 text-center text-sm text-(--text-faint)">
-        No spending to compare yet.
+        {t('detail.noCompare')}
       </p>
     )
   }
@@ -92,7 +95,7 @@ export default function MemberCategoryChart({
               <div className="flex items-center gap-2">
                 <span className="text-base">{cat.icon}</span>
                 <span className="flex-1 text-sm font-semibold text-(--text)">
-                  {cat.name}
+                  {t(`cat.${cat.id}` as TKey)}
                 </span>
                 <span className="text-xs tabular-nums text-(--text-muted)">
                   {formatMoney(total)}

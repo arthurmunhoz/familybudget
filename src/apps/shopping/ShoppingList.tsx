@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useI18n } from '../../hooks/useI18n'
 import { supabase } from '../../lib/supabase'
 import type { ShoppingItem } from '../../lib/types'
 
 export default function ShoppingList() {
   const back = useBack()
+  const { t } = useI18n()
   const { profile } = useAuth()
   const [items, setItems] = useState<ShoppingItem[]>([])
   const [label, setLabel] = useState('')
@@ -52,7 +54,7 @@ export default function ShoppingList() {
     const { error } = await supabase
       .from('shopping_items')
       .insert({ label: trimmed, added_by: profile.email })
-    if (error) alert('Could not add the item — please try again.')
+    if (error) alert(t('shopping.addFailed'))
     load()
   }
 
@@ -89,7 +91,7 @@ export default function ShoppingList() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">🛒 Shopping List</h1>
+        <h1 className="flex-1 text-2xl font-bold text-(--text)">🛒 {t('shopping.title')}</h1>
         {open.length > 0 && (
           <span className="rounded-full bg-(--surface) px-3 py-1 text-sm font-semibold text-(--text-muted)">
             {open.length}
@@ -98,14 +100,12 @@ export default function ShoppingList() {
       </header>
 
       {loading ? (
-        <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
+        <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : items.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
           <div className="text-5xl">🧾</div>
-          <p className="mt-4">The list is empty.</p>
-          <p className="text-sm text-(--text-faint)">
-            Add things below as they run out.
-          </p>
+          <p className="mt-4">{t('shopping.empty')}</p>
+          <p className="text-sm text-(--text-faint)">{t('shopping.emptyHint')}</p>
         </div>
       ) : (
         <>
@@ -124,7 +124,7 @@ export default function ShoppingList() {
                   </button>
                   <button
                     onClick={() => remove(item)}
-                    aria-label={`Remove ${item.label}`}
+                    aria-label={t('common.removeName', { name: item.label })}
                     className="px-1 text-(--text-faint) active:text-(--expense)"
                   >
                     ✕
@@ -138,13 +138,13 @@ export default function ShoppingList() {
             <>
               <div className="mt-6 mb-2 flex items-center justify-between">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-                  In the cart ({done.length})
+                  {t('shopping.inCart', { count: done.length })}
                 </h3>
                 <button
                   onClick={clearChecked}
                   className="text-xs font-semibold text-(--accent) active:opacity-70"
                 >
-                  Clear checked
+                  {t('shopping.clearChecked')}
                 </button>
               </div>
               <ul className="space-y-2">
@@ -180,7 +180,7 @@ export default function ShoppingList() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') add()
           }}
-          placeholder="Add an item…"
+          placeholder={t('shopping.addPlaceholder')}
           className="min-w-0 flex-1 rounded-2xl border border-white/30 bg-(--surface) px-4 py-4 text-(--text) shadow-lg outline-none focus:ring-2 focus:ring-(--accent)"
         />
         <button
@@ -188,7 +188,7 @@ export default function ShoppingList() {
           disabled={!label.trim()}
           className="rounded-2xl border border-white/30 bg-(--accent) px-6 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          Add
+          {t('common.add')}
         </button>
       </div>
     </div>

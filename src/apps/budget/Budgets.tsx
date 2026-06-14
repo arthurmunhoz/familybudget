@@ -2,18 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
+import { useI18n } from '../../hooks/useI18n'
 import { supabase } from '../../lib/supabase'
 import type { Budget, Period } from '../../lib/types'
 
-const PERIOD_OPTIONS: { id: Period; label: string }[] = [
-  { id: 'monthly', label: 'Monthly' },
-  { id: 'weekly', label: 'Weekly' },
-  { id: 'daily', label: 'Daily' },
-]
+const PERIOD_IDS: Period[] = ['monthly', 'weekly', 'daily']
 
 export default function Budgets() {
   const navigate = useNavigate()
   const back = useBack()
+  const { t } = useI18n()
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -54,21 +52,21 @@ export default function Budgets() {
         >
           ‹
         </button>
-        <h1 className="text-2xl font-bold text-(--text)">💰 Budgets</h1>
+        <h1 className="text-2xl font-bold text-(--text)">💰 {t('budget.title')}</h1>
       </header>
 
       {loading ? (
-        <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
+        <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : budgets.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
           <div className="text-5xl">💼</div>
-          <p className="mt-4">No budgets yet.</p>
-          <p className="text-sm text-(--text-faint)">Create your first one below.</p>
+          <p className="mt-4">{t('budget.empty')}</p>
+          <p className="text-sm text-(--text-faint)">{t('budget.emptyHint')}</p>
         </div>
       ) : (
         <ul className="space-y-3">
           {budgets.map((b) => {
-            const periodName = PERIOD_OPTIONS.find((p) => p.id === b.period)?.label
+            const periodName = t(`budget.${b.period}` as const)
             return (
               <li key={b.id}>
                 <button
@@ -102,33 +100,33 @@ export default function Budgets() {
           disabled={loading}
           className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          ＋ New budget
+          {t('budget.new')}
         </button>
       </div>
 
       {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
-            <h2 className="text-lg font-bold text-(--text)">New budget</h2>
+            <h2 className="text-lg font-bold text-(--text)">{t('budget.newTitle')}</h2>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Our Home Budget, Trip to Brazil"
+              placeholder={t('budget.namePlaceholder')}
               autoFocus
               className="mt-4 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
             <div className="mt-4">
-              <span className="text-sm text-(--text-muted)">Entries grouped by</span>
+              <span className="text-sm text-(--text-muted)">{t('budget.groupedBy')}</span>
               <div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-(--surface) p-1">
-                {PERIOD_OPTIONS.map((p) => (
+                {PERIOD_IDS.map((p) => (
                   <button
-                    key={p.id}
-                    onClick={() => setPeriod(p.id)}
+                    key={p}
+                    onClick={() => setPeriod(p)}
                     className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
-                      period === p.id ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
+                      period === p ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
                     }`}
                   >
-                    {p.label}
+                    {t(`budget.${p}` as const)}
                   </button>
                 ))}
               </div>
@@ -141,14 +139,14 @@ export default function Budgets() {
                 }}
                 className="rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={create}
                 disabled={saving || !name.trim()}
                 className="rounded-xl bg-(--accent) py-3 font-semibold text-white disabled:opacity-50"
               >
-                Create
+                {t('common.create')}
               </button>
             </div>
           </div>

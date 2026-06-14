@@ -5,11 +5,17 @@ import Drawer from '../components/Drawer'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { useHousehold } from '../hooks/useHousehold'
+import { useI18n } from '../hooks/useI18n'
 import { ADMIN_APP, APPS } from '../lib/apps'
+import { todayISO } from '../lib/format'
+import type { TKey } from '../lib/i18n'
+import { overdueEvents } from '../lib/petCare'
 import { supabase } from '../lib/supabase'
+import type { PetEvent } from '../lib/types'
 
 export default function Hub() {
   const { profile } = useAuth()
+  const { t } = useI18n()
   // Header shows the family's own name ("Munhoz Family"); the hook caches it
   // locally so it doesn't flash "One Roof" on every open.
   const { household } = useHousehold()
@@ -44,7 +50,26 @@ export default function Hub() {
     }
   }, [loadShoppingCount])
 
-  const badges: Record<string, number> = { shopping: shoppingCount }
+  // Overdue/ due-today pet reminders, shown as a red attention badge. Reloads
+  // when the hub remounts (i.e. on return from Pet Care), which is enough —
+  // overdue status changes by date, not by another phone's live action.
+  const [overduePets, setOverduePets] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('pet_events')
+      .select('*')
+      .order('event_date', { ascending: false })
+      .then(({ data }) => {
+        if (cancelled) return
+        setOverduePets(overdueEvents((data ?? []) as PetEvent[], todayISO()).length)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const badges: Record<string, number> = { shopping: shoppingCount, pets: overduePets }
 
   const tiles = [
     ...APPS.filter((app) => !hidden.includes(app.id)),
@@ -54,8 +79,14 @@ export default function Hub() {
   const badgeFor = (appId: string) => {
     const n = badges[appId] ?? 0
     if (n === 0) return null
+    // Pet reminders are overdue items → red (urgent); others use the accent.
+    const urgent = appId === 'pets'
     return (
-      <span className="absolute right-2 top-2 min-w-5 rounded-full bg-(--accent) px-1.5 py-0.5 text-center text-[11px] font-bold leading-tight text-white">
+      <span
+        className={`absolute right-2 top-2 min-w-5 rounded-full px-1.5 py-0.5 text-center text-[11px] font-bold leading-tight text-white ${
+          urgent ? 'bg-(--expense)' : 'bg-(--accent)'
+        }`}
+      >
         {n > 99 ? '99+' : n}
       </span>
     )
@@ -69,11 +100,13 @@ export default function Hub() {
           <h1 className="text-2xl font-bold text-(--text)">
             {household?.name ?? 'One Roof'}
           </h1>
-          <p className="text-sm text-(--text-muted)">Hi, {profile?.display_name} 👋</p>
+          <p className="text-sm text-(--text-muted)">
+            {t('hub.greeting', { name: profile?.display_name ?? '' })}
+          </p>
         </div>
         <button
           onClick={() => setDrawerOpen(true)}
-          aria-label="Open settings"
+          aria-label={t('hub.openSettings')}
           className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
         >
           ☰
@@ -83,10 +116,8 @@ export default function Hub() {
       {tiles.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
           <div className="text-5xl">🫥</div>
-          <p className="mt-4">All apps are hidden.</p>
-          <p className="text-sm text-(--text-faint)">
-            Open ☰ Settings → My apps to bring them back.
-          </p>
+          <p className="mt-4">{t('hub.allHidden')}</p>
+          <p className="text-sm text-(--text-faint)">{t('hub.allHiddenHint')}</p>
         </div>
       ) : tileStyle === 'compact' ? (
         <div className="grid grid-cols-3 gap-2.5">
@@ -99,7 +130,7 @@ export default function Hub() {
               {badgeFor(app.id)}
               <span className="text-2xl">{app.icon}</span>
               <span className="w-full truncate text-center text-xs font-semibold text-(--text)">
-                {app.name}
+                {t(`app.${app.id}.name` as TKey)}
               </span>
             </button>
           ))}
@@ -114,9 +145,11 @@ export default function Hub() {
             >
               {badgeFor(app.id)}
               <span className="text-3xl">{app.icon}</span>
-              <span className="mt-1 font-bold text-(--text)">{app.name}</span>
+              <span className="mt-1 font-bold text-(--text)">
+                {t(`app.${app.id}.name` as TKey)}
+              </span>
               <span className="text-xs leading-snug text-(--text-faint)">
-                {app.description}
+                {t(`app.${app.id}.desc` as TKey)}
               </span>
             </button>
           ))}

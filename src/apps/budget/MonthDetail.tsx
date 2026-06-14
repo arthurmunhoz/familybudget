@@ -6,6 +6,7 @@ import MemberCategoryChart from './MemberCategoryChart'
 import SummaryChart from './SummaryChart'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useI18n } from '../../hooks/useI18n'
 import { categoryById } from '../../lib/categories'
 import {
   formatDay,
@@ -29,6 +30,7 @@ type View = 'list' | 'members'
 export default function MonthDetail() {
   const { id } = useParams<{ id: string }>()
   const back = useBack()
+  const { t } = useI18n()
   const { profile, profiles } = useAuth()
 
   const [month, setMonth] = useState<MonthWithBudget | null>(null)
@@ -122,7 +124,7 @@ export default function MonthDetail() {
     setEntries((list) => list.filter((x) => x.id !== e.id))
     const { error } = await supabase.from('entries').delete().eq('id', e.id)
     if (error) {
-      alert('Could not delete the entry — please try again.')
+      alert(t('detail.deleteFailed'))
       load()
     }
   }
@@ -142,7 +144,7 @@ export default function MonthDetail() {
         body: JSON.stringify({ image: data, media_type: mediaType }),
       })
       const result = await res.json()
-      if (!res.ok) throw new Error(result.error ?? 'Scan failed')
+      if (!res.ok) throw new Error(result.error ?? t('detail.scanFailed'))
       setEditing(null)
       setPrefill({
         label: result.label,
@@ -152,7 +154,7 @@ export default function MonthDetail() {
       })
       setFormOpen(true)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not read the receipt.')
+      alert(err instanceof Error ? err.message : t('detail.scanFailed'))
     } finally {
       setScanning(false)
     }
@@ -161,7 +163,7 @@ export default function MonthDetail() {
   if (loading || !month) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <p className="animate-pulse text-(--text-faint)">Loading…</p>
+        <p className="animate-pulse text-(--text-faint)">{t('common.loading')}</p>
       </div>
     )
   }
@@ -185,7 +187,7 @@ export default function MonthDetail() {
             onClick={() => setPersonMenuOpen((o) => !o)}
             className="flex items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface) px-3.5 py-1.5 text-sm font-semibold text-(--text)"
           >
-            {person === 'all' ? 'Everyone' : nameOf(person)}
+            {person === 'all' ? t('common.everyone') : nameOf(person)}
             <span className="text-[9px] text-(--text-faint)">▼</span>
           </button>
           {personMenuOpen && (
@@ -196,7 +198,7 @@ export default function MonthDetail() {
               />
               <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-(--surface) bg-(--card) shadow-xl">
                 {[
-                  { key: 'all', label: 'Everyone' },
+                  { key: 'all', label: t('common.everyone') },
                   ...profiles.map((p: Profile) => ({
                     key: p.email,
                     label: p.display_name,
@@ -240,7 +242,7 @@ export default function MonthDetail() {
                 sortBy === 'date' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
               }`}
             >
-              By date {dateDir === 'asc' ? '↑' : '↓'}
+              {t('detail.byDate')} {dateDir === 'asc' ? '↑' : '↓'}
             </button>
             <button
               onClick={() => setSortBy('amount')}
@@ -248,7 +250,7 @@ export default function MonthDetail() {
                 sortBy === 'amount' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
               }`}
             >
-              By amount
+              {t('detail.byAmount')}
             </button>
           </div>
         ) : (
@@ -263,7 +265,7 @@ export default function MonthDetail() {
                 view === v ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
               }`}
             >
-              {v === 'list' ? '☰ List' : '📊 By member'}
+              {v === 'list' ? t('detail.list') : t('detail.byMember')}
             </button>
           ))}
         </div>
@@ -276,8 +278,8 @@ export default function MonthDetail() {
           className="mx-auto mt-3 block text-xs font-medium text-(--text-faint) underline decoration-dotted underline-offset-4 active:text-(--text-muted)"
         >
           {showFuture
-            ? 'Hide future entries'
-            : `Show ${futureCount} future ${futureCount === 1 ? 'entry' : 'entries'}`}
+            ? t('detail.hideFuture')
+            : t('detail.showFuture', { count: futureCount })}
         </button>
       )}
 
@@ -307,7 +309,7 @@ export default function MonthDetail() {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={scanning}
-          aria-label="Scan a receipt"
+          aria-label={t('detail.scanAria')}
           className="rounded-2xl border border-white/30 bg-(--surface) px-5 text-2xl shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
           📷
@@ -320,7 +322,7 @@ export default function MonthDetail() {
           }}
           className="flex-1 rounded-2xl border border-white/30 bg-(--accent) py-4 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform"
         >
-          ＋ New Entry
+          {t('detail.newEntry')}
         </button>
       </div>
 
@@ -342,7 +344,7 @@ export default function MonthDetail() {
           <div className="rounded-2xl bg-(--card) px-6 py-5 text-center">
             <div className="text-3xl">🧾</div>
             <p className="mt-2 animate-pulse font-semibold text-(--text)">
-              Reading receipt…
+              {t('detail.readingReceipt')}
             </p>
           </div>
         </div>
@@ -391,9 +393,10 @@ function EntryColumn({
   onSelect: (e: Entry) => void
   onDelete: (e: Entry) => void
 }) {
+  const { t } = useI18n()
   if (entries.length === 0) {
     return (
-      <p className="mt-6 text-center text-sm text-(--text-faint)">No entries yet.</p>
+      <p className="mt-6 text-center text-sm text-(--text-faint)">{t('detail.noEntries')}</p>
     )
   }
 
@@ -471,6 +474,7 @@ function EntryRow({
   onSelect: (e: Entry) => void
   onDelete: (e: Entry) => void
 }) {
+  const { t } = useI18n()
   const REVEAL = compact ? 64 : 84
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -571,7 +575,7 @@ function EntryRow({
         {confirming ? (
           <div className="flex w-full items-center justify-between gap-2 px-3 whitespace-nowrap">
             <span className={`font-semibold text-white ${compact ? 'text-[11px]' : 'text-sm'}`}>
-              {compact ? 'Delete?' : 'Confirm delete entry?'}
+              {compact ? t('detail.confirmDeleteShort') : t('detail.confirmDelete')}
             </span>
             <button
               onClick={(ev) => {
@@ -582,14 +586,14 @@ function EntryRow({
                 compact ? 'px-2 py-1 text-[11px]' : 'px-4 py-1.5 text-sm'
               }`}
             >
-              YES
+              {t('detail.yes')}
             </button>
           </div>
         ) : (
           <span
             className={`mx-auto font-bold text-white ${compact ? 'text-[11px]' : 'text-xs'}`}
           >
-            Delete
+            {t('common.delete')}
           </span>
         )}
       </div>

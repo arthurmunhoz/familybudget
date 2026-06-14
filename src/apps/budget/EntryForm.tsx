@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from '../../hooks/useI18n'
 import { CATEGORIES, normalizeLabel, suggestCategory } from '../../lib/categories'
 import { todayISO } from '../../lib/format'
+import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import type { CategoryRule, Entry, EntryType, Profile } from '../../lib/types'
 
@@ -42,6 +44,7 @@ export default function EntryForm({
   onClose,
   onSaved,
 }: Props) {
+  const { t } = useI18n()
   const today = todayISO()
   const inPeriod = (iso: string) => iso >= periodStart && iso <= periodEnd
   const defaultDate = inPeriod(today) ? today : periodStart
@@ -78,7 +81,7 @@ export default function EntryForm({
   async function save() {
     const value = parseFloat(amount)
     if (!label.trim() || !value || value <= 0) {
-      setError('Please enter a label and a positive amount.')
+      setError(t('entry.validation'))
       return
     }
     setSaving(true)
@@ -117,7 +120,7 @@ export default function EntryForm({
 
   async function remove() {
     if (!entry) return
-    if (!confirm(`Delete "${entry.label}"?`)) return
+    if (!confirm(t('entry.deleteConfirm', { label: entry.label }))) return
     setSaving(true)
     await supabase.from('entries').delete().eq('id', entry.id)
     onSaved()
@@ -131,7 +134,7 @@ export default function EntryForm({
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-(--text)">
-            {entry ? 'Edit entry' : 'New entry'}
+            {entry ? t('entry.editTitle') : t('entry.newTitle')}
           </h2>
           <button onClick={onClose} className="px-2 py-1 text-(--text-muted)">
             ✕
@@ -139,36 +142,40 @@ export default function EntryForm({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-(--surface) p-1">
-          {(['expense', 'income'] as const).map((t) => (
+          {(['expense', 'income'] as const).map((ty) => (
             <button
-              key={t}
-              onClick={() => setType(t)}
+              key={ty}
+              onClick={() => setType(ty)}
               className={`rounded-lg py-2 text-sm font-semibold capitalize transition-colors ${
-                type === t
-                  ? t === 'expense'
+                type === ty
+                  ? ty === 'expense'
                     ? 'bg-rose-500/90 text-white'
                     : 'bg-emerald-500/90 text-white'
                   : 'text-(--text-muted)'
               }`}
             >
-              {t === 'expense' ? '− Expense' : '＋ Income'}
+              {ty === 'expense' ? t('entry.expense') : t('entry.income')}
             </button>
           ))}
         </div>
 
         <label className="mt-4 block text-sm text-(--text-muted)">
-          Label
+          {t('entry.label')}
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder={type === 'expense' ? 'e.g. Groceries at Safeway' : 'e.g. Paycheck'}
+            placeholder={
+              type === 'expense'
+                ? t('entry.labelExpensePlaceholder')
+                : t('entry.labelIncomePlaceholder')
+            }
             className="mt-1 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             autoFocus={!entry}
           />
         </label>
 
         <label className="mt-3 block text-sm text-(--text-muted)">
-          Amount (USD)
+          {t('entry.amount')}
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -180,7 +187,7 @@ export default function EntryForm({
 
         {type === 'expense' && (
           <div className="mt-3">
-            <span className="text-sm text-(--text-muted)">Category</span>
+            <span className="text-sm text-(--text-muted)">{t('entry.category')}</span>
             <div className="mt-1 grid grid-cols-4 gap-2">
               {CATEGORIES.filter((c) => c.id !== 'salary').map((c) => (
                 <button
@@ -196,18 +203,21 @@ export default function EntryForm({
                   }`}
                 >
                   <span className="text-xl">{c.icon}</span>
-                  <span className="mt-0.5 text-[10px] text-(--text-muted)">{c.name}</span>
+                  <span className="mt-0.5 text-[10px] text-(--text-muted)">
+                    {t(`cat.${c.id}` as TKey)}
+                  </span>
                 </button>
               ))}
             </div>
 
             <label className="mt-3 block text-sm text-(--text-muted)">
-              Subcategory <span className="text-xs text-(--text-faint)">(optional)</span>
+              {t('entry.subcategory')}{' '}
+              <span className="text-xs text-(--text-faint)">{t('entry.optional')}</span>
               <input
                 value={subcategory}
                 onChange={(e) => setSubcategory(e.target.value)}
                 list="subcategory-suggestions"
-                placeholder="e.g. supplements, doctor visit"
+                placeholder={t('entry.subcategoryPlaceholder')}
                 className="mt-1 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
               />
               <datalist id="subcategory-suggestions">
@@ -221,7 +231,7 @@ export default function EntryForm({
 
         <div className="mt-3 grid grid-cols-2 gap-4">
           <label className="block text-sm text-(--text-muted)">
-            Date
+            {t('entry.date')}
             <input
               type="date"
               value={date}
@@ -230,7 +240,7 @@ export default function EntryForm({
             />
           </label>
           <label className="block text-sm text-(--text-muted)">
-            Who
+            {t('entry.who')}
             <select
               value={personEmail}
               onChange={(e) => setPersonEmail(e.target.value)}
@@ -247,8 +257,8 @@ export default function EntryForm({
 
         <label className="mt-4 flex items-center justify-between rounded-xl bg-(--surface) px-4 py-3">
           <span className="text-(--text)">
-            ↻ Recurring{' '}
-            <span className="text-xs text-(--text-faint)">(auto-added to new months)</span>
+            {t('entry.recurring')}{' '}
+            <span className="text-xs text-(--text-faint)">{t('entry.recurringHint')}</span>
           </span>
           <input
             type="checkbox"
@@ -265,7 +275,7 @@ export default function EntryForm({
           disabled={saving}
           className="mt-5 w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {saving ? 'Saving…' : entry ? 'Save changes' : 'Add entry'}
+          {saving ? t('common.saving') : entry ? t('entry.saveChanges') : t('entry.addEntry')}
         </button>
 
         {entry && (
@@ -274,7 +284,7 @@ export default function EntryForm({
             disabled={saving}
             className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
           >
-            Delete entry
+            {t('entry.deleteEntry')}
           </button>
         )}
       </div>

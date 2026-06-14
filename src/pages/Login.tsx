@@ -1,9 +1,11 @@
 import { DEFAULT_BACKDROP } from '../components/Backdrop'
 import { useAuth } from '../hooks/useAuth'
+import { useI18n } from '../hooks/useI18n'
 import { useTheme } from '../hooks/useTheme'
 
 export default function Login() {
   const { signIn } = useAuth()
+  const { t } = useI18n()
   const { theme } = useTheme()
 
   return (
@@ -18,14 +20,14 @@ export default function Login() {
       />
       <div className="text-center">
         <h1 className="text-3xl font-bold text-(--text)">One Roof</h1>
-        <p className="mt-2 text-(--text-muted)">Your family, under one roof.</p>
+        <p className="mt-2 text-(--text-muted)">{t('login.tagline')}</p>
       </div>
       <button
         onClick={signIn}
         className="flex items-center gap-3 rounded-2xl bg-(--card) px-6 py-4 text-lg font-semibold text-(--text) shadow-lg active:scale-95 transition-transform"
       >
         <GoogleLogo />
-        Sign in with Google
+        {t('login.signIn')}
       </button>
     </div>
   )

@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useI18n } from '../../hooks/useI18n'
 import { daysBetweenISO, formatDay, todayISO } from '../../lib/format'
+import type { TKey } from '../../lib/i18n'
 import { reminderEvents } from '../../lib/petCare'
 import { supabase } from '../../lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 
-const TYPE_META: Record<PetEventType, { icon: string; label: string }> = {
-  vet: { icon: '🩺', label: 'Vet' },
-  vaccine: { icon: '💉', label: 'Vaccine' },
-  medication: { icon: '💊', label: 'Meds' },
-  grooming: { icon: '✂️', label: 'Grooming' },
-  other: { icon: '📝', label: 'Other' },
+const TYPE_ICON: Record<PetEventType, string> = {
+  vet: '🩺',
+  vaccine: '💉',
+  medication: '💊',
+  grooming: '✂️',
+  other: '📝',
 }
-const TYPES = Object.keys(TYPE_META) as PetEventType[]
+const TYPES = Object.keys(TYPE_ICON) as PetEventType[]
 
 export default function PetCare() {
   const back = useBack()
+  const { t } = useI18n()
   const { profile } = useAuth()
   const [pets, setPets] = useState<Pet[]>([])
   const [events, setEvents] = useState<PetEvent[]>([])
@@ -66,9 +69,9 @@ export default function PetCare() {
 
   function dueLabel(due: string): { text: string; overdue: boolean } {
     const days = daysBetweenISO(todayISO(), due)
-    if (days < 0) return { text: `overdue ${-days}d`, overdue: true }
-    if (days === 0) return { text: 'due today', overdue: true }
-    if (days <= 30) return { text: `in ${days}d`, overdue: false }
+    if (days < 0) return { text: t('pets.overdue', { days: -days }), overdue: true }
+    if (days === 0) return { text: t('pets.dueToday'), overdue: true }
+    if (days <= 30) return { text: t('pets.inDays', { days }), overdue: false }
     return { text: formatDay(due), overdue: false }
   }
 
@@ -96,7 +99,7 @@ export default function PetCare() {
     })
     setSaving(false)
     if (error) {
-      alert('Could not save the event — please try again.')
+      alert(t('pets.saveFailed'))
       return
     }
     setShowForm(false)
@@ -111,7 +114,7 @@ export default function PetCare() {
       .insert({ name: pName.trim(), emoji: pEmoji.trim() || '🐶' })
     setSavingPet(false)
     if (error) {
-      alert('Could not add the pet — please try again.')
+      alert(t('pets.addPetFailed'))
       return
     }
     setShowPetForm(false)
@@ -122,7 +125,7 @@ export default function PetCare() {
 
   async function remove(event: PetEvent) {
     const pet = petById[event.pet_id]
-    if (!confirm(`Delete "${event.title}" for ${pet?.name ?? 'this pet'}?`)) return
+    if (!confirm(t('pets.deleteConfirm', { title: event.title, pet: pet?.name ?? '' }))) return
     setEvents((list) => list.filter((e) => e.id !== event.id))
     await supabase.from('pet_events').delete().eq('id', event.id)
   }
@@ -136,13 +139,13 @@ export default function PetCare() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">🐕 Pet Care</h1>
+        <h1 className="flex-1 text-2xl font-bold text-(--text)">🐕 {t('pets.title')}</h1>
       </header>
 
       {/* pet filter */}
       <div className="flex gap-2 pb-4">
         <FilterChip active={petFilter === 'all'} onClick={() => setPetFilter('all')}>
-          All
+          {t('pets.all')}
         </FilterChip>
         {pets.map((p) => (
           <FilterChip
@@ -159,13 +162,13 @@ export default function PetCare() {
       </div>
 
       {loading ? (
-        <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
+        <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : (
         <>
           {reminders.length > 0 && (
             <section className="mb-6">
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-                Coming up
+                {t('pets.comingUp')}
               </h3>
               <ul className="space-y-2">
                 {reminders.map((e) => {
@@ -177,12 +180,12 @@ export default function PetCare() {
                         due.overdue ? 'animate-attention' : ''
                       }`}
                     >
-                      <span className="text-xl">{TYPE_META[e.type].icon}</span>
+                      <span className="text-xl">{TYPE_ICON[e.type]}</span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-(--text)">{e.title}</p>
                         <p className="text-xs text-(--text-faint)">
-                          {petById[e.pet_id]?.emoji} {petById[e.pet_id]?.name} · last{' '}
-                          {formatDay(e.event_date)}
+                          {petById[e.pet_id]?.emoji} {petById[e.pet_id]?.name} ·{' '}
+                          {t('pets.lastDone')} {formatDay(e.event_date)}
                         </p>
                       </div>
                       <span
@@ -204,25 +207,19 @@ export default function PetCare() {
           {pets.length === 0 ? (
             <div className="mt-16 text-center text-(--text-muted)">
               <div className="text-5xl">🐾</div>
-              <p className="mt-4">No pets yet.</p>
-              <p className="text-sm text-(--text-faint)">
-                Add your pets with the + above, then start logging vet visits,
-                vaccines and meds.
-              </p>
+              <p className="mt-4">{t('pets.noPets')}</p>
+              <p className="text-sm text-(--text-faint)">{t('pets.noPetsHint')}</p>
             </div>
           ) : visible.length === 0 ? (
             <div className="mt-16 text-center text-(--text-muted)">
               <div className="text-5xl">🐾</div>
-              <p className="mt-4">No events yet.</p>
-              <p className="text-sm text-(--text-faint)">
-                Log vet visits, vaccines and meds — set a “next due” date to get
-                reminders here.
-              </p>
+              <p className="mt-4">{t('pets.noEvents')}</p>
+              <p className="text-sm text-(--text-faint)">{t('pets.noEventsHint')}</p>
             </div>
           ) : (
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-                History
+                {t('pets.history')}
               </h3>
               <ul className="space-y-2">
                 {visible.map((e) => (
@@ -230,13 +227,13 @@ export default function PetCare() {
                     key={e.id}
                     className="flex items-start gap-3 rounded-xl bg-(--card) px-4 py-3"
                   >
-                    <span className="text-xl">{TYPE_META[e.type].icon}</span>
+                    <span className="text-xl">{TYPE_ICON[e.type]}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-(--text)">{e.title}</p>
                       <p className="text-xs text-(--text-faint)">
                         {petById[e.pet_id]?.emoji} {petById[e.pet_id]?.name} ·{' '}
                         {formatDay(e.event_date)}
-                        {e.next_due && ` · next ${formatDay(e.next_due)}`}
+                        {e.next_due && ` · ${t('pets.next')} ${formatDay(e.next_due)}`}
                       </p>
                       {e.notes && (
                         <p className="mt-1 text-sm text-(--text-muted)">{e.notes}</p>
@@ -244,7 +241,7 @@ export default function PetCare() {
                     </div>
                     <button
                       onClick={() => remove(e)}
-                      aria-label={`Delete ${e.title}`}
+                      aria-label={t('common.deleteName', { name: e.title })}
                       className="px-1 text-(--text-faint) active:text-(--expense)"
                     >
                       ✕
@@ -266,17 +263,19 @@ export default function PetCare() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-(--text)">New event</h2>
+              <h2 className="text-lg font-bold text-(--text)">{t('pets.newEvent')}</h2>
               <button
                 onClick={() => setShowForm(false)}
-                aria-label="Close"
+                aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
                 ✕
               </button>
             </div>
 
-            <label className="block text-xs font-semibold text-(--text-faint)">Pet</label>
+            <label className="block text-xs font-semibold text-(--text-faint)">
+              {t('pets.pet')}
+            </label>
             <div className="mt-1 flex flex-wrap gap-2">
               {pets.map((p) => (
                 <FilterChip key={p.id} active={fPet === p.id} onClick={() => setFPet(p.id)}>
@@ -286,12 +285,12 @@ export default function PetCare() {
             </div>
 
             <label className="mt-3 block text-xs font-semibold text-(--text-faint)">
-              Type
+              {t('pets.typeLabel')}
             </label>
             <div className="mt-1 flex flex-wrap gap-2">
-              {TYPES.map((t) => (
-                <FilterChip key={t} active={fType === t} onClick={() => setFType(t)}>
-                  {TYPE_META[t].icon} {TYPE_META[t].label}
+              {TYPES.map((ty) => (
+                <FilterChip key={ty} active={fType === ty} onClick={() => setFType(ty)}>
+                  {TYPE_ICON[ty]} {t(`pets.type.${ty}` as TKey)}
                 </FilterChip>
               ))}
             </div>
@@ -299,13 +298,17 @@ export default function PetCare() {
             <input
               value={fTitle}
               onChange={(e) => setFTitle(e.target.value)}
-              placeholder={fType === 'medication' ? 'e.g. Heartworm pill' : 'What happened?'}
+              placeholder={
+                fType === 'medication'
+                  ? t('pets.titleMedPlaceholder')
+                  : t('pets.titlePlaceholder')
+              }
               className="mt-3 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
             <div className="mt-3 flex gap-5">
               <label className="flex-1 text-xs font-semibold text-(--text-faint)">
-                Date
+                {t('pets.date')}
                 <input
                   type="date"
                   value={fDate}
@@ -314,7 +317,7 @@ export default function PetCare() {
                 />
               </label>
               <label className="flex-1 text-xs font-semibold text-(--text-faint)">
-                Next due (optional)
+                {t('pets.nextDue')}
                 <input
                   type="date"
                   value={fNextDue}
@@ -327,7 +330,7 @@ export default function PetCare() {
             <input
               value={fNotes}
               onChange={(e) => setFNotes(e.target.value)}
-              placeholder="Notes (optional)"
+              placeholder={t('pets.notesPlaceholder')}
               className="mt-3 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
@@ -336,7 +339,7 @@ export default function PetCare() {
               disabled={!fTitle.trim() || !fPet || saving}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {saving ? 'Saving…' : 'Save event'}
+              {saving ? t('common.saving') : t('pets.saveEvent')}
             </button>
           </div>
         </div>
@@ -349,7 +352,7 @@ export default function PetCare() {
             onClick={() => (pets.length === 0 ? setShowPetForm(true) : openForm())}
             className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 font-bold text-white shadow-lg active:scale-[0.98] transition-transform"
           >
-            {pets.length === 0 ? '+ Add pet' : '+ New event'}
+            {pets.length === 0 ? t('pets.addPetBtn') : t('pets.newEventBtn')}
           </button>
         </div>
       )}
@@ -366,10 +369,10 @@ export default function PetCare() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-(--text)">Add pet</h2>
+              <h2 className="text-lg font-bold text-(--text)">{t('pets.addPet')}</h2>
               <button
                 onClick={() => setShowPetForm(false)}
-                aria-label="Close"
+                aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
                 ✕
@@ -379,13 +382,13 @@ export default function PetCare() {
               <input
                 value={pEmoji}
                 onChange={(e) => setPEmoji(e.target.value)}
-                aria-label="Pet emoji"
+                aria-label={t('pets.petEmoji')}
                 className="w-16 rounded-xl bg-(--surface) px-0 py-3 text-center text-xl outline-none focus:ring-2 focus:ring-(--accent)"
               />
               <input
                 value={pName}
                 onChange={(e) => setPName(e.target.value)}
-                placeholder="Name"
+                placeholder={t('pets.namePlaceholder')}
                 className="min-w-0 flex-1 rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
               />
             </div>
@@ -394,7 +397,7 @@ export default function PetCare() {
               disabled={!pName.trim() || savingPet}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {savingPet ? 'Saving…' : 'Add pet'}
+              {savingPet ? t('common.saving') : t('pets.addPet')}
             </button>
           </div>
         </div>

@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
+import { useI18n } from '../../hooks/useI18n'
+import type { TKey } from '../../lib/i18n'
 import {
   addDaysISO,
   currentPeriodStart,
@@ -12,12 +14,17 @@ import {
   periodLabel,
   periodLengthDays,
 } from '../../lib/format'
-import type { Budget, Entry, Month } from '../../lib/types'
+import type { Budget, Entry, Month, Period } from '../../lib/types'
+
+// Period-specific i18n key suffixes (month/week/day), so gendered nouns in
+// es/pt agree with their adjectives ("Nuevo mes" vs "Nueva semana").
+const CAP: Record<Period, string> = { monthly: 'Month', weekly: 'Week', daily: 'Day' }
 
 export default function Months() {
   const { budgetId } = useParams<{ budgetId: string }>()
   const navigate = useNavigate()
   const back = useBack()
+  const { t } = useI18n()
   const [budget, setBudget] = useState<Budget | null>(null)
   const [months, setMonths] = useState<Month[]>([])
   const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
@@ -65,7 +72,7 @@ export default function Months() {
     return map
   }, [entries])
 
-  const noun = period === 'monthly' ? 'Month' : period === 'weekly' ? 'Week' : 'Day'
+  const pk = CAP[period] // 'Month' | 'Week' | 'Day' — i18n key suffix
 
   // Suggested default: the current calendar period if missing, else the one
   // right after the latest existing period.
@@ -111,11 +118,7 @@ export default function Months() {
         .select()
         .single()
       if (error || !created) {
-        alert(
-          error?.code === '23505'
-            ? `That ${noun.toLowerCase()} already exists.`
-            : 'Could not create it — please try again.',
-        )
+        alert(error?.code === '23505' ? t('months.existsAlert') : t('months.createFailed'))
         return
       }
 
@@ -165,12 +168,7 @@ export default function Months() {
 
   async function deleteBudget() {
     if (!budget) return
-    if (
-      !confirm(
-        `Delete "${budget.name}" and ALL of its periods and entries? This cannot be undone.`,
-      )
-    )
-      return
+    if (!confirm(t('months.deleteConfirm', { name: budget.name }))) return
     await supabase.from('budgets').delete().eq('id', budget.id)
     back('/budget')
   }
@@ -190,7 +188,7 @@ export default function Months() {
         </h1>
         <button
           onClick={() => setMenuOpen(true)}
-          aria-label="Budget options"
+          aria-label={t('months.options')}
           className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
         >
           ⋯
@@ -198,15 +196,12 @@ export default function Months() {
       </header>
 
       {loading ? (
-        <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
+        <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : months.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
           <div className="text-5xl">🗓️</div>
-          <p className="mt-4">Nothing here yet.</p>
-          <p className="text-sm text-(--text-faint)">
-            Start your first {period === 'monthly' ? 'month' : period === 'weekly' ? 'week' : 'day'}{' '}
-            below to begin tracking.
-          </p>
+          <p className="mt-4">{t('months.empty')}</p>
+          <p className="text-sm text-(--text-faint)">{t(`months.emptyHint${pk}` as TKey)}</p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -224,7 +219,7 @@ export default function Months() {
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <div className="text-[10px] font-semibold uppercase tracking-wide text-(--text-faint)">
-                        Balance
+                        {t('common.balance')}
                       </div>
                       <div
                         className={`text-lg font-semibold tabular-nums ${
@@ -252,7 +247,7 @@ export default function Months() {
           disabled={creating || loading}
           className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 text-lg font-bold text-white shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          {creating ? 'Creating…' : `＋ New ${noun}`}
+          {creating ? t('months.creating') : t(`months.new${pk}` as TKey)}
         </button>
       </div>
 
@@ -275,7 +270,7 @@ export default function Months() {
               }}
               className="w-full rounded-xl px-4 py-3.5 text-left font-semibold text-(--text) active:bg-(--surface)"
             >
-              ✏️ Rename budget
+              {t('months.rename')}
             </button>
             <button
               onClick={() => {
@@ -284,13 +279,13 @@ export default function Months() {
               }}
               className="w-full rounded-xl px-4 py-3.5 text-left font-semibold text-(--expense) active:bg-(--surface)"
             >
-              🗑️ Delete budget
+              {t('months.delete')}
             </button>
             <button
               onClick={() => setMenuOpen(false)}
               className="mt-2 w-full rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -300,7 +295,7 @@ export default function Months() {
       {renameOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
-            <h2 className="text-lg font-bold text-(--text)">Rename budget</h2>
+            <h2 className="text-lg font-bold text-(--text)">{t('months.renameTitle')}</h2>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -312,14 +307,14 @@ export default function Months() {
                 onClick={() => setRenameOpen(false)}
                 className="rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={renameBudget}
                 disabled={saving || !name.trim()}
                 className="rounded-xl bg-(--accent) py-3 font-semibold text-white disabled:opacity-50"
               >
-                Save
+                {t('common.save')}
               </button>
             </div>
           </div>
@@ -329,13 +324,11 @@ export default function Months() {
       {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-(--card) p-6">
-            <h2 className="text-lg font-bold text-(--text)">New {noun.toLowerCase()}</h2>
+            <h2 className="text-lg font-bold text-(--text)">
+              {t(`months.new${pk}Title` as TKey)}
+            </h2>
             <label className="mt-4 block text-sm text-(--text-muted)">
-              {period === 'monthly'
-                ? 'Which month? Past months work too.'
-                : period === 'weekly'
-                  ? 'Pick any day — the week starts on its Sunday.'
-                  : 'Which day? Past days work too.'}
+              {t(`months.which${pk}` as TKey)}
             </label>
             <input
               type={period === 'monthly' ? 'month' : 'date'}
@@ -347,14 +340,17 @@ export default function Months() {
               <p className="mt-3 text-sm text-(--text-muted)">
                 {alreadyExists ? (
                   <span className="text-(--expense)">
-                    {periodLabel(period, pickedStart)} already exists.
+                    {t('months.alreadyExists', { label: periodLabel(period, pickedStart) })}
                   </span>
                 ) : willCopyRecurring ? (
-                  `${periodLabel(period, pickedStart)} — recurring entries from ${periodLabel(period, months[0].start_date)} will be copied over.`
+                  t('months.willCopy', {
+                    label: periodLabel(period, pickedStart),
+                    source: periodLabel(period, months[0].start_date),
+                  })
                 ) : months.length > 0 ? (
-                  `${periodLabel(period, pickedStart)} — added behind your latest ${noun.toLowerCase()}, so it starts empty.`
+                  t('months.addedBehind', { label: periodLabel(period, pickedStart) })
                 ) : (
-                  `${periodLabel(period, pickedStart)} will be the first ${noun.toLowerCase()} of this budget.`
+                  t('months.firstPeriod', { label: periodLabel(period, pickedStart) })
                 )}
               </p>
             )}
@@ -363,7 +359,7 @@ export default function Months() {
                 onClick={() => setCreateOpen(false)}
                 className="rounded-xl bg-(--surface) py-3 font-semibold text-(--text)"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() => {
@@ -374,7 +370,7 @@ export default function Months() {
                 disabled={!pickedStart || alreadyExists || creating}
                 className="rounded-xl bg-(--accent) py-3 font-semibold text-white disabled:opacity-50"
               >
-                Create
+                {t('common.create')}
               </button>
             </div>
           </div>

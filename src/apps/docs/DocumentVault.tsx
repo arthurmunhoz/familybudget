@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useI18n } from '../../hooks/useI18n'
 import { formatDay } from '../../lib/format'
+import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import type { DocCategory, FamilyDocument } from '../../lib/types'
 
-const CATEGORIES: { id: DocCategory; icon: string; label: string }[] = [
-  { id: 'ids', icon: '🪪', label: 'IDs' },
-  { id: 'insurance', icon: '🛡️', label: 'Insurance' },
-  { id: 'medical', icon: '🏥', label: 'Medical' },
-  { id: 'pets', icon: '🐾', label: 'Pets' },
-  { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'receipts', icon: '🧾', label: 'Receipts' },
-  { id: 'other', icon: '📦', label: 'Other' },
+const CATEGORIES: { id: DocCategory; icon: string }[] = [
+  { id: 'ids', icon: '🪪' },
+  { id: 'insurance', icon: '🛡️' },
+  { id: 'medical', icon: '🏥' },
+  { id: 'pets', icon: '🐾' },
+  { id: 'home', icon: '🏠' },
+  { id: 'receipts', icon: '🧾' },
+  { id: 'other', icon: '📦' },
 ]
-const CAT_META = Object.fromEntries(CATEGORIES.map((c) => [c.id, c])) as Record<
+const CAT_ICON = Object.fromEntries(CATEGORIES.map((c) => [c.id, c.icon])) as Record<
   DocCategory,
-  (typeof CATEGORIES)[number]
+  string
 >
 
 const MAX_SIZE = 20 * 1024 * 1024 // storage free tier is small — keep files reasonable
@@ -29,6 +31,7 @@ function formatBytes(n: number): string {
 
 export default function DocumentVault() {
   const back = useBack()
+  const { t } = useI18n()
   const { profile, profiles } = useAuth()
   const fileInput = useRef<HTMLInputElement>(null)
   const [docs, setDocs] = useState<FamilyDocument[]>([])
@@ -78,7 +81,7 @@ export default function DocumentVault() {
   // 'shared' is a sentinel owner for documents that belong to the whole family
   const nameOf = (email: string) =>
     email === 'shared'
-      ? 'Shared'
+      ? t('docs.shared')
       : (profiles.find((p) => p.email === email)?.display_name ?? email)
 
   /** With "Everyone" selected, the list splits into per-owner subsections:
@@ -100,7 +103,7 @@ export default function DocumentVault() {
 
   const ownerOptions = [
     ...profiles.map((p) => ({ key: p.email, label: p.display_name })),
-    { key: 'shared', label: '🏠 Shared' },
+    { key: 'shared', label: `🏠 ${t('docs.shared')}` },
   ]
 
   function pickFile() {
@@ -112,7 +115,7 @@ export default function DocumentVault() {
     e.target.value = '' // allow re-picking the same file later
     if (!file) return
     if (file.size > MAX_SIZE) {
-      alert(`That file is ${formatBytes(file.size)} — the limit is 20 MB.`)
+      alert(t('docs.tooBig', { size: formatBytes(file.size) }))
       return
     }
     setPendingFile(file)
@@ -136,7 +139,7 @@ export default function DocumentVault() {
       .upload(path, pendingFile, { contentType: mime })
     if (storageError) {
       setUploading(false)
-      alert('Upload failed — please try again.')
+      alert(t('docs.uploadFailed'))
       return
     }
     const { error: dbError } = await supabase.from('documents').insert({
@@ -151,7 +154,7 @@ export default function DocumentVault() {
     setUploading(false)
     if (dbError) {
       await supabase.storage.from('documents').remove([path])
-      alert('Could not save the document — please try again.')
+      alert(t('docs.saveFailed'))
       return
     }
     setPendingFile(null)
@@ -163,7 +166,7 @@ export default function DocumentVault() {
       .from('documents')
       .createSignedUrl(doc.file_path, 3600)
     if (error || !data) {
-      alert('Could not open the document — please try again.')
+      alert(t('docs.openFailed'))
       return
     }
     setPreview({ doc, url: data.signedUrl })
@@ -185,7 +188,7 @@ export default function DocumentVault() {
       .eq('id', editing.id)
     setSavingEdit(false)
     if (error) {
-      alert('Could not save the changes — please try again.')
+      alert(t('docs.editSaveFailed'))
       return
     }
     setEditing(null)
@@ -193,7 +196,7 @@ export default function DocumentVault() {
   }
 
   async function remove(doc: FamilyDocument) {
-    if (!confirm(`Delete "${doc.title}"? This can't be undone.`)) return
+    if (!confirm(t('docs.deleteConfirm', { title: doc.title }))) return
     setDocs((list) => list.filter((d) => d.id !== doc.id))
     await supabase.storage.from('documents').remove([doc.file_path])
     await supabase.from('documents').delete().eq('id', doc.id)
@@ -217,21 +220,21 @@ export default function DocumentVault() {
               {doc.title}
             </span>
             <span className="block text-xs text-(--text-faint)">
-              {CAT_META[doc.category].icon} {CAT_META[doc.category].label} ·{' '}
+              {CAT_ICON[doc.category]} {t(`docCat.${doc.category}` as TKey)} ·{' '}
               {formatDay(doc.created_at.slice(0, 10))} · {formatBytes(doc.size_bytes)}
             </span>
           </span>
         </button>
         <button
           onClick={() => openEdit(doc)}
-          aria-label={`Edit ${doc.title}`}
+          aria-label={t('common.editName', { name: doc.title })}
           className="px-1 text-(--text-faint) active:text-(--accent)"
         >
           ✎
         </button>
         <button
           onClick={() => remove(doc)}
-          aria-label={`Delete ${doc.title}`}
+          aria-label={t('common.deleteName', { name: doc.title })}
           className="px-1 text-(--text-faint) active:text-(--expense)"
         >
           ✕
@@ -250,7 +253,7 @@ export default function DocumentVault() {
           ‹
         </button>
         <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
-          📄 Documents
+          📄 {t('docs.title')}
         </h1>
 
         {/* Person filter chip — same pattern as the budget entries list */}
@@ -259,7 +262,7 @@ export default function DocumentVault() {
             onClick={() => setPersonMenuOpen((o) => !o)}
             className="flex items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface) px-3.5 py-1.5 text-sm font-semibold text-(--text)"
           >
-            {person === 'all' ? 'Everyone' : nameOf(person)}
+            {person === 'all' ? t('common.everyone') : nameOf(person)}
             <span className="text-[9px] text-(--text-faint)">▼</span>
           </button>
           {personMenuOpen && (
@@ -270,12 +273,12 @@ export default function DocumentVault() {
               />
               <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-(--surface) bg-(--card) shadow-xl">
                 {[
-                  { key: 'all', label: 'Everyone' },
+                  { key: 'all', label: t('common.everyone') },
                   ...profiles.map((p) => ({
                     key: p.email,
                     label: p.display_name,
                   })),
-                  { key: 'shared', label: 'Shared' },
+                  { key: 'shared', label: t('docs.shared') },
                 ].map((opt) => (
                   <button
                     key={opt.key}
@@ -300,25 +303,22 @@ export default function DocumentVault() {
       {/* category filter */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-4">
         <CatChip active={filter === 'all'} onClick={() => setFilter('all')}>
-          All
+          {t('common.all')}
         </CatChip>
         {CATEGORIES.map((c) => (
           <CatChip key={c.id} active={filter === c.id} onClick={() => setFilter(c.id)}>
-            {c.icon} {c.label}
+            {c.icon} {t(`docCat.${c.id}` as TKey)}
           </CatChip>
         ))}
       </div>
 
       {loading ? (
-        <p className="mt-12 text-center text-(--text-faint) animate-pulse">Loading…</p>
+        <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : visible.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
           <div className="text-5xl">🗂️</div>
-          <p className="mt-4">Nothing here yet.</p>
-          <p className="text-sm text-(--text-faint)">
-            Snap photos of IDs, insurance cards, vaccine records — they'll be
-            safe here when you need them.
-          </p>
+          <p className="mt-4">{t('docs.empty')}</p>
+          <p className="text-sm text-(--text-faint)">{t('docs.emptyHint')}</p>
         </div>
       ) : sections ? (
         sections.map((section) => (
@@ -326,7 +326,7 @@ export default function DocumentVault() {
             {/* owner subsection header with separator line */}
             <div className="mb-2 flex items-center gap-3">
               <h3 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-                {section.owner === 'shared' ? '🏠 Shared' : nameOf(section.owner)}
+                {section.owner === 'shared' ? `🏠 ${t('docs.shared')}` : nameOf(section.owner)}
               </h3>
               <div className="h-px flex-1 bg-(--surface-2) opacity-60" />
               <span className="shrink-0 text-xs text-(--text-faint)">
@@ -360,7 +360,7 @@ export default function DocumentVault() {
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-lg font-bold text-(--text)">Add document</h2>
+            <h2 className="mb-1 text-lg font-bold text-(--text)">{t('docs.addDoc')}</h2>
             <p className="mb-4 text-xs text-(--text-faint)">
               {pendingFile.name} · {formatBytes(pendingFile.size)}
             </p>
@@ -368,7 +368,7 @@ export default function DocumentVault() {
             <input
               value={fTitle}
               onChange={(e) => setFTitle(e.target.value)}
-              placeholder="Title"
+              placeholder={t('docs.titlePlaceholder')}
               className="w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
@@ -379,13 +379,13 @@ export default function DocumentVault() {
                   active={fCategory === c.id}
                   onClick={() => setFCategory(c.id)}
                 >
-                  {c.icon} {c.label}
+                  {c.icon} {t(`docCat.${c.id}` as TKey)}
                 </CatChip>
               ))}
             </div>
 
             <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-              Belongs to
+              {t('docs.belongsTo')}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {ownerOptions.map((o) => (
@@ -404,7 +404,7 @@ export default function DocumentVault() {
               disabled={!fTitle.trim() || uploading}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {uploading ? 'Uploading…' : 'Save document'}
+              {uploading ? t('docs.uploading') : t('docs.saveDoc')}
             </button>
           </div>
         </div>
@@ -421,12 +421,12 @@ export default function DocumentVault() {
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-4 text-lg font-bold text-(--text)">Edit document</h2>
+            <h2 className="mb-4 text-lg font-bold text-(--text)">{t('docs.editDoc')}</h2>
 
             <input
               value={eTitle}
               onChange={(e) => setETitle(e.target.value)}
-              placeholder="Title"
+              placeholder={t('docs.titlePlaceholder')}
               className="w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
@@ -437,13 +437,13 @@ export default function DocumentVault() {
                   active={eCategory === c.id}
                   onClick={() => setECategory(c.id)}
                 >
-                  {c.icon} {c.label}
+                  {c.icon} {t(`docCat.${c.id}` as TKey)}
                 </CatChip>
               ))}
             </div>
 
             <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-              Belongs to
+              {t('docs.belongsTo')}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {ownerOptions.map((o) => (
@@ -462,7 +462,7 @@ export default function DocumentVault() {
               disabled={!eTitle.trim() || savingEdit}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {savingEdit ? 'Saving…' : 'Save changes'}
+              {savingEdit ? t('common.saving') : t('entry.saveChanges')}
             </button>
           </div>
         </div>
@@ -490,7 +490,7 @@ export default function DocumentVault() {
               rel="noreferrer"
               className="text-sm font-semibold text-(--accent)"
             >
-              Open ↗
+              {t('docs.open')}
             </a>
           </header>
           {preview.doc.mime_type.startsWith('image/') ? (
@@ -521,7 +521,7 @@ export default function DocumentVault() {
             onClick={pickFile}
             className="w-full rounded-2xl border border-white/30 bg-(--accent) py-4 font-bold text-white shadow-lg active:scale-[0.98] transition-transform"
           >
-            + Add document
+            {t('docs.addBtn')}
           </button>
         </div>
       )}

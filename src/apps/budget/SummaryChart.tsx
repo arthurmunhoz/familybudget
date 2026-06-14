@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Cell, Pie, PieChart } from 'recharts'
 import { categoryById } from '../../lib/categories'
 import { formatMoney } from '../../lib/format'
+import { useI18n } from '../../hooks/useI18n'
 import { useTheme } from '../../hooks/useTheme'
 import type { Entry } from '../../lib/types'
 
 export default function SummaryChart({ entries }: { entries: Entry[] }) {
+  const { t } = useI18n()
   const { theme } = useTheme()
   // Which category is drilled down to show its subcategory breakdown.
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
@@ -49,7 +51,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
         {/* balance */}
         <div className="flex flex-1 flex-col items-center justify-center">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-(--text-faint)">
-            Balance
+            {t('common.balance')}
           </div>
           <div
             className={`mt-1 text-2xl font-bold tabular-nums ${
@@ -83,7 +85,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
                 className="inline-block h-2 w-2 shrink-0 rounded-full"
                 style={{ background: incomeColor }}
               />
-              Received
+              {t('chart.received')}
               <span className="ml-auto pl-2 font-semibold tabular-nums">
                 {formatMoney(income)}
               </span>
@@ -93,7 +95,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
                 className="inline-block h-2 w-2 shrink-0 rounded-full"
                 style={{ background: expenseColor }}
               />
-              Spent
+              {t('chart.spent')}
               <span className="ml-auto pl-2 font-semibold tabular-nums">
                 {formatMoney(spent)}
               </span>
@@ -144,7 +146,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
                     {subs.map(([sub, subAmt]) => (
                       <div key={sub || '—'} className="flex items-center gap-2">
                         <span className="w-20 shrink-0 truncate text-[11px] text-(--text-muted)">
-                          {sub || 'Unlabeled'}
+                          {sub || t('chart.unlabeled')}
                         </span>
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-(--surface)">
                           <div
