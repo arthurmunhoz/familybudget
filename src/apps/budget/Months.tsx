@@ -13,6 +13,7 @@ import {
   nextPeriodStart,
   periodLabel,
   periodLengthDays,
+  todayISO,
 } from '../../lib/format'
 import type { Budget, Entry, Month, Period } from '../../lib/types'
 
@@ -27,7 +28,9 @@ export default function Months() {
   const { t } = useI18n()
   const [budget, setBudget] = useState<Budget | null>(null)
   const [months, setMonths] = useState<Month[]>([])
-  const [entries, setEntries] = useState<Pick<Entry, 'month_id' | 'type' | 'amount'>[]>([])
+  const [entries, setEntries] = useState<
+    Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>[]
+  >([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -49,7 +52,7 @@ export default function Months() {
         .select('*')
         .eq('budget_id', budgetId)
         .order('start_date', { ascending: false }),
-      supabase.from('entries').select('month_id, type, amount'),
+      supabase.from('entries').select('month_id, type, amount, entry_date'),
     ])
     setBudget(b.data)
     setMonths(m.data ?? [])
@@ -63,9 +66,13 @@ export default function Months() {
 
   const period = budget?.period ?? 'monthly'
 
+  // Real to-date balance per period: future-dated entries (e.g. an upcoming
+  // paycheck) don't count yet, matching the period detail's balance.
   const balances = useMemo(() => {
+    const today = todayISO()
     const map = new Map<string, number>()
     for (const e of entries) {
+      if (e.entry_date > today) continue
       const delta = e.type === 'income' ? Number(e.amount) : -Number(e.amount)
       map.set(e.month_id, (map.get(e.month_id) ?? 0) + delta)
     }

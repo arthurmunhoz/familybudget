@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import { fileToResizedBase64 } from '../../lib/image'
-import MemberCategoryChart from './MemberCategoryChart'
 import SummaryChart from './SummaryChart'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
@@ -25,7 +24,6 @@ type MonthWithBudget = Month & {
 
 type SortBy = 'date' | 'amount'
 type SortDir = 'asc' | 'desc'
-type View = 'list' | 'members'
 
 export default function MonthDetail() {
   const { id } = useParams<{ id: string }>()
@@ -43,7 +41,6 @@ export default function MonthDetail() {
   const [personMenuOpen, setPersonMenuOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [dateDir, setDateDir] = useState<SortDir>('desc')
-  const [view, setView] = useState<View>('list')
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Entry | null>(null)
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
@@ -228,51 +225,34 @@ export default function MonthDetail() {
         <SummaryChart entries={filtered} />
       </div>
 
-      {/* List controls */}
-      <div className="mt-5 flex items-center justify-between">
+      {/* Sort controls */}
+      <div className="mt-5 flex items-center justify-end">
         <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
-          {(['list', 'members'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`rounded-md px-3 py-1.5 ${
-                view === v ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
-              }`}
-            >
-              {v === 'list' ? t('detail.list') : t('detail.byMember')}
-            </button>
-          ))}
+          <button
+            onClick={() =>
+              sortBy === 'date'
+                ? setDateDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                : setSortBy('date')
+            }
+            className={`rounded-md px-3 py-1.5 ${
+              sortBy === 'date' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
+            }`}
+          >
+            {t('detail.byDate')} {dateDir === 'asc' ? '↑' : '↓'}
+          </button>
+          <button
+            onClick={() => setSortBy('amount')}
+            className={`rounded-md px-3 py-1.5 ${
+              sortBy === 'amount' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
+            }`}
+          >
+            {t('detail.byAmount')}
+          </button>
         </div>
-        {view === 'list' ? (
-          <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
-            <button
-              onClick={() =>
-                sortBy === 'date'
-                  ? setDateDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-                  : setSortBy('date')
-              }
-              className={`rounded-md px-3 py-1.5 ${
-                sortBy === 'date' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
-              }`}
-            >
-              {t('detail.byDate')} {dateDir === 'asc' ? '↑' : '↓'}
-            </button>
-            <button
-              onClick={() => setSortBy('amount')}
-              className={`rounded-md px-3 py-1.5 ${
-                sortBy === 'amount' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
-              }`}
-            >
-              {t('detail.byAmount')}
-            </button>
-          </div>
-        ) : (
-          <div />
-        )}
       </div>
 
       {/* Future entries are collapsed behind a subtle toggle */}
-      {view === 'list' && futureCount > 0 && (
+      {futureCount > 0 && (
         <button
           onClick={() => setShowFuture((s) => !s)}
           className="mx-auto mt-3 block text-xs font-medium text-(--text-faint) underline decoration-dotted underline-offset-4 active:text-(--text-muted)"
@@ -284,22 +264,17 @@ export default function MonthDetail() {
       )}
 
       {/* Entries */}
-      {view === 'list' ? (
-        <EntryColumn
-          entries={sortEntries(listVisible(filtered))}
-          nameOf={nameOf}
-          showPerson={person === 'all'}
-          groupByDay={sortBy === 'date'}
-          onSelect={(e) => {
-            setEditing(e)
-            setFormOpen(true)
-          }}
-          onDelete={removeEntry}
-        />
-      ) : (
-        // Member breakdown compares everyone, so it ignores the person filter.
-        <MemberCategoryChart entries={entries} profiles={profiles} />
-      )}
+      <EntryColumn
+        entries={sortEntries(listVisible(filtered))}
+        nameOf={nameOf}
+        showPerson={person === 'all'}
+        groupByDay={sortBy === 'date'}
+        onSelect={(e) => {
+          setEditing(e)
+          setFormOpen(true)
+        }}
+        onDelete={removeEntry}
+      />
 
       {/* Add + scan buttons */}
       <div

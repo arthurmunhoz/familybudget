@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Cell, Pie, PieChart } from 'recharts'
 import { categoryById } from '../../lib/categories'
-import { formatMoney } from '../../lib/format'
+import { formatMoney, todayISO } from '../../lib/format'
 import { useI18n } from '../../hooks/useI18n'
 import { useTheme } from '../../hooks/useTheme'
 import type { Entry } from '../../lib/types'
@@ -15,13 +15,26 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
   const expenseColor = theme === 'dark' ? '#fb7185' : '#e11d48'
   const emptyColor = theme === 'dark' ? '#44403c' : '#e7e5e4'
 
+  // Balance reflects only what has actually happened by today: a future
+  // paycheck or upcoming bill doesn't move the current balance — it shows in
+  // the "Coming in" / "Due" section instead.
+  const today = todayISO()
+  const isPast = (e: Entry) => e.entry_date <= today
+
   const income = entries
-    .filter((e) => e.type === 'income')
+    .filter((e) => e.type === 'income' && isPast(e))
     .reduce((s, e) => s + Number(e.amount), 0)
   const spent = entries
-    .filter((e) => e.type === 'expense')
+    .filter((e) => e.type === 'expense' && isPast(e))
     .reduce((s, e) => s + Number(e.amount), 0)
   const balance = income - spent
+
+  const comingIn = entries
+    .filter((e) => e.type === 'income' && !isPast(e))
+    .reduce((s, e) => s + Number(e.amount), 0)
+  const due = entries
+    .filter((e) => e.type === 'expense' && !isPast(e))
+    .reduce((s, e) => s + Number(e.amount), 0)
 
   const hasData = income > 0 || spent > 0
   const pieData = hasData
@@ -35,7 +48,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
   // category → subcategory ('' = unlabeled) → amount, for the drill-down
   const bySub = new Map<string, Map<string, number>>()
   for (const e of entries) {
-    if (e.type !== 'expense') continue
+    if (e.type !== 'expense' || !isPast(e)) continue
     byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + Number(e.amount))
     const sub = e.subcategory?.trim() || ''
     if (!bySub.has(e.category)) bySub.set(e.category, new Map())
@@ -103,6 +116,28 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
           </div>
         </div>
       </div>
+
+      {/* Upcoming: future-dated income/expenses not yet in the balance */}
+      {(comingIn > 0 || due > 0) && (
+        <div className="mt-3 space-y-1 border-t border-(--surface) pt-3 text-[13px]">
+          {comingIn > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-(--text-muted)">⏳ {t('chart.comingIn')}</span>
+              <span className="font-semibold tabular-nums text-(--income)">
+                +{formatMoney(comingIn)}
+              </span>
+            </div>
+          )}
+          {due > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-(--text-muted)">📅 {t('chart.due')}</span>
+              <span className="font-semibold tabular-nums text-(--expense)">
+                −{formatMoney(due)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {categories.length > 0 && (
         <hr className="mt-4 border-t border-(--surface)" />

@@ -166,8 +166,6 @@ export const en = {
 
   'detail.byDate': 'By date',
   'detail.byAmount': 'By amount',
-  'detail.list': '☰ List',
-  'detail.byMember': '📊 By member',
   'detail.hideFuture': 'Hide future entries',
   'detail.showFuture': 'Show {count} future entry|Show {count} future entries',
   'detail.noEntries': 'No entries yet.',
@@ -179,7 +177,6 @@ export const en = {
   'detail.confirmDelete': 'Confirm delete entry?',
   'detail.confirmDeleteShort': 'Delete?',
   'detail.yes': 'YES',
-  'detail.noCompare': 'No spending to compare yet.',
 
   'entry.editTitle': 'Edit entry',
   'entry.newTitle': 'New entry',
@@ -218,6 +215,8 @@ export const en = {
 
   'chart.received': 'Received',
   'chart.spent': 'Spent',
+  'chart.comingIn': 'Coming in',
+  'chart.due': 'Due',
   'chart.unlabeled': 'Unlabeled',
 
   'common.all': 'All',

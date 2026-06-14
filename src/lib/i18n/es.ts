@@ -166,8 +166,6 @@ export const es: Record<keyof typeof en, string> = {
 
   'detail.byDate': 'Por fecha',
   'detail.byAmount': 'Por monto',
-  'detail.list': '☰ Lista',
-  'detail.byMember': '📊 Por persona',
   'detail.hideFuture': 'Ocultar entradas futuras',
   'detail.showFuture': 'Ver {count} entrada futura|Ver {count} entradas futuras',
   'detail.noEntries': 'Aún no hay entradas.',
@@ -179,7 +177,6 @@ export const es: Record<keyof typeof en, string> = {
   'detail.confirmDelete': '¿Eliminar esta entrada?',
   'detail.confirmDeleteShort': '¿Eliminar?',
   'detail.yes': 'SÍ',
-  'detail.noCompare': 'Aún no hay gastos para comparar.',
 
   'entry.editTitle': 'Editar entrada',
   'entry.newTitle': 'Nueva entrada',
@@ -218,6 +215,8 @@ export const es: Record<keyof typeof en, string> = {
 
   'chart.received': 'Recibido',
   'chart.spent': 'Gastado',
+  'chart.comingIn': 'Por recibir',
+  'chart.due': 'Por pagar',
   'chart.unlabeled': 'Sin etiqueta',
 
   'common.all': 'Todos',
