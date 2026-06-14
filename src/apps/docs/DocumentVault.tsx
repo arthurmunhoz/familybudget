@@ -210,11 +210,8 @@ export default function DocumentVault() {
       <div className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3">
         <button
           onClick={() => open(doc)}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          className="flex min-w-0 flex-1 items-center text-left"
         >
-          <span className="text-2xl">
-            {doc.mime_type.startsWith('image/') ? '🖼️' : '📄'}
-          </span>
           <span className="min-w-0">
             <span className="block truncate font-medium text-(--text)">
               {doc.title}

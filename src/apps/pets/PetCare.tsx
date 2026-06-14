@@ -34,11 +34,14 @@ export default function PetCare() {
   const [fNextDue, setFNextDue] = useState('')
   const [fNotes, setFNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null)
 
   const [showPetForm, setShowPetForm] = useState(false)
   const [pName, setPName] = useState('')
   const [pEmoji, setPEmoji] = useState('🐶')
   const [savingPet, setSavingPet] = useState(false)
+  const [editingPet, setEditingPet] = useState<Pet | null>(null)
+  const [showManagePets, setShowManagePets] = useState(false)
 
   const load = useCallback(async () => {
     const [petsRes, eventsRes] = await Promise.all([
@@ -76,6 +79,7 @@ export default function PetCare() {
   }
 
   function openForm() {
+    setEditingEvent(null)
     setFPet(petFilter !== 'all' ? petFilter : (pets[0]?.id ?? ''))
     setFType('medication')
     setFTitle('')
@@ -85,41 +89,93 @@ export default function PetCare() {
     setShowForm(true)
   }
 
+  function openEditForm(ev: PetEvent) {
+    setEditingEvent(ev)
+    setFPet(ev.pet_id)
+    setFType(ev.type)
+    setFTitle(ev.title)
+    setFDate(ev.event_date)
+    setFNextDue(ev.next_due ?? '')
+    setFNotes(ev.notes ?? '')
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditingEvent(null)
+  }
+
   async function save() {
     if (!fTitle.trim() || !fPet || !profile || saving) return
     setSaving(true)
-    const { error } = await supabase.from('pet_events').insert({
+    const fields = {
       pet_id: fPet,
       type: fType,
       title: fTitle.trim(),
       notes: fNotes.trim() || null,
       event_date: fDate,
       next_due: fNextDue || null,
-      added_by: profile.email,
-    })
+    }
+    const { error } = editingEvent
+      ? await supabase.from('pet_events').update(fields).eq('id', editingEvent.id)
+      : await supabase.from('pet_events').insert({ ...fields, added_by: profile.email })
     setSaving(false)
     if (error) {
       alert(t('pets.saveFailed'))
       return
     }
-    setShowForm(false)
+    closeForm()
     load()
+  }
+
+  function openAddPet() {
+    setEditingPet(null)
+    setPName('')
+    setPEmoji('🐶')
+    setShowManagePets(false)
+    setShowPetForm(true)
+  }
+
+  function openEditPet(p: Pet) {
+    setEditingPet(p)
+    setPName(p.name)
+    setPEmoji(p.emoji)
+    setShowManagePets(false)
+    setShowPetForm(true)
+  }
+
+  function closePetForm() {
+    setShowPetForm(false)
+    setEditingPet(null)
   }
 
   async function savePet() {
     if (!pName.trim() || savingPet) return
     setSavingPet(true)
-    const { error } = await supabase
-      .from('pets')
-      .insert({ name: pName.trim(), emoji: pEmoji.trim() || '🐶' })
+    const fields = { name: pName.trim(), emoji: pEmoji.trim() || '🐶' }
+    const { error } = editingPet
+      ? await supabase.from('pets').update(fields).eq('id', editingPet.id)
+      : await supabase.from('pets').insert(fields)
     setSavingPet(false)
     if (error) {
       alert(t('pets.addPetFailed'))
       return
     }
-    setShowPetForm(false)
+    closePetForm()
     setPName('')
     setPEmoji('🐶')
+    load()
+  }
+
+  async function deletePet(p: Pet) {
+    // Deleting a pet cascades to all of its events (DB on delete cascade).
+    if (!confirm(`Delete ${p.name} and all of their events? This can't be undone.`)) return
+    const { error } = await supabase.from('pets').delete().eq('id', p.id)
+    if (error) {
+      alert('Could not delete the pet — please try again.')
+      return
+    }
+    if (petFilter === p.id) setPetFilter('all')
     load()
   }
 
@@ -140,6 +196,15 @@ export default function PetCare() {
           ‹
         </button>
         <h1 className="flex-1 text-2xl font-bold text-(--text)">🐕 {t('pets.title')}</h1>
+        {pets.length > 0 && (
+          <button
+            onClick={() => setShowManagePets(true)}
+            aria-label="Manage pets"
+            className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+          >
+            ⚙️
+          </button>
+        )}
       </header>
 
       {/* pet filter */}
@@ -156,7 +221,7 @@ export default function PetCare() {
             {p.emoji} {p.name}
           </FilterChip>
         ))}
-        <FilterChip active={false} onClick={() => setShowPetForm(true)}>
+        <FilterChip active={false} onClick={openAddPet}>
           +
         </FilterChip>
       </div>
@@ -227,18 +292,23 @@ export default function PetCare() {
                     key={e.id}
                     className="flex items-start gap-3 rounded-xl bg-(--card) px-4 py-3"
                   >
-                    <span className="text-xl">{TYPE_ICON[e.type]}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-(--text)">{e.title}</p>
-                      <p className="text-xs text-(--text-faint)">
-                        {petById[e.pet_id]?.emoji} {petById[e.pet_id]?.name} ·{' '}
-                        {formatDay(e.event_date)}
-                        {e.next_due && ` · ${t('pets.next')} ${formatDay(e.next_due)}`}
-                      </p>
-                      {e.notes && (
-                        <p className="mt-1 text-sm text-(--text-muted)">{e.notes}</p>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => openEditForm(e)}
+                      className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                    >
+                      <span className="text-xl">{TYPE_ICON[e.type]}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-(--text)">{e.title}</p>
+                        <p className="text-xs text-(--text-faint)">
+                          {petById[e.pet_id]?.emoji} {petById[e.pet_id]?.name} ·{' '}
+                          {formatDay(e.event_date)}
+                          {e.next_due && ` · ${t('pets.next')} ${formatDay(e.next_due)}`}
+                        </p>
+                        {e.notes && (
+                          <p className="mt-1 text-sm text-(--text-muted)">{e.notes}</p>
+                        )}
+                      </div>
+                    </button>
                     <button
                       onClick={() => remove(e)}
                       aria-label={t('common.deleteName', { name: e.title })}
@@ -256,16 +326,18 @@ export default function PetCare() {
 
       {/* new event button / form */}
       {showForm ? (
-        <div className="fixed inset-0 z-20 flex items-end bg-black/50" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 z-20 flex items-end bg-black/50" onClick={closeForm}>
           <div
             className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-(--text)">{t('pets.newEvent')}</h2>
+              <h2 className="text-lg font-bold text-(--text)">
+                {editingEvent ? 'Edit event' : t('pets.newEvent')}
+              </h2>
               <button
-                onClick={() => setShowForm(false)}
+                onClick={closeForm}
                 aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
@@ -339,8 +411,22 @@ export default function PetCare() {
               disabled={!fTitle.trim() || !fPet || saving}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {saving ? t('common.saving') : t('pets.saveEvent')}
+              {saving ? t('common.saving') : editingEvent ? 'Save changes' : t('pets.saveEvent')}
             </button>
+
+            {editingEvent && (
+              <button
+                onClick={() => {
+                  const ev = editingEvent
+                  closeForm()
+                  remove(ev)
+                }}
+                disabled={saving}
+                className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
+              >
+                Delete event
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -361,7 +447,7 @@ export default function PetCare() {
       {showPetForm && (
         <div
           className="fixed inset-0 z-30 flex items-end bg-black/50"
-          onClick={() => setShowPetForm(false)}
+          onClick={closePetForm}
         >
           <div
             className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
@@ -369,9 +455,11 @@ export default function PetCare() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-(--text)">{t('pets.addPet')}</h2>
+              <h2 className="text-lg font-bold text-(--text)">
+                {editingPet ? 'Edit pet' : t('pets.addPet')}
+              </h2>
               <button
-                onClick={() => setShowPetForm(false)}
+                onClick={closePetForm}
                 aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
@@ -397,7 +485,67 @@ export default function PetCare() {
               disabled={!pName.trim() || savingPet}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {savingPet ? t('common.saving') : t('pets.addPet')}
+              {savingPet ? t('common.saving') : editingPet ? 'Save changes' : t('pets.addPet')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* manage pets sheet — household members add/edit/delete pets */}
+      {showManagePets && (
+        <div
+          className="fixed inset-0 z-30 flex items-end bg-black/50"
+          onClick={() => setShowManagePets(false)}
+        >
+          <div
+            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-(--text)">Manage pets</h2>
+              <button
+                onClick={() => setShowManagePets(false)}
+                aria-label={t('common.close')}
+                className="px-2 py-1 text-(--text-muted) active:text-(--text)"
+              >
+                ✕
+              </button>
+            </div>
+
+            <ul className="space-y-2">
+              {pets.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-3 rounded-xl bg-(--surface) px-4 py-3"
+                >
+                  <span className="text-xl">{p.emoji}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium text-(--text)">
+                    {p.name}
+                  </span>
+                  <button
+                    onClick={() => openEditPet(p)}
+                    aria-label={`Edit ${p.name}`}
+                    className="px-1 text-(--text-faint) active:text-(--accent)"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    onClick={() => deletePet(p)}
+                    aria-label={`Delete ${p.name}`}
+                    className="px-1 text-(--text-faint) active:text-(--expense)"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={openAddPet}
+              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform"
+            >
+              + Add pet
             </button>
           </div>
         </div>
