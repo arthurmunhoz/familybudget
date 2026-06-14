@@ -378,23 +378,23 @@ export default function PetCare() {
               className="mt-3 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
-            <div className="mt-3 flex gap-5">
-              <label className="flex-1 text-xs font-semibold text-(--text-faint)">
+            <div className="mt-3 flex gap-4">
+              <label className="min-w-0 flex-1 text-xs font-semibold text-(--text-faint)">
                 {t('pets.date')}
                 <input
                   type="date"
                   value={fDate}
                   onChange={(e) => setFDate(e.target.value)}
-                  className="mt-1 h-12 w-full rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+                  className="mt-1 h-12 w-full min-w-0 rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
                 />
               </label>
-              <label className="flex-1 text-xs font-semibold text-(--text-faint)">
+              <label className="min-w-0 flex-1 text-xs font-semibold text-(--text-faint)">
                 {t('pets.nextDue')}
                 <input
                   type="date"
                   value={fNextDue}
                   onChange={(e) => setFNextDue(e.target.value)}
-                  className="mt-1 h-12 w-full rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+                  className="mt-1 h-12 w-full min-w-0 rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
                 />
               </label>
             </div>
