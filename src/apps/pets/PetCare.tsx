@@ -391,23 +391,25 @@ export default function PetCare() {
               className="mt-3 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
-            <div className="mt-3 space-y-3">
-              <label className="block text-xs font-semibold text-(--text-faint)">
+            {/* Grid (not flex): grid-cols-2 = minmax(0,1fr) columns that shrink
+               to fit, so the native date inputs can't force horizontal overflow. */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="block min-w-0 text-xs font-semibold text-(--text-faint)">
                 {t('pets.date')}
                 <input
                   type="date"
                   value={fDate}
                   onChange={(e) => setFDate(e.target.value)}
-                  className="mt-1 h-12 w-full rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+                  className="mt-1 h-12 w-full min-w-0 rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
                 />
               </label>
-              <label className="block text-xs font-semibold text-(--text-faint)">
+              <label className="block min-w-0 text-xs font-semibold text-(--text-faint)">
                 {t('pets.nextDue')}
                 <input
                   type="date"
                   value={fNextDue}
                   onChange={(e) => setFNextDue(e.target.value)}
-                  className="mt-1 h-12 w-full rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+                  className="mt-1 h-12 w-full min-w-0 rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
                 />
               </label>
             </div>
