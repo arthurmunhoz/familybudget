@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { daysBetweenISO, formatDay, todayISO } from '../../lib/format'
+import { reminderEvents } from '../../lib/petCare'
 import { supabase } from '../../lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 
@@ -60,19 +61,8 @@ export default function PetCare() {
     [events, petFilter],
   )
 
-  /** Upcoming reminders: only the most recent event of each (pet, type, title)
-   *  counts, so logging this month's heartworm pill retires last month's due date. */
-  const reminders = useMemo(() => {
-    const latest = new Map<string, PetEvent>()
-    // events are sorted newest-first, so the first one per key wins
-    for (const e of visible) {
-      const key = `${e.pet_id}|${e.type}|${e.title.trim().toLowerCase()}`
-      if (!latest.has(key)) latest.set(key, e)
-    }
-    return [...latest.values()]
-      .filter((e) => e.next_due)
-      .sort((a, b) => a.next_due!.localeCompare(b.next_due!))
-  }, [visible])
+  // Upcoming reminders (latest event per pet/type/title that has a due date).
+  const reminders = useMemo(() => reminderEvents(visible), [visible])
 
   function dueLabel(due: string): { text: string; overdue: boolean } {
     const days = daysBetweenISO(todayISO(), due)
@@ -183,7 +173,9 @@ export default function PetCare() {
                   return (
                     <li
                       key={e.id}
-                      className="flex items-center gap-3 rounded-xl bg-(--card) px-4 py-3"
+                      className={`flex items-center gap-3 rounded-xl bg-(--card) px-4 py-3 ${
+                        due.overdue ? 'animate-attention' : ''
+                      }`}
                     >
                       <span className="text-xl">{TYPE_META[e.type].icon}</span>
                       <div className="min-w-0 flex-1">
@@ -273,9 +265,19 @@ export default function PetCare() {
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-4 text-lg font-bold text-(--text)">New event</h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-(--text)">New event</h2>
+              <button
+                onClick={() => setShowForm(false)}
+                aria-label="Close"
+                className="px-2 py-1 text-(--text-muted) active:text-(--text)"
+              >
+                ✕
+              </button>
+            </div>
 
-            <div className="flex gap-2">
+            <label className="block text-xs font-semibold text-(--text-faint)">Pet</label>
+            <div className="mt-1 flex flex-wrap gap-2">
               {pets.map((p) => (
                 <FilterChip key={p.id} active={fPet === p.id} onClick={() => setFPet(p.id)}>
                   {p.emoji} {p.name}
@@ -283,7 +285,10 @@ export default function PetCare() {
               ))}
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <label className="mt-3 block text-xs font-semibold text-(--text-faint)">
+              Type
+            </label>
+            <div className="mt-1 flex flex-wrap gap-2">
               {TYPES.map((t) => (
                 <FilterChip key={t} active={fType === t} onClick={() => setFType(t)}>
                   {TYPE_META[t].icon} {TYPE_META[t].label}
@@ -298,7 +303,7 @@ export default function PetCare() {
               className="mt-3 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
-            <div className="mt-3 flex gap-3">
+            <div className="mt-3 flex gap-5">
               <label className="flex-1 text-xs font-semibold text-(--text-faint)">
                 Date
                 <input
@@ -360,7 +365,16 @@ export default function PetCare() {
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-4 text-lg font-bold text-(--text)">Add pet</h2>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-(--text)">Add pet</h2>
+              <button
+                onClick={() => setShowPetForm(false)}
+                aria-label="Close"
+                className="px-2 py-1 text-(--text-muted) active:text-(--text)"
+              >
+                ✕
+              </button>
+            </div>
             <div className="flex gap-3">
               <input
                 value={pEmoji}
