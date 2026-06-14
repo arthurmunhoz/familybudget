@@ -106,3 +106,17 @@ export interface FamilyDocument {
   added_by: string
   created_at: string
 }
+
+export type ImportantDateType = 'birthday' | 'anniversary' | 'renewal' | 'other'
+
+export interface ImportantDate {
+  id: string
+  household_id: string
+  title: string
+  type: ImportantDateType
+  event_date: string
+  /** true = birthdays/anniversaries/yearly renewals; false = one-time deadline */
+  repeats_annually: boolean
+  notes: string | null
+  created_at: string
+}

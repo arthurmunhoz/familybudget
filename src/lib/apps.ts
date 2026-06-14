@@ -39,6 +39,13 @@ export const APPS: HubApp[] = [
     route: '/docs',
     description: 'IDs, insurance & records',
   },
+  {
+    id: 'dates',
+    name: 'Important Dates',
+    icon: '🗓️',
+    route: '/dates',
+    description: 'Birthdays, renewals & more',
+  },
 ]
 
 /** Shown on the hub only for admins (profile.is_admin). */
