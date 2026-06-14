@@ -11,7 +11,9 @@ export const pt: Record<keyof typeof en, string> = {
   'login.tagline': 'Sua família, sob o mesmo teto.',
   'login.signIn': 'Entrar com o Google',
 
-  'hub.greeting': 'Oi, {name} 👋',
+  'hub.morning': 'Bom dia, {name} 👋',
+  'hub.afternoon': 'Boa tarde, {name} 👋',
+  'hub.evening': 'Boa noite, {name} 👋',
   'hub.openSettings': 'Abrir configurações',
   'hub.allHidden': 'Todos os apps estão ocultos.',
   'hub.allHiddenHint': 'Abra ☰ Configurações → Meus apps para mostrá-los novamente.',

@@ -11,7 +11,9 @@ export const en = {
   'login.tagline': 'Your family, under one roof.',
   'login.signIn': 'Sign in with Google',
 
-  'hub.greeting': 'Hi, {name} 👋',
+  'hub.morning': 'Good morning, {name} 👋',
+  'hub.afternoon': 'Good afternoon, {name} 👋',
+  'hub.evening': 'Good evening, {name} 👋',
   'hub.openSettings': 'Open settings',
   'hub.allHidden': 'All apps are hidden.',
   'hub.allHiddenHint': 'Open ☰ Settings → My apps to bring them back.',

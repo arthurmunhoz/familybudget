@@ -17,6 +17,10 @@ import type { ImportantDate, PetEvent } from '../lib/types'
 export default function Hub() {
   const { profile } = useAuth()
   const { t } = useI18n()
+  // Greeting follows the time of day: morning 5–11, afternoon 12–17, else evening.
+  const hour = new Date().getHours()
+  const greetKey =
+    hour < 5 ? 'hub.evening' : hour < 12 ? 'hub.morning' : hour < 18 ? 'hub.afternoon' : 'hub.evening'
   // Header shows the family's own name ("Munhoz Family"); the hook caches it
   // locally so it doesn't flash "One Roof" on every open.
   const { household } = useHousehold()
@@ -125,7 +129,7 @@ export default function Hub() {
             {household?.name ?? 'One Roof'}
           </h1>
           <p className="text-sm text-(--text-muted)">
-            {t('hub.greeting', { name: profile?.display_name ?? '' })}
+            {t(greetKey, { name: profile?.display_name ?? '' })}
           </p>
         </div>
         <button
