@@ -169,10 +169,10 @@ export default function PetCare() {
 
   async function deletePet(p: Pet) {
     // Deleting a pet cascades to all of its events (DB on delete cascade).
-    if (!confirm(`Delete ${p.name} and all of their events? This can't be undone.`)) return
+    if (!confirm(t('pets.deletePetConfirm', { name: p.name }))) return
     const { error } = await supabase.from('pets').delete().eq('id', p.id)
     if (error) {
-      alert('Could not delete the pet — please try again.')
+      alert(t('pets.deletePetFailed'))
       return
     }
     if (petFilter === p.id) setPetFilter('all')
@@ -199,7 +199,7 @@ export default function PetCare() {
         {pets.length > 0 && (
           <button
             onClick={() => setShowManagePets(true)}
-            aria-label="Manage pets"
+            aria-label={t('pets.managePets')}
             className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
           >
             ⚙️
@@ -334,7 +334,7 @@ export default function PetCare() {
           >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-(--text)">
-                {editingEvent ? 'Edit event' : t('pets.newEvent')}
+                {editingEvent ? t('pets.editEvent') : t('pets.newEvent')}
               </h2>
               <button
                 onClick={closeForm}
@@ -411,7 +411,11 @@ export default function PetCare() {
               disabled={!fTitle.trim() || !fPet || saving}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {saving ? t('common.saving') : editingEvent ? 'Save changes' : t('pets.saveEvent')}
+              {saving
+                ? t('common.saving')
+                : editingEvent
+                  ? t('common.saveChanges')
+                  : t('pets.saveEvent')}
             </button>
 
             {editingEvent && (
@@ -424,7 +428,7 @@ export default function PetCare() {
                 disabled={saving}
                 className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
               >
-                Delete event
+                {t('pets.deleteEvent')}
               </button>
             )}
           </div>
@@ -456,7 +460,7 @@ export default function PetCare() {
           >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-(--text)">
-                {editingPet ? 'Edit pet' : t('pets.addPet')}
+                {editingPet ? t('pets.editPet') : t('pets.addPet')}
               </h2>
               <button
                 onClick={closePetForm}
@@ -485,7 +489,11 @@ export default function PetCare() {
               disabled={!pName.trim() || savingPet}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
             >
-              {savingPet ? t('common.saving') : editingPet ? 'Save changes' : t('pets.addPet')}
+              {savingPet
+                ? t('common.saving')
+                : editingPet
+                  ? t('common.saveChanges')
+                  : t('pets.addPet')}
             </button>
           </div>
         </div>
@@ -503,7 +511,7 @@ export default function PetCare() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-(--text)">Manage pets</h2>
+              <h2 className="text-lg font-bold text-(--text)">{t('pets.managePets')}</h2>
               <button
                 onClick={() => setShowManagePets(false)}
                 aria-label={t('common.close')}
@@ -525,14 +533,14 @@ export default function PetCare() {
                   </span>
                   <button
                     onClick={() => openEditPet(p)}
-                    aria-label={`Edit ${p.name}`}
+                    aria-label={t('common.editName', { name: p.name })}
                     className="px-1 text-(--text-faint) active:text-(--accent)"
                   >
                     ✎
                   </button>
                   <button
                     onClick={() => deletePet(p)}
-                    aria-label={`Delete ${p.name}`}
+                    aria-label={t('common.deleteName', { name: p.name })}
                     className="px-1 text-(--text-faint) active:text-(--expense)"
                   >
                     ✕
@@ -545,7 +553,7 @@ export default function PetCare() {
               onClick={openAddPet}
               className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform"
             >
-              + Add pet
+              {t('pets.addPetBtn')}
             </button>
           </div>
         </div>
