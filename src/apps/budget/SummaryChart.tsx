@@ -63,9 +63,9 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
 
   return (
     <div className="rounded-2xl bg-(--card) p-4">
-      <div className="flex items-start gap-4">
-        {/* current balance + upcoming projection */}
-        <div className="flex-1">
+      <div className="flex items-stretch gap-4">
+        {/* current balance (top) + upcoming projection (pinned to bottom) */}
+        <div className="flex flex-1 flex-col">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-(--text-faint)">
             {t('chart.currentBalance')}
           </div>
@@ -78,7 +78,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
           </div>
 
           {hasUpcoming && (
-            <div className="mt-2 space-y-0.5 text-[11px] text-(--text-muted)">
+            <div className="mt-auto space-y-0.5 pt-3 text-[11px] text-(--text-muted)">
               {comingIn > 0 && (
                 <div className="flex items-center justify-between gap-2">
                   <span>⏳ {t('chart.comingIn')}</span>
