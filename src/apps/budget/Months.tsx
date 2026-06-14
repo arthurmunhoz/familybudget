@@ -138,6 +138,7 @@ export default function Months() {
               label: e.label,
               amount: e.amount,
               category: e.category,
+              subcategory: e.subcategory,
               person_email: e.person_email,
               recurring: true,
               entry_date: addDaysISO(created.start_date, Math.min(offset, len - 1)),

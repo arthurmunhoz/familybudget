@@ -19,6 +19,8 @@ interface Props {
   profiles: Profile[]
   myEmail: string
   rules: CategoryRule[]
+  /** category id → subcategories already used by the household, most-used first */
+  subcategorySuggestions: Record<string, string[]>
   /** null = creating a new entry */
   entry: Entry | null
   /** Prefilled values for a new entry (e.g. from a scanned receipt) */
@@ -34,6 +36,7 @@ export default function EntryForm({
   profiles,
   myEmail,
   rules,
+  subcategorySuggestions,
   entry,
   initial,
   onClose,
@@ -59,6 +62,7 @@ export default function EntryForm({
   const [categoryTouched, setCategoryTouched] = useState(
     Boolean(entry) || Boolean(initial?.category),
   )
+  const [subcategory, setSubcategory] = useState(entry?.subcategory ?? '')
   const [date, setDate] = useState(entry?.entry_date ?? initialDate ?? defaultDate)
   const [recurring, setRecurring] = useState(entry?.recurring ?? false)
   const [personEmail, setPersonEmail] = useState(entry?.person_email ?? myEmail)
@@ -85,6 +89,7 @@ export default function EntryForm({
       label: label.trim(),
       amount: value,
       category: type === 'income' ? 'salary' : category,
+      subcategory: type === 'expense' && subcategory.trim() ? subcategory.trim() : null,
       entry_date: date,
       person_email: personEmail,
       recurring,
@@ -195,6 +200,22 @@ export default function EntryForm({
                 </button>
               ))}
             </div>
+
+            <label className="mt-3 block text-sm text-(--text-muted)">
+              Subcategory <span className="text-xs text-(--text-faint)">(optional)</span>
+              <input
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                list="subcategory-suggestions"
+                placeholder="e.g. supplements, doctor visit"
+                className="mt-1 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+              />
+              <datalist id="subcategory-suggestions">
+                {(subcategorySuggestions[category] ?? []).map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </label>
           </div>
         )}
 

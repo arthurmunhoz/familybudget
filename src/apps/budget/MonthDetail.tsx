@@ -34,6 +34,7 @@ export default function MonthDetail() {
   const [month, setMonth] = useState<MonthWithBudget | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [rules, setRules] = useState<CategoryRule[]>([])
+  const [subcatSuggestions, setSubcatSuggestions] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(true)
 
   const [person, setPerson] = useState<string>('all')
@@ -50,14 +51,34 @@ export default function MonthDetail() {
 
   const load = useCallback(async () => {
     if (!id) return
-    const [m, e, r] = await Promise.all([
+    const [m, e, r, subs] = await Promise.all([
       supabase.from('months').select('*, budgets(name, period)').eq('id', id).single(),
       supabase.from('entries').select('*').eq('month_id', id),
       supabase.from('category_rules').select('keyword, category'),
+      // Household-wide subcategory vocabulary for the entry-form autocomplete
+      // (RLS scopes this to the family). Most-used suggestions surface first.
+      supabase.from('entries').select('category, subcategory').not('subcategory', 'is', null),
     ])
     setMonth(m.data)
     setEntries(e.data ?? [])
     setRules(r.data ?? [])
+
+    const counts = new Map<string, Map<string, number>>()
+    for (const row of (subs.data ?? []) as { category: string; subcategory: string }[]) {
+      const key = row.subcategory.trim()
+      if (!key) continue
+      if (!counts.has(row.category)) counts.set(row.category, new Map())
+      const bucket = counts.get(row.category)!
+      // dedupe case-insensitively, keeping the first-seen casing
+      const existing = [...bucket.keys()].find((k) => k.toLowerCase() === key.toLowerCase())
+      const useKey = existing ?? key
+      bucket.set(useKey, (bucket.get(useKey) ?? 0) + 1)
+    }
+    const map: Record<string, string[]> = {}
+    for (const [cat, bucket] of counts) {
+      map[cat] = [...bucket.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s)
+    }
+    setSubcatSuggestions(map)
     setLoading(false)
   }, [id])
 
@@ -335,6 +356,7 @@ export default function MonthDetail() {
           profiles={profiles}
           myEmail={profile.email}
           rules={rules}
+          subcategorySuggestions={subcatSuggestions}
           entry={editing}
           initial={prefill}
           onClose={() => {
@@ -463,6 +485,7 @@ function EntryRow({
   const cat = categoryById(e.category)
   const isIncome = e.type === 'income'
   const secondary = [
+    e.subcategory,
     showDate ? formatDay(e.entry_date) : null,
     showPerson ? nameOf(e.person_email) : null,
   ]

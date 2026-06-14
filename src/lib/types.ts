@@ -41,6 +41,8 @@ export interface Entry {
   label: string
   amount: number
   category: string
+  /** Optional free-text subcategory, e.g. Health → "supplements" */
+  subcategory: string | null
   entry_date: string
   person_email: string
   recurring: boolean

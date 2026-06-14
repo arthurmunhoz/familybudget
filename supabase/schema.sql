@@ -180,3 +180,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-014-user-settings.sql (per-user hidden apps)
 --   migration-015-tile-style.sql (hub tile density per user)
 --   migration-016-member-limit.sql (max 6 members per household)
+--   migration-017-subcategory.sql (optional free-text entry subcategory)

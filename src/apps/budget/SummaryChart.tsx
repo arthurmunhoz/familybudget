@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Cell, Pie, PieChart } from 'recharts'
 import { categoryById } from '../../lib/categories'
 import { formatMoney } from '../../lib/format'
@@ -6,6 +7,8 @@ import type { Entry } from '../../lib/types'
 
 export default function SummaryChart({ entries }: { entries: Entry[] }) {
   const { theme } = useTheme()
+  // Which category is drilled down to show its subcategory breakdown.
+  const [expandedCat, setExpandedCat] = useState<string | null>(null)
   const incomeColor = theme === 'dark' ? '#34d399' : '#059669'
   const expenseColor = theme === 'dark' ? '#fb7185' : '#e11d48'
   const emptyColor = theme === 'dark' ? '#44403c' : '#e7e5e4'
@@ -27,9 +30,15 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
     : [{ name: 'No entries', value: 1, color: emptyColor }]
 
   const byCategory = new Map<string, number>()
+  // category → subcategory ('' = unlabeled) → amount, for the drill-down
+  const bySub = new Map<string, Map<string, number>>()
   for (const e of entries) {
     if (e.type !== 'expense') continue
     byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + Number(e.amount))
+    const sub = e.subcategory?.trim() || ''
+    if (!bySub.has(e.category)) bySub.set(e.category, new Map())
+    const m = bySub.get(e.category)!
+    m.set(sub, (m.get(sub) ?? 0) + Number(e.amount))
   }
   const categories = [...byCategory.entries()].sort((a, b) => b[1] - a[1])
   const maxCat = categories[0]?.[1] ?? 0
@@ -101,18 +110,55 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
         <div className="mt-4 space-y-2">
           {categories.map(([catId, amount]) => {
             const cat = categoryById(catId)
+            const subs = [...(bySub.get(catId)?.entries() ?? [])].sort(
+              (a, b) => b[1] - a[1],
+            )
+            const hasSubs = subs.some(([k]) => k !== '')
+            const expanded = expandedCat === catId
+            const maxSub = subs[0]?.[1] ?? 0
             return (
-              <div key={catId} className="flex items-center gap-2">
-                <span className="w-6 text-center">{cat.icon}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-(--surface)">
-                  <div
-                    className="h-full rounded-full bg-(--accent)"
-                    style={{ width: `${(amount / maxCat) * 100}%` }}
-                  />
-                </div>
-                <span className="w-20 text-right text-xs tabular-nums text-(--text-muted)">
-                  {formatMoney(amount)}
-                </span>
+              <div key={catId}>
+                <button
+                  onClick={() => hasSubs && setExpandedCat(expanded ? null : catId)}
+                  className={`flex w-full items-center gap-2 ${
+                    hasSubs ? 'active:opacity-70' : 'cursor-default'
+                  }`}
+                >
+                  <span className="w-6 text-center">{cat.icon}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-(--surface)">
+                    <div
+                      className="h-full rounded-full bg-(--accent)"
+                      style={{ width: `${(amount / maxCat) * 100}%` }}
+                    />
+                  </div>
+                  <span className="w-20 text-right text-xs tabular-nums text-(--text-muted)">
+                    {formatMoney(amount)}
+                  </span>
+                  <span className="w-3 text-[10px] text-(--text-faint)">
+                    {hasSubs ? (expanded ? '▾' : '▸') : ''}
+                  </span>
+                </button>
+
+                {expanded && (
+                  <div className="mt-1.5 mb-1 ml-8 space-y-1">
+                    {subs.map(([sub, subAmt]) => (
+                      <div key={sub || '—'} className="flex items-center gap-2">
+                        <span className="w-20 shrink-0 truncate text-[11px] text-(--text-muted)">
+                          {sub || 'Unlabeled'}
+                        </span>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-(--surface)">
+                          <div
+                            className="h-full rounded-full bg-(--accent) opacity-60"
+                            style={{ width: `${maxSub > 0 ? (subAmt / maxSub) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="w-16 text-right text-[11px] tabular-nums text-(--text-faint)">
+                          {formatMoney(subAmt)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
