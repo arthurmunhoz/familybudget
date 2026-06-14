@@ -217,7 +217,7 @@ export default function EntryForm({
                 value={subcategory}
                 onChange={(e) => setSubcategory(e.target.value)}
                 list="subcategory-suggestions"
-                placeholder={t('entry.subcategoryPlaceholder')}
+                placeholder={t(`entry.sub.${category}` as TKey)}
                 className="mt-1 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
               />
               <datalist id="subcategory-suggestions">

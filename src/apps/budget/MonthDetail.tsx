@@ -230,6 +230,19 @@ export default function MonthDetail() {
 
       {/* List controls */}
       <div className="mt-5 flex items-center justify-between">
+        <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
+          {(['list', 'members'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-md px-3 py-1.5 ${
+                view === v ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
+              }`}
+            >
+              {v === 'list' ? t('detail.list') : t('detail.byMember')}
+            </button>
+          ))}
+        </div>
         {view === 'list' ? (
           <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
             <button
@@ -256,19 +269,6 @@ export default function MonthDetail() {
         ) : (
           <div />
         )}
-        <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
-          {(['list', 'members'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`rounded-md px-3 py-1.5 ${
-                view === v ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
-              }`}
-            >
-              {v === 'list' ? t('detail.list') : t('detail.byMember')}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Future entries are collapsed behind a subtle toggle */}
