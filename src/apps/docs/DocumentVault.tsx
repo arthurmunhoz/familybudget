@@ -3,6 +3,12 @@ import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { useI18n } from '../../hooks/useI18n'
+import {
+  biometricAvailable,
+  isVaultLockEnabled,
+  setVaultLockEnabled,
+  unlockVault,
+} from '../../lib/biometric'
 import { formatDay } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
@@ -40,6 +46,32 @@ export default function DocumentVault() {
   const [filter, setFilter] = useState<DocCategory | 'all'>('all')
   const [person, setPerson] = useState<string>('all')
   const [personMenuOpen, setPersonMenuOpen] = useState(false)
+
+  // Opt-in Face ID lock (per device). The toggle only appears where biometrics
+  // are available; turning it on confirms with a biometric check first.
+  const [canLock, setCanLock] = useState(false)
+  const [lockOn, setLockOn] = useState(() =>
+    profile ? isVaultLockEnabled(profile.email) : false,
+  )
+  useEffect(() => {
+    biometricAvailable().then(setCanLock)
+  }, [])
+
+  async function toggleLock() {
+    if (!profile) return
+    if (lockOn) {
+      setVaultLockEnabled(profile.email, false)
+      setLockOn(false)
+      return
+    }
+    const ok = await unlockVault(profile.email) // enroll/verify before enabling
+    if (!ok) {
+      alert(t('vault.enableFailed'))
+      return
+    }
+    setVaultLockEnabled(profile.email, true)
+    setLockOn(true)
+  }
 
   // upload form state — appears after a file is picked
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -254,6 +286,19 @@ export default function DocumentVault() {
         <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
           📄 {t('docs.title')}
         </h1>
+
+        {/* Face ID lock toggle — only where the device supports biometrics */}
+        {canLock && (
+          <button
+            onClick={toggleLock}
+            aria-label={lockOn ? t('vault.disableLock') : t('vault.enableLock')}
+            className={`shrink-0 rounded-lg px-2 py-1 text-xl ${
+              lockOn ? 'text-(--accent)' : 'text-(--text-faint) active:text-(--text)'
+            }`}
+          >
+            {lockOn ? '🔒' : '🔓'}
+          </button>
+        )}
 
         {/* Person filter chip — same pattern as the budget entries list */}
         <div className="relative shrink-0">

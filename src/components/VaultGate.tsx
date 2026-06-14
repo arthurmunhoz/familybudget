@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
 import { useI18n } from '../hooks/useI18n'
-import { biometricAvailable, unlockVault } from '../lib/biometric'
+import { biometricAvailable, isVaultLockEnabled, unlockVault } from '../lib/biometric'
 
 type Status = 'checking' | 'locked' | 'unlocked'
 
@@ -21,6 +21,12 @@ export default function VaultGate({ children }: { children: ReactNode }) {
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
+    // Only lock when the user has opted in on this device AND it can do
+    // biometrics; otherwise open straight through.
+    if (!profile || !isVaultLockEnabled(profile.email)) {
+      setStatus('unlocked')
+      return
+    }
     let cancelled = false
     biometricAvailable().then((ok) => {
       if (!cancelled) setStatus(ok ? 'locked' : 'unlocked')
@@ -28,7 +34,7 @@ export default function VaultGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [profile])
 
   // WebAuthn needs a user gesture, so unlocking is driven by the button tap.
   async function tryUnlock() {

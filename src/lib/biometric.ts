@@ -7,6 +7,18 @@
 // authenticator completed user verification — there's no server check.
 
 const credKey = (email: string) => `vault-cred:${email}`
+const lockKey = (email: string) => `vault-lock:${email}`
+
+/** Whether this user has turned on the Face ID lock on THIS device.
+ *  Off by default — the lock is opt-in. */
+export function isVaultLockEnabled(email: string): boolean {
+  return localStorage.getItem(lockKey(email)) === '1'
+}
+
+export function setVaultLockEnabled(email: string, on: boolean) {
+  if (on) localStorage.setItem(lockKey(email), '1')
+  else localStorage.removeItem(lockKey(email))
+}
 
 function toB64url(buf: ArrayBuffer): string {
   let s = ''

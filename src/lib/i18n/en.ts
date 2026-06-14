@@ -238,6 +238,9 @@ export const en = {
   'vault.unlock': '🔓 Unlock',
   'vault.unlocking': 'Verifying…',
   'vault.failed': 'Couldn’t verify — try again.',
+  'vault.enableLock': 'Turn on Face ID lock',
+  'vault.disableLock': 'Turn off Face ID lock',
+  'vault.enableFailed': 'Couldn’t turn on the lock — try again.',
   'docs.empty': 'Nothing here yet.',
   'docs.emptyHint':
     "Snap photos of IDs, insurance cards, vaccine records — they'll be safe here when you need them.",

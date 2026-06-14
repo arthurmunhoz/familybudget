@@ -238,6 +238,9 @@ export const es: Record<keyof typeof en, string> = {
   'vault.unlock': '🔓 Desbloquear',
   'vault.unlocking': 'Verificando…',
   'vault.failed': 'No se pudo verificar — inténtalo de nuevo.',
+  'vault.enableLock': 'Activar bloqueo con Face ID',
+  'vault.disableLock': 'Desactivar bloqueo con Face ID',
+  'vault.enableFailed': 'No se pudo activar el bloqueo — inténtalo de nuevo.',
   'docs.empty': 'Aún no hay nada aquí.',
   'docs.emptyHint':
     'Toma fotos de identificaciones, tarjetas de seguro y carnés de vacunas — estarán seguros aquí cuando los necesites.',
