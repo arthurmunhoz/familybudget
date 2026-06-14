@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import { useI18n } from '../../hooks/useI18n'
 import { supabase } from '../../lib/supabase'
 import type { Budget, Period } from '../../lib/types'
@@ -19,6 +20,7 @@ export default function Budgets() {
   const [name, setName] = useState('')
   const [period, setPeriod] = useState<Period>('monthly')
   const [saving, setSaving] = useState(false)
+  useScrollLock(createOpen)
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('budgets').select('*').order('created_at')

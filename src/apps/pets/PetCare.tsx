@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import { daysBetweenISO, formatDay, todayISO } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
 import { reminderEvents } from '../../lib/petCare'
@@ -42,6 +43,9 @@ export default function PetCare() {
   const [savingPet, setSavingPet] = useState(false)
   const [editingPet, setEditingPet] = useState<Pet | null>(null)
   const [showManagePets, setShowManagePets] = useState(false)
+
+  // Lock the page behind any open sheet so it can't be dragged.
+  useScrollLock(showForm || showPetForm || showManagePets)
 
   const load = useCallback(async () => {
     const [petsRes, eventsRes] = await Promise.all([

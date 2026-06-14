@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import type { TKey } from '../../lib/i18n'
 import {
   addDaysISO,
@@ -41,6 +42,7 @@ export default function Months() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [name, setName] = useState('')
+  useScrollLock(createOpen || menuOpen || renameOpen)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {

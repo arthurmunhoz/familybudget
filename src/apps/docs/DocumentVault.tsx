@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import { useI18n } from '../../hooks/useI18n'
 import { formatDay } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
@@ -56,6 +57,7 @@ export default function DocumentVault() {
 
   // in-app preview
   const [preview, setPreview] = useState<{ doc: FamilyDocument; url: string } | null>(null)
+  useScrollLock(Boolean(pendingFile || editing || preview))
 
   const load = useCallback(async () => {
     const { data } = await supabase

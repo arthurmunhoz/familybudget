@@ -5,6 +5,7 @@ import { fileToResizedBase64 } from '../../lib/image'
 import SummaryChart from './SummaryChart'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import { useI18n } from '../../hooks/useI18n'
 import { categoryById } from '../../lib/categories'
 import {
@@ -46,6 +47,8 @@ export default function MonthDetail() {
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
   const [scanning, setScanning] = useState(false)
   const [showFuture, setShowFuture] = useState(false)
+  // EntryForm self-locks; this covers the receipt-scan overlay.
+  useScrollLock(scanning)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {

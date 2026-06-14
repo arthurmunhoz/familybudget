@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '../../hooks/useI18n'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import { CATEGORIES, normalizeLabel, suggestCategory } from '../../lib/categories'
 import { todayISO } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
@@ -71,6 +72,8 @@ export default function EntryForm({
   const [personEmail, setPersonEmail] = useState(entry?.person_email ?? myEmail)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // EntryForm only mounts while open, so lock the page behind it.
+  useScrollLock(true)
 
   // Auto-categorize as the label is typed, until the user picks manually.
   useEffect(() => {

@@ -3,6 +3,7 @@ import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { notifyHouseholdChanged, useHousehold } from '../hooks/useHousehold'
 import { useI18n } from '../hooks/useI18n'
+import { useScrollLock } from '../hooks/useScrollLock'
 import { useTheme } from '../hooks/useTheme'
 import { APPS } from '../lib/apps'
 import { LANGUAGES, type TKey } from '../lib/i18n'
@@ -23,6 +24,7 @@ export default function Drawer({
   const { hidden, toggleApp, tileStyle, setTileStyle } = useAppPrefs()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
+  useScrollLock(open)
 
   const backdropPath = household?.backdrop_path ?? null
   const isUploadedBackdrop = Boolean(backdropPath && backdropPath !== 'builtin:beach')
