@@ -215,8 +215,10 @@ export const pt: Record<keyof typeof en, string> = {
 
   'chart.received': 'Recebido',
   'chart.spent': 'Gasto',
+  'chart.currentBalance': 'Saldo atual',
   'chart.comingIn': 'A receber',
   'chart.due': 'A pagar',
+  'chart.expected': 'Previsto',
   'chart.unlabeled': 'Sem rótulo',
 
   'common.all': 'Todos',

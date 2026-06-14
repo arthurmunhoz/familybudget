@@ -215,8 +215,10 @@ export const en = {
 
   'chart.received': 'Received',
   'chart.spent': 'Spent',
+  'chart.currentBalance': 'Current balance',
   'chart.comingIn': 'Coming in',
   'chart.due': 'Due',
+  'chart.expected': 'Expected',
   'chart.unlabeled': 'Unlabeled',
 
   'common.all': 'All',

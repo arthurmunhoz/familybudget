@@ -35,6 +35,9 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
   const due = entries
     .filter((e) => e.type === 'expense' && !isPast(e))
     .reduce((s, e) => s + Number(e.amount), 0)
+  // Where the balance lands once all future-dated entries have happened.
+  const expected = balance + comingIn - due
+  const hasUpcoming = comingIn > 0 || due > 0
 
   const hasData = income > 0 || spent > 0
   const pieData = hasData
@@ -60,11 +63,11 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
 
   return (
     <div className="rounded-2xl bg-(--card) p-4">
-      <div className="flex items-center gap-4">
-        {/* balance */}
-        <div className="flex flex-1 flex-col items-center justify-center">
+      <div className="flex items-start gap-4">
+        {/* current balance + upcoming projection */}
+        <div className="flex-1">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-(--text-faint)">
-            {t('common.balance')}
+            {t('chart.currentBalance')}
           </div>
           <div
             className={`mt-1 text-2xl font-bold tabular-nums ${
@@ -73,6 +76,33 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
           >
             {formatMoney(balance)}
           </div>
+
+          {hasUpcoming && (
+            <div className="mt-2 space-y-0.5 text-[11px] text-(--text-muted)">
+              {comingIn > 0 && (
+                <div className="flex items-center justify-between gap-2">
+                  <span>⏳ {t('chart.comingIn')}</span>
+                  <span className="tabular-nums text-(--income)">+{formatMoney(comingIn)}</span>
+                </div>
+              )}
+              {due > 0 && (
+                <div className="flex items-center justify-between gap-2">
+                  <span>📅 {t('chart.due')}</span>
+                  <span className="tabular-nums text-(--expense)">−{formatMoney(due)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2 border-t border-(--surface) pt-0.5 font-semibold text-(--text)">
+                <span>{t('chart.expected')}</span>
+                <span
+                  className={`tabular-nums ${
+                    expected >= 0 ? 'text-(--income)' : 'text-(--expense)'
+                  }`}
+                >
+                  {formatMoney(expected)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* received vs spent pie with legend */}
@@ -116,28 +146,6 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
           </div>
         </div>
       </div>
-
-      {/* Upcoming: future-dated income/expenses not yet in the balance */}
-      {(comingIn > 0 || due > 0) && (
-        <div className="mt-3 space-y-1 border-t border-(--surface) pt-3 text-[13px]">
-          {comingIn > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-(--text-muted)">⏳ {t('chart.comingIn')}</span>
-              <span className="font-semibold tabular-nums text-(--income)">
-                +{formatMoney(comingIn)}
-              </span>
-            </div>
-          )}
-          {due > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-(--text-muted)">📅 {t('chart.due')}</span>
-              <span className="font-semibold tabular-nums text-(--expense)">
-                −{formatMoney(due)}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
 
       {categories.length > 0 && (
         <hr className="mt-4 border-t border-(--surface)" />
