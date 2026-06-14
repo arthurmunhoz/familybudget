@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import { fileToResizedBase64 } from '../../lib/image'
+import MemberCategoryChart from './MemberCategoryChart'
 import SummaryChart from './SummaryChart'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
@@ -23,7 +24,7 @@ type MonthWithBudget = Month & {
 
 type SortBy = 'date' | 'amount'
 type SortDir = 'asc' | 'desc'
-type View = 'list' | 'split'
+type View = 'list' | 'members'
 
 export default function MonthDetail() {
   const { id } = useParams<{ id: string }>()
@@ -163,7 +164,7 @@ export default function MonthDetail() {
             onClick={() => setPersonMenuOpen((o) => !o)}
             className="flex items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface) px-3.5 py-1.5 text-sm font-semibold text-(--text)"
           >
-            {person === 'all' ? 'Both' : nameOf(person)}
+            {person === 'all' ? 'Everyone' : nameOf(person)}
             <span className="text-[9px] text-(--text-faint)">▼</span>
           </button>
           {personMenuOpen && (
@@ -174,7 +175,7 @@ export default function MonthDetail() {
               />
               <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-(--surface) bg-(--card) shadow-xl">
                 {[
-                  { key: 'all', label: 'Both' },
+                  { key: 'all', label: 'Everyone' },
                   ...profiles.map((p: Profile) => ({
                     key: p.email,
                     label: p.display_name,
@@ -206,45 +207,49 @@ export default function MonthDetail() {
 
       {/* List controls */}
       <div className="mt-5 flex items-center justify-between">
+        {view === 'list' ? (
+          <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
+            <button
+              onClick={() =>
+                sortBy === 'date'
+                  ? setDateDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+                  : setSortBy('date')
+              }
+              className={`rounded-md px-3 py-1.5 ${
+                sortBy === 'date' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
+              }`}
+            >
+              By date {dateDir === 'asc' ? '↑' : '↓'}
+            </button>
+            <button
+              onClick={() => setSortBy('amount')}
+              className={`rounded-md px-3 py-1.5 ${
+                sortBy === 'amount' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
+              }`}
+            >
+              By amount
+            </button>
+          </div>
+        ) : (
+          <div />
+        )}
         <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
-          <button
-            onClick={() =>
-              sortBy === 'date'
-                ? setDateDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-                : setSortBy('date')
-            }
-            className={`rounded-md px-3 py-1.5 ${
-              sortBy === 'date' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
-            }`}
-          >
-            By date {dateDir === 'asc' ? '↑' : '↓'}
-          </button>
-          <button
-            onClick={() => setSortBy('amount')}
-            className={`rounded-md px-3 py-1.5 ${
-              sortBy === 'amount' ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
-            }`}
-          >
-            By amount
-          </button>
-        </div>
-        <div className="flex gap-1 rounded-lg bg-(--surface) p-1 text-xs font-semibold">
-          {(['list', 'split'] as const).map((v) => (
+          {(['list', 'members'] as const).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
-              className={`rounded-md px-3 py-1.5 capitalize ${
+              className={`rounded-md px-3 py-1.5 ${
                 view === v ? 'bg-(--surface-2) text-(--text)' : 'text-(--text-faint)'
               }`}
             >
-              {v === 'list' ? '☰ List' : '◫ Split'}
+              {v === 'list' ? '☰ List' : '📊 By member'}
             </button>
           ))}
         </div>
       </div>
 
       {/* Future entries are collapsed behind a subtle toggle */}
-      {futureCount > 0 && (
+      {view === 'list' && futureCount > 0 && (
         <button
           onClick={() => setShowFuture((s) => !s)}
           className="mx-auto mt-3 block text-xs font-medium text-(--text-faint) underline decoration-dotted underline-offset-4 active:text-(--text-muted)"
@@ -269,29 +274,8 @@ export default function MonthDetail() {
           onDelete={removeEntry}
         />
       ) : (
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {profiles.map((p) => (
-            <div key={p.email}>
-              <h3 className="mb-2 text-center text-sm font-bold text-(--text-muted)">
-                {p.display_name}
-              </h3>
-              <EntryColumn
-                entries={sortEntries(
-                  listVisible(entries.filter((e) => e.person_email === p.email)),
-                )}
-                nameOf={nameOf}
-                showPerson={false}
-                groupByDay={sortBy === 'date'}
-                compact
-                onSelect={(e) => {
-                  setEditing(e)
-                  setFormOpen(true)
-                }}
-                onDelete={removeEntry}
-              />
-            </div>
-          ))}
-        </div>
+        // Member breakdown compares everyone, so it ignores the person filter.
+        <MemberCategoryChart entries={entries} profiles={profiles} />
       )}
 
       {/* Add + scan buttons */}
