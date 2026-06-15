@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useCachedQuery } from '../../hooks/useCachedQuery'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { formatDay, formatPhone, todayISO } from '../../lib/format'
@@ -38,48 +39,45 @@ export default function Family() {
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
   const today = todayISO()
-  const [byEmail, setByEmail] = useState<Record<string, MemberProfile>>({})
-  const [loading, setLoading] = useState(true)
 
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
-  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({})
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   useScrollLock(editing || Boolean(preview))
 
-  const load = useCallback(async () => {
-    const { data } = await supabase.from('member_profiles').select('*')
-    const rows = (data ?? []) as MemberProfile[]
-    setByEmail(Object.fromEntries(rows.map((p) => [p.email, p])))
+  // Cached: member profiles + signed avatar URLs render instantly on return.
+  const {
+    data = { byEmail: {}, avatarUrls: {} },
+    loading,
+    revalidate,
+  } = useCachedQuery<{
+    byEmail: Record<string, MemberProfile>
+    avatarUrls: Record<string, string>
+  }>('family:profiles', async () => {
+    const { data: rowsData } = await supabase.from('member_profiles').select('*')
+    const rows = (rowsData ?? []) as MemberProfile[]
+    const byEmail = Object.fromEntries(rows.map((p) => [p.email, p]))
     // Sign avatar URLs so the household can see each other's photos.
     const paths = rows.map((p) => p.avatar_path).filter(Boolean) as string[]
-    if (paths.length) {
-      const { data: signed } = await supabase.storage
-        .from('documents')
-        .createSignedUrls(paths, 3600)
-      const urlByPath = Object.fromEntries(
-        (signed ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl]),
-      )
-      setAvatarUrls(
-        Object.fromEntries(
-          rows
-            .filter((p) => p.avatar_path && urlByPath[p.avatar_path])
-            .map((p) => [p.email, urlByPath[p.avatar_path as string]]),
-        ),
-      )
-    } else {
-      setAvatarUrls({})
-    }
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+    if (!paths.length) return { byEmail, avatarUrls: {} }
+    const { data: signed } = await supabase.storage
+      .from('documents')
+      .createSignedUrls(paths, 3600)
+    const urlByPath = Object.fromEntries(
+      (signed ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl]),
+    )
+    const avatarUrls = Object.fromEntries(
+      rows
+        .filter((p) => p.avatar_path && urlByPath[p.avatar_path])
+        .map((p) => [p.email, urlByPath[p.avatar_path as string]]),
+    )
+    return { byEmail, avatarUrls }
+  })
+  const { byEmail, avatarUrls } = data
 
   function openEdit() {
     const mine = profile ? byEmail[profile.email] : undefined
@@ -167,7 +165,7 @@ export default function Family() {
       await supabase.storage.from('documents').remove([oldAvatar])
     }
     setEditing(false)
-    load()
+    revalidate()
   }
 
   return (

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
+import { useCachedQuery } from '../../hooks/useCachedQuery'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { useI18n } from '../../hooks/useI18n'
 import { supabase } from '../../lib/supabase'
@@ -13,24 +14,20 @@ export default function Budgets() {
   const navigate = useNavigate()
   const back = useBack()
   const { t } = useI18n()
-  const [budgets, setBudgets] = useState<Budget[]>([])
-  const [loading, setLoading] = useState(true)
+  // Cached: the budgets list renders instantly on return, revalidates quietly.
+  const { data: budgets = [], loading, revalidate } = useCachedQuery<Budget[]>(
+    'budgets:list',
+    async () => {
+      const { data } = await supabase.from('budgets').select('*').order('created_at')
+      return data ?? []
+    },
+  )
 
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [period, setPeriod] = useState<Period>('monthly')
   const [saving, setSaving] = useState(false)
   useScrollLock(createOpen)
-
-  const load = useCallback(async () => {
-    const { data } = await supabase.from('budgets').select('*').order('created_at')
-    setBudgets(data ?? [])
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   async function create() {
     const trimmed = name.trim()
@@ -41,7 +38,7 @@ export default function Budgets() {
     setCreateOpen(false)
     setName('')
     setPeriod('monthly')
-    load()
+    revalidate()
   }
 
   return (

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
+import { useCachedQuery } from '../../hooks/useCachedQuery'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import type { TKey } from '../../lib/i18n'
@@ -27,12 +28,6 @@ export default function Months() {
   const navigate = useNavigate()
   const back = useBack()
   const { t } = useI18n()
-  const [budget, setBudget] = useState<Budget | null>(null)
-  const [months, setMonths] = useState<Month[]>([])
-  const [entries, setEntries] = useState<
-    Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>[]
-  >([])
-  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   // YYYY-MM for monthly budgets (month input), YYYY-MM-DD otherwise
@@ -45,8 +40,18 @@ export default function Months() {
   useScrollLock(createOpen || menuOpen || renameOpen)
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    if (!budgetId) return
+  type MonthsData = {
+    budget: Budget | null
+    months: Month[]
+    entries: Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>[]
+  }
+  // Cached per budget: list + balances render instantly on return.
+  const {
+    data = { budget: null, months: [], entries: [] },
+    loading,
+    revalidate,
+  } = useCachedQuery<MonthsData>(`months:${budgetId ?? ''}`, async () => {
+    if (!budgetId) return { budget: null, months: [], entries: [] }
     const [b, m, e] = await Promise.all([
       supabase.from('budgets').select('*').eq('id', budgetId).single(),
       supabase
@@ -56,15 +61,9 @@ export default function Months() {
         .order('start_date', { ascending: false }),
       supabase.from('entries').select('month_id, type, amount, entry_date'),
     ])
-    setBudget(b.data)
-    setMonths(m.data ?? [])
-    setEntries(e.data ?? [])
-    setLoading(false)
-  }, [budgetId])
-
-  useEffect(() => {
-    load()
-  }, [load])
+    return { budget: b.data, months: m.data ?? [], entries: e.data ?? [] }
+  })
+  const { budget, months, entries } = data
 
   const period = budget?.period ?? 'monthly'
 
@@ -172,7 +171,7 @@ export default function Months() {
     await supabase.from('budgets').update({ name: trimmed }).eq('id', budgetId)
     setSaving(false)
     setRenameOpen(false)
-    load()
+    revalidate()
   }
 
   async function deleteBudget() {
