@@ -345,11 +345,10 @@ export default function PetCare() {
       {showForm ? (
         <div className="fixed inset-0 z-20 flex items-end bg-black/50" onClick={closeForm}>
           <div
-            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            className="mx-auto flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-3">
               <h2 className="text-lg font-bold text-(--text)">
                 {editingEvent ? t('pets.editEvent') : t('pets.newEvent')}
               </h2>
@@ -362,6 +361,7 @@ export default function PetCare() {
               </button>
             </div>
 
+            <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-2">
             <label className="block text-xs font-semibold text-(--text-faint)">
               {t('pets.pet')}
             </label>
@@ -425,31 +425,38 @@ export default function PetCare() {
               className="mt-3 w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
             />
 
-            <button
-              onClick={save}
-              disabled={!fTitle.trim() || !fPet || saving}
-              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
-            >
-              {saving
-                ? t('common.saving')
-                : editingEvent
-                  ? t('common.saveChanges')
-                  : t('pets.saveEvent')}
-            </button>
+            </div>
 
-            {editingEvent && (
+            <div
+              className="shrink-0 px-4 pt-3"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
+            >
               <button
-                onClick={() => {
-                  const ev = editingEvent
-                  closeForm()
-                  remove(ev)
-                }}
-                disabled={saving}
-                className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
+                onClick={save}
+                disabled={!fTitle.trim() || !fPet || saving}
+                className="w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
               >
-                {t('pets.deleteEvent')}
+                {saving
+                  ? t('common.saving')
+                  : editingEvent
+                    ? t('common.saveChanges')
+                    : t('pets.saveEvent')}
               </button>
-            )}
+
+              {editingEvent && (
+                <button
+                  onClick={() => {
+                    const ev = editingEvent
+                    closeForm()
+                    remove(ev)
+                  }}
+                  disabled={saving}
+                  className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
+                >
+                  {t('pets.deleteEvent')}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       ) : (
@@ -473,11 +480,10 @@ export default function PetCare() {
           onClick={closePetForm}
         >
           <div
-            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            className="mx-auto flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-3">
               <h2 className="text-lg font-bold text-(--text)">
                 {editingPet ? t('pets.editPet') : t('pets.addPet')}
               </h2>
@@ -489,6 +495,7 @@ export default function PetCare() {
                 ✕
               </button>
             </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-2">
             <div className="flex gap-3">
               <input
                 value={pEmoji}
@@ -503,17 +510,24 @@ export default function PetCare() {
                 className="min-w-0 flex-1 rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
               />
             </div>
-            <button
-              onClick={savePet}
-              disabled={!pName.trim() || savingPet}
-              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+            </div>
+
+            <div
+              className="shrink-0 px-4 pt-3"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
             >
-              {savingPet
-                ? t('common.saving')
-                : editingPet
-                  ? t('common.saveChanges')
-                  : t('pets.addPet')}
-            </button>
+              <button
+                onClick={savePet}
+                disabled={!pName.trim() || savingPet}
+                className="w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+              >
+                {savingPet
+                  ? t('common.saving')
+                  : editingPet
+                    ? t('common.saveChanges')
+                    : t('pets.addPet')}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -525,11 +539,10 @@ export default function PetCare() {
           onClick={() => setShowManagePets(false)}
         >
           <div
-            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            className="mx-auto flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-3">
               <h2 className="text-lg font-bold text-(--text)">{t('pets.managePets')}</h2>
               <button
                 onClick={() => setShowManagePets(false)}
@@ -540,7 +553,7 @@ export default function PetCare() {
               </button>
             </div>
 
-            <ul className="space-y-2">
+            <ul className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 pb-2">
               {pets.map((p) => (
                 <li
                   key={p.id}
@@ -568,12 +581,17 @@ export default function PetCare() {
               ))}
             </ul>
 
-            <button
-              onClick={openAddPet}
-              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform"
+            <div
+              className="shrink-0 px-4 pt-3"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
             >
-              {t('pets.addPetBtn')}
-            </button>
+              <button
+                onClick={openAddPet}
+                className="w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform"
+              >
+                {t('pets.addPetBtn')}
+              </button>
+            </div>
           </div>
         </div>
       )}

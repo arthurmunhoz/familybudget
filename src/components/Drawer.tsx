@@ -88,21 +88,19 @@ export default function Drawer({
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div
-        className="absolute right-0 top-0 flex h-full w-72 flex-col overflow-y-auto bg-(--card) p-5"
-        style={{
-          paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)',
-        }}
-      >
-        <div className="flex items-center justify-between">
+      <div className="absolute right-0 top-0 flex h-full w-72 flex-col bg-(--card)">
+        <div
+          className="flex shrink-0 items-center justify-between px-5 pb-3"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)' }}
+        >
           <h2 className="text-lg font-bold text-(--text)">{t('drawer.settings')}</h2>
           <button onClick={onClose} className="px-2 py-1 text-(--text-muted)">
             ✕
           </button>
         </div>
 
-        <div className="mt-5 rounded-xl bg-(--surface) px-4 py-3">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
+        <div className="mt-1 rounded-xl bg-(--surface) px-4 py-3">
           <div className="font-semibold text-(--text)">
             {profile?.display_name}
           </div>
@@ -238,17 +236,22 @@ export default function Drawer({
           />
         </div>
 
-        <div className="flex-1" />
+        </div>
 
-        {/* --text-faint is grey in BOTH themes; --surface-2 is white in light mode */}
-        <div className="mt-6 mb-3 h-px shrink-0 bg-(--text-faint) opacity-40" />
-
-        <button
-          onClick={signOut}
-          className="w-full rounded-xl py-3 font-semibold text-(--expense) active:bg-(--surface)"
+        <div
+          className="shrink-0 px-5 pt-3"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
         >
-          {t('drawer.signOut')}
-        </button>
+          {/* --text-faint is grey in BOTH themes; --surface-2 is white in light mode */}
+          <div className="mb-3 h-px bg-(--text-faint) opacity-40" />
+
+          <button
+            onClick={signOut}
+            className="w-full rounded-xl py-3 font-semibold text-(--expense) active:bg-(--surface)"
+          >
+            {t('drawer.signOut')}
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -424,15 +424,17 @@ export default function DocumentVault() {
           onClick={() => !uploading && setPendingFile(null)}
         >
           <div
-            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) px-4 pt-5"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            className="mx-auto flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-lg font-bold text-(--text)">{t('docs.addDoc')}</h2>
-            <p className="mb-4 text-xs text-(--text-faint)">
-              {pendingFile.name} · {formatBytes(pendingFile.size)}
-            </p>
+            <div className="shrink-0 px-4 pt-5 pb-3">
+              <h2 className="text-lg font-bold text-(--text)">{t('docs.addDoc')}</h2>
+              <p className="text-xs text-(--text-faint)">
+                {pendingFile.name} · {formatBytes(pendingFile.size)}
+              </p>
+            </div>
 
+            <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-2">
             <input
               value={fTitle}
               onChange={(e) => setFTitle(e.target.value)}
@@ -467,13 +469,20 @@ export default function DocumentVault() {
               ))}
             </div>
 
-            <button
-              onClick={upload}
-              disabled={!fTitle.trim() || uploading}
-              className="mt-4 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+            </div>
+
+            <div
+              className="shrink-0 px-4 pt-3"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
             >
-              {uploading ? t('docs.uploading') : t('docs.saveDoc')}
-            </button>
+              <button
+                onClick={upload}
+                disabled={!fTitle.trim() || uploading}
+                className="w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+              >
+                {uploading ? t('docs.uploading') : t('docs.saveDoc')}
+              </button>
+            </div>
           </div>
         </div>
       )}
