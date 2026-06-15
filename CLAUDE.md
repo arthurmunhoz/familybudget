@@ -1,10 +1,14 @@
 # One Roof — guide for developer agents
 
-Multi-household family PWA (budget, shopping, pets, documents) at
-https://one-roof-app.vercel.app. React SPA + Supabase; RLS in Postgres is the
-real security boundary. This file tells you where things are, how to make
-changes safely, and which mistakes have already been made so you don't repeat
-them.
+Multi-household family PWA (budget, shopping list, pet care, document vault,
+important dates, family profiles) at https://one-roof-app.vercel.app. React SPA
++ Supabase; RLS in Postgres is the real security boundary. This file tells you
+where things are, how to make changes safely, and which mistakes have already
+been made so you don't repeat them.
+
+**Keep this file current.** After any change that alters structure, workflows,
+conventions, or gotchas, update the relevant section here in the same task —
+this doc is the contract for every agent that follows you.
 
 ## Tech stack
 
@@ -35,12 +39,17 @@ src/
                            SummaryChart) — note: a "month" = one budget period
     shopping/              ShoppingList (Realtime-synced)
     pets/                  PetCare (events + next-due reminders)
-    docs/                  DocumentVault (storage uploads, signed URLs)
-  components/              Shared: BeachBackdrop, Drawer, AnalyticsTracker
-  hooks/                   useAuth (profile + household members), useBack,
-                           useTheme
+    docs/                  DocumentVault (storage uploads, signed URLs;
+                           opt-in Face ID lock via VaultGate + biometric.ts)
+    dates/                 ImportantDates (birthday/renewal countdowns)
+    family/                Family (per-member profiles + avatars)
+  components/              Shared: Backdrop, Drawer, AnalyticsTracker,
+                           ErrorBoundary, VaultGate
+  hooks/                   useAuth, useBack, useTheme, useI18n, useHousehold,
+                           useAppPrefs, useScrollLock
   lib/                     apps.ts (hub registry), types.ts, format.ts,
-                           categories.ts, analytics.ts, image.ts, supabase.ts
+                           categories.ts, analytics.ts, biometric.ts,
+                           i18n/ (en|es|pt dicts), image.ts, supabase.ts
 supabase/
   schema.sql               Original bootstrap — NOT standalone; see its footer
   migration-NNN-*.sql      One file per applied migration, in order
@@ -90,6 +99,29 @@ Analytics code must never throw into the app.
 **Money/date helpers**: use `src/lib/format.ts` (`formatMoney`, `formatDay`,
 `todayISO`, period helpers). Dates are ISO `YYYY-MM-DD` strings end-to-end;
 compare them lexicographically, don't construct `Date` objects for that.
+
+## Verifying changes locally (including behind-auth screens)
+
+Use the Claude `preview` MCP (it runs the dev server, port 5173) — not raw
+`npm run dev` in Bash. Workflow: `preview_start` → drive the page → `preview_snapshot`
+(accessibility tree, best for asserting structure/text) and `preview_screenshot`
+(visual). Reload with `preview_eval` (`window.location.href=…`).
+
+Most screens sit behind Google sign-in, which the headless preview browser can't
+complete. To get in:
+- The Login screen has a DEV-only **🔧 Dev login** button (compiled out of prod
+  via `import.meta.env.DEV`) that signs in with `VITE_DEV_EMAIL` /
+  `VITE_DEV_PASSWORD` from `.env.local` — a seeded test household (Alex & Sam
+  Rivera with sample budget/pets/docs/family data). Click it, or the Supabase
+  session may already persist; then navigate to the route you changed.
+- New `.env.local` vars require a dev-server restart to load.
+- ALWAYS verify behind-auth UI this way before claiming it works. Do NOT build
+  throwaway mock-harness components for it (the old approach — no longer needed).
+- `preview_screenshot` is a Chromium render. iOS-specific behavior (Face ID /
+  WebAuthn, native `input[type=date]` sizing, standalone PWA layout) still needs
+  a real-device check — say so rather than implying you verified it.
+- Production (one-roof-app.vercel.app) only reflects committed + DEPLOYED code;
+  if someone "doesn't see" a committed change there, it just isn't deployed yet.
 
 ## How NOT to do things (learned the hard way)
 
