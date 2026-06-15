@@ -64,6 +64,8 @@ export const en = {
   'common.deleteName': 'Delete {name}',
   'common.close': 'Close',
   'common.everyone': 'Everyone',
+  'common.on': 'On',
+  'common.off': 'Off',
 
   'cat.groceries': 'Groceries',
   'cat.dining': 'Dining',
@@ -298,6 +300,8 @@ export const en = {
   'vault.enableLock': 'Turn on Face ID lock',
   'vault.disableLock': 'Turn off Face ID lock',
   'vault.enableFailed': 'Couldn’t turn on the lock — try again.',
+  'vault.lockTitle': 'Face ID lock',
+  'vault.lockDesc': 'Require Face ID to open the vault.',
   'docs.empty': 'Nothing here yet.',
   'docs.emptyHint':
     "Snap photos of IDs, insurance cards, vaccine records — they'll be safe here when you need them.",

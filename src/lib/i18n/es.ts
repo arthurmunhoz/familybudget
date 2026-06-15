@@ -64,6 +64,8 @@ export const es: Record<keyof typeof en, string> = {
   'common.deleteName': 'Eliminar {name}',
   'common.close': 'Cerrar',
   'common.everyone': 'Todos',
+  'common.on': 'Activado',
+  'common.off': 'Desactivado',
 
   'cat.groceries': 'Supermercado',
   'cat.dining': 'Restaurantes',
@@ -298,6 +300,8 @@ export const es: Record<keyof typeof en, string> = {
   'vault.enableLock': 'Activar bloqueo con Face ID',
   'vault.disableLock': 'Desactivar bloqueo con Face ID',
   'vault.enableFailed': 'No se pudo activar el bloqueo — inténtalo de nuevo.',
+  'vault.lockTitle': 'Bloqueo con Face ID',
+  'vault.lockDesc': 'Pide Face ID para abrir la bóveda.',
   'docs.empty': 'Aún no hay nada aquí.',
   'docs.emptyHint':
     'Toma fotos de identificaciones, tarjetas de seguro y carnés de vacunas — estarán seguros aquí cuando los necesites.',

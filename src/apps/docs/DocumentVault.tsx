@@ -287,19 +287,6 @@ export default function DocumentVault() {
           📄 {t('docs.title')}
         </h1>
 
-        {/* Face ID lock toggle — only where the device supports biometrics */}
-        {canLock && (
-          <button
-            onClick={toggleLock}
-            aria-label={lockOn ? t('vault.disableLock') : t('vault.enableLock')}
-            className={`shrink-0 rounded-lg px-2 py-1 text-xl ${
-              lockOn ? 'text-(--accent)' : 'text-(--text-faint) active:text-(--text)'
-            }`}
-          >
-            {lockOn ? '🔒' : '🔓'}
-          </button>
-        )}
-
         {/* Person filter chip — same pattern as the budget entries list */}
         <div className="relative shrink-0">
           <button
@@ -343,6 +330,43 @@ export default function DocumentVault() {
           )}
         </div>
       </header>
+
+      {/* Face ID lock card — only where the device supports biometrics */}
+      {canLock && (
+        <button
+          onClick={toggleLock}
+          role="switch"
+          aria-checked={lockOn}
+          aria-label={lockOn ? t('vault.disableLock') : t('vault.enableLock')}
+          className="mb-4 flex w-full items-center gap-3 rounded-2xl bg-(--card) px-4 py-3 text-left active:bg-(--card-active) transition-colors"
+        >
+          <span className="text-2xl">{lockOn ? '🔒' : '🔓'}</span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-(--text)">{t('vault.lockTitle')}</p>
+            <p className="text-xs text-(--text-faint)">{t('vault.lockDesc')}</p>
+          </div>
+          <span className="flex shrink-0 items-center gap-2">
+            <span
+              className={`text-xs font-bold ${
+                lockOn ? 'text-(--accent)' : 'text-(--text-faint)'
+              }`}
+            >
+              {lockOn ? t('common.on') : t('common.off')}
+            </span>
+            <span
+              className={`relative h-5 w-9 rounded-full transition-colors ${
+                lockOn ? 'bg-(--accent)' : 'bg-(--surface-2)'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                  lockOn ? 'left-4.5' : 'left-0.5'
+                }`}
+              />
+            </span>
+          </span>
+        </button>
+      )}
 
       {/* category filter */}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-4">
