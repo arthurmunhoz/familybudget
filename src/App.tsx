@@ -16,6 +16,7 @@ const ShoppingList = lazy(() => import('./apps/shopping/ShoppingList'))
 const PetCare = lazy(() => import('./apps/pets/PetCare'))
 const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
 const ImportantDates = lazy(() => import('./apps/dates/ImportantDates'))
+const Family = lazy(() => import('./apps/family/Family'))
 const Admin = lazy(() => import('./pages/Admin'))
 const AdminHousehold = lazy(() => import('./pages/AdminHousehold'))
 
@@ -89,6 +90,7 @@ export default function App() {
             }
           />
           <Route path="/dates" element={<ImportantDates />} />
+          <Route path="/family" element={<Family />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/household/:id" element={<AdminHousehold />} />
           <Route path="*" element={<Navigate to="/" replace />} />

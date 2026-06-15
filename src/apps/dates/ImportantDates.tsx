@@ -3,7 +3,7 @@ import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { formatDay, todayISO } from '../../lib/format'
-import { daysUntil, nextOccurrence, yearsAtNext } from '../../lib/importantDates'
+import { daysUntil, nextOccurrence } from '../../lib/importantDates'
 import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import type { ImportantDate, ImportantDateType } from '../../lib/types'
@@ -56,15 +56,6 @@ export default function ImportantDates() {
     if (days === 1) return { text: t('dates.tomorrow'), tone: 'soon' }
     if (days <= 45) return { text: t('dates.inDays', { days }), tone: days <= 14 ? 'soon' : 'far' }
     return { text: t('dates.inMonths', { months: Math.round(days / 30) }), tone: 'far' }
-  }
-
-  function ageStr(d: ImportantDate): string | null {
-    if (d.type !== 'birthday' && d.type !== 'anniversary') return null
-    const yrs = yearsAtNext(d, today)
-    if (yrs <= 0) return null
-    return d.type === 'birthday'
-      ? t('dates.turns', { years: yrs })
-      : t('dates.years', { years: yrs })
   }
 
   function openNew() {
@@ -147,10 +138,7 @@ export default function ImportantDates() {
         <ul className="space-y-2">
           {sorted.map((d) => {
             const rel = relLabel(d)
-            const age = ageStr(d)
-            const sub = [t(`dates.type.${d.type}` as TKey), formatDay(nextOccurrence(d, today)), age]
-              .filter(Boolean)
-              .join(' · ')
+            const sub = `${t(`dates.type.${d.type}` as TKey)} · ${formatDay(nextOccurrence(d, today))}`
             return (
               <li key={d.id}>
                 <button
@@ -161,6 +149,9 @@ export default function ImportantDates() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-(--text)">{d.title}</p>
                     <p className="truncate text-xs text-(--text-faint)">{sub}</p>
+                    {d.notes && (
+                      <p className="truncate text-xs text-(--text-muted)">{d.notes}</p>
+                    )}
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${

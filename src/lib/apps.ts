@@ -46,6 +46,13 @@ export const APPS: HubApp[] = [
     route: '/dates',
     description: 'Birthdays, renewals & more',
   },
+  {
+    id: 'family',
+    name: 'Family',
+    icon: '👪',
+    route: '/family',
+    description: 'Everyone’s info at a glance',
+  },
 ]
 
 /** Shown on the hub only for admins (profile.is_admin). */

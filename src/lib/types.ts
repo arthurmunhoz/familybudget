@@ -107,6 +107,22 @@ export interface FamilyDocument {
   created_at: string
 }
 
+export interface MemberProfile {
+  email: string
+  household_id: string
+  birthday: string | null
+  phone: string | null
+  blood_type: string | null
+  height: string | null
+  weight: string | null
+  shoe_size: string | null
+  pants_size: string | null
+  shirt_size: string | null
+  allergies: string | null
+  notes: string | null
+  updated_at: string
+}
+
 export type ImportantDateType = 'birthday' | 'anniversary' | 'renewal' | 'other'
 
 export interface ImportantDate {
