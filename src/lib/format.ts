@@ -136,3 +136,18 @@ export function timeAgo(iso: string): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
   return `${Math.floor(seconds / 86400)}d ago`
 }
+
+/** Pretty-print a US 10-digit phone as "(415) 555-0182" (or "+1 (…)" with a
+ *  leading country code). Anything else (international, partial) is returned
+ *  unchanged so non-US numbers aren't mangled. */
+export function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+  if (digits.length === 11 && digits[0] === '1') {
+    const d = digits.slice(1)
+    return `+1 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`
+  }
+  return value.trim()
+}

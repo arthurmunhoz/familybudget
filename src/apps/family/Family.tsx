@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
-import { formatDay, todayISO } from '../../lib/format'
+import { formatDay, formatPhone, todayISO } from '../../lib/format'
 import { fileToResizedBase64 } from '../../lib/image'
 import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
@@ -47,8 +47,9 @@ export default function Family() {
   const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({})
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
-  useScrollLock(editing)
+  useScrollLock(editing || Boolean(preview))
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('member_profiles').select('*')
@@ -171,7 +172,7 @@ export default function Family() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
-      <header className="flex items-center gap-2 pt-6 pb-4">
+      <header className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 flex items-center gap-2 bg-(--bg) px-4 pt-6 pb-4">
         <button
           onClick={() => back('/')}
           className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
@@ -202,24 +203,35 @@ export default function Family() {
             }
             for (const [key, labelKey] of FIELDS) {
               const v = p?.[key]
-              if (v) items.push({ label: t(labelKey), value: String(v) })
+              if (v) {
+                items.push({
+                  label: t(labelKey),
+                  value: key === 'phone' ? formatPhone(String(v)) : String(v),
+                })
+              }
             }
             return (
               <section key={m.email} className="rounded-2xl bg-(--card) p-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-(--text-faint)">
-                    {avatarUrls[m.email] ? (
+                  {avatarUrls[m.email] ? (
+                    <button
+                      onClick={() => setPreview(avatarUrls[m.email])}
+                      aria-label={m.display_name}
+                      className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-(--surface) active:opacity-80"
+                    >
                       <img
                         src={avatarUrls[m.email]}
                         alt=""
                         className="h-full w-full object-cover"
                       />
-                    ) : (
+                    </button>
+                  ) : (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-(--surface) text-(--text-faint)">
                       <span className="text-lg font-semibold">
                         {m.display_name.charAt(0).toUpperCase()}
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <h2 className="truncate font-bold text-(--text)">
                     {m.display_name}
                     {isMe && (
@@ -264,11 +276,11 @@ export default function Family() {
           onClick={() => !saving && setEditing(false)}
         >
           <div
-            className="mx-auto max-h-[88dvh] w-full max-w-md overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-3xl bg-(--card) px-4 pt-5"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            className="mx-auto flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
+            {/* static header */}
+            <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-3">
               <h2 className="text-lg font-bold text-(--text)">{t('family.editTitle')}</h2>
               <button
                 onClick={() => setEditing(false)}
@@ -279,34 +291,52 @@ export default function Family() {
               </button>
             </div>
 
-            <div className="mb-4 flex flex-col items-center gap-2">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-(--text-faint)">
-                {photoPreview ? (
-                  <img src={photoPreview} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-3xl">👤</span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
+            {/* static photo with floating edit / remove controls */}
+            <div className="flex shrink-0 flex-col items-center pb-4">
+              <div className="relative h-24 w-24">
+                <div
+                  className={`flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-(--text-faint) ${
+                    uploadingPhoto ? 'animate-pulse' : ''
+                  }`}
+                >
+                  {photoPreview ? (
+                    <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-3xl">👤</span>
+                  )}
+                </div>
+                {/* edit pencil — bottom-right */}
                 <button
                   type="button"
                   onClick={() => fileInput.current?.click()}
                   disabled={uploadingPhoto}
-                  className="rounded-lg bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text) disabled:opacity-50"
+                  aria-label={form.avatar_path ? t('family.changePhoto') : t('family.addPhoto')}
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-(--card) bg-(--accent) text-white shadow active:scale-95 disabled:opacity-50"
                 >
-                  {uploadingPhoto
-                    ? t('drawer.working')
-                    : form.avatar_path
-                      ? t('family.changePhoto')
-                      : t('family.addPhoto')}
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
                 </button>
+                {/* remove — top-right */}
                 {form.avatar_path && (
                   <button
                     type="button"
                     onClick={removePhoto}
-                    className="rounded-lg bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--expense)"
+                    aria-label={t('family.removePhoto')}
+                    className="absolute -top-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-(--card) bg-(--expense) text-sm font-bold text-white shadow active:scale-95"
                   >
-                    {t('family.removePhoto')}
+                    ✕
                   </button>
                 )}
               </div>
@@ -319,8 +349,10 @@ export default function Family() {
               />
             </div>
 
-            <label className="block text-xs font-semibold text-(--text-faint)">
-              {t('family.birthday')}
+            {/* scrollable fields */}
+            <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-2">
+              <label className="block text-xs font-semibold text-(--text-faint)">
+                {t('family.birthday')}
               <input
                 type="date"
                 value={form.birthday}
@@ -362,19 +394,59 @@ export default function Family() {
                 <input
                   value={form[key]}
                   onChange={(e) => set(key, e.target.value)}
+                  onBlur={
+                    key === 'phone'
+                      ? (e) => set('phone', formatPhone(e.target.value))
+                      : undefined
+                  }
                   inputMode={key === 'phone' ? 'tel' : undefined}
                   className="mt-1 w-full rounded-xl bg-(--surface) px-4 py-3 text-sm font-normal text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
                 />
               </label>
             ))}
+            </div>
 
-            <button
-              onClick={save}
-              disabled={saving}
-              className="mt-5 w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+            {/* static save */}
+            <div
+              className="shrink-0 px-4 pt-3"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
             >
-              {saving ? t('common.saving') : t('common.saveChanges')}
+              <button
+                onClick={save}
+                disabled={saving}
+                className="w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+              >
+                {saving ? t('common.saving') : t('common.saveChanges')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* full-screen photo preview */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-30 flex flex-col bg-black/90"
+          onClick={() => setPreview(null)}
+        >
+          <div
+            className="flex justify-end px-4"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}
+          >
+            <button
+              onClick={() => setPreview(null)}
+              aria-label={t('common.close')}
+              className="rounded-lg px-2 py-1 text-xl text-white/70 active:text-white"
+            >
+              ✕
             </button>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+            <img
+              src={preview}
+              alt=""
+              className="max-h-full max-w-full rounded-lg object-contain"
+            />
           </div>
         </div>
       )}
