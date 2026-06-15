@@ -131,11 +131,9 @@ export default function EntryForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60">
-      <div
-        className="w-full max-w-md rounded-t-3xl bg-(--card) p-5 max-h-[92dvh] overflow-y-auto"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
-      >
-        <div className="flex items-center justify-between">
+      <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)">
+        {/* static header */}
+        <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-2">
           <h2 className="text-lg font-bold text-(--text)">
             {entry ? t('entry.editTitle') : t('entry.newTitle')}
           </h2>
@@ -143,6 +141,9 @@ export default function EntryForm({
             ✕
           </button>
         </div>
+
+        {/* scrollable body */}
+        <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 pb-2">
 
         <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-(--surface) p-1">
           {(['expense', 'income'] as const).map((ty) => (
@@ -297,25 +298,32 @@ export default function EntryForm({
           />
         </label>
 
-        {error && <p className="mt-3 text-sm text-(--expense)">{error}</p>}
+        </div>
 
-        <button
-          onClick={save}
-          disabled={saving}
-          className="mt-5 w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+        {/* static footer */}
+        <div
+          className="shrink-0 px-5 pt-3"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
         >
-          {saving ? t('common.saving') : entry ? t('entry.saveChanges') : t('entry.addEntry')}
-        </button>
-
-        {entry && (
+          {error && <p className="mb-3 text-sm text-(--expense)">{error}</p>}
           <button
-            onClick={remove}
+            onClick={save}
             disabled={saving}
-            className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
+            className="w-full rounded-2xl bg-(--accent) py-4 text-lg font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
           >
-            {t('entry.deleteEntry')}
+            {saving ? t('common.saving') : entry ? t('entry.saveChanges') : t('entry.addEntry')}
           </button>
-        )}
+
+          {entry && (
+            <button
+              onClick={remove}
+              disabled={saving}
+              className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
+            >
+              {t('entry.deleteEntry')}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
