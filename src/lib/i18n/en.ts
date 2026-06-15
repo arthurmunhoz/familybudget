@@ -178,6 +178,10 @@ export const en = {
   'family.shirtSize': 'Shirt size',
   'family.allergies': 'Allergies',
   'family.notes': 'Notes',
+  'family.addPhoto': '📷 Add photo',
+  'family.changePhoto': '📷 Change photo',
+  'family.removePhoto': 'Remove',
+  'family.photoFailed': 'Could not upload the photo — please try again.',
 
   'budget.title': 'Budgets',
   'budget.empty': 'No budgets yet.',

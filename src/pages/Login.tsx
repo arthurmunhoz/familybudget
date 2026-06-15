@@ -2,11 +2,25 @@ import { DEFAULT_BACKDROP } from '../components/Backdrop'
 import { useAuth } from '../hooks/useAuth'
 import { useI18n } from '../hooks/useI18n'
 import { useTheme } from '../hooks/useTheme'
+import { supabase } from '../lib/supabase'
+
+// DEV-only password login for the local preview browser. Reads a throwaway
+// test account from .env.local; compiled out of production via import.meta.env.DEV.
+const DEV_EMAIL = import.meta.env.VITE_DEV_EMAIL as string | undefined
+const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD as string | undefined
 
 export default function Login() {
   const { signIn } = useAuth()
   const { t } = useI18n()
   const { theme } = useTheme()
+
+  async function devLogin() {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: DEV_EMAIL ?? '',
+      password: DEV_PASSWORD ?? '',
+    })
+    if (error) alert(`Dev login failed: ${error.message}`)
+  }
 
   return (
     // extra bottom padding (pb-44) lifts the centered content clear of the artwork
@@ -29,6 +43,15 @@ export default function Login() {
         <GoogleLogo />
         {t('login.signIn')}
       </button>
+
+      {import.meta.env.DEV && DEV_EMAIL && (
+        <button
+          onClick={devLogin}
+          className="rounded-xl border border-(--surface-2) px-4 py-2 text-sm font-semibold text-(--text-muted) active:text-(--text)"
+        >
+          🔧 Dev login
+        </button>
+      )}
     </div>
   )
 }

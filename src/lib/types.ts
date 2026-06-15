@@ -110,6 +110,7 @@ export interface FamilyDocument {
 export interface MemberProfile {
   email: string
   household_id: string
+  avatar_path: string | null
   birthday: string | null
   phone: string | null
   blood_type: string | null

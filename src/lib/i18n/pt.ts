@@ -178,6 +178,10 @@ export const pt: Record<keyof typeof en, string> = {
   'family.shirtSize': 'Tamanho de camisa',
   'family.allergies': 'Alergias',
   'family.notes': 'Notas',
+  'family.addPhoto': '📷 Adicionar foto',
+  'family.changePhoto': '📷 Trocar foto',
+  'family.removePhoto': 'Remover',
+  'family.photoFailed': 'Não foi possível enviar a foto — tente novamente.',
 
   'budget.title': 'Orçamentos',
   'budget.empty': 'Nenhum orçamento ainda.',

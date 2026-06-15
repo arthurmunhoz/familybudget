@@ -178,6 +178,10 @@ export const es: Record<keyof typeof en, string> = {
   'family.shirtSize': 'Talla de camisa',
   'family.allergies': 'Alergias',
   'family.notes': 'Notas',
+  'family.addPhoto': '📷 Agregar foto',
+  'family.changePhoto': '📷 Cambiar foto',
+  'family.removePhoto': 'Quitar',
+  'family.photoFailed': 'No se pudo subir la foto — inténtalo de nuevo.',
 
   'budget.title': 'Presupuestos',
   'budget.empty': 'Aún no hay presupuestos.',

@@ -184,3 +184,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-018-user-language.sql (per-user interface language)
 --   migration-018-important-dates.sql (birthdays, anniversaries, renewals)
 --   migration-019-member-profiles.sql (family member profiles)
+--   migration-020-member-avatar.sql (member profile photo)
