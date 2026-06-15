@@ -96,6 +96,19 @@ page views and button clicks globally — new features need no instrumentation.
 For custom events use `track(type, fields)` from `src/lib/analytics.ts`.
 Analytics code must never throw into the app.
 
+**Data fetching — cache to avoid the "blink"**: screens re-mount on every
+navigation, so fetching from empty state flashes (0 → real value). Use
+`useCachedQuery(key, fetcher)` (`src/hooks/useCachedQuery.ts`) — stale-while-
+revalidate over an in-memory cache: it returns the last value instantly,
+refetches in the background, and only re-renders if the data changed. Combine
+multiple queries into one object per screen (one cache key); call the returned
+`revalidate()` after a mutation instead of a manual `load()`. For screens with
+their own optimistic/Realtime local state (e.g. ShoppingList), keep that state
+but seed it from `readCache(key)` and write through with `writeCache(key, …)`.
+Already cached: Hub badges, Budgets, Months, MonthDetail, Family, ShoppingList,
+Admin. Not yet (were mid-edit by another agent): Pet Care, Documents,
+Important Dates.
+
 **Money/date helpers**: use `src/lib/format.ts` (`formatMoney`, `formatDay`,
 `todayISO`, period helpers). Dates are ISO `YYYY-MM-DD` strings end-to-end;
 compare them lexicographically, don't construct `Date` objects for that.
