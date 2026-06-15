@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import { fileToResizedBase64 } from '../../lib/image'
 import SummaryChart from './SummaryChart'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
+import { useCachedQuery } from '../../hooks/useCachedQuery'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { useI18n } from '../../hooks/useI18n'
 import { categoryById } from '../../lib/categories'
@@ -32,12 +33,6 @@ export default function MonthDetail() {
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
 
-  const [month, setMonth] = useState<MonthWithBudget | null>(null)
-  const [entries, setEntries] = useState<Entry[]>([])
-  const [rules, setRules] = useState<CategoryRule[]>([])
-  const [subcatSuggestions, setSubcatSuggestions] = useState<Record<string, string[]>>({})
-  const [loading, setLoading] = useState(true)
-
   const [person, setPerson] = useState<string>('all')
   const [personMenuOpen, setPersonMenuOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortBy>('date')
@@ -47,12 +42,26 @@ export default function MonthDetail() {
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
   const [scanning, setScanning] = useState(false)
   const [showFuture, setShowFuture] = useState(false)
+  // Optimistic-delete overlay: ids hidden immediately on swipe-delete, before
+  // the cached query revalidates.
+  const [removed, setRemoved] = useState<Set<string>>(new Set())
   // EntryForm self-locks; this covers the receipt-scan overlay.
   useScrollLock(scanning)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const load = useCallback(async () => {
-    if (!id) return
+  type DetailData = {
+    month: MonthWithBudget | null
+    entries: Entry[]
+    rules: CategoryRule[]
+    subcatSuggestions: Record<string, string[]>
+  }
+  // Cached per period: detail renders instantly on return, revalidates quietly.
+  const {
+    data = { month: null, entries: [], rules: [], subcatSuggestions: {} },
+    loading,
+    revalidate,
+  } = useCachedQuery<DetailData>(`monthDetail:${id ?? ''}`, async () => {
+    if (!id) return { month: null, entries: [], rules: [], subcatSuggestions: {} }
     const [m, e, r, subs] = await Promise.all([
       supabase.from('months').select('*, budgets(name, period)').eq('id', id).single(),
       supabase.from('entries').select('*').eq('month_id', id),
@@ -61,10 +70,6 @@ export default function MonthDetail() {
       // (RLS scopes this to the family). Most-used suggestions surface first.
       supabase.from('entries').select('category, subcategory').not('subcategory', 'is', null),
     ])
-    setMonth(m.data)
-    setEntries(e.data ?? [])
-    setRules(r.data ?? [])
-
     const counts = new Map<string, Map<string, number>>()
     for (const row of (subs.data ?? []) as { category: string; subcategory: string }[]) {
       const key = row.subcategory.trim()
@@ -80,18 +85,16 @@ export default function MonthDetail() {
     for (const [cat, bucket] of counts) {
       map[cat] = [...bucket.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s)
     }
-    setSubcatSuggestions(map)
-    setLoading(false)
-  }, [id])
+    return { month: m.data, entries: e.data ?? [], rules: r.data ?? [], subcatSuggestions: map }
+  })
 
-  useEffect(() => {
-    load()
-  }, [load])
-
-  const filtered = useMemo(
-    () => (person === 'all' ? entries : entries.filter((e) => e.person_email === person)),
-    [entries, person],
-  )
+  const month = data.month
+  const rules = data.rules
+  const subcatSuggestions = data.subcatSuggestions
+  const filtered = useMemo(() => {
+    const live = data.entries.filter((e) => !removed.has(e.id))
+    return person === 'all' ? live : live.filter((e) => e.person_email === person)
+  }, [data.entries, removed, person])
 
   // Future-dated entries (e.g. upcoming recurring bills) are hidden from the
   // lists by default so today's activity is immediately visible. Charts and
@@ -121,11 +124,17 @@ export default function MonthDetail() {
     profiles.find((p) => p.email === email)?.display_name ?? email
 
   async function removeEntry(e: Entry) {
-    setEntries((list) => list.filter((x) => x.id !== e.id))
+    setRemoved((prev) => new Set(prev).add(e.id)) // optimistic hide
     const { error } = await supabase.from('entries').delete().eq('id', e.id)
     if (error) {
       alert(t('detail.deleteFailed'))
-      load()
+      setRemoved((prev) => {
+        const next = new Set(prev)
+        next.delete(e.id) // roll back the hide
+        return next
+      })
+    } else {
+      revalidate()
     }
   }
 
@@ -346,7 +355,7 @@ export default function MonthDetail() {
           onSaved={() => {
             setFormOpen(false)
             setPrefill(undefined)
-            load()
+            revalidate()
           }}
         />
       )}

@@ -2,16 +2,35 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
+import { readCache, writeCache } from '../../hooks/useCachedQuery'
 import { supabase } from '../../lib/supabase'
 import type { ShoppingItem } from '../../lib/types'
+
+const CACHE_KEY = 'shopping:items'
 
 export default function ShoppingList() {
   const back = useBack()
   const { t } = useI18n()
   const { profile } = useAuth()
-  const [items, setItems] = useState<ShoppingItem[]>([])
+  // Seed from the in-memory cache so returning to the list shows it instantly
+  // (no "Loading…" flash); Realtime + optimistic edits keep it fresh.
+  const [items, setItemsState] = useState<ShoppingItem[]>(
+    () => readCache<ShoppingItem[]>(CACHE_KEY) ?? [],
+  )
   const [label, setLabel] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => readCache(CACHE_KEY) === undefined)
+
+  // Every update writes through to the cache, so the next mount restores it.
+  const setItems = useCallback(
+    (updater: ShoppingItem[] | ((prev: ShoppingItem[]) => ShoppingItem[])) => {
+      setItemsState((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        writeCache(CACHE_KEY, next)
+        return next
+      })
+    },
+    [],
+  )
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -20,7 +39,7 @@ export default function ShoppingList() {
       .order('created_at')
     setItems(data ?? [])
     setLoading(false)
-  }, [])
+  }, [setItems])
 
   // Initial load + live sync: any change made on the other phone re-fetches.
   useEffect(() => {

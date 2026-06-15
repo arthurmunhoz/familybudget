@@ -15,6 +15,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  */
 const cache = new Map<string, unknown>()
 
+/** Read/write the same in-memory cache directly. For screens that keep their
+ *  own optimistic/Realtime state but still want instant render on return
+ *  (seed from readCache, write-through on every update). */
+export function readCache<T>(key: string): T | undefined {
+  return cache.get(key) as T | undefined
+}
+export function writeCache<T>(key: string, value: T): void {
+  cache.set(key, value)
+}
+
 function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) return true
   try {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
+import { useCachedQuery } from '../hooks/useCachedQuery'
 import { formatDuration, timeAgo } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { Household, Profile } from '../lib/types'
@@ -40,81 +41,85 @@ export default function Admin() {
   const { profile } = useAuth()
   const [tab, setTab] = useState<Tab>('analytics')
 
-  // base data
-  const [households, setHouseholds] = useState<Household[]>([])
-  const [users, setUsers] = useState<Profile[]>([])
-  const [hhLastSeen, setHhLastSeen] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(true)
-
-  // analytics (reload when the period changes)
+  // analytics period + households tab controls
   const [days, setDays] = useState(30)
-  const [stats, setStats] = useState<AppStat[]>([])
-  const [errors, setErrors] = useState<
-    { id: number; user_email: string; target: string | null; path: string | null; created_at: string }[]
-  >([])
-
-  // households tab controls
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('name')
-
   const [newHousehold, setNewHousehold] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const loadBase = useCallback(async () => {
+  type BaseData = {
+    households: Household[]
+    users: Profile[]
+    hhLastSeen: Record<string, string>
+  }
+  // Cached: households + members render instantly on return; revalidate after edits.
+  const {
+    data: base = { households: [], users: [], hhLastSeen: {} },
+    loading,
+    revalidate: revalidateBase,
+  } = useCachedQuery<BaseData>('admin:base', async () => {
     const [h, u, hh] = await Promise.all([
       supabase.from('households').select('*').order('created_at'),
       supabase.from('allowed_users').select('email, display_name, household_id, is_admin'),
       supabase.rpc('admin_household_activity'),
     ])
-    setHouseholds(h.data ?? [])
-    setUsers(u.data ?? [])
-    setHhLastSeen(
-      Object.fromEntries(
+    return {
+      households: h.data ?? [],
+      users: u.data ?? [],
+      hhLastSeen: Object.fromEntries(
         ((hh.data ?? []) as { household_id: string; last_seen: string }[]).map((r) => [
           r.household_id,
           r.last_seen,
         ]),
       ),
-    )
-    setLoading(false)
-  }, [])
-
-  const loadAnalytics = useCallback(async (d: number) => {
-    const [use, time, errs] = await Promise.all([
-      supabase.rpc('admin_app_usage', { days: d }),
-      supabase.rpc('admin_app_time', { days: d }),
-      supabase
-        .from('web_events')
-        .select('id, user_email, target, path, created_at')
-        .eq('type', 'error')
-        .order('created_at', { ascending: false })
-        .limit(10),
-    ])
-    setErrors(errs.data ?? [])
-    // 'month' pages are budget-period details — fold them into Budget.
-    const merged = new Map<string, AppStat>()
-    for (const row of (use.data ?? []) as { root: string; views: number }[]) {
-      const label = APP_LABELS[row.root] ?? row.root
-      const s = merged.get(label) ?? { label, views: 0, seconds: 0 }
-      s.views += Number(row.views)
-      merged.set(label, s)
     }
-    for (const row of (time.data ?? []) as { root: string; seconds: number }[]) {
-      const label = APP_LABELS[row.root] ?? row.root
-      const s = merged.get(label) ?? { label, views: 0, seconds: 0 }
-      s.seconds += Number(row.seconds)
-      merged.set(label, s)
-    }
-    setStats([...merged.values()].sort((a, b) => b.views - a.views))
-  }, [])
+  })
+  const { households, users, hhLastSeen } = base
 
-  useEffect(() => {
-    loadBase()
-  }, [loadBase])
-
-  useEffect(() => {
-    loadAnalytics(days)
-  }, [loadAnalytics, days])
+  type ErrorRow = {
+    id: number
+    user_email: string
+    target: string | null
+    path: string | null
+    created_at: string
+  }
+  type AnalyticsData = { stats: AppStat[]; errors: ErrorRow[] }
+  // Cached per period (key includes `days`) so switching back to a period is instant.
+  const { data: analytics = { stats: [], errors: [] } } = useCachedQuery<AnalyticsData>(
+    `admin:analytics:${days}`,
+    async () => {
+      const [use, time, errs] = await Promise.all([
+        supabase.rpc('admin_app_usage', { days }),
+        supabase.rpc('admin_app_time', { days }),
+        supabase
+          .from('web_events')
+          .select('id, user_email, target, path, created_at')
+          .eq('type', 'error')
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ])
+      // 'month' pages are budget-period details — fold them into Budget.
+      const merged = new Map<string, AppStat>()
+      for (const row of (use.data ?? []) as { root: string; views: number }[]) {
+        const label = APP_LABELS[row.root] ?? row.root
+        const s = merged.get(label) ?? { label, views: 0, seconds: 0 }
+        s.views += Number(row.views)
+        merged.set(label, s)
+      }
+      for (const row of (time.data ?? []) as { root: string; seconds: number }[]) {
+        const label = APP_LABELS[row.root] ?? row.root
+        const s = merged.get(label) ?? { label, views: 0, seconds: 0 }
+        s.seconds += Number(row.seconds)
+        merged.set(label, s)
+      }
+      return {
+        stats: [...merged.values()].sort((a, b) => b.views - a.views),
+        errors: (errs.data ?? []) as ErrorRow[],
+      }
+    },
+  )
+  const { stats, errors } = analytics
 
   const visibleHouseholds = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -154,7 +159,7 @@ export default function Admin() {
       return
     }
     setNewHousehold('')
-    loadBase()
+    revalidateBase()
   }
 
   return (
