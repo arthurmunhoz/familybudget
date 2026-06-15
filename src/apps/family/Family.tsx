@@ -206,38 +206,28 @@ export default function Family() {
             }
             return (
               <section key={m.email} className="rounded-2xl bg-(--card) p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-(--text-faint)">
-                      {avatarUrls[m.email] ? (
-                        <img
-                          src={avatarUrls[m.email]}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-lg font-semibold">
-                          {m.display_name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="truncate font-bold text-(--text)">
-                      {m.display_name}
-                      {isMe && (
-                        <span className="ml-2 rounded-full bg-(--accent-soft) px-2 py-0.5 text-[10px] font-bold text-(--accent)">
-                          {t('family.you')}
-                        </span>
-                      )}
-                    </h2>
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-(--text-faint)">
+                    {avatarUrls[m.email] ? (
+                      <img
+                        src={avatarUrls[m.email]}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-lg font-semibold">
+                        {m.display_name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
                   </div>
-                  {isMe && (
-                    <button
-                      onClick={openEdit}
-                      className="shrink-0 rounded-lg bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text) active:bg-(--surface-2)"
-                    >
-                      ✎ {t('family.editMine')}
-                    </button>
-                  )}
+                  <h2 className="truncate font-bold text-(--text)">
+                    {m.display_name}
+                    {isMe && (
+                      <span className="ml-2 rounded-full bg-(--accent-soft) px-2 py-0.5 text-[10px] font-bold text-(--accent)">
+                        {t('family.you')}
+                      </span>
+                    )}
+                  </h2>
                 </div>
 
                 {items.length > 0 ? (
@@ -251,6 +241,15 @@ export default function Family() {
                   </dl>
                 ) : (
                   <p className="mt-2 text-sm text-(--text-faint)">{t('family.empty')}</p>
+                )}
+
+                {isMe && (
+                  <button
+                    onClick={openEdit}
+                    className="mt-4 w-full rounded-xl bg-(--surface) py-2.5 text-sm font-semibold text-(--text) active:bg-(--surface-2)"
+                  >
+                    ✎ {t('family.editMine')}
+                  </button>
                 )}
               </section>
             )
