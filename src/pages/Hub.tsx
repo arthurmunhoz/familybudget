@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
+import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useHousehold } from '../hooks/useHousehold'
 import { useI18n } from '../hooks/useI18n'
 import { ADMIN_APP, APPS } from '../lib/apps'
@@ -29,66 +30,50 @@ export default function Hub() {
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // Open (unchecked) shopping items, shown as a badge on the tile. Live via
-  // the same Realtime table the list itself uses, so the badge updates while
-  // the other phone is shopping.
-  const [shoppingCount, setShoppingCount] = useState(0)
-  const loadShoppingCount = useCallback(async () => {
-    const { count } = await supabase
-      .from('shopping_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('checked', false)
-    setShoppingCount(count ?? 0)
-  }, [])
+  // Badges are cached in memory (useCachedQuery): on return to the hub they
+  // render their last value instantly and only update if the data changed —
+  // no flash from 0 → N on every remount.
+
+  // Open (unchecked) shopping items. Live via the same Realtime table the list
+  // uses, so the badge updates while the other phone is shopping.
+  const { data: shoppingCount = 0, revalidate: reloadShopping } = useCachedQuery<number>(
+    'hub:shoppingCount',
+    async () => {
+      const { count } = await supabase
+        .from('shopping_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('checked', false)
+      return count ?? 0
+    },
+  )
   useEffect(() => {
-    loadShoppingCount()
     const channel = supabase
       .channel('hub_shopping_badge')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'shopping_items' },
-        () => loadShoppingCount(),
+        () => reloadShopping(),
       )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [loadShoppingCount])
+  }, [reloadShopping])
 
-  // Overdue/ due-today pet reminders, shown as a red attention badge. Reloads
-  // when the hub remounts (i.e. on return from Pet Care), which is enough —
-  // overdue status changes by date, not by another phone's live action.
-  const [overduePets, setOverduePets] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    supabase
+  // Overdue / due-today pet reminders → red attention badge.
+  const { data: overduePets = 0 } = useCachedQuery<number>('hub:overduePets', async () => {
+    const { data } = await supabase
       .from('pet_events')
       .select('*')
       .order('event_date', { ascending: false })
-      .then(({ data }) => {
-        if (cancelled) return
-        setOverduePets(overdueEvents((data ?? []) as PetEvent[], todayISO()).length)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    return overdueEvents((data ?? []) as PetEvent[], todayISO()).length
+  })
 
   // Dates due within ~30 days (or an expired one-time) → amber badge.
-  const [dueSoonDates, setDueSoonDates] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    supabase
-      .from('important_dates')
-      .select('*')
-      .then(({ data }) => {
-        if (cancelled) return
-        setDueSoonDates(dueSoonCount((data ?? []) as ImportantDate[], todayISO()))
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { data: dueSoonDates = 0 } = useCachedQuery<number>('hub:dueSoonDates', async () => {
+    const { data } = await supabase.from('important_dates').select('*')
+    return dueSoonCount((data ?? []) as ImportantDate[], todayISO())
+  })
 
   const badges: Record<string, number> = {
     shopping: shoppingCount,
