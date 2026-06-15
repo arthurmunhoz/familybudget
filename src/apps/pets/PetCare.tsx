@@ -397,7 +397,7 @@ export default function PetCare() {
 
             {/* Grid (not flex): grid-cols-2 = minmax(0,1fr) columns that shrink
                to fit, so the native date inputs can't force horizontal overflow. */}
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-4">
               <label className="block min-w-0 text-xs font-semibold text-(--text-faint)">
                 {t('pets.date')}
                 <input

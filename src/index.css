@@ -63,8 +63,14 @@ select {
   font-size: 16px;
 }
 
-/* iOS renders date inputs top-aligned when given a fixed height */
+/* iOS renders date inputs top-aligned when given a fixed height. Also strip
+   the native appearance + clear the intrinsic min-width: otherwise iOS Safari
+   gives date inputs a content-based width that refuses to shrink, so two side
+   by side overflow their container and collapse the gap between them. */
 input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
