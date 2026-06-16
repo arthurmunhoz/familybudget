@@ -188,3 +188,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-021-shopping-stores.sql (per-store shopping list sections)
 --   migration-022-shopping-store-slug.sql (catalog slug for store logos)
 --   migration-023-internal-household-analytics.sql (exclude dev household)
+--   migration-024-pet-profile-fields.sql (pet species/breed/birthday/photo/etc)
+--   migration-025-admin-recent-errors.sql (errors panel excludes testing noise)

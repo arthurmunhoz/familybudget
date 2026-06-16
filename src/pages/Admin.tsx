@@ -92,12 +92,9 @@ export default function Admin() {
       const [use, time, errs] = await Promise.all([
         supabase.rpc('admin_app_usage', { days }),
         supabase.rpc('admin_app_time', { days }),
-        supabase
-          .from('web_events')
-          .select('id, user_email, target, path, created_at')
-          .eq('type', 'error')
-          .order('created_at', { ascending: false })
-          .limit(10),
+        // admin_recent_errors excludes admin accounts and internal/dev
+        // households, so the panel shows only real-user errors.
+        supabase.rpc('admin_recent_errors', { lim: 10 }),
       ])
       // 'month' pages are budget-period details — fold them into Budget.
       const merged = new Map<string, AppStat>()
