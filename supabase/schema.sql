@@ -185,3 +185,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-018-important-dates.sql (birthdays, anniversaries, renewals)
 --   migration-019-member-profiles.sql (family member profiles)
 --   migration-020-member-avatar.sql (member profile photo)
+--   migration-021-shopping-stores.sql (per-store shopping list sections)
+--   migration-022-shopping-store-slug.sql (catalog slug for store logos)

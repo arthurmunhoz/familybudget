@@ -37,7 +37,8 @@ src/
   apps/<id>/               One folder per family app:
     budget/                Budgets → Months → MonthDetail (+ EntryForm,
                            SummaryChart) — note: a "month" = one budget period
-    shopping/              ShoppingList (Realtime-synced)
+    shopping/              ShoppingList (Realtime-synced) + optional per-store
+                           sections (StoreLogo, lib/stores.ts catalog)
     pets/                  PetCare (events + next-due reminders)
     docs/                  DocumentVault (storage uploads, signed URLs;
                            opt-in Face ID lock via VaultGate + biometric.ts)

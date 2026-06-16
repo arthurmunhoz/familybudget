@@ -61,6 +61,15 @@ export interface ShoppingItem {
   added_by: string
   created_at: string
   checked_at: string | null
+  store_id: string | null
+}
+
+export interface ShoppingStore {
+  id: string
+  household_id: string
+  name: string
+  slug: string | null
+  created_at: string
 }
 
 export type PetEventType = 'vet' | 'vaccine' | 'medication' | 'grooming' | 'other'
