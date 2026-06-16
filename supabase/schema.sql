@@ -187,3 +187,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-020-member-avatar.sql (member profile photo)
 --   migration-021-shopping-stores.sql (per-store shopping list sections)
 --   migration-022-shopping-store-slug.sql (catalog slug for store logos)
+--   migration-023-internal-household-analytics.sql (exclude dev household)

@@ -235,8 +235,8 @@ export default function Admin() {
               </ul>
             )}
             <p className="mt-3 text-xs text-(--text-faint)">
-              Admin accounts are excluded. Time is estimated from activity gaps
-              (idle capped at 5 min).
+              Admin accounts and internal test households are excluded. Time is
+              estimated from activity gaps (idle capped at 5 min).
             </p>
           </section>
 
