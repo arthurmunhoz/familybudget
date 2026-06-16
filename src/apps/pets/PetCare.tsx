@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
@@ -8,6 +9,7 @@ import type { TKey } from '../../lib/i18n'
 import { reminderEvents } from '../../lib/petCare'
 import { supabase } from '../../lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '../../lib/types'
+import PetForm from './PetForm'
 
 const TYPE_ICON: Record<PetEventType, string> = {
   vet: '🩺',
@@ -20,6 +22,7 @@ const TYPES = Object.keys(TYPE_ICON) as PetEventType[]
 
 export default function PetCare() {
   const back = useBack()
+  const navigate = useNavigate()
   const { t } = useI18n()
   const { profile } = useAuth()
   const [pets, setPets] = useState<Pet[]>([])
@@ -38,14 +41,11 @@ export default function PetCare() {
   const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null)
 
   const [showPetForm, setShowPetForm] = useState(false)
-  const [pName, setPName] = useState('')
-  const [pEmoji, setPEmoji] = useState('🐶')
-  const [savingPet, setSavingPet] = useState(false)
   const [editingPet, setEditingPet] = useState<Pet | null>(null)
   const [showManagePets, setShowManagePets] = useState(false)
 
-  // Lock the page behind any open sheet so it can't be dragged.
-  useScrollLock(showForm || showPetForm || showManagePets)
+  // PetForm self-locks while open; lock for the other sheets here.
+  useScrollLock(showForm || showManagePets)
 
   const load = useCallback(async () => {
     const [petsRes, eventsRes] = await Promise.all([
@@ -134,16 +134,12 @@ export default function PetCare() {
 
   function openAddPet() {
     setEditingPet(null)
-    setPName('')
-    setPEmoji('🐶')
     setShowManagePets(false)
     setShowPetForm(true)
   }
 
   function openEditPet(p: Pet) {
     setEditingPet(p)
-    setPName(p.name)
-    setPEmoji(p.emoji)
     setShowManagePets(false)
     setShowPetForm(true)
   }
@@ -151,24 +147,6 @@ export default function PetCare() {
   function closePetForm() {
     setShowPetForm(false)
     setEditingPet(null)
-  }
-
-  async function savePet() {
-    if (!pName.trim() || savingPet) return
-    setSavingPet(true)
-    const fields = { name: pName.trim(), emoji: pEmoji.trim() || '🐶' }
-    const { error } = editingPet
-      ? await supabase.from('pets').update(fields).eq('id', editingPet.id)
-      : await supabase.from('pets').insert(fields)
-    setSavingPet(false)
-    if (error) {
-      alert(t('pets.addPetFailed'))
-      return
-    }
-    closePetForm()
-    setPName('')
-    setPEmoji('🐶')
-    load()
   }
 
   async function deletePet(p: Pet) {
@@ -473,63 +451,16 @@ export default function PetCare() {
         </div>
       )}
 
-      {/* add pet sheet */}
+      {/* add / edit pet sheet (shared with the pet profile page) */}
       {showPetForm && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/50"
-          onClick={closePetForm}
-        >
-          <div
-            className="mx-auto flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-3">
-              <h2 className="text-lg font-bold text-(--text)">
-                {editingPet ? t('pets.editPet') : t('pets.addPet')}
-              </h2>
-              <button
-                onClick={closePetForm}
-                aria-label={t('common.close')}
-                className="px-2 py-1 text-(--text-muted) active:text-(--text)"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-2">
-            <div className="flex gap-3">
-              <input
-                value={pEmoji}
-                onChange={(e) => setPEmoji(e.target.value)}
-                aria-label={t('pets.petEmoji')}
-                className="w-16 rounded-xl bg-(--surface) px-0 py-3 text-center text-xl outline-none focus:ring-2 focus:ring-(--accent)"
-              />
-              <input
-                value={pName}
-                onChange={(e) => setPName(e.target.value)}
-                placeholder={t('pets.namePlaceholder')}
-                className="min-w-0 flex-1 rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
-              />
-            </div>
-            </div>
-
-            <div
-              className="shrink-0 px-4 pt-3"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
-            >
-              <button
-                onClick={savePet}
-                disabled={!pName.trim() || savingPet}
-                className="w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
-              >
-                {savingPet
-                  ? t('common.saving')
-                  : editingPet
-                    ? t('common.saveChanges')
-                    : t('pets.addPet')}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PetForm
+          pet={editingPet}
+          onClose={closePetForm}
+          onSaved={() => {
+            closePetForm()
+            load()
+          }}
+        />
       )}
 
       {/* manage pets sheet — household members add/edit/delete pets */}
@@ -559,10 +490,19 @@ export default function PetCare() {
                   key={p.id}
                   className="flex items-center gap-3 rounded-xl bg-(--surface) px-4 py-3"
                 >
-                  <span className="text-xl">{p.emoji}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium text-(--text)">
-                    {p.name}
-                  </span>
+                  <button
+                    onClick={() => {
+                      setShowManagePets(false)
+                      navigate(`/pets/${p.id}`)
+                    }}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <span className="text-xl">{p.emoji}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-(--text)">
+                      {p.name}
+                    </span>
+                    <span className="text-(--text-faint)">›</span>
+                  </button>
                   <button
                     onClick={() => openEditPet(p)}
                     aria-label={t('common.editName', { name: p.name })}

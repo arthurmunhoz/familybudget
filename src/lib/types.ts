@@ -78,6 +78,16 @@ export interface Pet {
   id: string
   name: string
   emoji: string
+  species: string | null
+  breed: string | null
+  birthday: string | null
+  color: string | null
+  color_secondary: string | null
+  weight: string | null
+  length: string | null
+  microchip: string | null
+  notes: string | null
+  photo_path: string | null
   created_at: string
 }
 
