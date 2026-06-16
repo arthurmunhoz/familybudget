@@ -11,6 +11,7 @@ export interface EntryPrefill {
   label?: string
   amount?: number
   category?: string
+  subcategory?: string | null
   entry_date?: string | null
 }
 
@@ -66,7 +67,9 @@ export default function EntryForm({
   const [categoryTouched, setCategoryTouched] = useState(
     Boolean(entry) || Boolean(initial?.category),
   )
-  const [subcategory, setSubcategory] = useState(entry?.subcategory ?? '')
+  const [subcategory, setSubcategory] = useState(
+    entry?.subcategory ?? initial?.subcategory ?? '',
+  )
   const [date, setDate] = useState(entry?.entry_date ?? initialDate ?? defaultDate)
   const [recurring, setRecurring] = useState(entry?.recurring ?? false)
   const [personEmail, setPersonEmail] = useState(entry?.person_email ?? myEmail)

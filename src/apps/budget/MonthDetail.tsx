@@ -159,6 +159,7 @@ export default function MonthDetail() {
         label: result.label,
         amount: result.amount,
         category: result.category,
+        subcategory: result.subcategory,
         entry_date: result.date,
       })
       setFormOpen(true)
