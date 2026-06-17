@@ -263,8 +263,10 @@ export default function PetCare() {
                   return (
                     <li
                       key={e.id}
-                      className={`flex items-center gap-3 rounded-xl bg-(--card) px-4 py-3 ${
-                        due.overdue ? 'animate-attention' : ''
+                      className={`flex cursor-default items-center gap-3 rounded-lg border-l-4 bg-(--surface) py-2.5 pl-3 pr-3 ${
+                        due.overdue
+                          ? 'animate-attention border-(--expense)'
+                          : 'border-(--accent)'
                       }`}
                     >
                       <span className="text-xl">{TYPE_ICON[e.type]}</span>
