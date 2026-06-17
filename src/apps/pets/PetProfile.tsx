@@ -101,43 +101,48 @@ export default function PetProfile() {
   if (pet.microchip) rows.push({ label: t('pets.microchip'), value: pet.microchip })
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
-      <header className="flex items-center gap-2 pt-6 pb-4">
-        <button
-          onClick={() => back('/pets')}
-          className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
-        >
-          ‹
-        </button>
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">{pet.name}</h1>
-        <button
-          onClick={() => setEditing(true)}
-          className="rounded-lg bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text) active:bg-(--surface-2)"
-        >
-          ✎ {t('pets.edit')}
-        </button>
-      </header>
-
-      {/* avatar */}
-      <div className="flex flex-col items-center">
-        <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-6xl">
+    <div className="mx-auto min-h-dvh max-w-md bg-(--bg)">
+      {/* full-width hero photo */}
+      <div className="relative">
+        <div className="aspect-square w-full overflow-hidden bg-(--surface)">
           {photoUrl ? (
             <img src={photoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span>{pet.emoji || speciesEmoji(pet.species)}</span>
+            <div className="flex h-full w-full items-center justify-center text-[6rem]">
+              {pet.emoji || speciesEmoji(pet.species)}
+            </div>
           )}
         </div>
+        {/* top scrim so the round buttons stay legible over any photo */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/45 to-transparent" />
+        <button
+          onClick={() => back('/pets')}
+          aria-label={t('common.close')}
+          className="absolute left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-xl text-white backdrop-blur active:bg-black/65"
+        >
+          ‹
+        </button>
+        <button
+          onClick={() => setEditing(true)}
+          aria-label={t('pets.edit')}
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-sm text-white backdrop-blur active:bg-black/65"
+        >
+          ✎
+        </button>
       </div>
 
-      {/* details */}
-      <section className="mt-6 rounded-2xl bg-(--card) p-4">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-          {t('pets.details')}
-        </h3>
+      {/* info "drawer" — a rounded card pulled up over the bottom of the photo */}
+      <div className="relative -mt-6 min-h-[40dvh] rounded-t-3xl bg-(--card) px-5 pt-5 pb-32">
+        <h1 className="text-2xl font-bold text-(--text)">
+          {pet.species ? `${speciesEmoji(pet.species)} ` : ''}
+          {pet.name}
+        </h1>
+
+        {/* details */}
         {rows.length === 0 && !pet.notes ? (
-          <p className="text-sm text-(--text-faint)">{t('pets.noInfo')}</p>
+          <p className="mt-4 text-sm text-(--text-faint)">{t('pets.noInfo')}</p>
         ) : (
-          <dl className="space-y-1.5">
+          <dl className="mt-4 space-y-2">
             {rows.map((r) => (
               <div key={r.label} className="flex items-baseline gap-3 text-sm">
                 <dt className="w-28 shrink-0 text-(--text-faint)">{r.label}</dt>
@@ -152,38 +157,41 @@ export default function PetProfile() {
             )}
           </dl>
         )}
-      </section>
 
-      {/* event history for this pet */}
-      {events.length > 0 && (
-        <section className="mt-6">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-            {t('pets.history')}
-          </h3>
-          <ul className="space-y-2">
-            {events.map((e) => (
-              <li key={e.id} className="flex items-start gap-3 rounded-xl bg-(--card) px-4 py-3">
-                <span className="text-xl">{TYPE_ICON[e.type]}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-(--text)">{e.title}</p>
-                  <p className="text-xs text-(--text-faint)">
-                    {formatDay(e.event_date)}
-                    {e.next_due && ` · ${t('pets.next')} ${formatDay(e.next_due)}`}
-                  </p>
-                  {e.notes && <p className="mt-1 text-sm text-(--text-muted)">{e.notes}</p>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {/* event history for this pet */}
+        {events.length > 0 && (
+          <section className="mt-6">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
+              {t('pets.history')}
+            </h3>
+            <ul className="space-y-2">
+              {events.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-start gap-3 rounded-xl bg-(--surface) px-4 py-3"
+                >
+                  <span className="text-xl">{TYPE_ICON[e.type]}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-(--text)">{e.title}</p>
+                    <p className="text-xs text-(--text-faint)">
+                      {formatDay(e.event_date)}
+                      {e.next_due && ` · ${t('pets.next')} ${formatDay(e.next_due)}`}
+                    </p>
+                    {e.notes && <p className="mt-1 text-sm text-(--text-muted)">{e.notes}</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      <button
-        onClick={deletePet}
-        className="mt-8 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-(--surface)"
-      >
-        {t('pets.deletePet')}
-      </button>
+        <button
+          onClick={deletePet}
+          className="mt-8 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-(--surface)"
+        >
+          {t('pets.deletePet')}
+        </button>
+      </div>
 
       {editing && (
         <PetForm

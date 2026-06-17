@@ -42,7 +42,7 @@ export default function PetCare() {
   const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null)
 
   const [showPetForm, setShowPetForm] = useState(false)
-  const [editingPet, setEditingPet] = useState<Pet | null>(null)
+  const [petFilter, setPetFilter] = useState<string>('all')
 
   // PetForm self-locks while open; lock for the event sheet here.
   useScrollLock(showForm)
@@ -86,8 +86,11 @@ export default function PetCare() {
     [pets],
   )
 
-  // All events across pets; each row shows which pet it belongs to.
-  const visible = events
+  // Selecting a pet card filters the events below to that pet.
+  const visible = useMemo(
+    () => (petFilter === 'all' ? events : events.filter((e) => e.pet_id === petFilter)),
+    [events, petFilter],
+  )
 
   // Upcoming reminders (latest event per pet/type/title that has a due date).
   const reminders = useMemo(() => reminderEvents(visible), [visible])
@@ -102,7 +105,7 @@ export default function PetCare() {
 
   function openForm() {
     setEditingEvent(null)
-    setFPet(pets[0]?.id ?? '')
+    setFPet(petFilter !== 'all' ? petFilter : (pets[0]?.id ?? ''))
     setFType('medication')
     setFTitle('')
     setFDate(todayISO())
@@ -151,18 +154,11 @@ export default function PetCare() {
   }
 
   function openAddPet() {
-    setEditingPet(null)
-    setShowPetForm(true)
-  }
-
-  function openEditPet(p: Pet) {
-    setEditingPet(p)
     setShowPetForm(true)
   }
 
   function closePetForm() {
     setShowPetForm(false)
-    setEditingPet(null)
   }
 
   async function remove(event: PetEvent) {
@@ -201,13 +197,16 @@ export default function PetCare() {
             ]
               .filter(Boolean)
               .join(' · ')
+            const selected = petFilter === p.id
             return (
               <div
                 key={p.id}
-                className="relative w-36 shrink-0 overflow-hidden rounded-2xl bg-(--card)"
+                className={`relative w-36 shrink-0 overflow-hidden rounded-2xl bg-(--card) ${
+                  selected ? 'ring-2 ring-(--accent)' : ''
+                }`}
               >
                 <button
-                  onClick={() => navigate(`/pets/${p.id}`)}
+                  onClick={() => setPetFilter(selected ? 'all' : p.id)}
                   className="block w-full text-left"
                 >
                   <div className="flex h-24 w-full items-center justify-center overflow-hidden bg-(--surface) text-5xl">
@@ -227,10 +226,11 @@ export default function PetCare() {
                     {age && <p className="text-xs text-(--text-muted)">{age}</p>}
                   </div>
                 </button>
+                {/* opens the pet's profile/details page */}
                 <button
-                  onClick={() => openEditPet(p)}
-                  aria-label={t('common.editName', { name: p.name })}
-                  className="absolute right-2 top-2 rounded-full bg-black/45 px-2 py-1 text-xs text-white backdrop-blur active:bg-black/65"
+                  onClick={() => navigate(`/pets/${p.id}`)}
+                  aria-label={`${t('pets.details')}: ${p.name}`}
+                  className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-xs text-white backdrop-blur active:bg-black/65"
                 >
                   ✎
                 </button>
@@ -481,7 +481,7 @@ export default function PetCare() {
       {/* add / edit pet sheet (shared with the pet profile page) */}
       {showPetForm && (
         <PetForm
-          pet={editingPet}
+          pet={null}
           onClose={closePetForm}
           onSaved={() => {
             closePetForm()
