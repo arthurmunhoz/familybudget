@@ -110,6 +110,7 @@ export const en = {
   'pets.dueToday': 'due today',
   'pets.inDays': 'in {days}d',
   'pets.lastDone': 'last',
+  'pets.markDone': 'Done',
   'pets.next': 'next',
   'pets.noPets': 'No pets yet.',
   'pets.noPetsHint':

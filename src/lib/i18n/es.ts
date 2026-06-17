@@ -110,6 +110,7 @@ export const es: Record<keyof typeof en, string> = {
   'pets.dueToday': 'para hoy',
   'pets.inDays': 'en {days}d',
   'pets.lastDone': 'última vez',
+  'pets.markDone': 'Hecho',
   'pets.next': 'próx.',
   'pets.noPets': 'Aún no hay mascotas.',
   'pets.noPetsHint':

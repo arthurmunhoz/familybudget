@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
-import { daysBetweenISO, formatDay, todayISO } from '../../lib/format'
+import { addDaysISO, daysBetweenISO, formatDay, todayISO } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
 import { reminderEvents } from '../../lib/petCare'
 import { supabase } from '../../lib/supabase'
@@ -114,6 +114,22 @@ export default function PetCare() {
     setShowForm(true)
   }
 
+  /** "I did this again" from an overdue reminder: open the event sheet as a NEW
+   *  entry, copying the original (pet/type/title/notes) but dated today. The
+   *  next-due is pre-filled by repeating the prior interval (last done → its due
+   *  date), so saving rolls the reminder forward; the user can still adjust it. */
+  function logAgain(ev: PetEvent) {
+    setEditingEvent(null)
+    setFPet(ev.pet_id)
+    setFType(ev.type)
+    setFTitle(ev.title)
+    setFDate(todayISO())
+    const interval = ev.next_due ? daysBetweenISO(ev.event_date, ev.next_due) : 0
+    setFNextDue(interval > 0 ? addDaysISO(todayISO(), interval) : '')
+    setFNotes(ev.notes ?? '')
+    setShowForm(true)
+  }
+
   function openEditForm(ev: PetEvent) {
     setEditingEvent(ev)
     setFPet(ev.pet_id)
@@ -180,9 +196,11 @@ export default function PetCare() {
         <h1 className="flex-1 text-2xl font-bold text-(--text)">🐕 {t('pets.title')}</h1>
       </header>
 
-      {/* pet carousel — tap a card to open its profile, ✎ to edit */}
+      {/* pet carousel — tap a card to filter, circle icon opens the profile.
+          pt/pb give the selected ring room (overflow-x clips vertically too)
+          and a gap so cards aren't tucked under the sticky header. */}
       {pets.length > 0 && (
-        <div className="-mx-4 mb-5 flex gap-3 overflow-x-auto px-4 pb-1">
+        <div className="-mx-4 mb-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-2">
           {pets.map((p) => {
             const m = p.birthday ? ageInMonths(p.birthday, todayISO()) : null
             const age =
@@ -277,15 +295,25 @@ export default function PetCare() {
                           {t('pets.lastDone')} {formatDay(e.event_date)}
                         </p>
                       </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                          due.overdue
-                            ? 'bg-(--expense) text-white'
-                            : 'bg-(--surface) text-(--text-muted)'
-                        }`}
-                      >
-                        {due.text}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                            due.overdue
+                              ? 'bg-(--expense) text-white'
+                              : 'bg-(--card) text-(--text-muted)'
+                          }`}
+                        >
+                          {due.text}
+                        </span>
+                        {due.overdue && (
+                          <button
+                            onClick={() => logAgain(e)}
+                            className="rounded-full bg-(--accent) px-3 py-1 text-xs font-bold text-white transition-transform active:scale-95"
+                          >
+                            ✓ {t('pets.markDone')}
+                          </button>
+                        )}
+                      </div>
                     </li>
                   )
                 })}
