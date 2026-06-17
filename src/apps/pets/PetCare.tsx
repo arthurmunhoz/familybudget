@@ -10,6 +10,7 @@ import { reminderEvents } from '../../lib/petCare'
 import { supabase } from '../../lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 import PetForm from './PetForm'
+import { ageInMonths, speciesEmoji } from './petMeta'
 
 const TYPE_ICON: Record<PetEventType, string> = {
   vet: '🩺',
@@ -27,8 +28,8 @@ export default function PetCare() {
   const { profile } = useAuth()
   const [pets, setPets] = useState<Pet[]>([])
   const [events, setEvents] = useState<PetEvent[]>([])
+  const [petPhotoUrls, setPetPhotoUrls] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
-  const [petFilter, setPetFilter] = useState<string>('all')
 
   const [showForm, setShowForm] = useState(false)
   const [fPet, setFPet] = useState('')
@@ -42,18 +43,37 @@ export default function PetCare() {
 
   const [showPetForm, setShowPetForm] = useState(false)
   const [editingPet, setEditingPet] = useState<Pet | null>(null)
-  const [showManagePets, setShowManagePets] = useState(false)
 
-  // PetForm self-locks while open; lock for the other sheets here.
-  useScrollLock(showForm || showManagePets)
+  // PetForm self-locks while open; lock for the event sheet here.
+  useScrollLock(showForm)
 
   const load = useCallback(async () => {
     const [petsRes, eventsRes] = await Promise.all([
       supabase.from('pets').select('*').order('name'),
       supabase.from('pet_events').select('*').order('event_date', { ascending: false }),
     ])
-    setPets(petsRes.data ?? [])
+    const petRows = (petsRes.data ?? []) as Pet[]
+    setPets(petRows)
     setEvents(eventsRes.data ?? [])
+    // Sign carousel photos so the household can see each pet's picture.
+    const paths = petRows.map((p) => p.photo_path).filter(Boolean) as string[]
+    if (paths.length) {
+      const { data: signed } = await supabase.storage
+        .from('documents')
+        .createSignedUrls(paths, 3600)
+      const byPath = Object.fromEntries(
+        (signed ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl]),
+      )
+      setPetPhotoUrls(
+        Object.fromEntries(
+          petRows
+            .filter((p) => p.photo_path && byPath[p.photo_path])
+            .map((p) => [p.id, byPath[p.photo_path as string]]),
+        ),
+      )
+    } else {
+      setPetPhotoUrls({})
+    }
     setLoading(false)
   }, [])
 
@@ -66,10 +86,8 @@ export default function PetCare() {
     [pets],
   )
 
-  const visible = useMemo(
-    () => (petFilter === 'all' ? events : events.filter((e) => e.pet_id === petFilter)),
-    [events, petFilter],
-  )
+  // All events across pets; each row shows which pet it belongs to.
+  const visible = events
 
   // Upcoming reminders (latest event per pet/type/title that has a due date).
   const reminders = useMemo(() => reminderEvents(visible), [visible])
@@ -84,7 +102,7 @@ export default function PetCare() {
 
   function openForm() {
     setEditingEvent(null)
-    setFPet(petFilter !== 'all' ? petFilter : (pets[0]?.id ?? ''))
+    setFPet(pets[0]?.id ?? '')
     setFType('medication')
     setFTitle('')
     setFDate(todayISO())
@@ -134,31 +152,17 @@ export default function PetCare() {
 
   function openAddPet() {
     setEditingPet(null)
-    setShowManagePets(false)
     setShowPetForm(true)
   }
 
   function openEditPet(p: Pet) {
     setEditingPet(p)
-    setShowManagePets(false)
     setShowPetForm(true)
   }
 
   function closePetForm() {
     setShowPetForm(false)
     setEditingPet(null)
-  }
-
-  async function deletePet(p: Pet) {
-    // Deleting a pet cascades to all of its events (DB on delete cascade).
-    if (!confirm(t('pets.deletePetConfirm', { name: p.name }))) return
-    const { error } = await supabase.from('pets').delete().eq('id', p.id)
-    if (error) {
-      alert(t('pets.deletePetFailed'))
-      return
-    }
-    if (petFilter === p.id) setPetFilter('all')
-    load()
   }
 
   async function remove(event: PetEvent) {
@@ -178,48 +182,71 @@ export default function PetCare() {
           ‹
         </button>
         <h1 className="flex-1 text-2xl font-bold text-(--text)">🐕 {t('pets.title')}</h1>
-        {pets.length > 0 && (
-          <button
-            onClick={() => setShowManagePets(true)}
-            aria-label={t('pets.managePets')}
-            className="rounded-lg px-2 py-2 text-(--text-muted) active:text-(--text)"
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-        )}
       </header>
 
-      {/* pet filter */}
-      <div className="flex gap-2 pb-4">
-        <FilterChip active={petFilter === 'all'} onClick={() => setPetFilter('all')}>
-          {t('pets.all')}
-        </FilterChip>
-        {pets.map((p) => (
-          <FilterChip
-            key={p.id}
-            active={petFilter === p.id}
-            onClick={() => setPetFilter(p.id)}
+      {/* pet carousel — tap a card to open its profile, ✎ to edit */}
+      {pets.length > 0 && (
+        <div className="-mx-4 mb-5 flex gap-3 overflow-x-auto px-4 pb-1">
+          {pets.map((p) => {
+            const m = p.birthday ? ageInMonths(p.birthday, todayISO()) : null
+            const age =
+              m == null || m < 0
+                ? null
+                : m < 12
+                  ? t('pets.ageMo', { months: m })
+                  : t('pets.ageY', { years: Math.floor(m / 12) })
+            const sub = [
+              p.species ? t(`pets.species.${p.species}` as TKey) : null,
+              p.breed,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+            return (
+              <div
+                key={p.id}
+                className="relative w-36 shrink-0 overflow-hidden rounded-2xl bg-(--card)"
+              >
+                <button
+                  onClick={() => navigate(`/pets/${p.id}`)}
+                  className="block w-full text-left"
+                >
+                  <div className="flex h-24 w-full items-center justify-center overflow-hidden bg-(--surface) text-5xl">
+                    {petPhotoUrls[p.id] ? (
+                      <img
+                        src={petPhotoUrls[p.id]}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span>{p.emoji || speciesEmoji(p.species)}</span>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="truncate font-bold text-(--text)">{p.name}</p>
+                    {sub && <p className="truncate text-xs text-(--text-faint)">{sub}</p>}
+                    {age && <p className="text-xs text-(--text-muted)">{age}</p>}
+                  </div>
+                </button>
+                <button
+                  onClick={() => openEditPet(p)}
+                  aria-label={t('common.editName', { name: p.name })}
+                  className="absolute right-2 top-2 rounded-full bg-black/45 px-2 py-1 text-xs text-white backdrop-blur active:bg-black/65"
+                >
+                  ✎
+                </button>
+              </div>
+            )
+          })}
+          {/* add-pet card */}
+          <button
+            onClick={openAddPet}
+            className="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-(--surface-2) py-3 text-(--text-faint) active:bg-(--surface)"
           >
-            {p.emoji} {p.name}
-          </FilterChip>
-        ))}
-        <FilterChip active={false} onClick={openAddPet}>
-          +
-        </FilterChip>
-      </div>
+            <span className="text-2xl">＋</span>
+            <span className="text-xs font-semibold">{t('pets.addPet')}</span>
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
@@ -461,79 +488,6 @@ export default function PetCare() {
             load()
           }}
         />
-      )}
-
-      {/* manage pets sheet — household members add/edit/delete pets */}
-      {showManagePets && (
-        <div
-          className="fixed inset-0 z-30 flex items-end bg-black/50"
-          onClick={() => setShowManagePets(false)}
-        >
-          <div
-            className="mx-auto flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-3">
-              <h2 className="text-lg font-bold text-(--text)">{t('pets.managePets')}</h2>
-              <button
-                onClick={() => setShowManagePets(false)}
-                aria-label={t('common.close')}
-                className="px-2 py-1 text-(--text-muted) active:text-(--text)"
-              >
-                ✕
-              </button>
-            </div>
-
-            <ul className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 pb-2">
-              {pets.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center gap-3 rounded-xl bg-(--surface) px-4 py-3"
-                >
-                  <button
-                    onClick={() => {
-                      setShowManagePets(false)
-                      navigate(`/pets/${p.id}`)
-                    }}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                  >
-                    <span className="text-xl">{p.emoji}</span>
-                    <span className="min-w-0 flex-1 truncate font-medium text-(--text)">
-                      {p.name}
-                    </span>
-                    <span className="text-(--text-faint)">›</span>
-                  </button>
-                  <button
-                    onClick={() => openEditPet(p)}
-                    aria-label={t('common.editName', { name: p.name })}
-                    className="px-1 text-(--text-faint) active:text-(--accent)"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    onClick={() => deletePet(p)}
-                    aria-label={t('common.deleteName', { name: p.name })}
-                    className="px-1 text-(--text-faint) active:text-(--expense)"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-
-            <div
-              className="shrink-0 px-4 pt-3"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
-            >
-              <button
-                onClick={openAddPet}
-                className="w-full rounded-2xl bg-(--accent) py-4 font-bold text-white active:scale-[0.98] transition-transform"
-              >
-                {t('pets.addPetBtn')}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )
