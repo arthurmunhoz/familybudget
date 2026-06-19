@@ -64,7 +64,7 @@ export default function Drawer({
       const path = `${profile.household_id}/backdrop/${crypto.randomUUID()}.jpg`
       const { error } = await supabase.storage
         .from('documents')
-        .upload(path, blob, { contentType: 'image/jpeg' })
+        .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '604800' })
       if (error) throw error
       await setBackdropPath(path)
     } catch {

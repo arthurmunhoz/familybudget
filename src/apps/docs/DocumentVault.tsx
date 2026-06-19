@@ -10,7 +10,9 @@ import {
   unlockVault,
 } from '../../lib/biometric'
 import { formatDay } from '../../lib/format'
+import { fileToResizedBase64 } from '../../lib/image'
 import type { TKey } from '../../lib/i18n'
+import { getSignedUrl } from '../../lib/signedUrls'
 import { supabase } from '../../lib/supabase'
 import type { DocCategory, FamilyDocument } from '../../lib/types'
 
@@ -161,16 +163,34 @@ export default function DocumentVault() {
   async function upload() {
     if (!pendingFile || !fTitle.trim() || !profile || uploading) return
     setUploading(true)
-    const ext = pendingFile.name.split('.').pop()?.toLowerCase() ?? 'bin'
+    const rawExt = pendingFile.name.split('.').pop()?.toLowerCase() ?? 'bin'
+    const isImage =
+      pendingFile.type.startsWith('image/') ||
+      ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif'].includes(rawExt)
+    // Downscale image documents before upload — a phone photo can be 5-10MB;
+    // 2048px keeps an ID or insurance card perfectly legible. PDFs upload as-is.
+    let body: Blob | File = pendingFile
+    let ext = rawExt
     // The bucket only accepts image/* and application/pdf (migration 013), so
     // when the picker doesn't report a type, infer it from the extension.
-    const mime =
-      pendingFile.type || (ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`)
+    let mime =
+      pendingFile.type || (rawExt === 'pdf' ? 'application/pdf' : `image/${rawExt === 'jpg' ? 'jpeg' : rawExt}`)
+    if (isImage) {
+      try {
+        const { data: b64 } = await fileToResizedBase64(pendingFile, 2048)
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+        body = new Blob([bytes], { type: 'image/jpeg' })
+        ext = 'jpg'
+        mime = 'image/jpeg'
+      } catch {
+        // Browser couldn't decode it (e.g. some HEIC) — upload the original.
+      }
+    }
     // Storage RLS only allows paths inside the user's own household folder.
     const path = `${profile.household_id}/${fCategory}/${crypto.randomUUID()}.${ext}`
     const { error: storageError } = await supabase.storage
       .from('documents')
-      .upload(path, pendingFile, { contentType: mime })
+      .upload(path, body, { contentType: mime, cacheControl: '604800' })
     if (storageError) {
       setUploading(false)
       alert(t('docs.uploadFailed'))
@@ -181,7 +201,7 @@ export default function DocumentVault() {
       category: fCategory,
       file_path: path,
       mime_type: mime,
-      size_bytes: pendingFile.size,
+      size_bytes: body.size,
       owner_email: fOwner || profile.email,
       added_by: profile.email,
     })
@@ -196,14 +216,12 @@ export default function DocumentVault() {
   }
 
   async function open(doc: FamilyDocument) {
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(doc.file_path, 3600)
-    if (error || !data) {
+    const url = await getSignedUrl(doc.file_path)
+    if (!url) {
       alert(t('docs.openFailed'))
       return
     }
-    setPreview({ doc, url: data.signedUrl })
+    setPreview({ doc, url })
   }
 
   function openEdit(doc: FamilyDocument) {

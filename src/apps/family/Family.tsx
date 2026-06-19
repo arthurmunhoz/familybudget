@@ -7,6 +7,7 @@ import { useScrollLock } from '../../hooks/useScrollLock'
 import { formatDay, formatPhone, todayISO } from '../../lib/format'
 import { fileToResizedBase64 } from '../../lib/image'
 import type { TKey } from '../../lib/i18n'
+import { getSignedUrls } from '../../lib/signedUrls'
 import { supabase } from '../../lib/supabase'
 import type { MemberProfile } from '../../lib/types'
 
@@ -64,12 +65,7 @@ export default function Family() {
     // Sign avatar URLs so the household can see each other's photos.
     const paths = rows.map((p) => p.avatar_path).filter(Boolean) as string[]
     if (!paths.length) return { byEmail, avatarUrls: {} }
-    const { data: signed } = await supabase.storage
-      .from('documents')
-      .createSignedUrls(paths, 3600)
-    const urlByPath = Object.fromEntries(
-      (signed ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl]),
-    )
+    const urlByPath = await getSignedUrls(paths)
     const avatarUrls = Object.fromEntries(
       rows
         .filter((p) => p.avatar_path && urlByPath[p.avatar_path])
@@ -116,7 +112,7 @@ export default function Family() {
       const path = `${profile.household_id}/avatars/${crypto.randomUUID()}.jpg`
       const { error } = await supabase.storage
         .from('documents')
-        .upload(path, blob, { contentType: 'image/jpeg' })
+        .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '604800' })
       if (error) throw error
       set('avatar_path', path)
       setPhotoPreview(URL.createObjectURL(blob))

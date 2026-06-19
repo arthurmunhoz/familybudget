@@ -5,6 +5,7 @@ import { useCachedQuery } from '../../hooks/useCachedQuery'
 import { useI18n } from '../../hooks/useI18n'
 import { formatDay, todayISO } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
+import { getSignedUrl } from '../../lib/signedUrls'
 import { supabase } from '../../lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 import PetForm from './PetForm'
@@ -43,10 +44,7 @@ export default function PetProfile() {
       const pet = petRes.data as Pet | null
       let photoUrl: string | null = null
       if (pet?.photo_path) {
-        const { data: signed } = await supabase.storage
-          .from('documents')
-          .createSignedUrl(pet.photo_path, 3600)
-        photoUrl = signed?.signedUrl ?? null
+        photoUrl = await getSignedUrl(pet.photo_path)
       }
       return { pet, events: evRes.data ?? [], photoUrl }
     },

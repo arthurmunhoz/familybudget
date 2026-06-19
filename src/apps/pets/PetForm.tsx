@@ -4,6 +4,7 @@ import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import type { TKey } from '../../lib/i18n'
 import { fileToResizedBase64 } from '../../lib/image'
+import { getSignedUrl } from '../../lib/signedUrls'
 import { supabase } from '../../lib/supabase'
 import type { Pet } from '../../lib/types'
 import { SPECIES, speciesEmoji } from './petMeta'
@@ -44,12 +45,9 @@ export default function PetForm({
   useEffect(() => {
     if (!pet?.photo_path) return
     let cancelled = false
-    supabase.storage
-      .from('documents')
-      .createSignedUrl(pet.photo_path, 3600)
-      .then(({ data }) => {
-        if (!cancelled && data) setPhotoPreview(data.signedUrl)
-      })
+    getSignedUrl(pet.photo_path).then((url) => {
+      if (!cancelled && url) setPhotoPreview(url)
+    })
     return () => {
       cancelled = true
     }
@@ -73,7 +71,7 @@ export default function PetForm({
       const path = `${profile.household_id}/pets/${crypto.randomUUID()}.jpg`
       const { error } = await supabase.storage
         .from('documents')
-        .upload(path, blob, { contentType: 'image/jpeg' })
+        .upload(path, blob, { contentType: 'image/jpeg', cacheControl: '604800' })
       if (error) throw error
       setPhotoPath(path)
       setPhotoPreview(URL.createObjectURL(blob))

@@ -7,6 +7,7 @@ import { useScrollLock } from '../../hooks/useScrollLock'
 import { addDaysISO, daysBetweenISO, formatDay, todayISO } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
 import { reminderEvents } from '../../lib/petCare'
+import { getSignedUrls } from '../../lib/signedUrls'
 import { supabase } from '../../lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 import PetForm from './PetForm'
@@ -58,12 +59,7 @@ export default function PetCare() {
     // Sign carousel photos so the household can see each pet's picture.
     const paths = petRows.map((p) => p.photo_path).filter(Boolean) as string[]
     if (paths.length) {
-      const { data: signed } = await supabase.storage
-        .from('documents')
-        .createSignedUrls(paths, 3600)
-      const byPath = Object.fromEntries(
-        (signed ?? []).filter((s) => s.signedUrl).map((s) => [s.path, s.signedUrl]),
-      )
+      const byPath = await getSignedUrls(paths)
       setPetPhotoUrls(
         Object.fromEntries(
           petRows

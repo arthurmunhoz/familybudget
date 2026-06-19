@@ -55,7 +55,7 @@ src/
   lib/                     apps.ts (hub registry), types.ts, format.ts,
                            categories.ts, analytics.ts, biometric.ts,
                            push.ts (web-push opt-in), i18n/ (en|es|pt dicts),
-                           image.ts, supabase.ts
+                           image.ts, signedUrls.ts, supabase.ts
 supabase/
   schema.sql               Original bootstrap — NOT standalone; see its footer
   migration-NNN-*.sql      One file per applied migration, in order
@@ -138,6 +138,16 @@ but seed it from `readCache(key)` and write through with `writeCache(key, …)`.
 Already cached: Hub badges, Budgets, Months, MonthDetail, Family, ShoppingList,
 Admin. Not yet (were mid-edit by another agent): Pet Care, Documents,
 Important Dates.
+
+**Images (avatars, pet photos, backdrop, docs)**: all live in the private
+`documents` bucket and are served via signed URLs. ALWAYS resolve them through
+`src/lib/signedUrls.ts` (`getSignedUrl` / `getSignedUrls`) — never call
+`createSignedUrl(s)` directly. The helper caches URLs in memory and mints 24h
+tokens, so repeat views skip the round-trip AND get browser-cache hits (a fresh
+token each load = a new URL = a forced re-download). Resize photos before upload
+with `fileToResizedBase64` (avatars/pets 512px, backdrop 1800px, doc images
+2048px) and pass `cacheControl: '604800'` to `.upload()` — paths are
+content-addressed (uuid per upload) so long caching is safe.
 
 **Money/date helpers**: use `src/lib/format.ts` (`formatMoney`, `formatDay`,
 `todayISO`, period helpers). Dates are ISO `YYYY-MM-DD` strings end-to-end;
