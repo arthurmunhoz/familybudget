@@ -37,8 +37,12 @@ export function yearsAtNext(d: ImportantDate, todayISO: string): number {
   return occYear - startYear
 }
 
-/** Count of entries needing attention: due within `within` days, or an expired
- *  one-time date. Drives the hub badge. */
+/** Count of upcoming entries: due today through `within` days out. Drives the
+ *  hub badge — expired one-time dates are excluded (the badge is a heads-up for
+ *  what's coming, not a backlog of what's passed). */
 export function dueSoonCount(dates: ImportantDate[], todayISO: string, within = 30): number {
-  return dates.filter((d) => daysUntil(d, todayISO) <= within).length
+  return dates.filter((d) => {
+    const days = daysUntil(d, todayISO)
+    return days >= 0 && days <= within
+  }).length
 }
