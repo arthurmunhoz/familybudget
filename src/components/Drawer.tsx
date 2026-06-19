@@ -5,6 +5,7 @@ import { notifyHouseholdChanged, useHousehold } from '../hooks/useHousehold'
 import { useI18n } from '../hooks/useI18n'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { useTheme } from '../hooks/useTheme'
+import NotificationsToggle from './NotificationsToggle'
 import { APPS } from '../lib/apps'
 import { LANGUAGES, type TKey } from '../lib/i18n'
 import { fileToResizedBase64 } from '../lib/image'
@@ -143,6 +144,8 @@ export default function Drawer({
             ))}
           </div>
         </div>
+
+        <NotificationsToggle />
 
         <div className="mt-6">
           <span className="text-sm text-(--text-muted)">{t('drawer.myApps')}</span>

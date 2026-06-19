@@ -49,6 +49,17 @@ export const es: Record<keyof typeof en, string> = {
   'drawer.addImage': '📷 Agregar imagen',
   'drawer.replaceImage': '📷 Cambiar imagen',
   'drawer.working': 'Procesando…',
+  'drawer.notifications': '🔔 Recordatorios',
+  'drawer.notifHint':
+    'Recibe una notificación cada mañana con el cuidado de mascotas pendiente y las fechas importantes próximas.',
+  'drawer.notifEnable': 'Activar recordatorios',
+  'drawer.notifOn': 'Recordatorios activados',
+  'drawer.notifInstall':
+    'Agrega One Roof a tu pantalla de inicio (Compartir → Agregar a inicio) para activar los recordatorios.',
+  'drawer.notifUnsupported': 'Los recordatorios no están disponibles en este dispositivo.',
+  'drawer.notifDenied':
+    'Las notificaciones están bloqueadas. Actívalas para One Roof en los ajustes de tu dispositivo.',
+  'drawer.notifFailed': 'No se pudieron actualizar los recordatorios — inténtalo de nuevo.',
   'drawer.signOut': 'Cerrar sesión',
   'drawer.backdropNotImage': 'Por favor elige una imagen.',
   'drawer.backdropTooBig': 'Esa imagen es muy grande — elige una de menos de 15 MB.',

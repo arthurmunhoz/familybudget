@@ -18,17 +18,21 @@ this doc is the contract for every agent that follows you.
   `src/index.css` and flipped by `:root[data-theme='light'|'dark']`.
 - **Supabase**: Postgres + RLS, Google OAuth, Storage (documents), Realtime
   (shopping list). Client in `src/lib/supabase.ts`, env via `VITE_SUPABASE_*`.
-- **Vercel**: static build + one serverless function (`api/scan-receipt.ts`,
-  Claude vision; uses `ANTHROPIC_API_KEY` env var, verifies the caller's
-  Supabase JWT before spending credits).
+- **Vercel**: static build + serverless functions in `api/` — `scan-receipt.ts`
+  (Claude vision; `ANTHROPIC_API_KEY`, verifies the caller's Supabase JWT) and
+  `send-digest.ts` (daily push digest cron, see Push notifications below).
 - PWA: `public/manifest.webmanifest`, apple-touch meta in `index.html`. Brand
-  is "One Roof"; icons are `public/roof-icon-*.png`.
+  is "One Roof"; icons are `public/roof-icon-*.png`. `public/sw.js` is a
+  PUSH-ONLY service worker (registered in `main.tsx`) — no `fetch` handler, so
+  it never caches/intercepts and can't break loading.
 
 ## File map
 
 ```
 api/scan-receipt.ts        Receipt photo → structured entry (Claude vision)
+api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
 public/                    Icons, manifest, family.jpg backdrop photo
+  sw.js                    Push-only service worker (no fetch handler)
 src/
   main.tsx                 BrowserRouter + AuthProvider + ThemeProvider
   App.tsx                  Route table; every app screen is lazy()-loaded
@@ -45,12 +49,13 @@ src/
     dates/                 ImportantDates (birthday/renewal countdowns)
     family/                Family (per-member profiles + avatars)
   components/              Shared: Backdrop, Drawer, AnalyticsTracker,
-                           ErrorBoundary, VaultGate
+                           ErrorBoundary, VaultGate, NotificationsToggle
   hooks/                   useAuth, useBack, useTheme, useI18n, useHousehold,
                            useAppPrefs, useScrollLock
   lib/                     apps.ts (hub registry), types.ts, format.ts,
                            categories.ts, analytics.ts, biometric.ts,
-                           i18n/ (en|es|pt dicts), image.ts, supabase.ts
+                           push.ts (web-push opt-in), i18n/ (en|es|pt dicts),
+                           image.ts, supabase.ts
 supabase/
   schema.sql               Original bootstrap — NOT standalone; see its footer
   migration-NNN-*.sql      One file per applied migration, in order
@@ -96,6 +101,30 @@ directly for cross-household needs, see `Admin.tsx`).
 page views and button clicks globally — new features need no instrumentation.
 For custom events use `track(type, fields)` from `src/lib/analytics.ts`.
 Analytics code must never throw into the app.
+
+**Push notifications (daily digest)**: opt-in web push, delivered as one
+morning notification per household. Pieces:
+- `public/sw.js` — push-only service worker (shows notification, focuses/opens
+  the app on tap). Registered in `main.tsx`.
+- `src/lib/push.ts` — browser side: `pushState()` (returns `unsupported` /
+  `needs-install` / `default` / `granted` / `denied`), `enablePush()` /
+  `disablePush()`. iOS only allows push for the **installed Home-Screen PWA**
+  (16.4+) — `pushState()` returns `needs-install` in a plain Safari tab.
+- `src/components/NotificationsToggle.tsx` — the Drawer "🔔 Reminders" control.
+- `push_subscriptions` table (migration 026) — one row per device; RLS so users
+  manage only their own. `user_email` + `household_id` are stamped by column
+  defaults (don't pass them from the client).
+- `api/send-digest.ts` — Vercel **Cron** target (`vercel.json` → daily 11:00
+  UTC ≈ 8am BRT / 7am ET). Reads every household with the **service role**
+  (bypasses RLS), collects pet events due/overdue + important dates at 7d/1d/
+  day-of lead marks, sends via `web-push`, prunes 404/410 subscriptions.
+- Env (Vercel only): `VITE_VAPID_PUBLIC_KEY` (also needed at BUILD time for the
+  client), `VAPID_PRIVATE_KEY`, `CRON_SECRET` (Cron sends it as a Bearer token;
+  the route rejects anything else), `SUPABASE_SERVICE_ROLE_KEY`. Generate VAPID
+  pairs with `npx web-push generate-vapid-keys`.
+- KNOWN v1 limits: digest text is English for all users (localize later by
+  joining `user_settings.language`); single fixed send time; Hobby-plan crons
+  fire once/day within ~the hour, not minute-precise.
 
 **Data fetching — cache to avoid the "blink"**: screens re-mount on every
 navigation, so fetching from empty state flashes (0 → real value). Use

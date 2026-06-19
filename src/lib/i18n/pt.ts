@@ -49,6 +49,17 @@ export const pt: Record<keyof typeof en, string> = {
   'drawer.addImage': '📷 Adicionar imagem',
   'drawer.replaceImage': '📷 Trocar imagem',
   'drawer.working': 'Processando…',
+  'drawer.notifications': '🔔 Lembretes',
+  'drawer.notifHint':
+    'Receba uma notificação toda manhã com os cuidados dos pets e as datas importantes chegando.',
+  'drawer.notifEnable': 'Ativar lembretes',
+  'drawer.notifOn': 'Lembretes ativados',
+  'drawer.notifInstall':
+    'Adicione o One Roof à sua Tela de Início (Compartilhar → Adicionar à Tela de Início) para ativar os lembretes.',
+  'drawer.notifUnsupported': 'Os lembretes não estão disponíveis neste aparelho.',
+  'drawer.notifDenied':
+    'As notificações estão bloqueadas. Ative-as para o One Roof nos ajustes do aparelho.',
+  'drawer.notifFailed': 'Não deu pra atualizar os lembretes — tenta de novo.',
   'drawer.signOut': 'Sair',
   'drawer.backdropNotImage': 'Escolha uma imagem, por favor.',
   'drawer.backdropTooBig': 'Essa imagem é muito grande — escolha uma com menos de 15 MB.',

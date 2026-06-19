@@ -49,6 +49,17 @@ export const en = {
   'drawer.addImage': '📷 Add image',
   'drawer.replaceImage': '📷 Replace image',
   'drawer.working': 'Working…',
+  'drawer.notifications': '🔔 Reminders',
+  'drawer.notifHint':
+    'Get a daily morning notification for pet care due and upcoming important dates.',
+  'drawer.notifEnable': 'Turn on reminders',
+  'drawer.notifOn': 'Reminders are on',
+  'drawer.notifInstall':
+    'Add One Roof to your Home Screen (Share → Add to Home Screen) to turn on reminders.',
+  'drawer.notifUnsupported': 'Reminders aren’t available on this device.',
+  'drawer.notifDenied':
+    'Notifications are blocked. Enable them for One Roof in your device settings.',
+  'drawer.notifFailed': 'Could not update reminders — please try again.',
   'drawer.signOut': 'Sign out',
   'drawer.backdropNotImage': 'Please choose an image.',
   'drawer.backdropTooBig': 'That image is too large — please pick one under 15 MB.',
