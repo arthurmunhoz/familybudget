@@ -100,7 +100,10 @@ export default function Drawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
+        <div
+          className="flex-1 overflow-y-auto overscroll-contain px-5"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+        >
         <div className="mt-1 rounded-xl bg-(--surface) px-4 py-3">
           <div className="font-semibold text-(--text)">
             {profile?.display_name}
@@ -239,21 +242,17 @@ export default function Drawer({
           />
         </div>
 
-        </div>
-
-        <div
-          className="shrink-0 px-5 pt-3"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
-        >
-          {/* --text-faint is grey in BOTH themes; --surface-2 is white in light mode */}
-          <div className="mb-3 h-px bg-(--text-faint) opacity-40" />
-
-          <button
-            onClick={signOut}
-            className="w-full rounded-xl py-3 font-semibold text-(--expense) active:bg-(--surface)"
-          >
-            {t('drawer.signOut')}
-          </button>
+          {/* sign out scrolls with the rest of the content — no fixed footer */}
+          <div className="mt-6">
+            {/* --text-faint is grey in BOTH themes; --surface-2 is white in light mode */}
+            <div className="mb-3 h-px bg-(--text-faint) opacity-40" />
+            <button
+              onClick={signOut}
+              className="w-full rounded-xl py-3 font-semibold text-(--expense) active:bg-(--surface)"
+            >
+              {t('drawer.signOut')}
+            </button>
+          </div>
         </div>
       </div>
     </div>
