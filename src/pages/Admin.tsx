@@ -60,7 +60,10 @@ export default function Admin() {
     revalidate: revalidateBase,
   } = useCachedQuery<BaseData>('admin:base', async () => {
     const [h, u, hh] = await Promise.all([
-      supabase.from('households').select('*').order('created_at'),
+      // Internal/dev households (the seeded "Preview Family") are hidden from the
+      // households list + last-active view, same as they're excluded from usage
+      // analytics (migration 023).
+      supabase.from('households').select('*').eq('is_internal', false).order('created_at'),
       supabase.from('allowed_users').select('email, display_name, household_id, is_admin'),
       supabase.rpc('admin_household_activity'),
     ])

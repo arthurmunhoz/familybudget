@@ -68,7 +68,7 @@ export default function SignalsBanner() {
       {signals.map((s) => {
         const mine = s.sender_email === myEmail
         const acked = ackedLocal.has(s.id) || s.acks.some((a) => a.user_email === myEmail)
-        const ackCount = s.acks.length
+        const ackNames = s.acks.map((a) => senderName(a.user_email)).join(', ')
         return (
           <div
             key={s.id}
@@ -79,7 +79,7 @@ export default function SignalsBanner() {
               <p className="truncate font-semibold text-(--text)">{s.message}</p>
               <p className="truncate text-xs text-(--text-faint)">
                 {senderName(s.sender_email)} · {timeAgo(s.created_at)}
-                {mine && ackCount > 0 && ` · ${t('signals.seenBy', { count: ackCount })}`}
+                {mine && ackNames && ` · ${t('signals.seenBy', { names: ackNames })}`}
               </p>
             </div>
             {!mine && (

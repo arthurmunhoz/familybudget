@@ -145,6 +145,12 @@ page. Pieces:
   list of member emails. The `signals_select` RLS makes targeted signals visible
   only to recipients + sender. `🆘 help` ALWAYS sends to everyone (forced in the
   page's `recipientsFor`).
+- The Signals page lists presets one-per-line (full-width, no truncation); each
+  row has a grip handle to drag-reorder (Pointer Events + pointer-capture +
+  `touch-none`, so it works on the iOS PWA). The order is saved per device in
+  `localStorage` (`signals-order:<email>`). The `help` row has a red border
+  (`border-(--expense)`) to stand out; others use `border-transparent` to keep
+  heights aligned.
 - `src/lib/signals.ts` — `SIGNAL_PRESETS` (kind+emoji; human text is the i18n
   key `signals.preset.<kind>`), `sendSignal(kind,emoji,msg,recipients)`,
   `sendCustomSignal(text,recipients)` (AI), `ackSignal`, `fetchActiveSignals`,

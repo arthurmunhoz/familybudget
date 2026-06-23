@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import SignalsBanner from '../../components/SignalsBanner'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
@@ -37,6 +37,65 @@ export default function Signals() {
   function recipientsFor(kind: string): string[] | null {
     if (kind === 'help' || everyone) return null
     return [...selected]
+  }
+
+  // --- preset ordering: drag the grip to reorder; saved per device. ---
+  const presetByKind = useMemo(
+    () => Object.fromEntries(SIGNAL_PRESETS.map((p) => [p.kind, p])),
+    [],
+  )
+  const storageKey = `signals-order:${myEmail ?? ''}`
+  const [order, setOrder] = useState<string[]>(() => SIGNAL_PRESETS.map((p) => p.kind))
+  const orderRef = useRef(order)
+  orderRef.current = order
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([])
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+
+  // Load the saved order once; keep only known presets, append any new ones.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey)
+      if (!raw) return
+      const saved = (JSON.parse(raw) as string[]).filter((k) => k in presetByKind)
+      const all = SIGNAL_PRESETS.map((p) => p.kind)
+      setOrder([...saved, ...all.filter((k) => !saved.includes(k))])
+    } catch {
+      // ignore bad/missing storage
+    }
+  }, [storageKey, presetByKind])
+
+  function startDrag(e: React.PointerEvent, index: number) {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragIndex(index)
+  }
+  function onDrag(e: React.PointerEvent) {
+    if (dragIndex === null) return
+    const y = e.clientY
+    for (let i = 0; i < rowRefs.current.length; i++) {
+      const el = rowRefs.current[i]
+      if (!el || i === dragIndex) continue
+      const r = el.getBoundingClientRect()
+      if (y >= r.top && y <= r.bottom) {
+        setOrder((prev) => {
+          const next = [...prev]
+          const [moved] = next.splice(dragIndex, 1)
+          next.splice(i, 0, moved)
+          return next
+        })
+        setDragIndex(i)
+        break
+      }
+    }
+  }
+  function endDrag() {
+    if (dragIndex === null) return
+    setDragIndex(null)
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(orderRef.current))
+    } catch {
+      // ignore storage failures
+    }
   }
 
   function toggle(email: string) {
@@ -140,21 +199,49 @@ export default function Signals() {
         </div>
       )}
 
-      {/* preset signals */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {SIGNAL_PRESETS.map((p) => (
-          <button
-            key={p.kind}
-            onClick={() => preset(p.kind, p.emoji)}
-            disabled={sending}
-            className="flex items-center gap-3 rounded-2xl bg-(--card) px-4 py-3.5 text-left active:scale-[0.98] transition-transform disabled:opacity-50"
-          >
-            <span className="text-2xl">{busyKind === p.kind ? '…' : p.emoji}</span>
-            <span className="min-w-0 flex-1 truncate font-semibold text-(--text)">
-              {t(`signals.preset.${p.kind}` as TKey)}
-            </span>
-          </button>
-        ))}
+      {/* preset signals — one per line, drag the grip to reorder */}
+      <div className="space-y-2.5">
+        {order.map((kind, index) => {
+          const p = presetByKind[kind]
+          if (!p) return null
+          const isHelp = kind === 'help'
+          const dragging = dragIndex === index
+          return (
+            <div
+              key={kind}
+              ref={(el) => {
+                rowRefs.current[index] = el
+              }}
+              className={`flex items-center rounded-2xl border-2 bg-(--card) transition-shadow ${
+                isHelp ? 'border-(--expense)' : 'border-transparent'
+              } ${dragging ? 'opacity-95 shadow-lg ring-2 ring-(--accent)' : ''}`}
+            >
+              <button
+                onClick={() => preset(p.kind, p.emoji)}
+                disabled={sending}
+                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left active:scale-[0.99] transition-transform disabled:opacity-50"
+              >
+                <span className="text-2xl">{busyKind === p.kind ? '…' : p.emoji}</span>
+                <span className="font-semibold text-(--text)">
+                  {t(`signals.preset.${p.kind}` as TKey)}
+                </span>
+              </button>
+              <span
+                role="button"
+                aria-label={t('signals.reorder')}
+                onPointerDown={(e) => startDrag(e, index)}
+                onPointerMove={onDrag}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                className={`shrink-0 touch-none select-none px-4 py-3.5 text-xl text-(--text-faint) ${
+                  dragging ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
+              >
+                ⠿
+              </span>
+            </div>
+          )
+        })}
       </div>
       <p className="mt-2 text-xs text-(--text-faint)">🆘 {t('signals.helpNote')}</p>
 
