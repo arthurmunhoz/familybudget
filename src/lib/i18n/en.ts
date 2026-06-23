@@ -89,6 +89,18 @@ export const en = {
     'Turn them on to get alerts on this device, including urgent ones.',
   'notif.enable': 'Enable notifications',
   'notif.alertsOff': 'Alerts off',
+  'intro.title': 'What’s new',
+  'intro.subtitle': 'A couple of new ways to keep your family in sync.',
+  'intro.pingsTitle': 'Quick Pings',
+  'intro.pingsDesc':
+    'One-tap alerts to everyone at home — on my way, dinner’s ready, and an urgent “Need help”.',
+  'intro.remindersTitle': 'Reminders',
+  'intro.remindersDesc':
+    'A daily morning note for pet care that’s due and upcoming important dates.',
+  'intro.needNotif': 'Turn on notifications to get these alerts on this device.',
+  'intro.allSet': 'Notifications are on — you’re all set.',
+  'intro.later': 'Maybe later',
+  'intro.gotIt': 'Got it',
   'drawer.signOut': 'Sign out',
   'drawer.backdropNotImage': 'Please choose an image.',
   'drawer.backdropTooBig': 'That image is too large — please pick one under 15 MB.',

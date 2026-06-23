@@ -89,6 +89,18 @@ export const pt: Record<keyof typeof en, string> = {
     'Ative para receber alertas neste aparelho, inclusive os urgentes.',
   'notif.enable': 'Ativar notificações',
   'notif.alertsOff': 'Alertas desligados',
+  'intro.title': 'Novidades',
+  'intro.subtitle': 'Algumas formas novas de manter a família em sintonia.',
+  'intro.pingsTitle': 'Avisos instantâneos',
+  'intro.pingsDesc':
+    'Avisos com um toque pra todo mundo em casa — tô indo, comida pronta e um urgente “Preciso de ajuda”.',
+  'intro.remindersTitle': 'Lembretes',
+  'intro.remindersDesc':
+    'Um aviso toda manhã com os cuidados dos pets e as datas importantes chegando.',
+  'intro.needNotif': 'Ative as notificações pra receber esses avisos neste aparelho.',
+  'intro.allSet': 'As notificações estão ativadas — tudo pronto!',
+  'intro.later': 'Talvez depois',
+  'intro.gotIt': 'Beleza',
   'drawer.signOut': 'Sair',
   'drawer.backdropNotImage': 'Escolha uma imagem, por favor.',
   'drawer.backdropTooBig': 'Essa imagem é muito grande — escolha uma com menos de 15 MB.',
