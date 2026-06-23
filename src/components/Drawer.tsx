@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { notifyHouseholdChanged, useHousehold } from '../hooks/useHousehold'
@@ -22,10 +22,54 @@ export default function Drawer({
   const { household } = useHousehold()
   const { t, lang, setLang } = useI18n()
   const { theme, setTheme } = useTheme()
-  const { hidden, toggleApp, tileStyle, setTileStyle } = useAppPrefs()
+  const { hidden, toggleApp, tileStyle, setTileStyle, orderedApps, reorderApps } =
+    useAppPrefs()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   useScrollLock(open)
+
+  // Drag-to-reorder the app list (grip handle), persisted via reorderApps.
+  const appById = useMemo(() => new Map(APPS.map((a) => [a.id, a])), [])
+  const [order, setOrder] = useState<string[]>(() => orderedApps.map((a) => a.id))
+  const orderRef = useRef(order)
+  orderRef.current = order
+  const appRowRefs = useRef<(HTMLDivElement | null)[]>([])
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  // Re-seed from saved order when it changes elsewhere (other device / new app),
+  // but never mid-drag.
+  useEffect(() => {
+    if (dragIndex === null) setOrder(orderedApps.map((a) => a.id))
+  }, [orderedApps, dragIndex])
+
+  function startAppDrag(e: React.PointerEvent, index: number) {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragIndex(index)
+  }
+  function onAppDrag(e: React.PointerEvent) {
+    if (dragIndex === null) return
+    const y = e.clientY
+    for (let i = 0; i < appRowRefs.current.length; i++) {
+      const el = appRowRefs.current[i]
+      if (!el || i === dragIndex) continue
+      const r = el.getBoundingClientRect()
+      if (y >= r.top && y <= r.bottom) {
+        setOrder((prev) => {
+          const next = [...prev]
+          const [moved] = next.splice(dragIndex, 1)
+          next.splice(i, 0, moved)
+          return next
+        })
+        setDragIndex(i)
+        break
+      }
+    }
+  }
+  function endAppDrag() {
+    if (dragIndex === null) return
+    setDragIndex(null)
+    reorderApps(orderRef.current)
+  }
 
   const backdropPath = household?.backdrop_path ?? null
   const isUploadedBackdrop = Boolean(backdropPath && backdropPath !== 'builtin:beach')
@@ -120,12 +164,12 @@ export default function Drawer({
               <button
                 key={l.id}
                 onClick={() => setLang(l.id)}
-                className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-xs font-semibold transition-colors ${
+                className={`flex flex-col items-center gap-0.5 rounded-lg py-2 font-semibold transition-colors ${
                   lang === l.id ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
                 }`}
               >
                 <span className="text-lg leading-none">{l.flag}</span>
-                {l.label}
+                <span className="text-[11px] leading-tight">{l.label}</span>
               </button>
             ))}
           </div>
@@ -154,36 +198,58 @@ export default function Drawer({
           <span className="text-sm text-(--text-muted)">{t('drawer.myApps')}</span>
           <p className="mt-1 text-xs text-(--text-faint)">{t('drawer.myAppsHint')}</p>
           <div className="mt-2 space-y-1 rounded-xl bg-(--surface) p-1">
-            {APPS.map((app) => {
+            {order.map((id, index) => {
+              const app = appById.get(id)
+              if (!app) return null
               const on = !hidden.includes(app.id)
+              const dragging = dragIndex === index
               return (
-                <button
+                <div
                   key={app.id}
-                  onClick={() => toggleApp(app.id)}
-                  role="switch"
-                  aria-checked={on}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left"
+                  ref={(el) => {
+                    appRowRefs.current[index] = el
+                  }}
+                  className={`flex items-center gap-1 rounded-lg pr-3 transition-shadow ${
+                    dragging ? 'bg-(--card) shadow' : ''
+                  }`}
                 >
-                  <span className={on ? '' : 'opacity-40 grayscale'}>{app.icon}</span>
-                  <span
-                    className={`flex-1 text-sm font-semibold ${
-                      on ? 'text-(--text)' : 'text-(--text-faint) line-through'
-                    }`}
+                  <button
+                    aria-label={t('signals.reorder')}
+                    onPointerDown={(e) => startAppDrag(e, index)}
+                    onPointerMove={onAppDrag}
+                    onPointerUp={endAppDrag}
+                    onPointerCancel={endAppDrag}
+                    className="shrink-0 cursor-grab touch-none px-2 py-2 text-(--text-faint) active:text-(--text)"
                   >
-                    {t(`app.${app.id}.name` as TKey)}
-                  </span>
-                  <span
-                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-                      on ? 'bg-(--accent)' : 'bg-(--surface-2)'
-                    }`}
+                    ⠿
+                  </button>
+                  <button
+                    onClick={() => toggleApp(app.id)}
+                    role="switch"
+                    aria-checked={on}
+                    className="flex flex-1 items-center gap-2.5 py-2 text-left"
                   >
+                    <span className={on ? '' : 'opacity-40 grayscale'}>{app.icon}</span>
                     <span
-                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
-                        on ? 'left-4.5' : 'left-0.5'
+                      className={`flex-1 text-sm font-semibold ${
+                        on ? 'text-(--text)' : 'text-(--text-faint) line-through'
                       }`}
-                    />
-                  </span>
-                </button>
+                    >
+                      {t(`app.${app.id}.name` as TKey)}
+                    </span>
+                    <span
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                        on ? 'bg-(--accent)' : 'bg-(--surface-2)'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                          on ? 'left-4.5' : 'left-0.5'
+                        }`}
+                      />
+                    </span>
+                  </button>
+                </div>
               )
             })}
           </div>

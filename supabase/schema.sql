@@ -193,3 +193,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-026-push-subscriptions.sql (web push subscriptions for daily digest)
 --   migration-027-signals.sql (household one-tap signals + acks, realtime)
 --   migration-028-signal-recipients.sql (per-signal recipient targeting)
+--   migration-029-app-order.sql (per-user hub app ordering)

@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useHousehold } from '../hooks/useHousehold'
 import { useI18n } from '../hooks/useI18n'
-import { ADMIN_APP, APPS } from '../lib/apps'
+import { ADMIN_APP } from '../lib/apps'
 import { todayISO } from '../lib/format'
 import type { TKey } from '../lib/i18n'
 import { dueSoonCount } from '../lib/importantDates'
@@ -27,7 +27,7 @@ export default function Hub() {
   // locally so it doesn't flash "One Roof" on every open.
   const { household } = useHousehold()
   // Each user picks their own tiles and density; Admin is always shown to admins.
-  const { hidden, tileStyle } = useAppPrefs()
+  const { hidden, tileStyle, orderedApps } = useAppPrefs()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -83,7 +83,7 @@ export default function Hub() {
   }
 
   const tiles = [
-    ...APPS.filter((app) => !hidden.includes(app.id)),
+    ...orderedApps.filter((app) => !hidden.includes(app.id)),
     ...(profile?.is_admin ? [ADMIN_APP] : []),
   ]
 
