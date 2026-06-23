@@ -143,6 +143,23 @@ export interface MemberProfile {
   updated_at: string
 }
 
+export interface Signal {
+  id: string
+  household_id: string
+  sender_email: string
+  kind: string
+  emoji: string
+  message: string
+  created_at: string
+  expires_at: string
+}
+
+export interface SignalAck {
+  signal_id: string
+  user_email: string
+  created_at: string
+}
+
 export type ImportantDateType = 'birthday' | 'anniversary' | 'renewal' | 'other'
 
 export interface ImportantDate {

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
+import SignalSheet from '../components/SignalSheet'
+import SignalsBanner from '../components/SignalsBanner'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -29,6 +31,7 @@ export default function Hub() {
   const { hidden, tileStyle } = useAppPrefs()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [signalSheetOpen, setSignalSheetOpen] = useState(false)
 
   // Badges are cached in memory (useCachedQuery): on return to the hub they
   // render their last value instantly and only update if the data changed —
@@ -117,14 +120,25 @@ export default function Hub() {
             {t(greetKey, { name: profile?.display_name ?? '' })}
           </p>
         </div>
-        <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label={t('hub.openSettings')}
-          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
-        >
-          ☰
-        </button>
+        <div className="flex items-center">
+          <button
+            onClick={() => setSignalSheetOpen(true)}
+            aria-label={t('signals.openSheet')}
+            className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+          >
+            📣
+          </button>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            aria-label={t('hub.openSettings')}
+            className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+          >
+            ☰
+          </button>
+        </div>
       </header>
+
+      <SignalsBanner />
 
       {tiles.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
@@ -170,6 +184,7 @@ export default function Hub() {
       )}
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      {signalSheetOpen && <SignalSheet onClose={() => setSignalSheetOpen(false)} />}
     </div>
   )
 }

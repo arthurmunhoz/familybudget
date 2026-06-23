@@ -191,3 +191,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-024-pet-profile-fields.sql (pet species/breed/birthday/photo/etc)
 --   migration-025-admin-recent-errors.sql (errors panel excludes testing noise)
 --   migration-026-push-subscriptions.sql (web push subscriptions for daily digest)
+--   migration-027-signals.sql (household one-tap signals + acks, realtime)
