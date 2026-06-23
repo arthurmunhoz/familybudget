@@ -9,7 +9,7 @@
 //   • On localhost the fetch handler is a no-op, so dev/HMR is unaffected.
 // Bump CACHE to invalidate everything on a breaking change.
 
-const CACHE = 'one-roof-shell-v2'
+const CACHE = 'one-roof-shell-v3'
 const SHELL = '/index.html'
 
 self.addEventListener('install', (event) => {
@@ -98,6 +98,15 @@ self.addEventListener('push', (event) => {
   // are ignored by iOS web-push today; the in-app Call button is the fallback.
   if (payload.tel) {
     options.actions = [{ action: 'call', title: '📞 Call' }]
+  }
+  // Urgent ("Need help"): make it sound, stay on screen, and vibrate. iOS uses
+  // the system default notification sound (custom sounds aren't supported on
+  // web push there); vibrate is honored on Android.
+  if (payload.urgent) {
+    options.silent = false
+    options.requireInteraction = true
+    options.vibrate = [300, 120, 300]
+    options.renotify = true
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })

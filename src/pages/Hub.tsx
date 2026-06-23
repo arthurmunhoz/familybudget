@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useHousehold } from '../hooks/useHousehold'
 import { useI18n } from '../hooks/useI18n'
+import { useNotificationsActive } from '../hooks/useNotificationsActive'
 import { ADMIN_APP } from '../lib/apps'
 import { todayISO } from '../lib/format'
 import type { TKey } from '../lib/i18n'
@@ -106,6 +107,20 @@ export default function Hub() {
     )
   }
 
+  // Subtle 🔕 on the pings/signals tile when this device can't receive alerts.
+  const notifActive = useNotificationsActive()
+  const PING_APP_IDS = ['signals', 'nudges', 'pings']
+  const alertsOffFor = (appId: string) =>
+    notifActive === false && PING_APP_IDS.includes(appId) ? (
+      <span
+        className="absolute left-2 top-2 text-xs opacity-70"
+        title={t('notif.alertsOff')}
+        aria-label={t('notif.alertsOff')}
+      >
+        🔕
+      </span>
+    ) : null
+
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
       <Backdrop />
@@ -144,6 +159,7 @@ export default function Hub() {
               className="relative flex flex-col items-center gap-1.5 rounded-xl bg-(--card) px-2 py-3.5 active:bg-(--card-active) transition-colors"
             >
               {badgeFor(app.id)}
+              {alertsOffFor(app.id)}
               <span className="text-2xl">{app.icon}</span>
               <span className="w-full truncate text-center text-xs font-semibold text-(--text)">
                 {t(`app.${app.id}.name` as TKey)}
@@ -160,6 +176,7 @@ export default function Hub() {
               className="relative flex flex-col items-start gap-1.5 rounded-2xl bg-(--card) p-5 text-left active:bg-(--card-active) transition-colors"
             >
               {badgeFor(app.id)}
+              {alertsOffFor(app.id)}
               <span className="text-3xl">{app.icon}</span>
               <span className="mt-1 font-bold text-(--text)">
                 {t(`app.${app.id}.name` as TKey)}

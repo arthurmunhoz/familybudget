@@ -84,6 +84,11 @@ export const en = {
   'drawer.notifDenied':
     'Notifications are blocked. Enable them for One Roof in your device settings.',
   'drawer.notifFailed': 'Could not update reminders — please try again.',
+  'notif.offTitle': 'Notifications are off',
+  'notif.offBody':
+    'Turn them on to get alerts on this device, including urgent ones.',
+  'notif.enable': 'Turn on notifications',
+  'notif.alertsOff': 'Alerts off',
   'drawer.signOut': 'Sign out',
   'drawer.backdropNotImage': 'Please choose an image.',
   'drawer.backdropTooBig': 'That image is too large — please pick one under 15 MB.',

@@ -36,7 +36,7 @@ export default async function handler(req: any, res: any) {
 
   const { data: signal } = await db
     .from('signals')
-    .select('id, household_id, sender_email, emoji, message, recipients')
+    .select('id, household_id, sender_email, kind, emoji, message, recipients')
     .eq('id', signal_id)
     .single()
   if (!signal) return res.status(404).json({ error: 'Signal not found' })
@@ -85,6 +85,8 @@ export default async function handler(req: any, res: any) {
     url: '/signals',
     tag: `signal-${signal.id}`,
     tel,
+    // "Need help" is urgent: sound + persistent + vibrate (where supported).
+    urgent: signal.kind === 'help',
   })
 
   let sent = 0

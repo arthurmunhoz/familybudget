@@ -84,6 +84,11 @@ export const es: Record<keyof typeof en, string> = {
   'drawer.notifDenied':
     'Las notificaciones están bloqueadas. Actívalas para One Roof en los ajustes de tu dispositivo.',
   'drawer.notifFailed': 'No se pudieron actualizar los recordatorios — inténtalo de nuevo.',
+  'notif.offTitle': 'Las notificaciones están desactivadas',
+  'notif.offBody':
+    'Actívalas para recibir alertas en este dispositivo, incluidas las urgentes.',
+  'notif.enable': 'Activar notificaciones',
+  'notif.alertsOff': 'Alertas desactivadas',
   'drawer.signOut': 'Cerrar sesión',
   'drawer.backdropNotImage': 'Por favor elige una imagen.',
   'drawer.backdropTooBig': 'Esa imagen es muy grande — elige una de menos de 15 MB.',

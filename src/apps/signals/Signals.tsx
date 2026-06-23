@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import NotificationsNudge from '../../components/NotificationsNudge'
 import SignalsBanner from '../../components/SignalsBanner'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
@@ -151,6 +152,9 @@ export default function Signals() {
           📣 {t('app.signals.name')}
         </h1>
       </header>
+
+      {/* prompt to turn on notifications when this device can't receive them */}
+      <NotificationsNudge />
 
       {/* incoming / active signals */}
       <SignalsBanner />

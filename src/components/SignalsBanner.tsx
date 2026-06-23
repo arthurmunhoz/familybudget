@@ -108,7 +108,9 @@ export default function SignalsBanner() {
         return (
           <div
             key={s.id}
-            className="flex items-center gap-3 rounded-2xl border-l-4 border-(--accent) bg-(--surface) py-2.5 pl-3 pr-3"
+            className={`flex items-center gap-3 rounded-2xl border-l-4 bg-(--surface) py-2.5 pl-3 pr-3 ${
+              s.kind === 'help' ? 'border-(--expense)' : 'border-(--accent)'
+            }`}
           >
             <span className="text-2xl">{s.emoji}</span>
             <div className="min-w-0 flex-1">
