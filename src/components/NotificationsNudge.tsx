@@ -34,23 +34,27 @@ export default function NotificationsNudge() {
     setBusy(false)
   }
 
+  // Shown under the button for the states where the OS prompt can't proceed
+  // (iOS needs the installed PWA; a prior "deny" must be cleared in settings).
+  const hint =
+    state === 'needs-install'
+      ? t('drawer.notifInstall')
+      : state === 'denied'
+        ? t('drawer.notifDenied')
+        : null
+
   return (
     <div className="mb-4 rounded-2xl border border-(--accent-soft) bg-(--card) p-4">
       <p className="font-semibold text-(--text)">🔔 {t('notif.offTitle')}</p>
       <p className="mt-1 text-sm text-(--text-faint)">{t('notif.offBody')}</p>
-      {state === 'needs-install' ? (
-        <p className="mt-2 text-xs text-(--text-faint)">{t('drawer.notifInstall')}</p>
-      ) : state === 'denied' ? (
-        <p className="mt-2 text-xs text-(--text-faint)">{t('drawer.notifDenied')}</p>
-      ) : (
-        <button
-          onClick={enable}
-          disabled={busy}
-          className="mt-3 w-full rounded-xl bg-(--accent) py-2.5 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
-        >
-          {busy ? t('drawer.working') : t('notif.enable')}
-        </button>
-      )}
+      <button
+        onClick={enable}
+        disabled={busy}
+        className="mt-3 w-full rounded-xl bg-(--accent) py-2.5 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+      >
+        {busy ? t('drawer.working') : t('notif.enable')}
+      </button>
+      {hint && <p className="mt-2 text-xs text-(--text-faint)">{hint}</p>}
     </div>
   )
 }

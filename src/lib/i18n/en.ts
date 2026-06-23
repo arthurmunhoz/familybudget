@@ -87,7 +87,7 @@ export const en = {
   'notif.offTitle': 'Notifications are off',
   'notif.offBody':
     'Turn them on to get alerts on this device, including urgent ones.',
-  'notif.enable': 'Turn on notifications',
+  'notif.enable': 'Enable notifications',
   'notif.alertsOff': 'Alerts off',
   'drawer.signOut': 'Sign out',
   'drawer.backdropNotImage': 'Please choose an image.',
