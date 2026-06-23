@@ -110,7 +110,12 @@ export default function DocumentVault() {
     () =>
       docs
         .filter((d) => filter === 'all' || d.category === filter)
-        .filter((d) => person === 'all' || d.owner_email === person),
+        .filter((d) => person === 'all' || d.owner_email === person)
+        // Alphabetical by title so similarly-named docs sit together (and each
+        // per-owner subsection is sorted, since the sections derive from this).
+        .sort((a, b) =>
+          a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }),
+        ),
     [docs, filter, person],
   )
 
