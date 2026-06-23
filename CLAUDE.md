@@ -34,8 +34,8 @@ this doc is the contract for every agent that follows you.
 ```
 api/scan-receipt.ts        Receipt photo → structured entry (Claude vision)
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
-api/send-signal.ts         Push a household signal to everyone but the sender
-api/suggest-signal.ts      Free text → {kind,emoji,message} signal (Claude)
+api/send-ping.ts         Push a household ping to everyone but the sender
+api/suggest-ping.ts      Free text → {kind,emoji,message} ping (Claude)
 public/                    Icons, manifest, family.jpg backdrop photo
   sw.js                    Service worker: push + offline app-shell cache
 src/
@@ -55,13 +55,13 @@ src/
     family/                Family (per-member profiles + avatars)
   components/              Shared: Backdrop, Drawer, AnalyticsTracker,
                            ErrorBoundary, VaultGate, NotificationsToggle,
-                           SignalSheet, SignalsBanner
+                           PingsBanner, NotificationsNudge
   hooks/                   useAuth, useBack, useTheme, useI18n, useHousehold,
                            useAppPrefs, useScrollLock
   lib/                     apps.ts (hub registry), types.ts, format.ts,
                            categories.ts, analytics.ts, biometric.ts,
-                           push.ts (web-push opt-in), signals.ts (household
-                           signals), i18n/ (en|es|pt dicts), image.ts,
+                           push.ts (web-push opt-in), pings.ts (household
+                           pings), i18n/ (en|es|pt dicts), image.ts,
                            signedUrls.ts, supabase.ts
 supabase/
   schema.sql               Original bootstrap — NOT standalone; see its footer
@@ -133,41 +133,41 @@ morning notification per household. Pieces:
   joining `user_settings.language`); single fixed send time; Hobby-plan crons
   fire once/day within ~the hour, not minute-precise.
 
-**Signals (household one-tap pings)**: a hub app (`/signals`, registered in
-`apps.ts`). The Signals page (`src/apps/signals/Signals.tsx`) has the composer:
+**Pings (household one-tap pings)**: a hub app (`/pings`, registered in
+`apps.ts`). The Pings page (`src/apps/pings/Pings.tsx`) has the composer:
 six one-tap presets, a recipient picker, and an AI "just type it" box.
-`SignalsBanner` shows active (non-expired) signals live with a 👍 ack + "seen
-by" names + a 📞 Call button — and is rendered on BOTH the Hub and the Signals
+`PingsBanner` shows active (non-expired) pings live with a 👍 ack + "seen
+by" names + a 📞 Call button — and is rendered on BOTH the Hub and the Pings
 page. Dismissal: the SENDER gets an ✕ to hide their own banner (persisted per
-device in `localStorage` `signals-dismissed:<email>`); RECIPIENTS auto-hide a
-signal 30s after their own ack (derived from the ack's `created_at`, re-checked
+device in `localStorage` `pings-dismissed:<email>`); RECIPIENTS auto-hide a
+ping 30s after their own ack (derived from the ack's `created_at`, re-checked
 by a 5s tick). Pieces:
-- `signals` + `signal_acks` tables (migration 027), RLS by household, Realtime.
-  Signals auto-expire 6h after creation (`expires_at`); banner filters on it.
-- `signals.recipients text[]` (migration 028): null = whole household, else a
-  list of member emails. The `signals_select` RLS makes targeted signals visible
+- `pings` + `ping_acks` tables (migration 027), RLS by household, Realtime.
+  Pings auto-expire 6h after creation (`expires_at`); banner filters on it.
+- `pings.recipients text[]` (migration 028): null = whole household, else a
+  list of member emails. The `pings_select` RLS makes targeted pings visible
   only to recipients + sender. `🆘 help` ALWAYS sends to everyone (forced in the
   page's `recipientsFor`).
-- The Signals page lists presets one-per-line (full-width, no truncation); each
+- The Pings page lists presets one-per-line (full-width, no truncation); each
   row has a grip handle to drag-reorder (Pointer Events + pointer-capture +
   `touch-none`, so it works on the iOS PWA). The order is saved per device in
-  `localStorage` (`signals-order:<email>`). The `help` row has a red border
+  `localStorage` (`pings-order:<email>`). The `help` row has a red border
   (`border-(--expense)`) to stand out; others use `border-transparent` to keep
   heights aligned.
-- `src/lib/signals.ts` — `SIGNAL_PRESETS` (kind+emoji; human text is the i18n
-  key `signals.preset.<kind>`), `sendSignal(kind,emoji,msg,recipients)`,
-  `sendCustomSignal(text,recipients)` (AI), `ackSignal`, `fetchActiveSignals`,
+- `src/lib/pings.ts` — `PING_PRESETS` (kind+emoji; human text is the i18n
+  key `pings.preset.<kind>`), `sendPing(kind,emoji,msg,recipients)`,
+  `sendCustomPing(text,recipients)` (AI), `ackPing`, `fetchActivePings`,
   `fetchMemberPhones` (for the Call button).
 - Send flow: client INSERTs under RLS (household + sender stamped by defaults),
-  then calls `api/send-signal` with the id; that function (service role) verifies
+  then calls `api/send-ping` with the id; that function (service role) verifies
   the caller shares the household and pushes to the recipients (or all but the
   sender). It also attaches the sender's `tel` from `member_profiles` so the push
   carries a Call action. Push failures are swallowed — Realtime shows it anyway.
-- `api/suggest-signal` — Claude Haiku maps free text → `{kind, emoji, message}`
+- `api/suggest-ping` — Claude Haiku maps free text → `{kind, emoji, message}`
   in the user's language; reuses `ANTHROPIC_API_KEY`. No new env vars.
 - Call button: `public/sw.js` adds a `call` notification action + `tel:` handler.
   iOS web-push IGNORES notification action buttons, so the in-app 📞 Call button
-  in `SignalsBanner` (shown when the sender has a Family phone) is the reliable
+  in `PingsBanner` (shown when the sender has a Family phone) is the reliable
   path on iPhone; the notification action only works on Android/desktop.
 
 **Data fetching — cache to avoid the "blink"**: screens re-mount on every

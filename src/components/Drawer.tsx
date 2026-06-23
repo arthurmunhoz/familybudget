@@ -214,7 +214,7 @@ export default function Drawer({
                   }`}
                 >
                   <button
-                    aria-label={t('signals.reorder')}
+                    aria-label={t('pings.reorder')}
                     onPointerDown={(e) => startAppDrag(e, index)}
                     onPointerMove={onAppDrag}
                     onPointerUp={endAppDrag}

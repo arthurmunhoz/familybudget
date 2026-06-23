@@ -143,7 +143,7 @@ export interface MemberProfile {
   updated_at: string
 }
 
-export interface Signal {
+export interface Ping {
   id: string
   household_id: string
   sender_email: string
@@ -156,8 +156,8 @@ export interface Signal {
   expires_at: string
 }
 
-export interface SignalAck {
-  signal_id: string
+export interface PingAck {
+  ping_id: string
   user_email: string
   created_at: string
 }

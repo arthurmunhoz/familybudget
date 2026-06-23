@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import NotificationsNudge from '../../components/NotificationsNudge'
-import SignalsBanner from '../../components/SignalsBanner'
+import PingsBanner from '../../components/PingsBanner'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
 import type { TKey } from '../../lib/i18n'
-import { SIGNAL_PRESETS, sendCustomSignal, sendSignal } from '../../lib/signals'
+import { PING_PRESETS, sendCustomPing, sendPing } from '../../lib/pings'
 
-/** Signals app: compose a household ping. Pick recipients (default everyone),
- *  tap a preset or type free text (AI maps it). Active signals show up top via
+/** Pings app: compose a household ping. Pick recipients (default everyone),
+ *  tap a preset or type free text (AI maps it). Active pings show up top via
  *  the shared banner. "Need a hand" always goes to everyone. */
-export default function Signals() {
+export default function Pings() {
   const back = useBack()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
@@ -42,11 +42,11 @@ export default function Signals() {
 
   // --- preset ordering: drag the grip to reorder; saved per device. ---
   const presetByKind = useMemo(
-    () => Object.fromEntries(SIGNAL_PRESETS.map((p) => [p.kind, p])),
+    () => Object.fromEntries(PING_PRESETS.map((p) => [p.kind, p])),
     [],
   )
-  const storageKey = `signals-order:${myEmail ?? ''}`
-  const [order, setOrder] = useState<string[]>(() => SIGNAL_PRESETS.map((p) => p.kind))
+  const storageKey = `pings-order:${myEmail ?? ''}`
+  const [order, setOrder] = useState<string[]>(() => PING_PRESETS.map((p) => p.kind))
   const orderRef = useRef(order)
   orderRef.current = order
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -58,7 +58,7 @@ export default function Signals() {
       const raw = localStorage.getItem(storageKey)
       if (!raw) return
       const saved = (JSON.parse(raw) as string[]).filter((k) => k in presetByKind)
-      const all = SIGNAL_PRESETS.map((p) => p.kind)
+      const all = PING_PRESETS.map((p) => p.kind)
       setOrder([...saved, ...all.filter((k) => !saved.includes(k))])
     } catch {
       // ignore bad/missing storage
@@ -109,19 +109,19 @@ export default function Signals() {
   }
 
   const toLabel = everyone
-    ? t('signals.everyone')
+    ? t('pings.everyone')
     : members
         .filter((m) => selected.has(m.email))
         .map((m) => m.display_name)
-        .join(', ') || t('signals.everyone')
+        .join(', ') || t('pings.everyone')
 
   async function preset(kind: string, emoji: string) {
     if (sending) return
     setBusyKind(kind)
     try {
-      await sendSignal(kind, emoji, t(`signals.preset.${kind}` as TKey), recipientsFor(kind))
+      await sendPing(kind, emoji, t(`pings.preset.${kind}` as TKey), recipientsFor(kind))
     } catch {
-      alert(t('signals.failed'))
+      alert(t('pings.failed'))
     }
     setBusyKind(null)
   }
@@ -131,10 +131,10 @@ export default function Signals() {
     if (!value || sending) return
     setAiBusy(true)
     try {
-      await sendCustomSignal(value, recipientsFor('custom'))
+      await sendCustomPing(value, recipientsFor('custom'))
       setText('')
     } catch {
-      alert(t('signals.failed'))
+      alert(t('pings.failed'))
     }
     setAiBusy(false)
   }
@@ -149,15 +149,15 @@ export default function Signals() {
           ‹
         </button>
         <h1 className="flex-1 text-2xl font-bold text-(--text)">
-          📣 {t('app.signals.name')}
+          📣 {t('app.pings.name')}
         </h1>
       </header>
 
       {/* prompt to turn on notifications when this device can't receive them */}
       <NotificationsNudge />
 
-      {/* incoming / active signals */}
-      <SignalsBanner />
+      {/* incoming / active pings */}
+      <PingsBanner />
 
       {/* recipient picker (hidden when there's nobody else to target) */}
       {members.length > 0 && (
@@ -166,7 +166,7 @@ export default function Signals() {
             onClick={() => setPickerOpen((v) => !v)}
             className="flex w-full items-center gap-2 rounded-xl bg-(--card) px-4 py-3 text-left"
           >
-            <span className="text-(--text-faint)">{t('signals.to')}</span>
+            <span className="text-(--text-faint)">{t('pings.to')}</span>
             <span className="min-w-0 flex-1 truncate font-semibold text-(--text)">
               {toLabel}
             </span>
@@ -179,7 +179,7 @@ export default function Signals() {
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left"
               >
                 <span className="flex-1 text-sm font-semibold text-(--text)">
-                  {t('signals.everyone')}
+                  {t('pings.everyone')}
                 </span>
                 {everyone && <span className="text-(--accent)">✓</span>}
               </button>
@@ -203,7 +203,7 @@ export default function Signals() {
         </div>
       )}
 
-      {/* preset signals — one per line, drag the grip to reorder */}
+      {/* preset pings — one per line, drag the grip to reorder */}
       <div className="space-y-2.5">
         {order.map((kind, index) => {
           const p = presetByKind[kind]
@@ -227,12 +227,12 @@ export default function Signals() {
               >
                 <span className="text-2xl">{busyKind === p.kind ? '…' : p.emoji}</span>
                 <span className="font-semibold text-(--text)">
-                  {t(`signals.preset.${p.kind}` as TKey)}
+                  {t(`pings.preset.${p.kind}` as TKey)}
                 </span>
               </button>
               <span
                 role="button"
-                aria-label={t('signals.reorder')}
+                aria-label={t('pings.reorder')}
                 onPointerDown={(e) => startDrag(e, index)}
                 onPointerMove={onDrag}
                 onPointerUp={endDrag}
@@ -251,7 +251,7 @@ export default function Signals() {
       {/* AI free-text */}
       <div className="my-4 flex items-center gap-3 text-xs text-(--text-faint)">
         <span className="h-px flex-1 bg-(--surface-2)" />
-        {t('signals.or')}
+        {t('pings.or')}
         <span className="h-px flex-1 bg-(--surface-2)" />
       </div>
 
@@ -262,7 +262,7 @@ export default function Signals() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') sendAI()
           }}
-          placeholder={t('signals.aiPlaceholder')}
+          placeholder={t('pings.aiPlaceholder')}
           disabled={aiBusy}
           className="min-w-0 flex-1 rounded-xl bg-(--card) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent) disabled:opacity-50"
         />
@@ -271,10 +271,10 @@ export default function Signals() {
           disabled={!text.trim() || sending}
           className="shrink-0 rounded-xl bg-(--accent) px-4 font-bold text-white disabled:opacity-50"
         >
-          {aiBusy ? '…' : t('signals.send')}
+          {aiBusy ? '…' : t('pings.send')}
         </button>
       </div>
-      <p className="mt-2 text-xs text-(--text-faint)">✨ {t('signals.aiHint')}</p>
+      <p className="mt-2 text-xs text-(--text-faint)">✨ {t('pings.aiHint')}</p>
     </div>
   )
 }

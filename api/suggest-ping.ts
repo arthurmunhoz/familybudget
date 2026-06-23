@@ -1,19 +1,19 @@
 // Vercel serverless: turn a family member's free-text note into a household
-// "signal" — {kind, emoji, message}. Used by the Signals sheet's "just type it"
+// "ping" — {kind, emoji, message}. Used by the Pings sheet's "just type it"
 // box. Auth: the caller must send a valid Supabase JWT (don't burn AI credits
 // for strangers). Uses a small/fast model — this is a trivial mapping task.
 import Anthropic from '@anthropic-ai/sdk'
 
 const KINDS = ['help', 'omw', 'late', 'dinner', 'grab', 'love', 'custom'] as const
 
-const SIGNAL_SCHEMA = {
+const PING_SCHEMA = {
   type: 'object',
   properties: {
     kind: {
       type: 'string',
       enum: [...KINDS],
       description:
-        "Closest signal kind: help=needs a hand, omw=on my way/heading home, late=running late, dinner=food/meal is ready, grab=asking someone to buy or bring something, love=affection or checking in, custom=anything else.",
+        "Closest ping kind: help=needs a hand, omw=on my way/heading home, late=running late, dinner=food/meal is ready, grab=asking someone to buy or bring something, love=affection or checking in, custom=anything else.",
     },
     emoji: { type: 'string', description: 'A single emoji that fits the message.' },
     message: {
@@ -47,7 +47,7 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'Missing text' })
   }
   if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'AI signals are not configured.' })
+    return res.status(500).json({ error: 'AI pings are not configured.' })
   }
 
   try {
@@ -62,7 +62,7 @@ export default async function handler(req: any, res: any) {
             {
               type: 'text',
               text: [
-                'Convert this short note from a family member into a household "signal" —',
+                'Convert this short note from a family member into a household "ping" —',
                 'a quick ping the rest of the household will see on their phones.',
                 'Pick the closest kind, a fitting single emoji, and a concise message',
                 'in the SAME language as the note.',
@@ -74,13 +74,13 @@ export default async function handler(req: any, res: any) {
         },
       ],
       output_config: {
-        format: { type: 'json_schema', schema: SIGNAL_SCHEMA },
+        format: { type: 'json_schema', schema: PING_SCHEMA },
       },
     })
 
     const block = response.content.find((b) => b.type === 'text')
     if (!block || block.type !== 'text') {
-      return res.status(502).json({ error: 'Could not build the signal.' })
+      return res.status(502).json({ error: 'Could not build the ping.' })
     }
     const parsed = JSON.parse(block.text)
     return res.status(200).json({
@@ -92,6 +92,6 @@ export default async function handler(req: any, res: any) {
     if (err instanceof Anthropic.APIError && /credit balance|billing/i.test(err.message ?? '')) {
       return res.status(502).json({ error: 'AI is paused — out of credits.' })
     }
-    return res.status(502).json({ error: 'Could not build the signal — try a preset.' })
+    return res.status(502).json({ error: 'Could not build the ping — try a preset.' })
   }
 }

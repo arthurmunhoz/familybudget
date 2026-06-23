@@ -1,12 +1,12 @@
-// Household signals: one-tap pings shown live on every member's Hub and pushed
+// Household pings: one-tap pings shown live on every member's Hub and pushed
 // to their phones. Insert goes through RLS (household + sender stamped by column
-// defaults); the push is a best-effort call to api/send-signal.
+// defaults); the push is a best-effort call to api/send-ping.
 import { supabase } from './supabase'
-import type { Signal, SignalAck } from './types'
+import type { Ping, PingAck } from './types'
 
-// Preset signals. `emoji` is stored on the row; the human text is localized at
-// send time (i18n key `signals.preset.<kind>`) so the banner/push read nicely.
-export const SIGNAL_PRESETS = [
+// Preset pings. `emoji` is stored on the row; the human text is localized at
+// send time (i18n key `pings.preset.<kind>`) so the banner/push read nicely.
+export const PING_PRESETS = [
   { kind: 'help', emoji: '🆘' },
   { kind: 'omw', emoji: '🚗' },
   { kind: 'late', emoji: '⏰' },
@@ -15,36 +15,36 @@ export const SIGNAL_PRESETS = [
   { kind: 'love', emoji: '👋' },
 ] as const
 
-export type SignalPreset = (typeof SIGNAL_PRESETS)[number]
-export type ActiveSignal = Signal & { acks: SignalAck[] }
+export type PingPreset = (typeof PING_PRESETS)[number]
+export type ActivePing = Ping & { acks: PingAck[] }
 
 async function authToken(): Promise<string> {
   const { data } = await supabase.auth.getSession()
   return data.session?.access_token ?? ''
 }
 
-/** Insert a signal (RLS stamps household + sender) then fire the household push.
+/** Insert a ping (RLS stamps household + sender) then fire the household push.
  *  `recipients` null = whole household; otherwise only those member emails.
- *  Push failures are swallowed — the signal is already saved and shows up live
+ *  Push failures are swallowed — the ping is already saved and shows up live
  *  via Realtime regardless. */
-export async function sendSignal(
+export async function sendPing(
   kind: string,
   emoji: string,
   message: string,
   recipients: string[] | null = null,
 ): Promise<void> {
   const { data, error } = await supabase
-    .from('signals')
+    .from('pings')
     .insert({ kind, emoji, message, recipients })
     .select()
     .single()
-  if (error || !data) throw error ?? new Error('Could not send signal')
+  if (error || !data) throw error ?? new Error('Could not send ping')
   try {
     const token = await authToken()
-    await fetch('/api/send-signal', {
+    await fetch('/api/send-ping', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ signal_id: data.id }),
+      body: JSON.stringify({ ping_id: data.id }),
     })
   } catch {
     // best-effort push only
@@ -54,12 +54,12 @@ export async function sendSignal(
 /** AI: map free text → {kind, emoji, message} in the user's language, then send
  *  to `recipients` (null = whole household). Returns what was sent so the UI can
  *  show a brief confirmation. */
-export async function sendCustomSignal(
+export async function sendCustomPing(
   text: string,
   recipients: string[] | null = null,
 ): Promise<{ emoji: string; message: string }> {
   const token = await authToken()
-  const res = await fetch('/api/suggest-signal', {
+  const res = await fetch('/api/suggest-ping', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ text }),
@@ -69,7 +69,7 @@ export async function sendCustomSignal(
   const emoji = (result.emoji || '📣').trim()
   const message = (result.message || text).trim()
   const kind = result.kind || 'custom'
-  await sendSignal(kind, emoji, message, recipients)
+  await sendPing(kind, emoji, message, recipients)
   return { emoji, message }
 }
 
@@ -84,32 +84,32 @@ export async function fetchMemberPhones(): Promise<Record<string, string>> {
   return out
 }
 
-/** Record that the current user saw/acknowledged a signal. */
-export async function ackSignal(signalId: string): Promise<void> {
-  await supabase.from('signal_acks').insert({ signal_id: signalId })
+/** Record that the current user saw/acknowledged a ping. */
+export async function ackPing(pingId: string): Promise<void> {
+  await supabase.from('ping_acks').insert({ ping_id: pingId })
 }
 
-/** Active (non-expired) signals for the household, newest first, each with its
+/** Active (non-expired) pings for the household, newest first, each with its
  *  acks attached for the "seen by" count. */
-export async function fetchActiveSignals(): Promise<ActiveSignal[]> {
+export async function fetchActivePings(): Promise<ActivePing[]> {
   const nowISO = new Date().toISOString()
   const { data: sigs } = await supabase
-    .from('signals')
+    .from('pings')
     .select('*')
     .gt('expires_at', nowISO)
     .order('created_at', { ascending: false })
-  const signals = (sigs ?? []) as Signal[]
-  if (!signals.length) return []
+  const pings = (sigs ?? []) as Ping[]
+  if (!pings.length) return []
   const { data: acks } = await supabase
-    .from('signal_acks')
+    .from('ping_acks')
     .select('*')
     .in(
-      'signal_id',
-      signals.map((s) => s.id),
+      'ping_id',
+      pings.map((s) => s.id),
     )
-  const ackList = (acks ?? []) as SignalAck[]
-  return signals.map((s) => ({
+  const ackList = (acks ?? []) as PingAck[]
+  return pings.map((s) => ({
     ...s,
-    acks: ackList.filter((a) => a.signal_id === s.id),
+    acks: ackList.filter((a) => a.ping_id === s.id),
   }))
 }

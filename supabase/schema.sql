@@ -194,3 +194,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-027-signals.sql (household one-tap signals + acks, realtime)
 --   migration-028-signal-recipients.sql (per-signal recipient targeting)
 --   migration-029-app-order.sql (per-user hub app ordering)
+--   migration-030-rename-signals-to-pings.sql (Signals → Pings, +compat views)

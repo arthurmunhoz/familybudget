@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
-import SignalsBanner from '../components/SignalsBanner'
+import PingsBanner from '../components/PingsBanner'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -107,13 +107,13 @@ export default function Hub() {
     )
   }
 
-  // Subtle 🔕 on the pings/signals tile when this device can't receive alerts.
+  // Subtle 🔕 on the pings/pings tile when this device can't receive alerts.
   const notifActive = useNotificationsActive()
-  const PING_APP_IDS = ['signals', 'nudges', 'pings']
+  const PING_APP_IDS = ['pings']
   const alertsOffFor = (appId: string) =>
     notifActive === false && PING_APP_IDS.includes(appId) ? (
       <span
-        className="absolute left-2 top-2 text-xs opacity-70"
+        className="absolute left-2 top-2 text-xs opacity-50 grayscale"
         title={t('notif.alertsOff')}
         aria-label={t('notif.alertsOff')}
       >
@@ -142,7 +142,7 @@ export default function Hub() {
         </button>
       </header>
 
-      <SignalsBanner />
+      <PingsBanner />
 
       {tiles.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
@@ -160,8 +160,8 @@ export default function Hub() {
             >
               {badgeFor(app.id)}
               {alertsOffFor(app.id)}
-              <span className="text-2xl">{app.icon}</span>
-              <span className="w-full truncate text-center text-xs font-semibold text-(--text)">
+              <span className="text-xl">{app.icon}</span>
+              <span className="w-full text-center text-[11px] font-semibold leading-tight text-(--text)">
                 {t(`app.${app.id}.name` as TKey)}
               </span>
             </button>

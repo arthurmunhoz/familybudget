@@ -4,28 +4,28 @@ import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
 import { timeAgo } from '../lib/format'
 import {
-  ackSignal,
-  fetchActiveSignals,
+  ackPing,
+  fetchActivePings,
   fetchMemberPhones,
-  type ActiveSignal,
-} from '../lib/signals'
+  type ActivePing,
+} from '../lib/pings'
 import { supabase } from '../lib/supabase'
 
-/** Live banner of active household signals on the Hub. Updates in real time as
- *  signals arrive and as members acknowledge them. */
-export default function SignalsBanner() {
+/** Live banner of active household pings on the Hub. Updates in real time as
+ *  pings arrive and as members acknowledge them. */
+export default function PingsBanner() {
   const { profile, profiles } = useAuth()
   const { t } = useI18n()
   const myEmail = profile?.email
   // Cached so it doesn't flash on every Hub remount; revalidated by Realtime.
-  const { data: signals = [], revalidate } = useCachedQuery<ActiveSignal[]>(
-    'signals:active',
-    fetchActiveSignals,
+  const { data: pings = [], revalidate } = useCachedQuery<ActivePing[]>(
+    'pings:active',
+    fetchActivePings,
   )
-  // Phone numbers (from the Family feature) → a "Call" button on signals whose
+  // Phone numbers (from the Family feature) → a "Call" button on pings whose
   // sender has a number saved.
   const { data: phones = {} } = useCachedQuery<Record<string, string>>(
-    'signals:phones',
+    'pings:phones',
     fetchMemberPhones,
   )
   // Optimistic ack: hide the button immediately, before the round-trip lands.
@@ -33,7 +33,7 @@ export default function SignalsBanner() {
 
   // The sender can dismiss their own banner (persisted per device). Recipients
   // don't dismiss manually — their banner auto-hides 30s after they ack.
-  const dismissKey = `signals-dismissed:${myEmail ?? ''}`
+  const dismissKey = `pings-dismissed:${myEmail ?? ''}`
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
     try {
       return new Set(JSON.parse(localStorage.getItem(dismissKey) || '[]') as string[])
@@ -61,15 +61,15 @@ export default function SignalsBanner() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('hub_signals')
+      .channel('hub_pings')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'signals' },
+        { event: '*', schema: 'public', table: 'pings' },
         () => revalidate(),
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'signal_acks' },
+        { event: '*', schema: 'public', table: 'ping_acks' },
         () => revalidate(),
       )
       .subscribe()
@@ -81,7 +81,7 @@ export default function SignalsBanner() {
   // Hide: sender-dismissed (mine), or 30s past my own ack (recipient).
   const ACK_GRACE_MS = 30_000
   const nowMs = Date.now()
-  const visible = signals.filter((s) => {
+  const visible = pings.filter((s) => {
     if (s.sender_email === myEmail) return !dismissed.has(s.id)
     const myAck = s.acks.find((a) => a.user_email === myEmail)
     return !(myAck && nowMs - Date.parse(myAck.created_at) > ACK_GRACE_MS)
@@ -90,12 +90,12 @@ export default function SignalsBanner() {
 
   const senderName = (email: string) =>
     email === myEmail
-      ? t('signals.you')
+      ? t('pings.you')
       : (profiles.find((p) => p.email === email)?.display_name ?? email.split('@')[0])
 
   async function ack(id: string) {
     setAckedLocal((s) => new Set(s).add(id))
-    await ackSignal(id)
+    await ackPing(id)
     revalidate()
   }
 
@@ -117,7 +117,7 @@ export default function SignalsBanner() {
               <p className="truncate font-semibold text-(--text)">{s.message}</p>
               <p className="truncate text-xs text-(--text-faint)">
                 {senderName(s.sender_email)} · {timeAgo(s.created_at)}
-                {mine && ackNames && ` · ${t('signals.seenBy', { names: ackNames })}`}
+                {mine && ackNames && ` · ${t('pings.seenBy', { names: ackNames })}`}
               </p>
             </div>
             {!mine && (
@@ -127,19 +127,19 @@ export default function SignalsBanner() {
                     href={`tel:${phones[s.sender_email]}`}
                     className="rounded-full bg-(--expense) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
                   >
-                    📞 {t('signals.call')}
+                    📞 {t('pings.call')}
                   </a>
                 )}
                 {acked ? (
                   <span className="text-xs font-semibold text-(--text-faint)">
-                    ✓ {t('signals.acked')}
+                    ✓ {t('pings.acked')}
                   </span>
                 ) : (
                   <button
                     onClick={() => ack(s.id)}
                     className="rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
                   >
-                    👍 {t('signals.gotIt')}
+                    👍 {t('pings.gotIt')}
                   </button>
                 )}
               </div>
