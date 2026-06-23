@@ -34,6 +34,8 @@ this doc is the contract for every agent that follows you.
 ```
 api/scan-receipt.ts        Receipt photo → structured entry (Claude vision)
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
+api/send-signal.ts         Push a household signal to everyone but the sender
+api/suggest-signal.ts      Free text → {kind,emoji,message} signal (Claude)
 public/                    Icons, manifest, family.jpg backdrop photo
   sw.js                    Service worker: push + offline app-shell cache
 src/
@@ -52,13 +54,15 @@ src/
     dates/                 ImportantDates (birthday/renewal countdowns)
     family/                Family (per-member profiles + avatars)
   components/              Shared: Backdrop, Drawer, AnalyticsTracker,
-                           ErrorBoundary, VaultGate, NotificationsToggle
+                           ErrorBoundary, VaultGate, NotificationsToggle,
+                           SignalSheet, SignalsBanner
   hooks/                   useAuth, useBack, useTheme, useI18n, useHousehold,
                            useAppPrefs, useScrollLock
   lib/                     apps.ts (hub registry), types.ts, format.ts,
                            categories.ts, analytics.ts, biometric.ts,
-                           push.ts (web-push opt-in), i18n/ (en|es|pt dicts),
-                           image.ts, signedUrls.ts, supabase.ts
+                           push.ts (web-push opt-in), signals.ts (household
+                           signals), i18n/ (en|es|pt dicts), image.ts,
+                           signedUrls.ts, supabase.ts
 supabase/
   schema.sql               Original bootstrap — NOT standalone; see its footer
   migration-NNN-*.sql      One file per applied migration, in order
@@ -128,6 +132,24 @@ morning notification per household. Pieces:
 - KNOWN v1 limits: digest text is English for all users (localize later by
   joining `user_settings.language`); single fixed send time; Hobby-plan crons
   fire once/day within ~the hour, not minute-precise.
+
+**Signals (household one-tap pings)**: a Hub-level feature (not an app tile).
+The 📣 button in the Hub header opens `SignalSheet` — six one-tap presets plus
+an AI "just type it" box. `SignalsBanner` (under the Hub header) shows active
+(non-expired) signals live with a 👍 ack + "seen by" count. Pieces:
+- `signals` + `signal_acks` tables (migration 027), RLS by household, Realtime
+  enabled. Signals auto-expire 6h after creation (`expires_at`); the banner
+  filters on `expires_at > now()`.
+- `src/lib/signals.ts` — `SIGNAL_PRESETS` (kind+emoji; the human text is the
+  i18n key `signals.preset.<kind>` resolved at send time), `sendSignal`,
+  `sendCustomSignal` (AI), `ackSignal`, `fetchActiveSignals`.
+- Send flow: client INSERTs the signal under RLS (household + sender stamped by
+  column defaults), then calls `api/send-signal` with the new id; that function
+  (service role) verifies the caller shares the household and pushes to everyone
+  EXCEPT the sender. Push failures are swallowed — Realtime shows it regardless.
+- `api/suggest-signal` — Claude Haiku maps free text → `{kind, emoji, message}`
+  in the user's language; reuses `ANTHROPIC_API_KEY`. No new env vars for either
+  endpoint (they reuse the digest's VAPID + service-role config).
 
 **Data fetching — cache to avoid the "blink"**: screens re-mount on every
 navigation, so fetching from empty state flashes (0 → real value). Use
