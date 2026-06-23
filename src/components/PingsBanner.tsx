@@ -32,7 +32,7 @@ export default function PingsBanner() {
   const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
 
   // The sender can dismiss their own banner (persisted per device). Recipients
-  // don't dismiss manually — their banner auto-hides 30s after they ack.
+  // don't dismiss manually — their banner disappears the moment they ack.
   const dismissKey = `pings-dismissed:${myEmail ?? ''}`
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
     try {
@@ -52,13 +52,6 @@ export default function PingsBanner() {
       return next
     })
   }
-  // Re-render every few seconds so the 30s post-ack auto-hide kicks in on time.
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), 5000)
-    return () => clearInterval(id)
-  }, [])
-
   useEffect(() => {
     const channel = supabase
       .channel('hub_pings')
@@ -78,13 +71,10 @@ export default function PingsBanner() {
     }
   }, [revalidate])
 
-  // Hide: sender-dismissed (mine), or 30s past my own ack (recipient).
-  const ACK_GRACE_MS = 30_000
-  const nowMs = Date.now()
+  // Hide: sender-dismissed (mine), or acked (recipient — disappears at once).
   const visible = pings.filter((s) => {
     if (s.sender_email === myEmail) return !dismissed.has(s.id)
-    const myAck = s.acks.find((a) => a.user_email === myEmail)
-    return !(myAck && nowMs - Date.parse(myAck.created_at) > ACK_GRACE_MS)
+    return !(ackedLocal.has(s.id) || s.acks.some((a) => a.user_email === myEmail))
   })
   if (visible.length === 0) return null
 
@@ -103,7 +93,6 @@ export default function PingsBanner() {
     <div className="mb-4 space-y-2">
       {visible.map((s) => {
         const mine = s.sender_email === myEmail
-        const acked = ackedLocal.has(s.id) || s.acks.some((a) => a.user_email === myEmail)
         const ackNames = s.acks.map((a) => senderName(a.user_email)).join(', ')
         return (
           <div
@@ -130,18 +119,12 @@ export default function PingsBanner() {
                     📞 {t('pings.call')}
                   </a>
                 )}
-                {acked ? (
-                  <span className="text-xs font-semibold text-(--text-faint)">
-                    ✓ {t('pings.acked')}
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => ack(s.id)}
-                    className="rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
-                  >
-                    👍 {t('pings.gotIt')}
-                  </button>
-                )}
+                <button
+                  onClick={() => ack(s.id)}
+                  className="rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
+                >
+                  👍 {t('pings.gotIt')}
+                </button>
               </div>
             )}
             {mine && (
