@@ -34,14 +34,9 @@ export default function NotificationsNudge() {
     setBusy(false)
   }
 
-  // Shown under the button for the states where the OS prompt can't proceed
-  // (iOS needs the installed PWA; a prior "deny" must be cleared in settings).
-  const hint =
-    state === 'needs-install'
-      ? t('drawer.notifInstall')
-      : state === 'denied'
-        ? t('drawer.notifDenied')
-        : null
+  // Only the iOS "add to Home Screen" hint is shown under the button; the
+  // "blocked in settings" message is intentionally omitted.
+  const hint = state === 'needs-install' ? t('drawer.notifInstall') : null
 
   return (
     <div className="mb-4 rounded-2xl border border-(--accent-soft) bg-(--card) p-4">
