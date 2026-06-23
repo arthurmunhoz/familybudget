@@ -16,9 +16,12 @@ const TYPE_ICON: Record<ImportantDateType, string> = {
 }
 const TYPES = Object.keys(TYPE_ICON) as ImportantDateType[]
 
+// App language → BCP-47 locale for Intl relative-time ("8 months ago" etc.).
+const LOCALES: Record<string, string> = { en: 'en', es: 'es', pt: 'pt-BR' }
+
 export default function ImportantDates() {
   const back = useBack()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const today = todayISO()
   const [dates, setDates] = useState<ImportantDate[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,15 +46,35 @@ export default function ImportantDates() {
     load()
   }, [load])
 
-  // Soonest first; expired one-time dates (negative days) bubble to the top.
+  // Upcoming first (soonest at top); past one-time dates sink to the bottom,
+  // most-recent first — kept for reference, not nagging at the top.
   const sorted = useMemo(
-    () => [...dates].sort((a, b) => daysUntil(a, today) - daysUntil(b, today)),
+    () =>
+      [...dates].sort((a, b) => {
+        const da = daysUntil(a, today)
+        const db = daysUntil(b, today)
+        const aPast = da < 0
+        const bPast = db < 0
+        if (aPast !== bPast) return aPast ? 1 : -1
+        return aPast ? db - da : da - db
+      }),
     [dates, today],
   )
 
-  function relLabel(d: ImportantDate): { text: string; tone: 'expired' | 'soon' | 'far' } {
+  function relLabel(d: ImportantDate): { text: string; tone: 'soon' | 'far' | 'past' } {
     const days = daysUntil(d, today)
-    if (days < 0) return { text: t('dates.expired', { days: -days }), tone: 'expired' }
+    if (days < 0) {
+      // Past one-time date: "28 days ago" / "8 months ago", localized for free.
+      const ago = -days
+      const rtf = new Intl.RelativeTimeFormat(LOCALES[lang] ?? 'en', { numeric: 'auto' })
+      const text =
+        ago < 45
+          ? rtf.format(-ago, 'day')
+          : ago < 365
+            ? rtf.format(-Math.round(ago / 30), 'month')
+            : rtf.format(-Math.round(ago / 365), 'year')
+      return { text, tone: 'past' }
+    }
     if (days === 0) return { text: t('dates.today'), tone: 'soon' }
     if (days === 1) return { text: t('dates.tomorrow'), tone: 'soon' }
     if (days <= 45) return { text: t('dates.inDays', { days }), tone: days <= 14 ? 'soon' : 'far' }
@@ -155,10 +178,10 @@ export default function ImportantDates() {
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                      rel.tone === 'expired'
-                        ? 'bg-(--expense) text-white'
-                        : rel.tone === 'soon'
-                          ? 'bg-(--accent) text-white'
+                      rel.tone === 'soon'
+                        ? 'bg-(--accent) text-white'
+                        : rel.tone === 'past'
+                          ? 'bg-(--surface) text-(--text-faint)'
                           : 'bg-(--surface) text-(--text-muted)'
                     }`}
                   >

@@ -32,6 +32,41 @@ type Subscription = {
   p256dh: string
   auth: string
   household_id: string
+  user_email: string
+}
+
+type Lang = 'en' | 'es' | 'pt'
+
+// Per-language label builders for the digest — content (pet/date names) stays
+// as the user typed it; only the surrounding wording is translated. Mirrors the
+// app's own i18n vocabulary.
+const I18N: Record<
+  Lang,
+  {
+    petLabel: (days: number) => string
+    dateLabel: (days: number) => string
+    remindersTitle: (n: number) => string
+  }
+> = {
+  en: {
+    petLabel: (d) => (d < 0 ? `overdue ${-d}d` : d === 0 ? 'due today' : `in ${d}d`),
+    dateLabel: (d) => (d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d}d`),
+    remindersTitle: (n) => `${n} reminders today`,
+  },
+  es: {
+    petLabel: (d) => (d < 0 ? `atrasado ${-d}d` : d === 0 ? 'para hoy' : `en ${d}d`),
+    dateLabel: (d) => (d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d}d`),
+    remindersTitle: (n) => `${n} recordatorios hoy`,
+  },
+  pt: {
+    petLabel: (d) => (d < 0 ? `atrasado ${-d}d` : d === 0 ? 'para hoje' : `em ${d}d`),
+    dateLabel: (d) => (d === 0 ? 'hoje' : d === 1 ? 'amanhã' : `em ${d}d`),
+    remindersTitle: (n) => `${n} lembretes hoje`,
+  },
+}
+
+function langOf(v: unknown): Lang {
+  return v === 'es' || v === 'pt' ? v : 'en'
 }
 
 const TYPE_ICON: Record<string, string> = {
@@ -89,18 +124,6 @@ function latestPerKey(events: PetEvent[]): PetEvent[] {
   return out
 }
 
-function overdueLabel(days: number): string {
-  if (days < 0) return `overdue ${-days}d`
-  if (days === 0) return 'due today'
-  return `in ${days}d`
-}
-
-function dueLabel(days: number): string {
-  if (days === 0) return 'today'
-  if (days === 1) return 'tomorrow'
-  return `in ${days}d`
-}
-
 export default async function handler(req: any, res: any) {
   // Only Vercel Cron (which sends the secret) may run this.
   const secret = process.env.CRON_SECRET
@@ -121,7 +144,7 @@ export default async function handler(req: any, res: any) {
   const today = todayUTC()
 
   // Pull everything once, then group in memory (the data set is tiny).
-  const [petsRes, eventsRes, datesRes, subsRes] = await Promise.all([
+  const [petsRes, eventsRes, datesRes, subsRes, settingsRes] = await Promise.all([
     db.from('pets').select('id, name, emoji, household_id'),
     db
       .from('pet_events')
@@ -131,13 +154,17 @@ export default async function handler(req: any, res: any) {
     db
       .from('important_dates')
       .select('household_id, title, type, event_date, repeats_annually'),
-    db.from('push_subscriptions').select('endpoint, p256dh, auth, household_id'),
+    db.from('push_subscriptions').select('endpoint, p256dh, auth, household_id, user_email'),
+    db.from('user_settings').select('email, language'),
   ])
 
   const pets = (petsRes.data ?? []) as Pet[]
   const events = (eventsRes.data ?? []) as PetEvent[]
   const dates = (datesRes.data ?? []) as ImportantDate[]
   const subs = (subsRes.data ?? []) as Subscription[]
+  // Each recipient gets the digest in their own chosen language (default en).
+  const settings = (settingsRes.data ?? []) as { email: string; language: string | null }[]
+  const langByEmail = new Map<string, Lang>(settings.map((r) => [r.email, langOf(r.language)]))
 
   const petById = new Map(pets.map((p) => [p.id, p]))
 
@@ -150,8 +177,11 @@ export default async function handler(req: any, res: any) {
     subsByHousehold.set(s.household_id, list)
   }
 
-  // Pet reminders due today or overdue, keyed by household.
-  const petLinesByHousehold = new Map<string, string[]>()
+  // Pet reminders due today or overdue, keyed by household. Stored as data so
+  // each line can be rendered in the recipient's language at send time.
+  type PetReminder = { icon: string; name: string; title: string; days: number }
+  type DateReminder = { icon: string; title: string; days: number }
+  const petRemindersByHousehold = new Map<string, PetReminder[]>()
   const dueEvents = latestPerKey(events).filter(
     (e) => e.next_due && e.next_due <= today,
   )
@@ -159,22 +189,20 @@ export default async function handler(req: any, res: any) {
     const pet = petById.get(e.pet_id)
     if (!pet) continue
     const days = daysBetween(today, e.next_due!)
-    const line = `${TYPE_ICON[e.type] ?? '📝'} ${pet.name} — ${e.title} (${overdueLabel(days)})`
-    const list = petLinesByHousehold.get(pet.household_id) ?? []
-    list.push(line)
-    petLinesByHousehold.set(pet.household_id, list)
+    const list = petRemindersByHousehold.get(pet.household_id) ?? []
+    list.push({ icon: TYPE_ICON[e.type] ?? '📝', name: pet.name, title: e.title, days })
+    petRemindersByHousehold.set(pet.household_id, list)
   }
 
   // Important-date reminders at the lead-day marks, keyed by household.
-  const dateLinesByHousehold = new Map<string, string[]>()
+  const dateRemindersByHousehold = new Map<string, DateReminder[]>()
   for (const d of dates) {
     const occ = nextOccurrence(d, today)
     const days = daysBetween(today, occ)
     if (!DATE_LEAD_DAYS.includes(days)) continue
-    const line = `${DATE_ICON[d.type] ?? '📅'} ${d.title} (${dueLabel(days)})`
-    const list = dateLinesByHousehold.get(d.household_id) ?? []
-    list.push(line)
-    dateLinesByHousehold.set(d.household_id, list)
+    const list = dateRemindersByHousehold.get(d.household_id) ?? []
+    list.push({ icon: DATE_ICON[d.type] ?? '📅', title: d.title, days })
+    dateRemindersByHousehold.set(d.household_id, list)
   }
 
   let sent = 0
@@ -182,20 +210,26 @@ export default async function handler(req: any, res: any) {
   const stale: string[] = []
 
   for (const [householdId, householdSubs] of subsByHousehold) {
-    const petLines = petLinesByHousehold.get(householdId) ?? []
-    const dateLines = dateLinesByHousehold.get(householdId) ?? []
-    const lines = [...petLines, ...dateLines]
-    if (lines.length === 0) continue
+    const petR = petRemindersByHousehold.get(householdId) ?? []
+    const dateR = dateRemindersByHousehold.get(householdId) ?? []
+    if (petR.length + dateR.length === 0) continue
     households++
 
-    const title =
-      lines.length === 1 ? '🏠 One Roof' : `🏠 ${lines.length} reminders today`
-    const body = lines.join('\n')
-    // Deep-link to the most relevant screen.
-    const link = petLines.length && dateLines.length ? '/' : petLines.length ? '/pets' : '/dates'
-    const payload = JSON.stringify({ title, body, url: link, tag: 'one-roof-digest' })
+    // Deep-link to the most relevant screen (same for everyone in the household).
+    const link = petR.length && dateR.length ? '/' : petR.length ? '/pets' : '/dates'
 
     for (const s of householdSubs) {
+      const L = I18N[langByEmail.get(s.user_email) ?? 'en']
+      const petLines = petR.map((r) => `${r.icon} ${r.name} — ${r.title} (${L.petLabel(r.days)})`)
+      const dateLines = dateR.map((r) => `${r.icon} ${r.title} (${L.dateLabel(r.days)})`)
+      const lines = [...petLines, ...dateLines]
+      const title = lines.length === 1 ? '🏠 One Roof' : `🏠 ${L.remindersTitle(lines.length)}`
+      const payload = JSON.stringify({
+        title,
+        body: lines.join('\n'),
+        url: link,
+        tag: 'one-roof-digest',
+      })
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },

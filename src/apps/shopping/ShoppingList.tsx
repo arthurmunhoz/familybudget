@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
@@ -82,13 +82,21 @@ export default function ShoppingList() {
     setLoading(false)
   }, [setItems, setStores])
 
+  // Coalesce the bursts of load() triggers (a mutation + its own Realtime echo,
+  // or several quick toggles) into a single fetch.
+  const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleLoad = useCallback(() => {
+    if (loadTimer.current) clearTimeout(loadTimer.current)
+    loadTimer.current = setTimeout(() => void load(), 300)
+  }, [load])
+
   // Initial load + live sync: any change made on the other phone re-fetches.
   useEffect(() => {
     load()
     const channel = supabase
       .channel('shopping_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_stores' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () => scheduleLoad())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_stores' }, () => scheduleLoad())
       .subscribe()
     // Back online → flush queued offline edits and pull fresh state.
     const onOnline = () => load()
@@ -96,8 +104,9 @@ export default function ShoppingList() {
     return () => {
       supabase.removeChannel(channel)
       window.removeEventListener('online', onOnline)
+      if (loadTimer.current) clearTimeout(loadTimer.current)
     }
-  }, [load])
+  }, [load, scheduleLoad])
 
   function selectStore(id: string | null) {
     setActiveStoreId(id)
@@ -129,26 +138,26 @@ export default function ShoppingList() {
     }
     setItems((list) => [...list, optimistic])
     enqueueOp({ k: 'item.add', tempId, label: trimmed, store_id: activeStoreId, added_by: profile.email })
-    void load()
+    scheduleLoad()
   }
 
   function toggle(item: ShoppingItem) {
     const checked = !item.checked
     setItems((list) => list.map((i) => (i.id === item.id ? { ...i, checked } : i)))
     enqueueOp({ k: 'item.toggle', id: item.id, checked })
-    void load()
+    scheduleLoad()
   }
 
   function remove(item: ShoppingItem) {
     setItems((list) => list.filter((i) => i.id !== item.id))
     enqueueOp({ k: 'item.remove', id: item.id })
-    void load()
+    scheduleLoad()
   }
 
   function clearChecked() {
     setItems((list) => list.filter((i) => !i.checked))
     enqueueOp({ k: 'item.clearChecked' })
-    void load()
+    scheduleLoad()
   }
 
   /** Build an offline-friendly store row with a temp id. */
@@ -177,7 +186,7 @@ export default function ShoppingList() {
     enqueueOp({ k: 'store.add', tempId: store.id, name: entry.name, slug: entry.slug })
     selectStore(store.id)
     setPicking(false)
-    void load()
+    scheduleLoad()
   }
 
   function addCustomStore() {
@@ -190,7 +199,7 @@ export default function ShoppingList() {
     enqueueOp({ k: 'store.add', tempId: store.id, name, slug: null })
     selectStore(store.id)
     setPicking(false)
-    void load()
+    scheduleLoad()
   }
 
   function removeStore(store: ShoppingStore) {
@@ -199,7 +208,7 @@ export default function ShoppingList() {
     setItems((prev) => prev.map((i) => (i.store_id === store.id ? { ...i, store_id: null } : i)))
     if (activeStoreId === store.id) selectStore(null)
     enqueueOp({ k: 'store.remove', id: store.id })
-    void load()
+    scheduleLoad()
   }
 
   // Build the visible groups: one per store (in store order) then "Anywhere",
