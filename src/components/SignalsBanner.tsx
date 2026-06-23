@@ -31,6 +31,34 @@ export default function SignalsBanner() {
   // Optimistic ack: hide the button immediately, before the round-trip lands.
   const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
 
+  // The sender can dismiss their own banner (persisted per device). Recipients
+  // don't dismiss manually — their banner auto-hides 30s after they ack.
+  const dismissKey = `signals-dismissed:${myEmail ?? ''}`
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(dismissKey) || '[]') as string[])
+    } catch {
+      return new Set()
+    }
+  })
+  function dismiss(id: string) {
+    setDismissed((prev) => {
+      const next = new Set(prev).add(id)
+      try {
+        localStorage.setItem(dismissKey, JSON.stringify([...next]))
+      } catch {
+        // ignore storage failures
+      }
+      return next
+    })
+  }
+  // Re-render every few seconds so the 30s post-ack auto-hide kicks in on time.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 5000)
+    return () => clearInterval(id)
+  }, [])
+
   useEffect(() => {
     const channel = supabase
       .channel('hub_signals')
@@ -50,7 +78,15 @@ export default function SignalsBanner() {
     }
   }, [revalidate])
 
-  if (signals.length === 0) return null
+  // Hide: sender-dismissed (mine), or 30s past my own ack (recipient).
+  const ACK_GRACE_MS = 30_000
+  const nowMs = Date.now()
+  const visible = signals.filter((s) => {
+    if (s.sender_email === myEmail) return !dismissed.has(s.id)
+    const myAck = s.acks.find((a) => a.user_email === myEmail)
+    return !(myAck && nowMs - Date.parse(myAck.created_at) > ACK_GRACE_MS)
+  })
+  if (visible.length === 0) return null
 
   const senderName = (email: string) =>
     email === myEmail
@@ -65,7 +101,7 @@ export default function SignalsBanner() {
 
   return (
     <div className="mb-4 space-y-2">
-      {signals.map((s) => {
+      {visible.map((s) => {
         const mine = s.sender_email === myEmail
         const acked = ackedLocal.has(s.id) || s.acks.some((a) => a.user_email === myEmail)
         const ackNames = s.acks.map((a) => senderName(a.user_email)).join(', ')
@@ -105,6 +141,15 @@ export default function SignalsBanner() {
                   </button>
                 )}
               </div>
+            )}
+            {mine && (
+              <button
+                onClick={() => dismiss(s.id)}
+                aria-label={t('common.close')}
+                className="shrink-0 px-1 text-lg text-(--text-faint) active:text-(--text)"
+              >
+                ✕
+              </button>
             )}
           </div>
         )

@@ -28,7 +28,6 @@ export const es: Record<keyof typeof en, string> = {
   'signals.everyone': 'Todos',
   'signals.call': 'Llamar',
   'signals.reorder': 'Arrastra para reordenar',
-  'signals.helpNote': '«Necesito ayuda» siempre se envía a todos.',
   'signals.gotIt': 'Entendido',
   'signals.acked': 'Entendido',
   'signals.seenBy': 'visto por {names}',

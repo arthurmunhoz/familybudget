@@ -137,8 +137,11 @@ morning notification per household. Pieces:
 `apps.ts`). The Signals page (`src/apps/signals/Signals.tsx`) has the composer:
 six one-tap presets, a recipient picker, and an AI "just type it" box.
 `SignalsBanner` shows active (non-expired) signals live with a 👍 ack + "seen
-by" count + a 📞 Call button — and is rendered on BOTH the Hub and the Signals
-page. Pieces:
+by" names + a 📞 Call button — and is rendered on BOTH the Hub and the Signals
+page. Dismissal: the SENDER gets an ✕ to hide their own banner (persisted per
+device in `localStorage` `signals-dismissed:<email>`); RECIPIENTS auto-hide a
+signal 30s after their own ack (derived from the ack's `created_at`, re-checked
+by a 5s tick). Pieces:
 - `signals` + `signal_acks` tables (migration 027), RLS by household, Realtime.
   Signals auto-expire 6h after creation (`expires_at`); banner filters on it.
 - `signals.recipients text[]` (migration 028): null = whole household, else a

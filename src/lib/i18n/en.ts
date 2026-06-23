@@ -28,7 +28,6 @@ export const en = {
   'signals.everyone': 'Everyone',
   'signals.call': 'Call',
   'signals.reorder': 'Drag to reorder',
-  'signals.helpNote': 'Need help always goes to everyone.',
   'signals.gotIt': 'Got it',
   'signals.acked': 'Got it',
   'signals.seenBy': 'seen by {names}',

@@ -243,7 +243,6 @@ export default function Signals() {
           )
         })}
       </div>
-      <p className="mt-2 text-xs text-(--text-faint)">🆘 {t('signals.helpNote')}</p>
 
       {/* AI free-text */}
       <div className="my-4 flex items-center gap-3 text-xs text-(--text-faint)">
