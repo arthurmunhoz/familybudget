@@ -159,24 +159,27 @@ export default function Pings() {
       {/* incoming / active pings */}
       <PingsBanner />
 
-      {/* recipient picker (hidden when there's nobody else to target) */}
+      {/* recipient picker — a compact, recessed filter control, deliberately
+          unlike the raised ping action cards below it */}
       {members.length > 0 && (
-        <div className="mb-3">
+        <div className="mb-5">
           <button
             onClick={() => setPickerOpen((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-xl bg-(--card) px-4 py-3 text-left"
+            className="flex w-full items-center gap-2 rounded-full bg-(--surface) px-4 py-2 text-left"
           >
-            <span className="text-(--text-faint)">{t('pings.to')}</span>
-            <span className="min-w-0 flex-1 truncate font-semibold text-(--text)">
+            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
+              {t('pings.to')}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-(--text)">
               {toLabel}
             </span>
-            <span className="shrink-0 text-(--text-faint)">{pickerOpen ? '▴' : '▾'}</span>
+            <span className="shrink-0 text-xs text-(--text-faint)">{pickerOpen ? '▴' : '▾'}</span>
           </button>
           {pickerOpen && (
-            <div className="mt-1 space-y-1 rounded-xl bg-(--card) p-1">
+            <div className="mt-1.5 space-y-0.5 rounded-2xl bg-(--surface) p-1.5">
               <button
                 onClick={() => setSelected(new Set(members.map((m) => m.email)))}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left"
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left active:bg-(--surface-2)"
               >
                 <span className="flex-1 text-sm font-semibold text-(--text)">
                   {t('pings.everyone')}
@@ -189,7 +192,7 @@ export default function Pings() {
                   <button
                     key={m.email}
                     onClick={() => toggle(m.email)}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left active:bg-(--surface-2)"
                   >
                     <span className="flex-1 truncate text-sm text-(--text)">
                       {m.display_name}
