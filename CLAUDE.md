@@ -22,9 +22,12 @@ this doc is the contract for every agent that follows you.
   (Claude vision; `ANTHROPIC_API_KEY`, verifies the caller's Supabase JWT) and
   `send-digest.ts` (daily push digest cron, see Push notifications below).
 - PWA: `public/manifest.webmanifest`, apple-touch meta in `index.html`. Brand
-  is "One Roof"; icons are `public/roof-icon-*.png`. `public/sw.js` is a
-  PUSH-ONLY service worker (registered in `main.tsx`) — no `fetch` handler, so
-  it never caches/intercepts and can't break loading.
+  is "One Roof"; icons are `public/roof-icon-*.png`. `public/sw.js` (registered
+  in `main.tsx`) handles push AND offline app-shell caching — but
+  CONSERVATIVELY: navigations are network-first (a deploy always wins online),
+  hashed `/assets/*` are cache-first (content-fingerprinted, safe forever),
+  cross-origin (Supabase) is never touched, and on `localhost` the fetch handler
+  is a no-op so dev/HMR is unaffected. Bump `CACHE` in `sw.js` to hard-reset.
 
 ## File map
 
@@ -32,7 +35,7 @@ this doc is the contract for every agent that follows you.
 api/scan-receipt.ts        Receipt photo → structured entry (Claude vision)
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
 public/                    Icons, manifest, family.jpg backdrop photo
-  sw.js                    Push-only service worker (no fetch handler)
+  sw.js                    Service worker: push + offline app-shell cache
 src/
   main.tsx                 BrowserRouter + AuthProvider + ThemeProvider
   App.tsx                  Route table; every app screen is lazy()-loaded
@@ -138,6 +141,17 @@ but seed it from `readCache(key)` and write through with `writeCache(key, …)`.
 Already cached: Hub badges, Budgets, Months, MonthDetail, Family, ShoppingList,
 Admin. Not yet (were mid-edit by another agent): Pet Care, Documents,
 Important Dates.
+
+**Offline (`src/lib/offline.ts`)**: the shopping list works with no connection.
+`loadLocal`/`saveLocal` are durable (localStorage) JSON helpers; the shopping
+list seeds from and writes through to them so it renders offline. Mutations are
+offline-first: update local state → `enqueueOp(...)` → `void load()`. `load()`
+no-ops when `!navigator.onLine` (keeps the persisted list, never wipes it on a
+failed fetch) and otherwise flushes the outbox before refetching.
+`flushShoppingOutbox()` replays queued ops in order, remapping `tmp-…` ids to
+real ids as inserts land (so a toggle of an offline-added item still resolves);
+it runs on each mutation, on the `online` event, and on mount. To extend
+offline to another feature, follow the same outbox shape.
 
 **Images (avatars, pet photos, backdrop, docs)**: all live in the private
 `documents` bucket and are served via signed URLs. ALWAYS resolve them through
