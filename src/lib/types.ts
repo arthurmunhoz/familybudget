@@ -150,6 +150,8 @@ export interface Signal {
   kind: string
   emoji: string
   message: string
+  /** Targeted recipient emails; null = the whole household. */
+  recipients: string[] | null
   created_at: string
   expires_at: string
 }

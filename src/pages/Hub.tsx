@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
-import SignalSheet from '../components/SignalSheet'
 import SignalsBanner from '../components/SignalsBanner'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
@@ -31,7 +30,6 @@ export default function Hub() {
   const { hidden, tileStyle } = useAppPrefs()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [signalSheetOpen, setSignalSheetOpen] = useState(false)
 
   // Badges are cached in memory (useCachedQuery): on return to the hub they
   // render their last value instantly and only update if the data changed —
@@ -111,7 +109,7 @@ export default function Hub() {
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
       <Backdrop />
-      <header className="flex items-center justify-between pt-6 pb-5">
+      <header className="sticky top-0 z-10 -mx-4 -mt-[env(safe-area-inset-top)] flex items-center justify-between bg-(--bg) px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-5">
         <div>
           <h1 className="text-2xl font-bold text-(--text)">
             {household?.name ?? 'One Roof'}
@@ -120,22 +118,13 @@ export default function Hub() {
             {t(greetKey, { name: profile?.display_name ?? '' })}
           </p>
         </div>
-        <div className="flex items-center">
-          <button
-            onClick={() => setSignalSheetOpen(true)}
-            aria-label={t('signals.openSheet')}
-            className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
-          >
-            📣
-          </button>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            aria-label={t('hub.openSettings')}
-            className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
-          >
-            ☰
-          </button>
-        </div>
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label={t('hub.openSettings')}
+          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+        >
+          ☰
+        </button>
       </header>
 
       <SignalsBanner />
@@ -184,7 +173,6 @@ export default function Hub() {
       )}
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-      {signalSheetOpen && <SignalSheet onClose={() => setSignalSheetOpen(false)} />}
     </div>
   )
 }

@@ -12,6 +12,13 @@ export interface HubApp {
 
 export const APPS: HubApp[] = [
   {
+    id: 'signals',
+    name: 'Signals',
+    icon: '📣',
+    route: '/signals',
+    description: 'Quick pings to the family',
+  },
+  {
     id: 'budget',
     name: 'Budget',
     icon: '💰',

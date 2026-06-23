@@ -36,7 +36,7 @@ export default async function handler(req: any, res: any) {
 
   const { data: signal } = await db
     .from('signals')
-    .select('id, household_id, sender_email, emoji, message')
+    .select('id, household_id, sender_email, emoji, message, recipients')
     .eq('id', signal_id)
     .single()
   if (!signal) return res.status(404).json({ error: 'Signal not found' })
@@ -58,19 +58,33 @@ export default async function handler(req: any, res: any) {
     .single()
   const senderName = sender?.display_name || signal.sender_email.split('@')[0]
 
-  // Everyone in the household except the sender's own devices.
-  const { data: subs } = await db
+  // Sender's phone (from the Family feature) powers the "Call" affordance.
+  const { data: senderProfile } = await db
+    .from('member_profiles')
+    .select('phone')
+    .eq('email', signal.sender_email)
+    .maybeSingle()
+  const tel = senderProfile?.phone || null
+
+  // Recipients: targeted list if set, otherwise the whole household — always
+  // excluding the sender's own devices.
+  let query = db
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')
     .eq('household_id', signal.household_id)
     .neq('user_email', signal.sender_email)
+  if (Array.isArray(signal.recipients) && signal.recipients.length > 0) {
+    query = query.in('user_email', signal.recipients)
+  }
+  const { data: subs } = await query
 
   webpush.setVapidDetails('mailto:arthur@peek.us', vapidPublic, vapidPrivate)
   const payload = JSON.stringify({
     title: `${signal.emoji} ${senderName}`,
     body: signal.message,
-    url: '/',
+    url: '/signals',
     tag: `signal-${signal.id}`,
+    tel,
   })
 
   let sent = 0

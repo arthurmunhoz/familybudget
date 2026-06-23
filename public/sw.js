@@ -9,7 +9,7 @@
 //   • On localhost the fetch handler is a no-op, so dev/HMR is unaffected.
 // Bump CACHE to invalidate everything on a breaking change.
 
-const CACHE = 'one-roof-shell-v1'
+const CACHE = 'one-roof-shell-v2'
 const SHELL = '/index.html'
 
 self.addEventListener('install', (event) => {
@@ -92,14 +92,25 @@ self.addEventListener('push', (event) => {
     icon: '/roof-icon-180.png',
     badge: '/roof-icon-180.png',
     tag: payload.tag || 'one-roof-digest',
-    data: { url: payload.url || '/' },
+    data: { url: payload.url || '/', tel: payload.tel || null },
+  }
+  // A "Call" action when the sender has a phone on file. NOTE: action buttons
+  // are ignored by iOS web-push today; the in-app Call button is the fallback.
+  if (payload.tel) {
+    options.actions = [{ action: 'call', title: '📞 Call' }]
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = (event.notification.data && event.notification.data.url) || '/'
+  const data = event.notification.data || {}
+  // Tapping the "Call" action dials the sender directly.
+  if (event.action === 'call' && data.tel) {
+    event.waitUntil(self.clients.openWindow(`tel:${data.tel}`))
+    return
+  }
+  const url = data.url || '/'
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })

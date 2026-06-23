@@ -24,16 +24,18 @@ async function authToken(): Promise<string> {
 }
 
 /** Insert a signal (RLS stamps household + sender) then fire the household push.
+ *  `recipients` null = whole household; otherwise only those member emails.
  *  Push failures are swallowed — the signal is already saved and shows up live
  *  via Realtime regardless. */
 export async function sendSignal(
   kind: string,
   emoji: string,
   message: string,
+  recipients: string[] | null = null,
 ): Promise<void> {
   const { data, error } = await supabase
     .from('signals')
-    .insert({ kind, emoji, message })
+    .insert({ kind, emoji, message, recipients })
     .select()
     .single()
   if (error || !data) throw error ?? new Error('Could not send signal')
@@ -49,10 +51,12 @@ export async function sendSignal(
   }
 }
 
-/** AI: map free text → {kind, emoji, message} in the user's language, then send.
- *  Returns what was sent so the UI can show a brief confirmation. */
+/** AI: map free text → {kind, emoji, message} in the user's language, then send
+ *  to `recipients` (null = whole household). Returns what was sent so the UI can
+ *  show a brief confirmation. */
 export async function sendCustomSignal(
   text: string,
+  recipients: string[] | null = null,
 ): Promise<{ emoji: string; message: string }> {
   const token = await authToken()
   const res = await fetch('/api/suggest-signal', {
@@ -65,8 +69,19 @@ export async function sendCustomSignal(
   const emoji = (result.emoji || '📣').trim()
   const message = (result.message || text).trim()
   const kind = result.kind || 'custom'
-  await sendSignal(kind, emoji, message)
+  await sendSignal(kind, emoji, message, recipients)
   return { emoji, message }
+}
+
+/** Phone numbers of household members, keyed by email, for the in-app "Call"
+ *  button. Members without a saved phone are omitted. */
+export async function fetchMemberPhones(): Promise<Record<string, string>> {
+  const { data } = await supabase.from('member_profiles').select('email, phone')
+  const out: Record<string, string> = {}
+  for (const r of (data ?? []) as { email: string; phone: string | null }[]) {
+    if (r.phone) out[r.email] = r.phone
+  }
+  return out
 }
 
 /** Record that the current user saw/acknowledged a signal. */

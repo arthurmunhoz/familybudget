@@ -133,23 +133,33 @@ morning notification per household. Pieces:
   joining `user_settings.language`); single fixed send time; Hobby-plan crons
   fire once/day within ~the hour, not minute-precise.
 
-**Signals (household one-tap pings)**: a Hub-level feature (not an app tile).
-The 📣 button in the Hub header opens `SignalSheet` — six one-tap presets plus
-an AI "just type it" box. `SignalsBanner` (under the Hub header) shows active
-(non-expired) signals live with a 👍 ack + "seen by" count. Pieces:
-- `signals` + `signal_acks` tables (migration 027), RLS by household, Realtime
-  enabled. Signals auto-expire 6h after creation (`expires_at`); the banner
-  filters on `expires_at > now()`.
-- `src/lib/signals.ts` — `SIGNAL_PRESETS` (kind+emoji; the human text is the
-  i18n key `signals.preset.<kind>` resolved at send time), `sendSignal`,
-  `sendCustomSignal` (AI), `ackSignal`, `fetchActiveSignals`.
-- Send flow: client INSERTs the signal under RLS (household + sender stamped by
-  column defaults), then calls `api/send-signal` with the new id; that function
-  (service role) verifies the caller shares the household and pushes to everyone
-  EXCEPT the sender. Push failures are swallowed — Realtime shows it regardless.
+**Signals (household one-tap pings)**: a hub app (`/signals`, registered in
+`apps.ts`). The Signals page (`src/apps/signals/Signals.tsx`) has the composer:
+six one-tap presets, a recipient picker, and an AI "just type it" box.
+`SignalsBanner` shows active (non-expired) signals live with a 👍 ack + "seen
+by" count + a 📞 Call button — and is rendered on BOTH the Hub and the Signals
+page. Pieces:
+- `signals` + `signal_acks` tables (migration 027), RLS by household, Realtime.
+  Signals auto-expire 6h after creation (`expires_at`); banner filters on it.
+- `signals.recipients text[]` (migration 028): null = whole household, else a
+  list of member emails. The `signals_select` RLS makes targeted signals visible
+  only to recipients + sender. `🆘 help` ALWAYS sends to everyone (forced in the
+  page's `recipientsFor`).
+- `src/lib/signals.ts` — `SIGNAL_PRESETS` (kind+emoji; human text is the i18n
+  key `signals.preset.<kind>`), `sendSignal(kind,emoji,msg,recipients)`,
+  `sendCustomSignal(text,recipients)` (AI), `ackSignal`, `fetchActiveSignals`,
+  `fetchMemberPhones` (for the Call button).
+- Send flow: client INSERTs under RLS (household + sender stamped by defaults),
+  then calls `api/send-signal` with the id; that function (service role) verifies
+  the caller shares the household and pushes to the recipients (or all but the
+  sender). It also attaches the sender's `tel` from `member_profiles` so the push
+  carries a Call action. Push failures are swallowed — Realtime shows it anyway.
 - `api/suggest-signal` — Claude Haiku maps free text → `{kind, emoji, message}`
-  in the user's language; reuses `ANTHROPIC_API_KEY`. No new env vars for either
-  endpoint (they reuse the digest's VAPID + service-role config).
+  in the user's language; reuses `ANTHROPIC_API_KEY`. No new env vars.
+- Call button: `public/sw.js` adds a `call` notification action + `tel:` handler.
+  iOS web-push IGNORES notification action buttons, so the in-app 📞 Call button
+  in `SignalsBanner` (shown when the sender has a Family phone) is the reliable
+  path on iPhone; the notification action only works on Android/desktop.
 
 **Data fetching — cache to avoid the "blink"**: screens re-mount on every
 navigation, so fetching from empty state flashes (0 → real value). Use

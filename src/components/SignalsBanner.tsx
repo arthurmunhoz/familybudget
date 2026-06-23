@@ -3,7 +3,12 @@ import { useAuth } from '../hooks/useAuth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
 import { timeAgo } from '../lib/format'
-import { ackSignal, fetchActiveSignals, type ActiveSignal } from '../lib/signals'
+import {
+  ackSignal,
+  fetchActiveSignals,
+  fetchMemberPhones,
+  type ActiveSignal,
+} from '../lib/signals'
 import { supabase } from '../lib/supabase'
 
 /** Live banner of active household signals on the Hub. Updates in real time as
@@ -16,6 +21,12 @@ export default function SignalsBanner() {
   const { data: signals = [], revalidate } = useCachedQuery<ActiveSignal[]>(
     'signals:active',
     fetchActiveSignals,
+  )
+  // Phone numbers (from the Family feature) → a "Call" button on signals whose
+  // sender has a number saved.
+  const { data: phones = {} } = useCachedQuery<Record<string, string>>(
+    'signals:phones',
+    fetchMemberPhones,
   )
   // Optimistic ack: hide the button immediately, before the round-trip lands.
   const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
@@ -71,19 +82,30 @@ export default function SignalsBanner() {
                 {mine && ackCount > 0 && ` · ${t('signals.seenBy', { count: ackCount })}`}
               </p>
             </div>
-            {!mine &&
-              (acked ? (
-                <span className="shrink-0 text-xs font-semibold text-(--text-faint)">
-                  ✓ {t('signals.acked')}
-                </span>
-              ) : (
-                <button
-                  onClick={() => ack(s.id)}
-                  className="shrink-0 rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
-                >
-                  👍 {t('signals.gotIt')}
-                </button>
-              ))}
+            {!mine && (
+              <div className="flex shrink-0 items-center gap-2">
+                {phones[s.sender_email] && (
+                  <a
+                    href={`tel:${phones[s.sender_email]}`}
+                    className="rounded-full bg-(--expense) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
+                  >
+                    📞 {t('signals.call')}
+                  </a>
+                )}
+                {acked ? (
+                  <span className="text-xs font-semibold text-(--text-faint)">
+                    ✓ {t('signals.acked')}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => ack(s.id)}
+                    className="rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
+                  >
+                    👍 {t('signals.gotIt')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )
       })}
