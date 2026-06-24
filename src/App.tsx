@@ -19,6 +19,7 @@ const PetProfile = lazy(() => import('./apps/pets/PetProfile'))
 const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
 const ImportantDates = lazy(() => import('./apps/dates/ImportantDates'))
 const Family = lazy(() => import('./apps/family/Family'))
+const Calculator = lazy(() => import('./apps/calc/Calculator'))
 const Admin = lazy(() => import('./pages/Admin'))
 const AdminHousehold = lazy(() => import('./pages/AdminHousehold'))
 
@@ -95,6 +96,7 @@ export default function App() {
           />
           <Route path="/dates" element={<ImportantDates />} />
           <Route path="/family" element={<Family />} />
+          <Route path="/calc" element={<Calculator />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/household/:id" element={<AdminHousehold />} />
           <Route path="*" element={<Navigate to="/" replace />} />

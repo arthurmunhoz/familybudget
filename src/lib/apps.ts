@@ -60,6 +60,13 @@ export const APPS: HubApp[] = [
     route: '/family',
     description: 'Everyone’s info at a glance',
   },
+  {
+    id: 'calc',
+    name: 'Calculator',
+    icon: '🧮',
+    route: '/calc',
+    description: 'Quick math & family money tools',
+  },
 ]
 
 /** Shown on the hub only for admins (profile.is_admin). */

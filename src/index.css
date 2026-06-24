@@ -102,3 +102,29 @@ input[type='date']::-webkit-date-and-time-value {
     animation: none;
   }
 }
+
+/* A small celebratory pop — used when the "Better deal" winner appears so the
+   result lands with a little life instead of just snapping in. */
+@keyframes pop-in {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-pop {
+  animation: pop-in 0.35s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop {
+    animation: none;
+  }
+}

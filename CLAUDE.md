@@ -33,6 +33,7 @@ this doc is the contract for every agent that follows you.
 
 ```
 api/scan-receipt.ts        Receipt photo → structured entry (Claude vision)
+api/scan-bill.ts           Itemized bill photo → line items + tax/tip (Claude vision)
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
 api/send-ping.ts         Push a household ping to everyone but the sender
 api/suggest-ping.ts      Free text → {kind,emoji,message} ping (Claude)
@@ -53,6 +54,8 @@ src/
                            opt-in Face ID lock via VaultGate + biometric.ts)
     dates/                 ImportantDates (birthday/renewal countdowns)
     family/                Family (per-member profiles + avatars)
+    calc/                  Calculator (Split a bill evenly/by-item via photo
+                           scan, Better deal unit-price, Discount) — no DB
   components/              Shared: Backdrop, Drawer, AnalyticsTracker,
                            ErrorBoundary, VaultGate, NotificationsToggle,
                            PingsBanner, NotificationsNudge
