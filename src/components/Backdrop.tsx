@@ -3,13 +3,7 @@ import { useHousehold } from '../hooks/useHousehold'
 import { useTheme } from '../hooks/useTheme'
 import { supabase } from '../lib/supabase'
 import BeachBackdrop from './BeachBackdrop'
-
-/** Bundled One Roof default art, per theme. Not stored in the database, so it
- *  can never be deleted — households without a custom image always get it. */
-export const DEFAULT_BACKDROP = {
-  light: '/default-backdrop-light.png',
-  dark: '/default-backdrop-dark.png',
-}
+import HearthBackdrop from './HearthBackdrop'
 
 // Signed URLs live ~1h; cache them per path so navigating between pages
 // doesn't re-request one on every mount.
@@ -80,14 +74,6 @@ export default function Backdrop() {
     )
   }
 
-  // No custom image → the bundled One Roof art, a band along the bottom.
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 mx-auto max-w-md select-none"
-      style={{ opacity: 0.25 }}
-    >
-      <img src={DEFAULT_BACKDROP[theme]} alt="" className="w-full" />
-    </div>
-  )
+  // No custom image → the bundled One Roof "Warm Hearth" art, faint behind content.
+  return <HearthBackdrop theme={theme} opacity={0.25} />
 }

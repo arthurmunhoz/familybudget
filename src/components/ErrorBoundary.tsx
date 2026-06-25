@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { trackError } from '../lib/analytics'
 
 interface Props {
@@ -32,8 +33,10 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="flex min-h-dvh items-center justify-center p-6">
         <div className="max-w-sm text-center">
-          <div className="text-5xl">🚧</div>
-          <h1 className="mt-4 text-xl font-bold text-(--text)">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+            <AlertTriangle size={40} aria-hidden="true" className="text-(--accent)" />
+          </div>
+          <h1 className="font-display mt-4 text-xl font-bold text-(--text)">
             Something went wrong
           </h1>
           <p className="mt-2 text-sm text-(--text-muted)">

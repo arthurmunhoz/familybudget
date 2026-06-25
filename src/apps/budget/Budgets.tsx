@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Wallet, Briefcase } from 'lucide-react'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
 import { useCachedQuery } from '../../hooks/useCachedQuery'
@@ -51,14 +52,19 @@ export default function Budgets() {
         >
           ‹
         </button>
-        <h1 className="text-2xl font-bold text-(--text)">💰 {t('budget.title')}</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-(--text) font-display">
+          <Wallet size={22} strokeWidth={2} aria-hidden="true" className="text-(--accent)" />
+          {t('budget.title')}
+        </h1>
       </header>
 
       {loading ? (
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : budgets.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
-          <div className="text-5xl">💼</div>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+            <Briefcase size={40} className="text-(--text-faint)" aria-hidden="true" />
+          </div>
           <p className="mt-4">{t('budget.empty')}</p>
           <p className="text-sm text-(--text-faint)">{t('budget.emptyHint')}</p>
         </div>

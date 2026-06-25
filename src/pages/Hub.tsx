@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BellOff, LayoutGrid, Menu } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
@@ -108,26 +109,18 @@ export default function Hub() {
     )
   }
 
-  // Subtle 🔕 on the pings/pings tile when this device can't receive alerts.
+  // The Nudges tile's own icon reflects whether this device can get alerts:
+  // a struck-through bell (BellOff) when notifications are off, the normal bell
+  // when they're on. `alertsOff` is computed per-tile below.
   const notifActive = useNotificationsActive()
-  const PING_APP_IDS = ['pings']
-  const alertsOffFor = (appId: string) =>
-    notifActive === false && PING_APP_IDS.includes(appId) ? (
-      <span
-        className="absolute left-2 top-2 text-xs opacity-50 grayscale"
-        title={t('notif.alertsOff')}
-        aria-label={t('notif.alertsOff')}
-      >
-        🔕
-      </span>
-    ) : null
+  const alertsOff = (appId: string) => appId === 'pings' && notifActive === false
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
       <Backdrop />
       <header className="sticky top-0 z-10 -mx-4 -mt-[env(safe-area-inset-top)] flex items-center justify-between bg-(--bg) px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-(--text)">
+          <h1 className="font-display text-[26px] font-semibold text-(--text)">
             {household?.name ?? 'One Roof'}
           </h1>
           <p className="text-sm text-(--text-muted)">
@@ -137,56 +130,74 @@ export default function Hub() {
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label={t('hub.openSettings')}
-          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+          className="rounded-lg px-3 py-2 text-(--text-muted) active:text-(--text)"
         >
-          ☰
+          <Menu size={24} strokeWidth={2} aria-hidden="true" />
         </button>
       </header>
 
       <PingsBanner />
 
       {tiles.length === 0 ? (
-        <div className="mt-16 text-center text-(--text-muted)">
-          <div className="text-5xl">🫥</div>
+        <div className="mt-16 flex flex-col items-center text-center text-(--text-muted)">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-(--surface) text-(--text-faint)">
+            <LayoutGrid size={32} strokeWidth={1.75} aria-hidden="true" />
+          </div>
           <p className="mt-4">{t('hub.allHidden')}</p>
           <p className="text-sm text-(--text-faint)">{t('hub.allHiddenHint')}</p>
         </div>
       ) : tileStyle === 'compact' ? (
         <div className="grid grid-cols-3 gap-2.5">
-          {tiles.map((app) => (
-            <button
-              key={app.id}
-              onClick={() => navigate(app.route)}
-              className="relative flex flex-col items-center gap-1.5 rounded-xl bg-(--card) px-2 py-3.5 active:bg-(--card-active) transition-colors"
-            >
-              {badgeFor(app.id)}
-              {alertsOffFor(app.id)}
-              <span className="text-xl">{app.icon}</span>
-              <span className="w-full text-center text-[11px] font-semibold leading-tight text-(--text)">
-                {t(`app.${app.id}.name` as TKey)}
-              </span>
-            </button>
-          ))}
+          {tiles.map((app) => {
+            const off = alertsOff(app.id)
+            const Icon = off ? BellOff : app.icon
+            return (
+              <button
+                key={app.id}
+                onClick={() => navigate(app.route)}
+                className="relative flex flex-col items-center gap-2 rounded-2xl border border-(--surface-2) bg-(--card) px-2 py-4 active:bg-(--card-active) transition-colors"
+              >
+                {badgeFor(app.id)}
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-xl bg-(--surface) text-(--accent)"
+                  title={off ? t('notif.alertsOff') : undefined}
+                >
+                  <Icon size={21} strokeWidth={2} aria-hidden="true" />
+                </span>
+                <span className="w-full text-center text-[11px] font-semibold leading-tight text-(--text)">
+                  {t(`app.${app.id}.name` as TKey)}
+                </span>
+              </button>
+            )
+          })}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {tiles.map((app) => (
-            <button
-              key={app.id}
-              onClick={() => navigate(app.route)}
-              className="relative flex flex-col items-start gap-1.5 rounded-2xl bg-(--card) p-5 text-left active:bg-(--card-active) transition-colors"
-            >
-              {badgeFor(app.id)}
-              {alertsOffFor(app.id)}
-              <span className="text-3xl">{app.icon}</span>
-              <span className="mt-1 font-bold text-(--text)">
-                {t(`app.${app.id}.name` as TKey)}
-              </span>
-              <span className="text-xs leading-snug text-(--text-faint)">
-                {t(`app.${app.id}.desc` as TKey)}
-              </span>
-            </button>
-          ))}
+          {tiles.map((app) => {
+            const off = alertsOff(app.id)
+            const Icon = off ? BellOff : app.icon
+            return (
+              <button
+                key={app.id}
+                onClick={() => navigate(app.route)}
+                className="relative flex flex-col items-start gap-2 rounded-2xl border border-(--surface-2) bg-(--card) p-4 text-left active:bg-(--card-active) transition-colors"
+              >
+                {badgeFor(app.id)}
+                <span
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl bg-(--surface) text-(--accent)"
+                  title={off ? t('notif.alertsOff') : undefined}
+                >
+                  <Icon size={24} strokeWidth={2} aria-hidden="true" />
+                </span>
+                <span className="mt-1 font-semibold text-(--text)">
+                  {t(`app.${app.id}.name` as TKey)}
+                </span>
+                <span className="text-xs leading-snug text-(--text-faint)">
+                  {t(`app.${app.id}.desc` as TKey)}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
 

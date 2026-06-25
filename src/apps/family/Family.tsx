@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Pencil, User, Users, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useCachedQuery } from '../../hooks/useCachedQuery'
@@ -173,7 +174,10 @@ export default function Family() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">👪 {t('family.title')}</h1>
+        <h1 className="flex flex-1 items-center gap-2 font-display text-2xl font-bold text-(--text)">
+          <Users size={24} strokeWidth={2} className="text-(--accent)" aria-hidden="true" />
+          {t('family.title')}
+        </h1>
       </header>
 
       {loading ? (
@@ -252,9 +256,10 @@ export default function Family() {
                 {isMe && (
                   <button
                     onClick={openEdit}
-                    className="mt-4 w-full rounded-xl bg-(--surface) py-2.5 text-sm font-semibold text-(--text) active:bg-(--surface-2)"
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-(--surface) py-2.5 text-sm font-semibold text-(--text) active:bg-(--surface-2)"
                   >
-                    ✎ {t('family.editMine')}
+                    <Pencil size={16} strokeWidth={2} aria-hidden="true" />
+                    {t('family.editMine')}
                   </button>
                 )}
               </section>
@@ -281,7 +286,7 @@ export default function Family() {
                 aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
-                ✕
+                <X size={20} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
 
@@ -296,7 +301,7 @@ export default function Family() {
                   {photoPreview ? (
                     <img src={photoPreview} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-3xl">👤</span>
+                    <User size={40} className="text-(--text-faint)" aria-hidden="true" />
                   )}
                 </div>
                 {/* edit pencil — bottom-right */}
@@ -328,9 +333,9 @@ export default function Family() {
                     type="button"
                     onClick={removePhoto}
                     aria-label={t('family.removePhoto')}
-                    className="absolute -top-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-(--card) bg-(--expense) text-sm font-bold text-white shadow active:scale-95"
+                    className="absolute -top-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-(--card) bg-(--expense) text-white shadow active:scale-95"
                   >
-                    ✕
+                    <X size={16} strokeWidth={2.5} aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -430,9 +435,9 @@ export default function Family() {
             <button
               onClick={() => setPreview(null)}
               aria-label={t('common.close')}
-              className="rounded-lg px-2 py-1 text-xl text-white/70 active:text-white"
+              className="rounded-lg px-2 py-1 text-white/70 active:text-white"
             >
-              ✕
+              <X size={24} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
           <div className="flex min-h-0 flex-1 items-center justify-center p-4">

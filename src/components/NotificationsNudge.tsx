@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Bell } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import { enablePush, isSubscribed, pushState, type PushState } from '../lib/push'
 
@@ -40,7 +41,10 @@ export default function NotificationsNudge() {
 
   return (
     <div className="mb-4 rounded-2xl border border-(--accent-soft) bg-(--card) p-4">
-      <p className="font-semibold text-(--text)">🔔 {t('notif.offTitle')}</p>
+      <p className="flex items-center gap-1.5 font-semibold text-(--text)">
+        <Bell size={18} strokeWidth={2} aria-hidden="true" />
+        {t('notif.offTitle')}
+      </p>
       <p className="mt-1 text-sm text-(--text-faint)">{t('notif.offBody')}</p>
       <button
         onClick={enable}

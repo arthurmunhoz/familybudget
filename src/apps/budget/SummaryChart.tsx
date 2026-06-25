@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Hourglass, Calendar } from 'lucide-react'
 import { Cell, Pie, PieChart } from 'recharts'
 import { categoryById } from '../../lib/categories'
 import { formatMoney, todayISO } from '../../lib/format'
@@ -70,7 +71,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
             {t('chart.currentBalance')}
           </div>
           <div
-            className={`mt-1 text-2xl font-bold tabular-nums ${
+            className={`mt-1 text-2xl font-bold tabular-nums font-display ${
               balance >= 0 ? 'text-(--income)' : 'text-(--expense)'
             }`}
           >
@@ -81,13 +82,19 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
             <div className="mt-auto space-y-0.5 pt-3 text-[11px] text-(--text-muted)">
               {comingIn > 0 && (
                 <div className="flex items-center justify-between gap-2">
-                  <span>⏳ {t('chart.comingIn')}</span>
+                  <span className="flex items-center gap-1.5">
+                    <Hourglass size={14} strokeWidth={2} aria-hidden="true" className="text-(--text-muted)" />
+                    {t('chart.comingIn')}
+                  </span>
                   <span className="tabular-nums text-(--income)">+{formatMoney(comingIn)}</span>
                 </div>
               )}
               {due > 0 && (
                 <div className="flex items-center justify-between gap-2">
-                  <span>📅 {t('chart.due')}</span>
+                  <span className="flex items-center gap-1.5">
+                    <Calendar size={14} strokeWidth={2} aria-hidden="true" className="text-(--text-muted)" />
+                    {t('chart.due')}
+                  </span>
                   <span className="tabular-nums text-(--expense)">−{formatMoney(due)}</span>
                 </div>
               )}

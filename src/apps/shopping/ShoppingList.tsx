@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Plus, ShoppingCart, Store, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
@@ -267,8 +268,8 @@ export default function ShoppingList() {
             className="flex min-w-0 flex-1 items-center gap-3 text-left"
           >
             {item.checked ? (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-(--income) text-[11px] font-bold text-white">
-                ✓
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-(--income) text-white">
+                <Check size={12} strokeWidth={3} aria-hidden="true" />
               </span>
             ) : (
               <span className="h-5 w-5 shrink-0 rounded-full border-2 border-(--text-faint)" />
@@ -287,7 +288,7 @@ export default function ShoppingList() {
               aria-label={t('common.removeName', { name: item.label })}
               className="px-1 text-(--text-faint) active:text-(--expense)"
             >
-              ✕
+              <X size={18} strokeWidth={2} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -304,7 +305,10 @@ export default function ShoppingList() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">🛒 {t('shopping.title')}</h1>
+        <h1 className="flex-1 flex items-center gap-2 text-2xl font-bold font-display text-(--text)">
+          <ShoppingCart size={24} strokeWidth={2} aria-hidden="true" />
+          {t('shopping.title')}
+        </h1>
         {openCount > 0 && (
           <span className="rounded-full bg-(--surface) px-3 py-1 text-sm font-semibold text-(--text-muted)">
             {openCount}
@@ -316,7 +320,9 @@ export default function ShoppingList() {
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : items.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
-          <div className="text-5xl">🧾</div>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+            <ShoppingCart size={40} className="text-(--text-faint)" strokeWidth={2} aria-hidden="true" />
+          </div>
           <p className="mt-4">{t('shopping.empty')}</p>
           <p className="text-sm text-(--text-faint)">{t('shopping.emptyHint')}</p>
         </div>
@@ -331,7 +337,7 @@ export default function ShoppingList() {
                     {g.isStore ? (
                       <StoreLogo slug={g.slug} name={g.name} size={20} />
                     ) : (
-                      <span className="text-base">🧺</span>
+                      <ShoppingCart size={18} className="text-(--text-faint)" strokeWidth={2} aria-hidden="true" />
                     )}
                     <h3
                       className={`text-xs font-semibold uppercase tracking-wide ${
@@ -368,9 +374,10 @@ export default function ShoppingList() {
           <div className="mb-2">
             <button
               onClick={() => setPicking(true)}
-              className="rounded-full border border-white/30 bg-(--surface) px-3 py-1.5 text-sm font-semibold text-(--text-muted) shadow-lg active:scale-95 transition-transform"
+              className="flex items-center gap-1.5 rounded-full border border-white/30 bg-(--surface) px-3 py-1.5 text-sm font-semibold text-(--text-muted) shadow-lg active:scale-95 transition-transform"
             >
-              🏪 {t('shopping.selectStores')}
+              <Store size={16} strokeWidth={2} aria-hidden="true" />
+              {t('shopping.selectStores')}
             </button>
           </div>
         ) : (
@@ -405,9 +412,9 @@ export default function ShoppingList() {
             <button
               onClick={() => setPicking(true)}
               aria-label={t('shopping.manageStores')}
-              className="shrink-0 rounded-full border border-white/30 bg-(--surface) px-3 py-1.5 text-sm font-semibold text-(--text-muted) shadow-lg active:scale-95 transition-transform"
+              className="flex shrink-0 items-center rounded-full border border-white/30 bg-(--surface) px-3 py-1.5 text-sm font-semibold text-(--text-muted) shadow-lg active:scale-95 transition-transform"
             >
-              ＋
+              <Plus size={18} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
         )}
@@ -444,13 +451,16 @@ export default function ShoppingList() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex shrink-0 items-center justify-between px-4 pt-5 pb-3">
-              <h2 className="text-lg font-bold text-(--text)">🏪 {t('shopping.stores')}</h2>
+              <h2 className="flex items-center gap-2 text-lg font-bold text-(--text)">
+                <Store size={20} strokeWidth={2} aria-hidden="true" />
+                {t('shopping.stores')}
+              </h2>
               <button
                 onClick={() => setPicking(false)}
                 aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
-                ✕
+                <X size={20} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
 
@@ -481,7 +491,7 @@ export default function ShoppingList() {
                           aria-label={t('common.removeName', { name: s.name })}
                           className="shrink-0 px-1 text-(--text-faint) active:text-(--expense)"
                         >
-                          ✕
+                          <X size={18} strokeWidth={2} aria-hidden="true" />
                         </button>
                       </div>
                     ))}

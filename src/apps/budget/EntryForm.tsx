@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import { CATEGORIES, normalizeLabel, suggestCategory } from '../../lib/categories'
@@ -140,8 +141,12 @@ export default function EntryForm({
           <h2 className="text-lg font-bold text-(--text)">
             {entry ? t('entry.editTitle') : t('entry.newTitle')}
           </h2>
-          <button onClick={onClose} className="px-2 py-1 text-(--text-muted)">
-            ✕
+          <button
+            onClick={onClose}
+            aria-label={t('common.cancel')}
+            className="px-2 py-1 text-(--text-muted)"
+          >
+            <X size={22} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
 

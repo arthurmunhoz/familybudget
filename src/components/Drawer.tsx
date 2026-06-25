@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { notifyHouseholdChanged, useHousehold } from '../hooks/useHousehold'
@@ -138,9 +139,9 @@ export default function Drawer({
           className="flex shrink-0 items-center justify-between px-5 pb-3"
           style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)' }}
         >
-          <h2 className="text-lg font-bold text-(--text)">{t('drawer.settings')}</h2>
+          <h2 className="font-display text-lg font-bold text-(--text)">{t('drawer.settings')}</h2>
           <button onClick={onClose} className="px-2 py-1 text-(--text-muted)">
-            ✕
+            <X size={20} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
 
@@ -229,7 +230,9 @@ export default function Drawer({
                     aria-checked={on}
                     className="flex flex-1 items-center gap-2.5 py-2 text-left"
                   >
-                    <span className={on ? '' : 'opacity-40 grayscale'}>{app.icon}</span>
+                    <span className={on ? 'text-(--accent)' : 'text-(--text-faint)'}>
+                      <app.icon size={20} strokeWidth={2} aria-hidden="true" />
+                    </span>
                     <span
                       className={`flex-1 text-sm font-semibold ${
                         on ? 'text-(--text)' : 'text-(--text-faint) line-through'

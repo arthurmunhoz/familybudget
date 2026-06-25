@@ -16,6 +16,22 @@ this doc is the contract for every agent that follows you.
 - **Tailwind CSS v4** — note the v4 arbitrary-value syntax used everywhere:
   `bg-(--card)`, `text-(--text-muted)`. Tokens are CSS variables defined in
   `src/index.css` and flipped by `:root[data-theme='light'|'dark']`.
+- **Design system — "Warm Hearth"** (full refresh, 2026-06): warm clay/terracotta
+  brand on warm-paper neutrals. Light theme is "Paper", dark is "Dusk" (warm
+  espresso, never cold gray) — both defined as the same token names in
+  `index.css`, so screens need no theme-specific code. `--accent` is clay.
+  - **Type**: Fraunces (display serif) + Hanken Grotesk (UI sans), self-hosted
+    via `@fontsource-variable/*` (imported in `main.tsx`). `--font-sans` is the
+    body default; add the `.font-display` class to screen titles, greetings, and
+    hero numbers to get the serif. `src/fonts.d.ts` declares the side-effect imports.
+  - **Icons**: one cohesive outline set from `lucide-react`. Hub/app icons live
+    in `apps.ts` as `LucideIcon` components (`HubApp.icon`), rendered `<app.icon/>`.
+    Chrome must use Lucide, NOT emoji. Emoji are kept ONLY as *content* markers:
+    budget categories (`categories.ts`), pet species (`pets/petMeta.ts`), ping
+    presets (`pings.ts`), important-date types, store monograms, and language flags.
+  - App tile display names are localized via `app.<id>.name` (e.g. Budget→"Money",
+    Pings→"Nudges", Document Vault→"Documents"); the `pings` slug/route/tables stay
+    internal — only the display label changed to Nudges.
 - **Supabase**: Postgres + RLS, Google OAuth, Storage (documents), Realtime
   (shopping list). Client in `src/lib/supabase.ts`, env via `VITE_SUPABASE_*`.
 - **Vercel**: static build + serverless functions in `api/` — `scan-receipt.ts`

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { Camera, Check, Receipt } from 'lucide-react'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import { fileToResizedBase64 } from '../../lib/image'
 import SummaryChart from './SummaryChart'
@@ -187,7 +188,7 @@ export default function MonthDetail() {
         >
           ‹
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-(--text)">
+        <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-(--text) font-display">
           {periodTitle(month.budgets?.period ?? 'monthly', month.start_date)}
         </h1>
 
@@ -225,7 +226,9 @@ export default function MonthDetail() {
                     }`}
                   >
                     {opt.label}
-                    {person === opt.key && <span>✓</span>}
+                    {person === opt.key && (
+                      <Check size={16} strokeWidth={2} aria-hidden="true" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -298,9 +301,9 @@ export default function MonthDetail() {
           onClick={() => fileInputRef.current?.click()}
           disabled={scanning}
           aria-label={t('detail.scanAria')}
-          className="rounded-2xl border border-white/30 bg-(--surface) px-5 text-2xl shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
+          className="flex items-center justify-center rounded-2xl border border-white/30 bg-(--surface) px-5 shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
         >
-          📷
+          <Camera size={24} strokeWidth={2} aria-hidden="true" className="text-(--text)" />
         </button>
         <button
           onClick={() => {
@@ -330,7 +333,7 @@ export default function MonthDetail() {
       {scanning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="rounded-2xl bg-(--card) px-6 py-5 text-center">
-            <div className="text-3xl">🧾</div>
+            <Receipt size={32} strokeWidth={2} aria-hidden="true" className="mx-auto text-(--accent)" />
             <p className="mt-2 animate-pulse font-semibold text-(--text)">
               {t('detail.readingReceipt')}
             </p>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CalendarHeart, X } from 'lucide-react'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
@@ -144,7 +145,10 @@ export default function ImportantDates() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">🗓️ {t('dates.title')}</h1>
+        <h1 className="flex flex-1 items-center gap-2 font-display text-2xl font-bold text-(--text)">
+          <CalendarHeart size={24} strokeWidth={2} className="text-(--accent)" aria-hidden="true" />
+          {t('dates.title')}
+        </h1>
       </header>
 
       {loading ? (
@@ -153,7 +157,9 @@ export default function ImportantDates() {
         </p>
       ) : sorted.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
-          <div className="text-5xl">📅</div>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+            <CalendarHeart size={40} className="text-(--text-faint)" aria-hidden="true" />
+          </div>
           <p className="mt-4">{t('dates.empty')}</p>
           <p className="text-sm text-(--text-faint)">{t('dates.emptyHint')}</p>
         </div>
@@ -223,7 +229,7 @@ export default function ImportantDates() {
                 aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
-                ✕
+                <X size={20} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
 

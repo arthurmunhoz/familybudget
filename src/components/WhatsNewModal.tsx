@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Bell, Check, Megaphone, Sparkles, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useI18n } from '../hooks/useI18n'
 import { useScrollLock } from '../hooks/useScrollLock'
@@ -71,13 +72,16 @@ export default function WhatsNewModal() {
         className="w-full max-w-sm rounded-3xl bg-(--card) p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-xl font-bold text-(--text)">✨ {t('intro.title')}</h2>
+        <h2 className="font-display flex items-center gap-2 text-xl font-bold text-(--text)">
+          <Sparkles size={20} strokeWidth={2} aria-hidden="true" className="text-(--accent)" />
+          {t('intro.title')}
+        </h2>
         <p className="mt-1 text-sm text-(--text-faint)">{t('intro.subtitle')}</p>
 
         <div className="mt-4 space-y-3">
-          <Feature emoji="📣" title={t('intro.pingsTitle')} desc={t('intro.pingsDesc')} />
+          <Feature icon={Megaphone} title={t('intro.pingsTitle')} desc={t('intro.pingsDesc')} />
           <Feature
-            emoji="🔔"
+            icon={Bell}
             title={t('intro.remindersTitle')}
             desc={t('intro.remindersDesc')}
           />
@@ -85,8 +89,9 @@ export default function WhatsNewModal() {
 
         {active ? (
           <>
-            <p className="mt-5 text-sm font-semibold text-(--accent)">
-              ✅ {t('intro.allSet')}
+            <p className="mt-5 flex items-center gap-1.5 text-sm font-semibold text-(--accent)">
+              <Check size={16} strokeWidth={2} aria-hidden="true" />
+              {t('intro.allSet')}
             </p>
             <button
               onClick={close}
@@ -121,10 +126,20 @@ export default function WhatsNewModal() {
   )
 }
 
-function Feature({ emoji, title, desc }: { emoji: string; title: string; desc: string }) {
+function Feature({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: LucideIcon
+  title: string
+  desc: string
+}) {
   return (
     <div className="flex gap-3">
-      <span className="text-2xl">{emoji}</span>
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--surface) text-(--accent)">
+        <Icon size={18} strokeWidth={2} aria-hidden="true" />
+      </span>
       <div className="min-w-0">
         <p className="font-semibold text-(--text)">{title}</p>
         <p className="text-xs text-(--text-faint)">{desc}</p>

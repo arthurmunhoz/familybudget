@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { FileText, Lock } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
 import { useI18n } from '../hooks/useI18n'
@@ -58,7 +59,10 @@ export default function VaultGate({ children }: { children: ReactNode }) {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">📄 {t('docs.title')}</h1>
+        <h1 className="font-display flex flex-1 items-center gap-2 text-2xl font-bold text-(--text)">
+          <FileText size={22} strokeWidth={2} aria-hidden="true" />
+          {t('docs.title')}
+        </h1>
       </header>
 
       {status === 'checking' ? (
@@ -67,7 +71,9 @@ export default function VaultGate({ children }: { children: ReactNode }) {
         </p>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center pb-24 text-center">
-          <div className="text-6xl">🔒</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+            <Lock size={40} aria-hidden="true" className="text-(--accent)" />
+          </div>
           <p className="mt-5 max-w-xs text-(--text-muted)">{t('vault.locked')}</p>
           {failed && (
             <p className="mt-3 text-sm font-medium text-(--expense)">{t('vault.failed')}</p>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FileText, FolderOpen, Lock, LockOpen, Pencil, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useScrollLock } from '../../hooks/useScrollLock'
@@ -284,14 +285,14 @@ export default function DocumentVault() {
           aria-label={t('common.editName', { name: doc.title })}
           className="px-1 text-(--text-faint) active:text-(--accent)"
         >
-          ✎
+          <Pencil size={18} strokeWidth={2} aria-hidden="true" />
         </button>
         <button
           onClick={() => remove(doc)}
           aria-label={t('common.deleteName', { name: doc.title })}
           className="px-1 text-(--text-faint) active:text-(--expense)"
         >
-          ✕
+          <X size={18} strokeWidth={2} aria-hidden="true" />
         </button>
       </div>
     </li>
@@ -306,8 +307,9 @@ export default function DocumentVault() {
         >
           ‹
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
-          📄 {t('docs.title')}
+        <h1 className="font-display min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
+          <FileText size={22} strokeWidth={2} aria-hidden="true" className="mr-2 inline-block align-[-0.2em] text-(--text-muted)" />
+          {t('docs.title')}
         </h1>
 
         {/* Person filter chip — same pattern as the budget entries list */}
@@ -363,7 +365,13 @@ export default function DocumentVault() {
           aria-label={lockOn ? t('vault.disableLock') : t('vault.enableLock')}
           className="mb-4 flex w-full items-center gap-3 rounded-2xl bg-(--card) px-4 py-3 text-left active:bg-(--card-active) transition-colors"
         >
-          <span className="text-2xl">{lockOn ? '🔒' : '🔓'}</span>
+          <span className="text-(--text-muted)">
+            {lockOn ? (
+              <Lock size={24} strokeWidth={2} aria-hidden="true" />
+            ) : (
+              <LockOpen size={24} strokeWidth={2} aria-hidden="true" />
+            )}
+          </span>
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-(--text)">{t('vault.lockTitle')}</p>
             <p className="text-xs text-(--text-faint)">{t('vault.lockDesc')}</p>
@@ -407,7 +415,7 @@ export default function DocumentVault() {
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : visible.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
-          <div className="text-5xl">🗂️</div>
+          <FolderOpen size={40} strokeWidth={2} aria-hidden="true" className="mx-auto text-(--text-faint)" />
           <p className="mt-4">{t('docs.empty')}</p>
           <p className="text-sm text-(--text-faint)">{t('docs.emptyHint')}</p>
         </div>
@@ -577,9 +585,9 @@ export default function DocumentVault() {
           >
             <button
               onClick={() => setPreview(null)}
-              className="rounded-lg px-2 py-1 text-xl text-white/70 active:text-white"
+              className="rounded-lg px-2 py-1 text-white/70 active:text-white"
             >
-              ✕
+              <X size={22} strokeWidth={2} aria-hidden="true" />
             </button>
             <h2 className="min-w-0 flex-1 truncate font-semibold text-white">
               {preview.doc.title}

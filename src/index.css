@@ -1,38 +1,47 @@
 @import 'tailwindcss';
 
 /* Theme tokens — components reference these via bg-(--card) etc.
-   Bare :root defaults to LIGHT so first paint matches the app default. */
+   Bare :root defaults to LIGHT ("Paper") so first paint matches the default.
+   Brand: "Warm Hearth" — warm paper neutrals + a clay/terracotta accent. */
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #f5f5f4;
+  --bg: #fbf6f0;
   --card: #ffffff;
-  --card-active: #e7e5e4;
-  --surface: #e7e5e4;
-  --surface-2: #ffffff;
-  --text: #1c1917;
-  --text-muted: #57534e;
-  --text-faint: #a8a29e;
-  --accent: #2563eb;
-  --accent-soft: rgb(37 99 235 / 0.15);
-  --income: #059669;
-  --expense: #e11d48;
+  --card-active: #f4ecdf;
+  --surface: #f1e8dc;
+  --surface-2: #ece3d6;
+  --text: #2b2521;
+  --text-muted: #8c8076;
+  --text-faint: #b3a89b;
+  --accent: #c2603f;
+  --accent-soft: rgb(194 96 63 / 0.14);
+  --income: #3c7d58;
+  --expense: #cf5a4c;
 }
 
+/* Dark "Dusk" — warm espresso, never cold gray; clay lifts to read on dark. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0c0a09;
-  --card: #1c1917;
-  --card-active: #292524;
-  --surface: #292524;
-  --surface-2: #44403c;
-  --text: #f5f5f4;
-  --text-muted: #a8a29e;
-  --text-faint: #78716c;
-  --accent: #2563eb;
-  --accent-soft: rgb(37 99 235 / 0.25);
-  --income: #34d399;
-  --expense: #fb7185;
+  --bg: #1b1714;
+  --card: #262019;
+  --card-active: #2f2820;
+  --surface: #322a21;
+  --surface-2: #3a332b;
+  --text: #f3ebe0;
+  --text-muted: #a89c8e;
+  --text-faint: #7c7165;
+  --accent: #da7a5b;
+  --accent-soft: rgb(218 122 91 / 0.22);
+  --income: #6fb58a;
+  --expense: #e07a6a;
+}
+
+/* Type: Fraunces (warm display serif) for titles, greetings & big numbers;
+   Hanken Grotesk (humanist sans) for the interface. Loaded in main.tsx. */
+:root {
+  --font-sans: 'Hanken Grotesk Variable', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
 }
 
 /* Background lives on html only: if body also had one, it would paint over
@@ -43,12 +52,20 @@ html {
 
 body {
   color: var(--text);
+  font-family: var(--font-sans);
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+
+/* Brand display type — apply to screen titles, greetings, and hero numbers. */
+.font-display {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
 }
 
 input,

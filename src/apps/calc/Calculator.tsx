@@ -1,4 +1,17 @@
 import { useRef, useState } from 'react'
+import {
+  Calculator as CalcIcon,
+  Camera,
+  Check,
+  ChevronRight,
+  Receipt,
+  Scale,
+  Tag,
+  Users,
+  Utensils,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
@@ -8,10 +21,10 @@ import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 
 type Tool = 'split' | 'unit' | 'discount'
-const TOOLS: { id: Tool; icon: string; title: TKey; sub: TKey }[] = [
-  { id: 'split', icon: '🍽️', title: 'calc.tool.split', sub: 'calc.tool.splitSub' },
-  { id: 'unit', icon: '⚖️', title: 'calc.tool.unit', sub: 'calc.tool.unitSub' },
-  { id: 'discount', icon: '🏷️', title: 'calc.tool.discount', sub: 'calc.tool.discountSub' },
+const TOOLS: { id: Tool; icon: LucideIcon; title: TKey; sub: TKey }[] = [
+  { id: 'split', icon: Utensils, title: 'calc.tool.split', sub: 'calc.tool.splitSub' },
+  { id: 'unit', icon: Scale, title: 'calc.tool.unit', sub: 'calc.tool.unitSub' },
+  { id: 'discount', icon: Tag, title: 'calc.tool.discount', sub: 'calc.tool.discountSub' },
 ]
 
 // Currency with extra precision for tiny per-unit prices.
@@ -42,8 +55,18 @@ export default function Calculator() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">
-          {active ? `${active.icon} ${t(active.title)}` : `🧮 ${t('calc.title')}`}
+        <h1 className="flex flex-1 items-center gap-2 font-display text-2xl font-semibold text-(--text)">
+          {active ? (
+            <>
+              <active.icon size={22} strokeWidth={2} className="text-(--accent)" aria-hidden="true" />
+              {t(active.title)}
+            </>
+          ) : (
+            <>
+              <CalcIcon size={22} strokeWidth={2} className="text-(--accent)" aria-hidden="true" />
+              {t('calc.title')}
+            </>
+          )}
         </h1>
       </header>
 
@@ -72,12 +95,14 @@ function Menu({ onPick }: { onPick: (t: Tool) => void }) {
           onClick={() => onPick(tl.id)}
           className="flex w-full items-center gap-4 rounded-2xl bg-(--card) p-4 text-left active:bg-(--card-active) transition-colors"
         >
-          <span className="text-3xl">{tl.icon}</span>
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-(--surface) text-(--accent)">
+            <tl.icon size={24} strokeWidth={2} aria-hidden="true" />
+          </span>
           <span className="min-w-0 flex-1">
-            <span className="block font-bold text-(--text)">{t(tl.title)}</span>
+            <span className="block font-semibold text-(--text)">{t(tl.title)}</span>
             <span className="block text-xs text-(--text-faint)">{t(tl.sub)}</span>
           </span>
-          <span className="shrink-0 text-xl text-(--text-faint)">›</span>
+          <ChevronRight size={20} className="shrink-0 text-(--text-faint)" aria-hidden="true" />
         </button>
       ))}
     </div>
@@ -305,8 +330,8 @@ function BetterDeal() {
           {side === 'A' ? t('calc.optionA') : t('calc.optionB')}
         </span>
         {winner === side && (
-          <span className="animate-pop rounded-full bg-(--income) px-2 py-0.5 text-[11px] font-bold text-white">
-            ✓ {t('calc.betterDeal')}
+          <span className="animate-pop inline-flex items-center gap-1 rounded-full bg-(--income) px-2 py-0.5 text-[11px] font-bold text-white">
+            <Check size={12} strokeWidth={2.5} aria-hidden="true" /> {t('calc.betterDeal')}
           </span>
         )}
       </div>
@@ -564,18 +589,20 @@ function ItemSplit() {
 
   // ── start ──
   if (phase === 'start') {
-    const steps: [string, TKey][] = [
-      ['📷', 'bill.step1'],
-      ['👥', 'bill.step2'],
-      ['🍽️', 'bill.step3'],
+    const steps: [LucideIcon, TKey][] = [
+      [Camera, 'bill.step1'],
+      [Users, 'bill.step2'],
+      [Utensils, 'bill.step3'],
     ]
     return (
       <div className="flex flex-col items-center gap-6 pt-6 text-center">
-        <div className="text-6xl">🧾</div>
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-(--surface) text-(--accent)">
+          <Receipt size={36} strokeWidth={1.75} aria-hidden="true" />
+        </div>
         <p className="max-w-xs text-sm text-(--text-muted)">{t('bill.scanHint')}</p>
         {err && <p className="text-sm font-medium text-(--expense)">{err}</p>}
         <div className="w-full max-w-xs space-y-2">
-          {steps.map(([emoji, key], i) => (
+          {steps.map(([StepIcon, key], i) => (
             <div
               key={key}
               className="flex items-center gap-3 rounded-xl bg-(--card) px-3 py-2.5 text-left"
@@ -583,7 +610,7 @@ function ItemSplit() {
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--surface) text-xs font-bold text-(--text-muted)">
                 {i + 1}
               </span>
-              <span className="text-lg">{emoji}</span>
+              <StepIcon size={18} strokeWidth={2} className="text-(--accent)" aria-hidden="true" />
               <span className="text-sm font-medium text-(--text)">{t(key)}</span>
             </div>
           ))}
@@ -598,8 +625,9 @@ function ItemSplit() {
         />
         <button
           onClick={() => fileRef.current?.click()}
-          className="w-full max-w-xs rounded-2xl bg-(--accent) py-3.5 font-bold text-white active:scale-[0.99] transition-transform"
+          className="flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-(--accent) py-3.5 font-bold text-white active:scale-[0.99] transition-transform"
         >
+          <Camera size={18} strokeWidth={2} aria-hidden="true" />
           {t('bill.takePhoto')}
         </button>
         {import.meta.env.DEV && (
@@ -618,7 +646,9 @@ function ItemSplit() {
   if (phase === 'scanning') {
     return (
       <div className="flex flex-col items-center gap-4 pt-16 text-center">
-        <div className="animate-bounce text-5xl">🧾</div>
+        <div className="flex h-16 w-16 animate-bounce items-center justify-center rounded-full bg-(--surface) text-(--accent)">
+          <Receipt size={30} strokeWidth={1.75} aria-hidden="true" />
+        </div>
         <p className="animate-pulse font-medium text-(--text-muted)">{t('bill.scanning')}</p>
       </div>
     )
@@ -643,7 +673,7 @@ function ItemSplit() {
             >
               <Avatar name={p} sm />
               {firstName(p)}
-              <span className="text-(--text-faint)">✕</span>
+              <X size={14} strokeWidth={2} className="text-(--text-faint)" aria-hidden="true" />
             </button>
           ))}
           {others.map((n) => (
@@ -711,9 +741,9 @@ function ItemSplit() {
                   />
                   <button
                     onClick={() => removeItem(it.id)}
-                    className="shrink-0 px-1 text-lg text-(--text-faint) active:text-(--expense)"
+                    className="shrink-0 px-1 text-(--text-faint) active:text-(--expense)"
                   >
-                    ✕
+                    <X size={18} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
                 {people.length > 0 && (

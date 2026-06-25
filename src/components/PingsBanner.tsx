@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Phone, ThumbsUp, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
@@ -114,16 +115,18 @@ export default function PingsBanner() {
                 {phones[s.sender_email] && (
                   <a
                     href={`tel:${phones[s.sender_email]}`}
-                    className="rounded-full bg-(--expense) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
+                    className="flex items-center gap-1 rounded-full bg-(--expense) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
                   >
-                    📞 {t('pings.call')}
+                    <Phone size={14} strokeWidth={2} aria-hidden="true" />
+                    {t('pings.call')}
                   </a>
                 )}
                 <button
                   onClick={() => ack(s.id)}
-                  className="rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
+                  className="flex items-center gap-1 rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
                 >
-                  👍 {t('pings.gotIt')}
+                  <ThumbsUp size={14} strokeWidth={2} aria-hidden="true" />
+                  {t('pings.gotIt')}
                 </button>
               </div>
             )}
@@ -131,9 +134,9 @@ export default function PingsBanner() {
               <button
                 onClick={() => dismiss(s.id)}
                 aria-label={t('common.close')}
-                className="shrink-0 px-1 text-lg text-(--text-faint) active:text-(--text)"
+                className="shrink-0 px-1 text-(--text-faint) active:text-(--text)"
               >
-                ✕
+                <X size={18} strokeWidth={2} aria-hidden="true" />
               </button>
             )}
           </div>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { MoreHorizontal, CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Backdrop from '../../components/Backdrop'
 import { useBack } from '../../hooks/useBack'
@@ -191,15 +192,15 @@ export default function Months() {
         >
           ‹
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text) font-display">
           {budget?.name ?? '…'}
         </h1>
         <button
           onClick={() => setMenuOpen(true)}
           aria-label={t('months.options')}
-          className="rounded-lg px-3 py-2 text-xl text-(--text-muted) active:text-(--text)"
+          className="rounded-lg px-3 py-2 text-(--text-muted) active:text-(--text)"
         >
-          ⋯
+          <MoreHorizontal size={22} strokeWidth={2} aria-hidden="true" />
         </button>
       </header>
 
@@ -207,7 +208,9 @@ export default function Months() {
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : months.length === 0 ? (
         <div className="mt-16 text-center text-(--text-muted)">
-          <div className="text-5xl">🗓️</div>
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+            <CalendarDays size={40} className="text-(--text-faint)" aria-hidden="true" />
+          </div>
           <p className="mt-4">{t('months.empty')}</p>
           <p className="text-sm text-(--text-faint)">{t(`months.emptyHint${pk}` as TKey)}</p>
         </div>

@@ -1,7 +1,11 @@
 // English — the source dictionary. es.ts and pt.ts must provide every key here
+
 // (enforced by the Record<TKey, string> type). Keys are dotted by screen.
+
 // Interpolation: {name}. Plurals: "one|many" picked by a `count` var.
+
 export const en = {
+
   'common.loading': 'Loading…',
   'common.cancel': 'Cancel',
   'common.save': 'Save',
@@ -11,12 +15,12 @@ export const en = {
   'login.tagline': 'Your family, under one roof.',
   'login.signIn': 'Sign in with Google',
 
-  'hub.morning': 'Good morning, {name} 👋',
-  'hub.afternoon': 'Good afternoon, {name} 👋',
-  'hub.evening': 'Good evening, {name} 👋',
+  'hub.morning': 'Good morning, {name}',
+  'hub.afternoon': 'Good afternoon, {name}',
+  'hub.evening': 'Good evening, {name}',
   'hub.openSettings': 'Open settings',
   'pings.openSheet': 'Send a ping',
-  'pings.title': '📣 Send a ping',
+  'pings.title': 'Send a ping',
   'pings.subtitle': 'A quick ping everyone at home gets right away.',
   'pings.or': 'or',
   'pings.send': 'Send',
@@ -38,21 +42,21 @@ export const en = {
   'pings.preset.grab': 'Grab something?',
   'pings.preset.love': 'Thinking of you',
   'hub.allHidden': 'All apps are hidden.',
-  'hub.allHiddenHint': 'Open ☰ Settings → My apps to bring them back.',
+  'hub.allHiddenHint': 'Open Settings → My apps to bring them back.',
 
-  'app.budget.name': 'Budget',
+  'app.budget.name': 'Money',
   'app.budget.desc': 'Income & spending by period',
-  'app.shopping.name': 'Shopping List',
-  'app.shopping.desc': 'Shared grocery list, live sync',
-  'app.pings.name': 'Quick pings',
-  'app.pings.desc': 'Quick pings to the family',
-  'app.pets.name': 'Pet Care',
+  'app.shopping.name': 'Shopping',
+  'app.shopping.desc': 'Shared list, live sync',
+  'app.pings.name': 'Nudges',
+  'app.pings.desc': 'A quick nudge to the family',
+  'app.pets.name': 'Pets',
   'app.pets.desc': 'Vet visits, meds & due dates',
-  'app.docs.name': 'Document Vault',
+  'app.docs.name': 'Documents',
   'app.docs.desc': 'IDs, insurance & records',
   'app.admin.name': 'Admin',
   'app.admin.desc': 'Households & members',
-  'app.dates.name': 'Important Dates',
+  'app.dates.name': 'Dates',
   'app.dates.desc': 'Birthdays, renewals & more',
   'app.family.name': 'Family',
   'app.family.desc': 'Everyone’s info at a glance',
@@ -93,7 +97,7 @@ export const en = {
   'bill.step1': 'Snap a photo of the bill',
   'bill.step2': 'Add who’s splitting',
   'bill.step3': 'Tap who had each item',
-  'bill.takePhoto': '📷 Take a photo of the bill',
+  'bill.takePhoto': 'Take a photo of the bill',
   'bill.scanning': 'Reading the bill…',
   'bill.scanFailed': 'Couldn’t read that bill — try a clearer photo.',
   'bill.people': 'Who’s splitting?',
@@ -115,34 +119,39 @@ export const en = {
 
   'drawer.settings': 'Settings',
   'drawer.theme': 'Theme',
-  'drawer.light': '🌞 Light',
-  'drawer.dark': '🌙 Dark',
+  'drawer.light': 'Light',
+  'drawer.dark': 'Dark',
   'drawer.language': 'Language',
   'drawer.myApps': 'My apps',
   'drawer.myAppsHint': 'Choose what shows on your home screen — just for you.',
   'drawer.iconsHint': 'Choose how the app icons look.',
-  'drawer.large': '🔲 Large',
-  'drawer.compact': '▪️ Compact',
+  'drawer.large': 'Large',
+  'drawer.compact': 'Compact',
   'drawer.backdrop': 'Backdrop',
   'drawer.backdropHint':
     'A photo shown softly behind the home screen, visible only to your family. Removing it brings back the One Roof default.',
-  'drawer.addImage': '📷 Add image',
-  'drawer.replaceImage': '📷 Replace image',
+
+  'drawer.addImage': 'Add image',
+  'drawer.replaceImage': 'Replace image',
   'drawer.working': 'Working…',
-  'drawer.notifications': '🔔 Reminders',
+  'drawer.notifications': 'Reminders',
   'drawer.notifHint':
     'Get a daily morning notification for pet care due and upcoming important dates.',
+
   'drawer.notifEnable': 'Turn on reminders',
   'drawer.notifOn': 'Reminders are on',
   'drawer.notifInstall':
     'Add One Roof to your Home Screen (Share → Add to Home Screen) to turn on reminders.',
+
   'drawer.notifUnsupported': 'Reminders aren’t available on this device.',
   'drawer.notifDenied':
     'Notifications are blocked. Enable them for One Roof in your device settings.',
+
   'drawer.notifFailed': 'Could not update reminders — please try again.',
   'notif.offTitle': 'Notifications are off',
   'notif.offBody':
     'Turn them on to get alerts on this device, including urgent ones.',
+
   'notif.enable': 'Enable notifications',
   'notif.alertsOff': 'Alerts off',
   'intro.title': 'What’s new',
@@ -150,9 +159,11 @@ export const en = {
   'intro.pingsTitle': 'Quick Pings',
   'intro.pingsDesc':
     'One-tap alerts to everyone at home — on my way, dinner’s ready, and an urgent “Need help”.',
+
   'intro.remindersTitle': 'Reminders',
   'intro.remindersDesc':
     'A daily morning note for pet care that’s due and upcoming important dates.',
+
   'intro.needNotif': 'Turn on notifications to get these alerts on this device.',
   'intro.allSet': 'Notifications are on — you’re all set.',
   'intro.later': 'Maybe later',
@@ -190,7 +201,7 @@ export const en = {
   'cat.salary': 'Salary',
   'cat.other': 'Other',
 
-  'shopping.title': 'Shopping List',
+  'shopping.title': 'Shopping',
   'shopping.empty': 'The list is empty.',
   'shopping.emptyHint': 'Add things below as they run out.',
   'shopping.inCart': 'In the cart ({count})',
@@ -223,9 +234,11 @@ export const en = {
   'pets.noPets': 'No pets yet.',
   'pets.noPetsHint':
     'Add your pets with the + above, then start logging vet visits, vaccines and meds.',
+
   'pets.noEvents': 'No events yet.',
   'pets.noEventsHint':
     'Log vet visits, vaccines and meds — set a “next due” date to get reminders here.',
+
   'pets.history': 'History',
   'pets.newEvent': 'New event',
   'pets.newEventBtn': '＋ New event',
@@ -286,8 +299,8 @@ export const en = {
   'pets.lengthPlaceholder': 'e.g. 40 cm',
   'pets.microchipPlaceholder': 'e.g. 985112…',
   'pets.petNotesPlaceholder': 'Anything else worth remembering',
-  'pets.addPhoto': '📷 Add photo',
-  'pets.changePhoto': '📷 Change photo',
+  'pets.addPhoto': 'Add photo',
+  'pets.changePhoto': 'Change photo',
   'pets.photoFailed': 'Could not upload the photo — please try again.',
   'pets.deletePet': 'Delete pet',
   'pets.edit': 'Edit',
@@ -296,7 +309,8 @@ export const en = {
   'dates.empty': 'No dates yet.',
   'dates.emptyHint':
     'Add birthdays, anniversaries and renewal deadlines to get a heads-up before they arrive.',
-  'dates.today': 'today 🎉',
+
+  'dates.today': 'today',
   'dates.tomorrow': 'tomorrow',
   'dates.inDays': 'in {days}d',
   'dates.inMonths': 'in {months}mo',
@@ -338,8 +352,8 @@ export const en = {
   'family.shirtSize': 'Shirt size',
   'family.allergies': 'Allergies',
   'family.notes': 'Notes',
-  'family.addPhoto': '📷 Add photo',
-  'family.changePhoto': '📷 Change photo',
+  'family.addPhoto': 'Add photo',
+  'family.changePhoto': 'Change photo',
   'family.removePhoto': 'Remove',
   'family.photoFailed': 'Could not upload the photo — please try again.',
 
@@ -363,8 +377,8 @@ export const en = {
   'months.newWeek': '＋ New week',
   'months.newDay': '＋ New day',
   'months.creating': 'Creating…',
-  'months.rename': '✏️ Rename budget',
-  'months.delete': '🗑️ Delete budget',
+  'months.rename': 'Rename budget',
+  'months.delete': 'Delete budget',
   'months.renameTitle': 'Rename budget',
   'months.newMonthTitle': 'New month',
   'months.newWeekTitle': 'New week',
@@ -449,10 +463,10 @@ export const en = {
   'docCat.receipts': 'Receipts',
   'docCat.other': 'Other',
 
-  'docs.title': 'Document Vault',
+  'docs.title': 'Documents',
   'docs.shared': 'Shared',
   'vault.locked': 'Locked — verify it’s you to open it.',
-  'vault.unlock': '🔓 Unlock',
+  'vault.unlock': 'Unlock',
   'vault.unlocking': 'Verifying…',
   'vault.failed': 'Couldn’t verify — try again.',
   'vault.enableLock': 'Turn on Face ID lock',
@@ -462,7 +476,9 @@ export const en = {
   'vault.lockDesc': 'Require Face ID to open the vault.',
   'docs.empty': 'Nothing here yet.',
   'docs.emptyHint':
+
     "Snap photos of IDs, insurance cards, vaccine records — they'll be safe here when you need them.",
+
   'docs.belongsTo': 'Belongs to',
   'docs.addDoc': 'Add document',
   'docs.editDoc': 'Edit document',
@@ -478,3 +494,4 @@ export const en = {
   'docs.editSaveFailed': 'Could not save the changes — please try again.',
   'docs.deleteConfirm': 'Delete “{title}”? This can’t be undone.',
 } as const
+

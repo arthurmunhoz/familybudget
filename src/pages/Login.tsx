@@ -1,4 +1,5 @@
-import { DEFAULT_BACKDROP } from '../components/Backdrop'
+import { Wrench } from 'lucide-react'
+import HearthBackdrop from '../components/HearthBackdrop'
 import { useAuth } from '../hooks/useAuth'
 import { useI18n } from '../hooks/useI18n'
 import { useTheme } from '../hooks/useTheme'
@@ -26,14 +27,9 @@ export default function Login() {
     // extra bottom padding (pb-44) lifts the centered content clear of the artwork
     <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6 pb-44">
       {/* One Roof default art, full strength — this is the branding moment */}
-      <img
-        aria-hidden
-        src={DEFAULT_BACKDROP[theme]}
-        alt=""
-        className="pointer-events-none fixed inset-x-0 bottom-0 -z-10 mx-auto w-full max-w-md select-none"
-      />
+      <HearthBackdrop theme={theme} />
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-(--text)">One Roof</h1>
+        <h1 className="font-display text-3xl font-bold text-(--text)">One Roof</h1>
         <p className="mt-2 text-(--text-muted)">{t('login.tagline')}</p>
       </div>
       <button
@@ -47,9 +43,10 @@ export default function Login() {
       {import.meta.env.DEV && DEV_EMAIL && (
         <button
           onClick={devLogin}
-          className="rounded-xl border border-(--surface-2) px-4 py-2 text-sm font-semibold text-(--text-muted) active:text-(--text)"
+          className="flex items-center gap-1.5 rounded-xl border border-(--surface-2) px-4 py-2 text-sm font-semibold text-(--text-muted) active:text-(--text)"
         >
-          🔧 Dev login
+          <Wrench size={16} strokeWidth={2} aria-hidden="true" />
+          Dev login
         </button>
       )}
     </div>

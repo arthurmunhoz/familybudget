@@ -1,3 +1,12 @@
+import {
+  FileText,
+  Pencil,
+  Pill,
+  Scissors,
+  Stethoscope,
+  Syringe,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useBack } from '../../hooks/useBack'
@@ -11,12 +20,12 @@ import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 import PetForm from './PetForm'
 import { ageInMonths, speciesEmoji } from './petMeta'
 
-const TYPE_ICON: Record<PetEventType, string> = {
-  vet: '🩺',
-  vaccine: '💉',
-  medication: '💊',
-  grooming: '✂️',
-  other: '📝',
+const TYPE_ICON: Record<PetEventType, LucideIcon> = {
+  vet: Stethoscope,
+  vaccine: Syringe,
+  medication: Pill,
+  grooming: Scissors,
+  other: FileText,
 }
 
 export default function PetProfile() {
@@ -123,15 +132,15 @@ export default function PetProfile() {
         <button
           onClick={() => setEditing(true)}
           aria-label={t('pets.edit')}
-          className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-sm text-white backdrop-blur active:bg-black/65"
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur active:bg-black/65"
         >
-          ✎
+          <Pencil size={16} strokeWidth={2} aria-hidden="true" />
         </button>
       </div>
 
       {/* info "drawer" — a rounded card pulled up over the bottom of the photo */}
       <div className="relative -mt-6 min-h-[40dvh] rounded-t-3xl bg-(--card) px-5 pt-5 pb-32">
-        <h1 className="text-2xl font-bold text-(--text)">
+        <h1 className="font-display text-2xl font-bold text-(--text)">
           {pet.species ? `${speciesEmoji(pet.species)} ` : ''}
           {pet.name}
         </h1>
@@ -163,12 +172,14 @@ export default function PetProfile() {
               {t('pets.history')}
             </h3>
             <ul className="space-y-2">
-              {events.map((e) => (
+              {events.map((e) => {
+                const TypeIcon = TYPE_ICON[e.type]
+                return (
                 <li
                   key={e.id}
                   className="flex items-start gap-3 rounded-xl bg-(--surface) px-4 py-3"
                 >
-                  <span className="text-xl">{TYPE_ICON[e.type]}</span>
+                  <TypeIcon size={20} strokeWidth={2} aria-hidden="true" className="shrink-0 text-(--text-muted)" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-(--text)">{e.title}</p>
                     <p className="text-xs text-(--text-faint)">
@@ -178,7 +189,8 @@ export default function PetProfile() {
                     {e.notes && <p className="mt-1 text-sm text-(--text-muted)">{e.notes}</p>}
                   </div>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           </section>
         )}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { BarChart3, Bug, Home, PartyPopper, Plus, Wrench, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -171,24 +172,28 @@ export default function Admin() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">🛠️ Admin</h1>
+        <h1 className="font-display flex flex-1 items-center gap-2 text-2xl font-bold text-(--text)">
+          <Wrench size={22} strokeWidth={2} aria-hidden="true" />
+          Admin
+        </h1>
       </header>
 
       {/* section tabs */}
       <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-(--surface) p-1">
         {(
           [
-            { key: 'analytics', label: '📊 Analytics' },
-            { key: 'households', label: '🏠 Households' },
-          ] as { key: Tab; label: string }[]
+            { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+            { key: 'households', label: 'Households', icon: Home },
+          ] as { key: Tab; label: string; icon: typeof BarChart3 }[]
         ).map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${
               tab === t.key ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
             }`}
           >
+            <t.icon size={16} strokeWidth={2} aria-hidden="true" />
             {t.label}
           </button>
         ))}
@@ -216,7 +221,10 @@ export default function Admin() {
           </div>
 
           <section className="rounded-2xl bg-(--card) p-4">
-            <h2 className="font-bold text-(--text)">📊 App usage</h2>
+            <h2 className="flex items-center gap-2 font-bold text-(--text)">
+              <BarChart3 size={18} strokeWidth={2} aria-hidden="true" />
+              App usage
+            </h2>
             {stats.length === 0 ? (
               <p className="mt-3 text-sm text-(--text-faint)">
                 No activity in this period yet.
@@ -241,10 +249,14 @@ export default function Admin() {
           </section>
 
           <section className="rounded-2xl bg-(--card) p-4">
-            <h2 className="font-bold text-(--text)">🐞 Recent errors</h2>
+            <h2 className="flex items-center gap-2 font-bold text-(--text)">
+              <Bug size={18} strokeWidth={2} aria-hidden="true" />
+              Recent errors
+            </h2>
             {errors.length === 0 ? (
-              <p className="mt-3 text-sm text-(--text-faint)">
-                No errors reported. 🎉
+              <p className="mt-3 flex items-center gap-1.5 text-sm text-(--text-faint)">
+                No errors reported.
+                <PartyPopper size={16} strokeWidth={2} aria-hidden="true" />
               </p>
             ) : (
               <ul className="mt-3 space-y-2.5">
@@ -267,8 +279,9 @@ export default function Admin() {
         <div className="space-y-4">
           {/* create — bordered so it reads as an action card, not a list item */}
           <section className="rounded-2xl border border-(--accent-soft) bg-(--card) p-4">
-            <h2 className="text-sm font-semibold text-(--text-muted)">
-              ➕ New household
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-(--text-muted)">
+              <Plus size={16} strokeWidth={2} aria-hidden="true" />
+              New household
             </h2>
             <div className="mt-2 flex gap-2">
               <input
@@ -304,7 +317,7 @@ export default function Admin() {
                 aria-label="Clear search"
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-2 py-1 text-(--text-faint) active:text-(--text)"
               >
-                ✕
+                <X size={16} strokeWidth={2} aria-hidden="true" />
               </button>
             )}
           </div>
@@ -340,7 +353,10 @@ export default function Admin() {
                     className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3 text-left active:bg-(--card-active) transition-colors"
                   >
                     <div className="min-w-0 flex-1">
-                      <h2 className="truncate font-bold text-(--text)">🏠 {h.name}</h2>
+                      <h2 className="flex items-center gap-1.5 truncate font-bold text-(--text)">
+                        <Home size={16} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+                        {h.name}
+                      </h2>
                       <p className="text-xs text-(--text-faint)">
                         {memberCount} {memberCount === 1 ? 'member' : 'members'} ·{' '}
                         {hhLastSeen[h.id]

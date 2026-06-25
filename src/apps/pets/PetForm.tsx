@@ -1,3 +1,4 @@
+import { Camera, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useI18n } from '../../hooks/useI18n'
@@ -139,7 +140,7 @@ export default function PetForm({
             aria-label={t('common.close')}
             className="px-2 py-1 text-(--text-muted) active:text-(--text)"
           >
-            ✕
+            <X size={20} strokeWidth={2} aria-hidden="true" />
           </button>
         </div>
 
@@ -158,8 +159,9 @@ export default function PetForm({
                 type="button"
                 onClick={() => fileInput.current?.click()}
                 disabled={uploadingPhoto}
-                className="rounded-lg bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text) disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text) disabled:opacity-50"
               >
+                <Camera size={16} strokeWidth={2} aria-hidden="true" />
                 {uploadingPhoto
                   ? t('drawer.working')
                   : photoPath

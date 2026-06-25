@@ -1,7 +1,9 @@
 import type { en } from './en'
 
 // Neutral Latin American Spanish (the audience is US Hispanic families).
+
 export const es: Record<keyof typeof en, string> = {
+
   'common.loading': 'Cargando…',
   'common.cancel': 'Cancelar',
   'common.save': 'Guardar',
@@ -11,12 +13,12 @@ export const es: Record<keyof typeof en, string> = {
   'login.tagline': 'Tu familia, bajo un mismo techo.',
   'login.signIn': 'Iniciar sesión con Google',
 
-  'hub.morning': 'Buenos días, {name} 👋',
-  'hub.afternoon': 'Buenas tardes, {name} 👋',
-  'hub.evening': 'Buenas noches, {name} 👋',
+  'hub.morning': 'Buenos días, {name}',
+  'hub.afternoon': 'Buenas tardes, {name}',
+  'hub.evening': 'Buenas noches, {name}',
   'hub.openSettings': 'Abrir ajustes',
   'pings.openSheet': 'Enviar una señal',
-  'pings.title': '📣 Enviar una señal',
+  'pings.title': 'Enviar una señal',
   'pings.subtitle': 'Un aviso rápido que todos en casa reciben al instante.',
   'pings.or': 'o',
   'pings.send': 'Enviar',
@@ -38,21 +40,21 @@ export const es: Record<keyof typeof en, string> = {
   'pings.preset.grab': '¿Traes algo?',
   'pings.preset.love': 'Pensando en ti',
   'hub.allHidden': 'Todas las apps están ocultas.',
-  'hub.allHiddenHint': 'Abre ☰ Ajustes → Mis apps para mostrarlas de nuevo.',
+  'hub.allHiddenHint': 'Abre Ajustes → Mis apps para mostrarlas de nuevo.',
 
-  'app.budget.name': 'Presupuesto',
+  'app.budget.name': 'Dinero',
   'app.budget.desc': 'Ingresos y gastos por período',
-  'app.shopping.name': 'Lista de compras',
+  'app.shopping.name': 'Compras',
   'app.shopping.desc': 'Lista compartida, en tiempo real',
-  'app.pings.name': 'Avisos instantáneos',
-  'app.pings.desc': 'Avisos rápidos a la familia',
+  'app.pings.name': 'Avisos',
+  'app.pings.desc': 'Un aviso rápido a la familia',
   'app.pets.name': 'Mascotas',
   'app.pets.desc': 'Veterinario, medicinas y fechas',
-  'app.docs.name': 'Bóveda de documentos',
+  'app.docs.name': 'Documentos',
   'app.docs.desc': 'Identificaciones, seguros y más',
   'app.admin.name': 'Administración',
   'app.admin.desc': 'Hogares y miembros',
-  'app.dates.name': 'Fechas importantes',
+  'app.dates.name': 'Fechas',
   'app.dates.desc': 'Cumpleaños, renovaciones y más',
   'app.family.name': 'Familia',
   'app.family.desc': 'La info de todos a la mano',
@@ -93,7 +95,7 @@ export const es: Record<keyof typeof en, string> = {
   'bill.step1': 'Saca una foto de la cuenta',
   'bill.step2': 'Agrega quiénes dividen',
   'bill.step3': 'Toca quién pidió cada plato',
-  'bill.takePhoto': '📷 Sacar foto de la cuenta',
+  'bill.takePhoto': 'Sacar foto de la cuenta',
   'bill.scanning': 'Leyendo la cuenta…',
   'bill.scanFailed': 'No pude leer esa cuenta — prueba con una foto más clara.',
   'bill.people': '¿Quiénes dividen?',
@@ -115,34 +117,39 @@ export const es: Record<keyof typeof en, string> = {
 
   'drawer.settings': 'Ajustes',
   'drawer.theme': 'Tema',
-  'drawer.light': '🌞 Claro',
-  'drawer.dark': '🌙 Oscuro',
+  'drawer.light': 'Claro',
+  'drawer.dark': 'Oscuro',
   'drawer.language': 'Idioma',
   'drawer.myApps': 'Mis apps',
   'drawer.myAppsHint': 'Elige qué se muestra en tu pantalla de inicio — solo para ti.',
   'drawer.iconsHint': 'Elige cómo se ven los íconos de las apps.',
-  'drawer.large': '🔲 Grande',
-  'drawer.compact': '▪️ Compacto',
+  'drawer.large': 'Grande',
+  'drawer.compact': 'Compacto',
   'drawer.backdrop': 'Fondo',
   'drawer.backdropHint':
     'Una foto que se muestra suavemente detrás de la pantalla de inicio, visible solo para tu familia. Al quitarla vuelve el fondo predeterminado de One Roof.',
-  'drawer.addImage': '📷 Agregar imagen',
-  'drawer.replaceImage': '📷 Cambiar imagen',
+
+  'drawer.addImage': 'Agregar imagen',
+  'drawer.replaceImage': 'Cambiar imagen',
   'drawer.working': 'Procesando…',
-  'drawer.notifications': '🔔 Recordatorios',
+  'drawer.notifications': 'Recordatorios',
   'drawer.notifHint':
     'Recibe una notificación cada mañana con el cuidado de mascotas pendiente y las fechas importantes próximas.',
+
   'drawer.notifEnable': 'Activar recordatorios',
   'drawer.notifOn': 'Recordatorios activados',
   'drawer.notifInstall':
     'Agrega One Roof a tu pantalla de inicio (Compartir → Agregar a inicio) para activar los recordatorios.',
+
   'drawer.notifUnsupported': 'Los recordatorios no están disponibles en este dispositivo.',
   'drawer.notifDenied':
     'Las notificaciones están bloqueadas. Actívalas para One Roof en los ajustes de tu dispositivo.',
+
   'drawer.notifFailed': 'No se pudieron actualizar los recordatorios — inténtalo de nuevo.',
   'notif.offTitle': 'Las notificaciones están desactivadas',
   'notif.offBody':
     'Actívalas para recibir alertas en este dispositivo, incluidas las urgentes.',
+
   'notif.enable': 'Activar notificaciones',
   'notif.alertsOff': 'Alertas desactivadas',
   'intro.title': 'Novedades',
@@ -150,9 +157,11 @@ export const es: Record<keyof typeof en, string> = {
   'intro.pingsTitle': 'Avisos rápidos',
   'intro.pingsDesc':
     'Avisos de un toque para todos en casa — voy en camino, la comida está lista y un urgente «Necesito ayuda».',
+
   'intro.remindersTitle': 'Recordatorios',
   'intro.remindersDesc':
     'Un aviso cada mañana del cuidado de mascotas pendiente y las fechas importantes próximas.',
+
   'intro.needNotif': 'Activa las notificaciones para recibir estos avisos en este dispositivo.',
   'intro.allSet': 'Las notificaciones están activadas — ¡todo listo!',
   'intro.later': 'Quizás luego',
@@ -190,7 +199,7 @@ export const es: Record<keyof typeof en, string> = {
   'cat.salary': 'Sueldo',
   'cat.other': 'Otros',
 
-  'shopping.title': 'Lista de compras',
+  'shopping.title': 'Compras',
   'shopping.empty': 'La lista está vacía.',
   'shopping.emptyHint': 'Agrega cosas abajo cuando se vayan acabando.',
   'shopping.inCart': 'En el carrito ({count})',
@@ -223,9 +232,11 @@ export const es: Record<keyof typeof en, string> = {
   'pets.noPets': 'Aún no hay mascotas.',
   'pets.noPetsHint':
     'Agrega tus mascotas con el + de arriba y empieza a registrar visitas al veterinario, vacunas y medicinas.',
+
   'pets.noEvents': 'Aún no hay registros.',
   'pets.noEventsHint':
     'Registra visitas al veterinario, vacunas y medicinas — pon una fecha de “próxima vez” para ver recordatorios aquí.',
+
   'pets.history': 'Historial',
   'pets.newEvent': 'Nuevo registro',
   'pets.newEventBtn': '＋ Nuevo registro',
@@ -286,8 +297,8 @@ export const es: Record<keyof typeof en, string> = {
   'pets.lengthPlaceholder': 'ej. 40 cm',
   'pets.microchipPlaceholder': 'ej. 985112…',
   'pets.petNotesPlaceholder': 'Algo más que valga la pena recordar',
-  'pets.addPhoto': '📷 Agregar foto',
-  'pets.changePhoto': '📷 Cambiar foto',
+  'pets.addPhoto': 'Agregar foto',
+  'pets.changePhoto': 'Cambiar foto',
   'pets.photoFailed': 'No se pudo subir la foto — inténtalo de nuevo.',
   'pets.deletePet': 'Eliminar mascota',
   'pets.edit': 'Editar',
@@ -296,7 +307,8 @@ export const es: Record<keyof typeof en, string> = {
   'dates.empty': 'Aún no hay fechas.',
   'dates.emptyHint':
     'Agrega cumpleaños, aniversarios y vencimientos para avisarte antes de que lleguen.',
-  'dates.today': 'hoy 🎉',
+
+  'dates.today': 'hoy',
   'dates.tomorrow': 'mañana',
   'dates.inDays': 'en {days}d',
   'dates.inMonths': 'en {months}m',
@@ -338,8 +350,8 @@ export const es: Record<keyof typeof en, string> = {
   'family.shirtSize': 'Talla de camisa',
   'family.allergies': 'Alergias',
   'family.notes': 'Notas',
-  'family.addPhoto': '📷 Agregar foto',
-  'family.changePhoto': '📷 Cambiar foto',
+  'family.addPhoto': 'Agregar foto',
+  'family.changePhoto': 'Cambiar foto',
   'family.removePhoto': 'Quitar',
   'family.photoFailed': 'No se pudo subir la foto — inténtalo de nuevo.',
 
@@ -363,8 +375,8 @@ export const es: Record<keyof typeof en, string> = {
   'months.newWeek': '＋ Nueva semana',
   'months.newDay': '＋ Nuevo día',
   'months.creating': 'Creando…',
-  'months.rename': '✏️ Renombrar presupuesto',
-  'months.delete': '🗑️ Eliminar presupuesto',
+  'months.rename': 'Renombrar presupuesto',
+  'months.delete': 'Eliminar presupuesto',
   'months.renameTitle': 'Renombrar presupuesto',
   'months.newMonthTitle': 'Nuevo mes',
   'months.newWeekTitle': 'Nueva semana',
@@ -449,10 +461,10 @@ export const es: Record<keyof typeof en, string> = {
   'docCat.receipts': 'Recibos',
   'docCat.other': 'Otros',
 
-  'docs.title': 'Bóveda de documentos',
+  'docs.title': 'Documentos',
   'docs.shared': 'Compartido',
   'vault.locked': 'Bloqueado — verifica tu identidad para abrirlo.',
-  'vault.unlock': '🔓 Desbloquear',
+  'vault.unlock': 'Desbloquear',
   'vault.unlocking': 'Verificando…',
   'vault.failed': 'No se pudo verificar — inténtalo de nuevo.',
   'vault.enableLock': 'Activar bloqueo con Face ID',
@@ -463,6 +475,7 @@ export const es: Record<keyof typeof en, string> = {
   'docs.empty': 'Aún no hay nada aquí.',
   'docs.emptyHint':
     'Toma fotos de identificaciones, tarjetas de seguro y carnés de vacunas — estarán seguros aquí cuando los necesites.',
+
   'docs.belongsTo': 'Pertenece a',
   'docs.addDoc': 'Agregar documento',
   'docs.editDoc': 'Editar documento',
@@ -478,3 +491,4 @@ export const es: Record<keyof typeof en, string> = {
   'docs.editSaveFailed': 'No se pudieron guardar los cambios — inténtalo de nuevo.',
   'docs.deleteConfirm': '¿Eliminar “{title}”? Esto no se puede deshacer.',
 }
+

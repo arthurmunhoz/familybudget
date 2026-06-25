@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bell, Check, ChevronDown, ChevronUp, GripVertical, Sparkles } from 'lucide-react'
 import NotificationsNudge from '../../components/NotificationsNudge'
 import PingsBanner from '../../components/PingsBanner'
 import { useAuth } from '../../hooks/useAuth'
@@ -148,8 +149,9 @@ export default function Pings() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">
-          📣 {t('app.pings.name')}
+        <h1 className="flex-1 flex items-center gap-2 text-2xl font-bold font-display text-(--text)">
+          <Bell size={24} strokeWidth={2} aria-hidden="true" />
+          {t('app.pings.name')}
         </h1>
       </header>
 
@@ -173,7 +175,13 @@ export default function Pings() {
             <span className="min-w-0 flex-1 truncate text-sm font-semibold text-(--text)">
               {toLabel}
             </span>
-            <span className="shrink-0 text-xs text-(--text-faint)">{pickerOpen ? '▴' : '▾'}</span>
+            <span className="shrink-0 text-(--text-faint)">
+              {pickerOpen ? (
+                <ChevronUp size={16} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
+              )}
+            </span>
           </button>
           {pickerOpen && (
             <div className="mt-1.5 space-y-0.5 rounded-2xl bg-(--surface) p-1.5">
@@ -184,7 +192,7 @@ export default function Pings() {
                 <span className="flex-1 text-sm font-semibold text-(--text)">
                   {t('pings.everyone')}
                 </span>
-                {everyone && <span className="text-(--accent)">✓</span>}
+                {everyone && <Check size={16} strokeWidth={2.5} className="text-(--accent)" aria-hidden="true" />}
               </button>
               {members.map((m) => {
                 const on = !everyone && selected.has(m.email)
@@ -197,7 +205,7 @@ export default function Pings() {
                     <span className="flex-1 truncate text-sm text-(--text)">
                       {m.display_name}
                     </span>
-                    {on && <span className="text-(--accent)">✓</span>}
+                    {on && <Check size={16} strokeWidth={2.5} className="text-(--accent)" aria-hidden="true" />}
                   </button>
                 )
               })}
@@ -240,11 +248,11 @@ export default function Pings() {
                 onPointerMove={onDrag}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
-                className={`shrink-0 touch-none select-none px-4 py-3.5 text-xl text-(--text-faint) ${
+                className={`flex shrink-0 touch-none select-none items-center px-4 py-3.5 text-(--text-faint) ${
                   dragging ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
               >
-                ⠿
+                <GripVertical size={20} strokeWidth={2} aria-hidden="true" />
               </span>
             </div>
           )
@@ -277,7 +285,10 @@ export default function Pings() {
           {aiBusy ? '…' : t('pings.send')}
         </button>
       </div>
-      <p className="mt-2 text-xs text-(--text-faint)">✨ {t('pings.aiHint')}</p>
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-(--text-faint)">
+        <Sparkles size={14} strokeWidth={2} aria-hidden="true" />
+        {t('pings.aiHint')}
+      </p>
     </div>
   )
 }

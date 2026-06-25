@@ -1,11 +1,28 @@
 /**
  * Registry of the apps available in One Roof. Adding a new app is one
  * entry here plus a folder under src/apps/ and a route in App.tsx.
+ *
+ * Display names + descriptions are localized via i18n (`app.<id>.name` /
+ * `app.<id>.desc`); the strings here are English fallbacks only. Icons are
+ * Lucide components (one cohesive outline set — see the Warm Hearth refresh).
  */
+import type { LucideIcon } from 'lucide-react'
+import {
+  Bell,
+  Wallet,
+  ShoppingCart,
+  PawPrint,
+  FolderLock,
+  CalendarHeart,
+  Users,
+  Calculator,
+  Wrench,
+} from 'lucide-react'
+
 export interface HubApp {
   id: string
   name: string
-  icon: string
+  icon: LucideIcon
   route: string
   description: string
 }
@@ -13,59 +30,59 @@ export interface HubApp {
 export const APPS: HubApp[] = [
   {
     id: 'pings',
-    name: 'Pings',
-    icon: '📣',
+    name: 'Nudges',
+    icon: Bell,
     route: '/pings',
-    description: 'Quick pings to the family',
+    description: 'A quick nudge to the family',
   },
   {
     id: 'budget',
-    name: 'Budget',
-    icon: '💰',
+    name: 'Money',
+    icon: Wallet,
     route: '/budget',
     description: 'Income & spending by period',
   },
   {
     id: 'shopping',
-    name: 'Shopping List',
-    icon: '🛒',
+    name: 'Shopping',
+    icon: ShoppingCart,
     route: '/shopping',
-    description: 'Shared grocery list, live sync',
+    description: 'Shared list, live sync',
   },
   {
     id: 'pets',
-    name: 'Pet Care',
-    icon: '🐕',
+    name: 'Pets',
+    icon: PawPrint,
     route: '/pets',
     description: 'Vet visits, meds & due dates',
   },
   {
     id: 'docs',
     name: 'Documents',
-    icon: '📄',
+    icon: FolderLock,
     route: '/docs',
     description: 'IDs, insurance & records',
   },
   {
     id: 'dates',
-    name: 'Important Dates',
-    icon: '🗓️',
+    name: 'Dates',
+    icon: CalendarHeart,
     route: '/dates',
     description: 'Birthdays, renewals & more',
   },
   {
     id: 'family',
     name: 'Family',
-    icon: '👪',
+    icon: Users,
     route: '/family',
     description: 'Everyone’s info at a glance',
   },
   {
     id: 'calc',
     name: 'Calculator',
-    icon: '🧮',
+    icon: Calculator,
     route: '/calc',
-    description: 'Quick math & family money tools',
+    description: 'Split bills, tips & deals',
   },
 ]
 
@@ -73,7 +90,7 @@ export const APPS: HubApp[] = [
 export const ADMIN_APP: HubApp = {
   id: 'admin',
   name: 'Admin',
-  icon: '🛠️',
+  icon: Wrench,
   route: '/admin',
   description: 'Households & members',
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
+import { Home, Trash2, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
 import { formatDay, timeAgo } from '../lib/format'
@@ -133,8 +134,9 @@ export default function AdminHousehold() {
         >
           ‹
         </button>
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-(--text)">
-          🏠 {household?.name ?? '…'}
+        <h1 className="font-display flex min-w-0 flex-1 items-center gap-2 truncate text-2xl font-bold text-(--text)">
+          <Home size={22} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+          {household?.name ?? '…'}
         </h1>
       </header>
 
@@ -185,7 +187,7 @@ export default function AdminHousehold() {
                       aria-label={`Remove ${u.display_name}`}
                       className="px-1 text-(--text-faint) active:text-(--expense)"
                     >
-                      ✕
+                      <X size={18} strokeWidth={2} aria-hidden="true" />
                     </button>
                   )}
                 </li>
@@ -229,9 +231,10 @@ export default function AdminHousehold() {
           {members.length === 0 && (
             <button
               onClick={removeHousehold}
-              className="mt-8 w-full rounded-xl bg-(--card) py-3 font-semibold text-(--expense) active:bg-(--card-active)"
+              className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-(--card) py-3 font-semibold text-(--expense) active:bg-(--card-active)"
             >
-              🗑️ Delete household
+              <Trash2 size={18} strokeWidth={2} aria-hidden="true" />
+              Delete household
             </button>
           )}
         </>

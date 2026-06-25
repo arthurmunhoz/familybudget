@@ -1,3 +1,16 @@
+import {
+  Check,
+  FileText,
+  PawPrint,
+  Pencil,
+  Pill,
+  Plus,
+  Scissors,
+  Stethoscope,
+  Syringe,
+  X,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
@@ -13,12 +26,12 @@ import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 import PetForm from './PetForm'
 import { ageInMonths, speciesEmoji } from './petMeta'
 
-const TYPE_ICON: Record<PetEventType, string> = {
-  vet: '🩺',
-  vaccine: '💉',
-  medication: '💊',
-  grooming: '✂️',
-  other: '📝',
+const TYPE_ICON: Record<PetEventType, LucideIcon> = {
+  vet: Stethoscope,
+  vaccine: Syringe,
+  medication: Pill,
+  grooming: Scissors,
+  other: FileText,
 }
 const TYPES = Object.keys(TYPE_ICON) as PetEventType[]
 
@@ -189,7 +202,10 @@ export default function PetCare() {
         >
           ‹
         </button>
-        <h1 className="flex-1 text-2xl font-bold text-(--text)">🐕 {t('pets.title')}</h1>
+        <h1 className="flex flex-1 items-center gap-2 font-display text-2xl font-bold text-(--text)">
+          <PawPrint size={22} strokeWidth={2} aria-hidden="true" className="text-(--accent)" />
+          {t('pets.title')}
+        </h1>
       </header>
 
       {/* pet carousel — tap a card to filter, circle icon opens the profile.
@@ -244,9 +260,9 @@ export default function PetCare() {
                 <button
                   onClick={() => navigate(`/pets/${p.id}`)}
                   aria-label={`${t('pets.details')}: ${p.name}`}
-                  className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-xs text-white backdrop-blur active:bg-black/65"
+                  className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur active:bg-black/65"
                 >
-                  ✎
+                  <Pencil size={14} strokeWidth={2} aria-hidden="true" />
                 </button>
               </div>
             )
@@ -256,7 +272,7 @@ export default function PetCare() {
             onClick={openAddPet}
             className="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-(--surface-2) py-3 text-(--text-faint) active:bg-(--surface)"
           >
-            <span className="text-2xl">＋</span>
+            <Plus size={24} strokeWidth={2} aria-hidden="true" />
             <span className="text-xs font-semibold">{t('pets.addPet')}</span>
           </button>
         </div>
@@ -274,6 +290,7 @@ export default function PetCare() {
               <ul className="space-y-2">
                 {reminders.map((e) => {
                   const due = dueLabel(e.next_due!)
+                  const TypeIcon = TYPE_ICON[e.type]
                   return (
                     <li
                       key={e.id}
@@ -283,7 +300,7 @@ export default function PetCare() {
                           : 'border-(--accent)'
                       }`}
                     >
-                      <span className="text-xl">{TYPE_ICON[e.type]}</span>
+                      <TypeIcon size={20} strokeWidth={2} aria-hidden="true" className="shrink-0 text-(--text-muted)" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-(--text)">{e.title}</p>
                         <p className="text-xs text-(--text-faint)">
@@ -304,9 +321,10 @@ export default function PetCare() {
                         {due.overdue && (
                           <button
                             onClick={() => logAgain(e)}
-                            className="rounded-full bg-(--accent) px-3 py-1 text-xs font-bold text-white transition-transform active:scale-95"
+                            className="flex items-center gap-1 rounded-full bg-(--accent) px-3 py-1 text-xs font-bold text-white transition-transform active:scale-95"
                           >
-                            ✓ {t('pets.markDone')}
+                            <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+                            {t('pets.markDone')}
                           </button>
                         )}
                       </div>
@@ -319,13 +337,17 @@ export default function PetCare() {
 
           {pets.length === 0 ? (
             <div className="mt-16 text-center text-(--text-muted)">
-              <div className="text-5xl">🐾</div>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+                <PawPrint size={40} aria-hidden="true" className="text-(--text-faint)" />
+              </div>
               <p className="mt-4">{t('pets.noPets')}</p>
               <p className="text-sm text-(--text-faint)">{t('pets.noPetsHint')}</p>
             </div>
           ) : visible.length === 0 ? (
             <div className="mt-16 text-center text-(--text-muted)">
-              <div className="text-5xl">🐾</div>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
+                <PawPrint size={40} aria-hidden="true" className="text-(--text-faint)" />
+              </div>
               <p className="mt-4">{t('pets.noEvents')}</p>
               <p className="text-sm text-(--text-faint)">{t('pets.noEventsHint')}</p>
             </div>
@@ -335,7 +357,9 @@ export default function PetCare() {
                 {t('pets.history')}
               </h3>
               <ul className="space-y-2">
-                {visible.map((e) => (
+                {visible.map((e) => {
+                  const TypeIcon = TYPE_ICON[e.type]
+                  return (
                   <li
                     key={e.id}
                     className="flex items-start gap-3 rounded-xl bg-(--card) px-4 py-3"
@@ -344,7 +368,7 @@ export default function PetCare() {
                       onClick={() => openEditForm(e)}
                       className="flex min-w-0 flex-1 items-start gap-3 text-left"
                     >
-                      <span className="text-xl">{TYPE_ICON[e.type]}</span>
+                      <TypeIcon size={20} strokeWidth={2} aria-hidden="true" className="shrink-0 text-(--text-muted)" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-(--text)">{e.title}</p>
                         <p className="text-xs text-(--text-faint)">
@@ -362,10 +386,11 @@ export default function PetCare() {
                       aria-label={t('common.deleteName', { name: e.title })}
                       className="px-1 text-(--text-faint) active:text-(--expense)"
                     >
-                      ✕
+                      <X size={18} strokeWidth={2} aria-hidden="true" />
                     </button>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </section>
           )}
@@ -388,7 +413,7 @@ export default function PetCare() {
                 aria-label={t('common.close')}
                 className="px-2 py-1 text-(--text-muted) active:text-(--text)"
               >
-                ✕
+                <X size={20} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
 
@@ -408,11 +433,17 @@ export default function PetCare() {
               {t('pets.typeLabel')}
             </label>
             <div className="mt-1 flex flex-wrap gap-2">
-              {TYPES.map((ty) => (
-                <FilterChip key={ty} active={fType === ty} onClick={() => setFType(ty)}>
-                  {TYPE_ICON[ty]} {t(`pets.type.${ty}` as TKey)}
-                </FilterChip>
-              ))}
+              {TYPES.map((ty) => {
+                const TypeIcon = TYPE_ICON[ty]
+                return (
+                  <FilterChip key={ty} active={fType === ty} onClick={() => setFType(ty)}>
+                    <span className="flex items-center gap-1.5">
+                      <TypeIcon size={16} strokeWidth={2} aria-hidden="true" />
+                      {t(`pets.type.${ty}` as TKey)}
+                    </span>
+                  </FilterChip>
+                )
+              })}
             </div>
 
             <input
