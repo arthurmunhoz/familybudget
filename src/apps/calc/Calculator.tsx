@@ -223,7 +223,7 @@ function SplitBill() {
 function EvenSplit() {
   const { t } = useI18n()
   const [bill, setBill] = useState('')
-  const [tipPct, setTipPct] = useState(10)
+  const [tipPct, setTipPct] = useState(20)
   const [people, setPeople] = useState(2)
 
   const b = num(bill)
@@ -493,7 +493,7 @@ function ItemSplit() {
   // already has a tip starts in amount mode; one without starts in % mode so
   // you can just tap a percentage.
   const [tipMode, setTipMode] = useState<'amount' | 'percent'>('amount')
-  const [tipPct, setTipPct] = useState(15)
+  const [tipPct, setTipPct] = useState(20)
   const [people, setPeople] = useState<string[]>([])
   const [nameInput, setNameInput] = useState('')
   const [err, setErr] = useState('')
