@@ -1,6 +1,24 @@
 import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { BarChart3, Bug, Home, PartyPopper, Plus, Wrench, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import {
+  BarChart3,
+  Bell,
+  Bug,
+  Calculator,
+  CalendarHeart,
+  FolderLock,
+  Home,
+  LayoutGrid,
+  PartyPopper,
+  PawPrint,
+  Plus,
+  ShoppingCart,
+  Users,
+  Wallet,
+  Wrench,
+  X,
+} from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -9,19 +27,25 @@ import { supabase } from '../lib/supabase'
 import type { Household, Profile } from '../lib/types'
 
 interface AppStat {
-  label: string
+  name: string
+  icon: LucideIcon
   views: number
   seconds: number
 }
 
-const APP_LABELS: Record<string, string> = {
-  '': '🏠 Hub',
-  budget: '💰 Budget',
-  month: '💰 Budget',
-  shopping: '🛒 Shopping List',
-  pets: '🐕 Pet Care',
-  docs: '📄 Documents',
-  admin: '🛠️ Admin',
+// Route root → app name + icon, kept in sync with the hub apps (see apps.ts).
+const APP_META: Record<string, { name: string; icon: LucideIcon }> = {
+  '': { name: 'Hub', icon: Home },
+  budget: { name: 'Money', icon: Wallet },
+  month: { name: 'Money', icon: Wallet },
+  shopping: { name: 'Shopping', icon: ShoppingCart },
+  pings: { name: 'Nudges', icon: Bell },
+  pets: { name: 'Pets', icon: PawPrint },
+  docs: { name: 'Documents', icon: FolderLock },
+  dates: { name: 'Dates', icon: CalendarHeart },
+  family: { name: 'Family', icon: Users },
+  calc: { name: 'Calculator', icon: Calculator },
+  admin: { name: 'Admin', icon: Wrench },
 }
 
 const PERIODS = [7, 30, 90]
@@ -40,12 +64,12 @@ export default function Admin() {
   const back = useBack()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const [tab, setTab] = useState<Tab>('analytics')
+  const [tab, setTab] = useState<Tab>('households')
 
   // analytics period + households tab controls
   const [days, setDays] = useState(30)
   const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortKey, setSortKey] = useState<SortKey>('active')
   const [newHousehold, setNewHousehold] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -100,19 +124,19 @@ export default function Admin() {
         // households, so the panel shows only real-user errors.
         supabase.rpc('admin_recent_errors', { lim: 10 }),
       ])
-      // 'month' pages are budget-period details — fold them into Budget.
+      // 'month' pages are budget-period details — fold them into Money.
       const merged = new Map<string, AppStat>()
       for (const row of (use.data ?? []) as { root: string; views: number }[]) {
-        const label = APP_LABELS[row.root] ?? row.root
-        const s = merged.get(label) ?? { label, views: 0, seconds: 0 }
+        const meta = APP_META[row.root] ?? { name: row.root, icon: LayoutGrid }
+        const s = merged.get(meta.name) ?? { name: meta.name, icon: meta.icon, views: 0, seconds: 0 }
         s.views += Number(row.views)
-        merged.set(label, s)
+        merged.set(meta.name, s)
       }
       for (const row of (time.data ?? []) as { root: string; seconds: number }[]) {
-        const label = APP_LABELS[row.root] ?? row.root
-        const s = merged.get(label) ?? { label, views: 0, seconds: 0 }
+        const meta = APP_META[row.root] ?? { name: row.root, icon: LayoutGrid }
+        const s = merged.get(meta.name) ?? { name: meta.name, icon: meta.icon, views: 0, seconds: 0 }
         s.seconds += Number(row.seconds)
-        merged.set(label, s)
+        merged.set(meta.name, s)
       }
       return {
         stats: [...merged.values()].sort((a, b) => b.views - a.views),
@@ -232,8 +256,11 @@ export default function Admin() {
             ) : (
               <ul className="mt-3 space-y-2">
                 {stats.map((s) => (
-                  <li key={s.label} className="flex items-center justify-between text-sm">
-                    <span className="text-(--text)">{s.label}</span>
+                  <li key={s.name} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-(--text)">
+                      <s.icon size={16} strokeWidth={2} className="text-(--accent)" aria-hidden="true" />
+                      {s.name}
+                    </span>
                     <span className="font-semibold text-(--text-muted)">
                       {s.views} {s.views === 1 ? 'view' : 'views'} ·{' '}
                       {formatDuration(s.seconds)}
