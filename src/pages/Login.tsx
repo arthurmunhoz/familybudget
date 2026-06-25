@@ -1,8 +1,6 @@
 import { Wrench } from 'lucide-react'
-import HearthBackdrop from '../components/HearthBackdrop'
 import { useAuth } from '../hooks/useAuth'
 import { useI18n } from '../hooks/useI18n'
-import { useTheme } from '../hooks/useTheme'
 import { supabase } from '../lib/supabase'
 
 // DEV-only password login for the local preview browser. Reads a throwaway
@@ -13,7 +11,6 @@ const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD as string | undefined
 export default function Login() {
   const { signIn } = useAuth()
   const { t } = useI18n()
-  const { theme } = useTheme()
 
   async function devLogin() {
     const { error } = await supabase.auth.signInWithPassword({
@@ -24,14 +21,13 @@ export default function Login() {
   }
 
   return (
-    // extra bottom padding (pb-44) lifts the centered content clear of the artwork
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6 pb-44">
-      {/* One Roof default art, full strength — this is the branding moment */}
-      <HearthBackdrop theme={theme} />
-      <div className="text-center">
-        <h1 className="font-display text-3xl font-bold text-(--text)">One Roof</h1>
-        <p className="mt-2 text-(--text-muted)">{t('login.tagline')}</p>
-      </div>
+    // The full-bleed branding artwork (title + tagline are baked into the image);
+    // the sign-in button sits in the image's empty mid-zone, above the tree.
+    // pb-44 biases the centered button up into that clear space.
+    <div
+      className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-(--bg) bg-cover bg-center bg-no-repeat p-6 pb-44"
+      style={{ backgroundImage: 'url(/login-bg.jpg)' }}
+    >
       <button
         onClick={signIn}
         className="flex items-center gap-3 rounded-2xl bg-(--card) px-6 py-4 text-lg font-semibold text-(--text) shadow-lg active:scale-95 transition-transform"
