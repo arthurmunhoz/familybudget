@@ -257,7 +257,7 @@ function EvenSplit() {
         <span className="text-xs font-semibold text-(--text-faint)">
           {t('calc.tipPct')} · {tipPct}%
         </span>
-        <PercentPicker value={tipPct} onChange={setTipPct} presets={[10, 15, 18, 20]} />
+        <PercentPicker value={tipPct} onChange={setTipPct} presets={[18, 20, 22]} />
       </div>
 
       <div>
@@ -831,7 +831,7 @@ function ItemSplit() {
             </div>
           </div>
           {tipMode === 'percent' && (
-            <PercentPicker value={tipPct} onChange={setTipPct} presets={[10, 15, 18, 20]} />
+            <PercentPicker value={tipPct} onChange={setTipPct} presets={[18, 20, 22]} />
           )}
         </div>
         <div className="my-1 h-px bg-(--surface-2)" />
