@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarHeart, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CalendarHeart, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useBack } from '../../hooks/useBack'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
@@ -36,6 +36,20 @@ export default function ImportantDates() {
   const [fNotes, setFNotes] = useState('')
   const [saving, setSaving] = useState(false)
   useScrollLock(showForm)
+
+  // Tapping an event on the calendar scrolls to its row and briefly rings it.
+  const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const highlightTimer = useRef<number | undefined>(undefined)
+  function scrollToDate(d: ImportantDate) {
+    itemRefs.current[d.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    window.clearTimeout(highlightTimer.current)
+    setHighlightId(null) // re-trigger the animation even if the same row is re-picked
+    requestAnimationFrame(() => {
+      setHighlightId(d.id)
+      highlightTimer.current = window.setTimeout(() => setHighlightId(null), 1700)
+    })
+  }
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('important_dates').select('*')
@@ -155,24 +169,29 @@ export default function ImportantDates() {
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">
           {t('common.loading')}
         </p>
-      ) : sorted.length === 0 ? (
-        <div className="mt-16 text-center text-(--text-muted)">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--surface)">
-            <CalendarHeart size={40} className="text-(--text-faint)" aria-hidden="true" />
-          </div>
-          <p className="mt-4">{t('dates.empty')}</p>
-          <p className="text-sm text-(--text-faint)">{t('dates.emptyHint')}</p>
-        </div>
       ) : (
-        <ul className="space-y-2">
+        <>
+          <MonthCalendar dates={dates} today={today} lang={lang} onPick={scrollToDate} />
+          {sorted.length === 0 ? (
+            <div className="mt-6 text-center text-(--text-muted)">
+              <p>{t('dates.empty')}</p>
+              <p className="text-sm text-(--text-faint)">{t('dates.emptyHint')}</p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
           {sorted.map((d) => {
             const rel = relLabel(d)
             const sub = `${t(`dates.type.${d.type}` as TKey)} · ${formatDay(nextOccurrence(d, today))}`
             return (
               <li key={d.id}>
                 <button
+                  ref={(el) => {
+                    itemRefs.current[d.id] = el
+                  }}
                   onClick={() => openEdit(d)}
-                  className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3 text-left active:bg-(--card-active) transition-colors"
+                  className={`flex w-full items-center gap-3 rounded-xl bg-(--card) px-4 py-3 text-left active:bg-(--card-active) transition-colors ${
+                    highlightId === d.id ? 'animate-highlight' : ''
+                  }`}
                 >
                   <span className="text-xl">{TYPE_ICON[d.type]}</span>
                   <div className="min-w-0 flex-1">
@@ -197,7 +216,9 @@ export default function ImportantDates() {
               </li>
             )
           })}
-        </ul>
+            </ul>
+          )}
+        </>
       )}
 
       {/* add button */}
@@ -318,6 +339,149 @@ export default function ImportantDates() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Month overview: event days get a clay dot; today is a filled clay circle so
+ *  it reads distinctly from the event marks. Annual dates (birthdays etc.) mark
+ *  every year; one-time dates mark only their own month. Browsable month-to-month. */
+function MonthCalendar({
+  dates,
+  today,
+  lang,
+  onPick,
+}: {
+  dates: ImportantDate[]
+  today: string
+  lang: string
+  onPick: (d: ImportantDate) => void
+}) {
+  const [ty, tm] = today.split('-').map(Number)
+  const [view, setView] = useState({ y: ty, m: tm }) // m is 1-indexed
+  const locale = LOCALES[lang] ?? 'en'
+
+  // Day-of-month → the events on that day in the shown month.
+  const eventsByDay = useMemo(() => {
+    const map = new Map<number, ImportantDate[]>()
+    for (const d of dates) {
+      const [y, m, day] = d.event_date.split('-').map(Number)
+      if (d.repeats_annually ? m === view.m : y === view.y && m === view.m) {
+        const arr = map.get(day) ?? []
+        arr.push(d)
+        map.set(day, arr)
+      }
+    }
+    return map
+  }, [dates, view])
+
+  const weekdays = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(locale, { weekday: 'narrow' })
+    // 2023-01-01 is a Sunday → label columns Sun…Sat.
+    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2023, 0, 1 + i)))
+  }, [locale])
+
+  const firstDow = new Date(view.y, view.m - 1, 1).getDay()
+  const daysInMonth = new Date(view.y, view.m, 0).getDate()
+  const monthLabel = new Date(view.y, view.m - 1, 1).toLocaleDateString(locale, {
+    month: 'long',
+    year: 'numeric',
+  })
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+
+  function shift(delta: number) {
+    setView((v) => {
+      let m = v.m + delta
+      let y = v.y
+      if (m < 1) {
+        m = 12
+        y--
+      } else if (m > 12) {
+        m = 1
+        y++
+      }
+      return { y, m }
+    })
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl bg-(--card) p-3">
+      <div className="flex items-center justify-between px-1 pb-2">
+        <button
+          onClick={() => shift(-1)}
+          aria-label="Previous month"
+          className="rounded-lg p-1.5 text-(--text-muted) active:text-(--text)"
+        >
+          <ChevronLeft size={20} strokeWidth={2} aria-hidden="true" />
+        </button>
+        <span className="font-display text-base font-semibold capitalize text-(--text)">
+          {monthLabel}
+        </span>
+        <button
+          onClick={() => shift(1)}
+          aria-label="Next month"
+          className="rounded-lg p-1.5 text-(--text-muted) active:text-(--text)"
+        >
+          <ChevronRight size={20} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {weekdays.map((w, i) => (
+          <div
+            key={i}
+            className="pb-1 text-center text-[11px] font-semibold text-(--text-faint)"
+          >
+            {w}
+          </div>
+        ))}
+        {cells.map((day, i) => {
+          if (day === null) return <div key={`b${i}`} />
+          const evs = eventsByDay.get(day)
+          // Judge each cell by ITS OWN date vs today: clay if today or still to
+          // come, muted grey once it's past — so a recurring birthday only shows
+          // clay for its upcoming instances, grey for ones that already happened.
+          const dateStr = `${view.y}-${String(view.m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const isPast = dateStr < today
+          const isToday = dateStr === today
+          const inner = (
+            <>
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm ${
+                  evs
+                    ? isPast
+                      ? 'bg-(--surface-2) font-semibold text-(--text-muted)'
+                      : 'bg-(--accent) font-semibold text-white'
+                    : 'text-(--text)'
+                }`}
+              >
+                {day}
+              </span>
+              <span
+                className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
+                  isToday ? 'bg-[#e0a23c]' : 'bg-transparent'
+                }`}
+              />
+            </>
+          )
+          return evs ? (
+            <button
+              key={day}
+              onClick={() => onPick(evs[0])}
+              aria-label={evs.map((e) => e.title).join(', ')}
+              className="flex flex-col items-center py-0.5 active:scale-95 transition-transform"
+            >
+              {inner}
+            </button>
+          ) : (
+            <div key={day} className="flex flex-col items-center py-0.5">
+              {inner}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
