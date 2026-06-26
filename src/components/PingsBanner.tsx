@@ -112,7 +112,10 @@ export default function PingsBanner() {
             </div>
             {!mine && (
               <div className="flex shrink-0 items-center gap-2">
-                {phones[s.sender_email] && (
+                {/* "Need help" is urgent → call the sender. Every other nudge
+                    just gets a "Got it" acknowledgement. (Help with no saved
+                    phone falls back to "Got it" so it can still be cleared.) */}
+                {s.kind === 'help' && phones[s.sender_email] ? (
                   <a
                     href={`tel:${phones[s.sender_email]}`}
                     className="flex items-center gap-1 rounded-full bg-(--expense) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
@@ -120,14 +123,15 @@ export default function PingsBanner() {
                     <Phone size={14} strokeWidth={2} aria-hidden="true" />
                     {t('pings.call')}
                   </a>
+                ) : (
+                  <button
+                    onClick={() => ack(s.id)}
+                    className="flex items-center gap-1 rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
+                  >
+                    <ThumbsUp size={14} strokeWidth={2} aria-hidden="true" />
+                    {t('pings.gotIt')}
+                  </button>
                 )}
-                <button
-                  onClick={() => ack(s.id)}
-                  className="flex items-center gap-1 rounded-full bg-(--accent) px-3 py-1.5 text-xs font-bold text-white active:scale-95 transition-transform"
-                >
-                  <ThumbsUp size={14} strokeWidth={2} aria-hidden="true" />
-                  {t('pings.gotIt')}
-                </button>
               </div>
             )}
             {mine && (
