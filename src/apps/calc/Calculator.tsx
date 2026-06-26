@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Calculator as CalcIcon,
   Camera,
@@ -45,6 +45,18 @@ export default function Calculator() {
   const { t } = useI18n()
   const [tool, setTool] = useState<Tool | null>(null)
   const active = TOOLS.find((x) => x.id === tool)
+
+  // Leave room for the sticky header when iOS scrolls a focused input into view
+  // (otherwise the on-screen keyboard can tuck content under the header). Scoped
+  // to this page: set on the scrolling root while mounted, restored on exit.
+  useEffect(() => {
+    const root = document.documentElement
+    const prev = root.style.scrollPaddingTop
+    root.style.scrollPaddingTop = 'calc(env(safe-area-inset-top) + 4.5rem)'
+    return () => {
+      root.style.scrollPaddingTop = prev
+    }
+  }, [])
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-10">
@@ -225,6 +237,13 @@ function EvenSplit() {
   const [bill, setBill] = useState('')
   const [tipPct, setTipPct] = useState(20)
   const [people, setPeople] = useState(2)
+  // Focus the amount on open WITHOUT scrolling — the field is already at the top
+  // above the keyboard, so iOS won't leave the page scrolled under the header
+  // (which `autoFocus` did). See the Calculator scroll-padding note too.
+  const billRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    billRef.current?.focus({ preventScroll: true })
+  }, [])
 
   const b = num(bill)
   const tip = (b * tipPct) / 100
@@ -242,11 +261,11 @@ function EvenSplit() {
           {/* font-size/weight are set inline: an unlayered global `input` rule in
               index.css (font-size:16px) outranks Tailwind's layered text utility. */}
           <input
+            ref={billRef}
             value={bill}
             onChange={(e) => setBill(e.target.value)}
             inputMode="decimal"
             placeholder="0.00"
-            autoFocus
             style={{ fontSize: '2.75rem', fontWeight: 700 }}
             className="w-52 bg-transparent text-center tracking-tight text-(--text) outline-none placeholder:text-(--text-faint)"
           />
@@ -400,6 +419,11 @@ function Discount() {
   const { t } = useI18n()
   const [price, setPrice] = useState('')
   const [pct, setPct] = useState(20)
+  // Focus without scrolling — see SplitBill / the Calculator scroll-padding note.
+  const priceRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    priceRef.current?.focus({ preventScroll: true })
+  }, [])
 
   const p = num(price)
   const save = (p * pct) / 100
@@ -409,11 +433,11 @@ function Discount() {
     <div className="space-y-4">
       <Field label={t('calc.original')}>
         <input
+          ref={priceRef}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           inputMode="decimal"
           placeholder="0.00"
-          autoFocus
           className={inputCls}
         />
       </Field>
