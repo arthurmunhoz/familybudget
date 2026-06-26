@@ -147,7 +147,7 @@ export default function Hub() {
           <p className="text-sm text-(--text-faint)">{t('hub.allHiddenHint')}</p>
         </div>
       ) : tileStyle === 'compact' ? (
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="mt-2 grid grid-cols-3 gap-2.5">
           {tiles.map((app) => {
             const off = alertsOff(app.id)
             const Icon = off ? BellOff : app.icon
@@ -155,7 +155,7 @@ export default function Hub() {
               <button
                 key={app.id}
                 onClick={() => navigate(app.route)}
-                className="relative flex flex-col items-center gap-2 rounded-2xl border border-(--surface-2) bg-(--card) px-2 py-4 active:bg-(--card-active) transition-colors"
+                className="relative flex flex-col items-center gap-2 rounded-2xl border border-(--surface-2) bg-(--card)/65 px-2 py-4 backdrop-blur-md active:bg-(--card-active) transition-colors"
               >
                 {badgeFor(app.id)}
                 <span
@@ -172,7 +172,7 @@ export default function Hub() {
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="mt-2 grid grid-cols-2 gap-3">
           {tiles.map((app) => {
             const off = alertsOff(app.id)
             const Icon = off ? BellOff : app.icon
@@ -180,7 +180,7 @@ export default function Hub() {
               <button
                 key={app.id}
                 onClick={() => navigate(app.route)}
-                className="relative flex flex-col items-start gap-2 rounded-2xl border border-(--surface-2) bg-(--card) p-4 text-left active:bg-(--card-active) transition-colors"
+                className="relative flex flex-col items-start gap-2 rounded-2xl border border-(--surface-2) bg-(--card)/65 p-4 text-left backdrop-blur-md active:bg-(--card-active) transition-colors"
               >
                 {badgeFor(app.id)}
                 <span
