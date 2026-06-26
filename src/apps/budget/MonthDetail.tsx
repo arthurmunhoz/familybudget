@@ -42,6 +42,7 @@ export default function MonthDetail() {
   const [editing, setEditing] = useState<Entry | null>(null)
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
   const [scanning, setScanning] = useState(false)
+  const [showScanTip, setShowScanTip] = useState(false)
   const [showFuture, setShowFuture] = useState(false)
   // Optimistic-delete overlay: ids hidden immediately on swipe-delete, before
   // the cached query revalidates.
@@ -298,7 +299,7 @@ export default function MonthDetail() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
       >
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => setShowScanTip(true)}
           disabled={scanning}
           aria-label={t('detail.scanAria')}
           className="flex items-center justify-center rounded-2xl border border-white/30 bg-(--surface) px-5 shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
@@ -337,6 +338,53 @@ export default function MonthDetail() {
             <p className="mt-2 animate-pulse font-semibold text-(--text)">
               {t('detail.readingReceipt')}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Quick guidance before the native camera opens — a clear shot of the
+          store name + total is what the scanner needs to read the receipt. */}
+      {showScanTip && (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/50"
+          onClick={() => setShowScanTip(false)}
+        >
+          <div
+            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) p-6"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="flex items-center gap-2 text-lg font-bold text-(--text)">
+              <Camera size={22} strokeWidth={2} aria-hidden="true" className="text-(--accent)" />
+              {t('detail.scanTipTitle')}
+            </h2>
+            <p className="mt-2 text-sm text-(--text-muted)">{t('detail.scanTipBody')}</p>
+            <ul className="mt-3 space-y-1.5 text-sm text-(--text)">
+              {[t('detail.scanTipStore'), t('detail.scanTipTotal'), t('detail.scanTipClear')].map(
+                (line) => (
+                  <li key={line} className="flex items-center gap-2">
+                    <Check size={16} strokeWidth={2.5} aria-hidden="true" className="shrink-0 text-(--accent)" />
+                    {line}
+                  </li>
+                ),
+              )}
+            </ul>
+            <button
+              onClick={() => {
+                setShowScanTip(false)
+                // Synchronous within this tap so iOS allows the native camera.
+                fileInputRef.current?.click()
+              }}
+              className="mt-5 w-full rounded-2xl bg-(--accent) py-3.5 font-bold text-white active:scale-[0.98] transition-transform"
+            >
+              {t('detail.scanTipOpen')}
+            </button>
+            <button
+              onClick={() => setShowScanTip(false)}
+              className="mt-2 w-full py-2 text-sm font-medium text-(--text-muted)"
+            >
+              {t('common.cancel')}
+            </button>
           </div>
         </div>
       )}
