@@ -300,7 +300,7 @@ export default function DocumentVault() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
-      <header className="sticky top-0 z-10 -mx-4 -mt-[env(safe-area-inset-top)] flex items-center gap-2 bg-(--bg) px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-4">
+      <header className="sticky top-0 z-10 -mx-4 -mt-[env(safe-area-inset-top)] flex items-center gap-2 bg-(--bg) px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-4 mb-2">
         <button
           onClick={() => back('/')}
           className="rounded-lg px-2 py-1 text-xl text-(--text-muted) active:text-(--text)"
