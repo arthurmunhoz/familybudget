@@ -229,7 +229,9 @@ export default function Calendar() {
     // it there too (the row itself is gone after the delete below).
     if (ev.google_event_id) {
       await supabase.from('calendar_deletions').insert({
-        user_email: ev.created_by,
+        // Pulled events have no created_by — fall back to the owner so the
+        // deletion routes to the right connection.
+        user_email: ev.created_by ?? ev.owner_email,
         google_event_id: ev.google_event_id,
         google_calendar_id: ev.google_calendar_id,
       })

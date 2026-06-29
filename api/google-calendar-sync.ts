@@ -276,11 +276,13 @@ async function syncConnection(db: any, conn: Conn, clientId: string, clientSecre
     .eq('household_id', conn.household_id)
     .eq('user_email', conn.user_email)
   let deleted = 0
+  const deletedGids = new Set<string>()
   for (const t of tombs ?? []) {
     await deleteEvent(access, t.google_calendar_id || conn.calendar_id, t.google_event_id).catch(
       () => {},
     )
     await db.from('calendar_deletions').delete().eq('id', t.id)
+    deletedGids.add(t.google_event_id)
     deleted++
   }
 
@@ -293,8 +295,18 @@ async function syncConnection(db: any, conn: Conn, clientId: string, clientSecre
     .eq('source', 'oneroof')
     .not('google_event_id', 'is', null)
   const ownIds = new Set((ownPushed ?? []).map((r: any) => r.google_event_id))
+  // Also skip anything we deleted this run — rawItems was fetched before the
+  // delete, so without this the just-deleted event would re-import as "new".
   const mapped = rawItems
-    .filter((it) => !ownIds.has(it.id) && !(it.recurringEventId && ownIds.has(it.recurringEventId)))
+    .filter(
+      (it) =>
+        !ownIds.has(it.id) &&
+        !deletedGids.has(it.id) &&
+        !(
+          it.recurringEventId &&
+          (ownIds.has(it.recurringEventId) || deletedGids.has(it.recurringEventId))
+        ),
+    )
     .map(mapFromGoogle)
   const pulledIds = new Set(mapped.map((m) => m.google_event_id))
 
