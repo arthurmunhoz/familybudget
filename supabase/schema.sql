@@ -199,3 +199,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-032-ai-metering.sql (per-household AI scan metering + kill-switch)
 --   migration-033-ai-metering-harden.sql (parameterize RPCs, service-role-only)
 --   migration-034-ai-metering-revoke-client.sql (revoke anon/auth execute)
+--   migration-035-calendar.sql (shared calendar_events: events, recurrence, color-by-member)
+--   migration-036-google-calendar.sql (google_calendar_connections: OAuth tokens for sync)

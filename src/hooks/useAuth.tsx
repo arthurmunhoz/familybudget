@@ -7,6 +7,7 @@ import {
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { handleConnectRedirect } from '../lib/googleCalendar'
 import type { Profile } from '../lib/types'
 
 interface AuthState {
@@ -37,6 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!s) {
         setProfiles([])
         setLoading(false)
+      } else {
+        // Returning from a "Connect Google Calendar" consent? This session
+        // carries the one-time provider refresh token — capture it now.
+        void handleConnectRedirect(s)
       }
     })
     return () => sub.subscription.unsubscribe()

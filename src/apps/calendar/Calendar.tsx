@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight, MapPin, RefreshCw, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useCachedQuery } from '../../hooks/useCachedQuery'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
-import { todayISO } from '../../lib/format'
+import { timeAgo, todayISO } from '../../lib/format'
 import {
   compareOccurrences,
   eventColor,
@@ -15,6 +15,13 @@ import {
   occurrencesByDay,
   type Occurrence,
 } from '../../lib/calendar'
+import {
+  connectGoogleCalendar,
+  disconnectGoogleCalendar,
+  getGoogleConnection,
+  syncGoogleCalendar,
+  type GoogleConnection,
+} from '../../lib/googleCalendar'
 import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import type { CalendarEvent, EventRecurrence } from '../../lib/types'
@@ -80,7 +87,69 @@ export default function Calendar() {
   const [fLocation, setFLocation] = useState('')
   const [fNotes, setFNotes] = useState('')
   const [saving, setSaving] = useState(false)
-  useScrollLock(showForm)
+  const [showConn, setShowConn] = useState(false)
+  const [connection, setConnection] = useState<GoogleConnection | null>(null)
+  const [gcalBusy, setGcalBusy] = useState(false)
+  useScrollLock(showForm || showConn)
+
+  // Google Calendar connection status; refresh events after a connect/sync.
+  useEffect(() => {
+    let cancelled = false
+    const load = () => {
+      getGoogleConnection().then((c) => {
+        if (cancelled) return
+        setConnection(c)
+        // Pull fresh Google events on open if the last sync is over 10 min old.
+        const stale = !c?.last_synced_at || Date.now() - Date.parse(c.last_synced_at) > 600_000
+        if (c && stale) {
+          syncGoogleCalendar()
+            .then(() => {
+              if (cancelled) return
+              getGoogleConnection().then((c2) => !cancelled && setConnection(c2))
+              revalidate()
+            })
+            .catch(() => {})
+        }
+      })
+    }
+    load()
+    const onChanged = () => {
+      load()
+      revalidate()
+    }
+    const onError = () => {
+      setGcalBusy(false)
+      alert(t('calendar.connectError'))
+    }
+    window.addEventListener('gcal-changed', onChanged)
+    window.addEventListener('gcal-error', onError)
+    return () => {
+      cancelled = true
+      window.removeEventListener('gcal-changed', onChanged)
+      window.removeEventListener('gcal-error', onError)
+    }
+  }, [revalidate, t])
+
+  async function syncGcal() {
+    setGcalBusy(true)
+    try {
+      await syncGoogleCalendar()
+      setConnection(await getGoogleConnection())
+      revalidate()
+    } catch {
+      alert(t('calendar.connectError'))
+    }
+    setGcalBusy(false)
+  }
+
+  async function disconnectGcal() {
+    setGcalBusy(true)
+    await disconnectGoogleCalendar().catch(() => {})
+    setConnection(null)
+    setGcalBusy(false)
+    setShowConn(false)
+    revalidate()
+  }
 
   function openNew() {
     setEditing(null)
@@ -223,6 +292,15 @@ export default function Calendar() {
           <CalendarDays size={24} strokeWidth={2} className="text-(--accent)" aria-hidden="true" />
           {t('calendar.title')}
         </h1>
+        <button
+          onClick={() => setShowConn(true)}
+          aria-label={t('calendar.google')}
+          className={`rounded-full bg-(--surface) p-2 active:text-(--text) ${
+            connection ? 'text-(--accent)' : 'text-(--text-muted)'
+          }`}
+        >
+          <RefreshCw size={16} strokeWidth={2} aria-hidden="true" />
+        </button>
         <button
           onClick={goToday}
           className="rounded-full bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text-muted) active:text-(--text)"
@@ -544,6 +622,70 @@ export default function Calendar() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Google Calendar connection sheet */}
+      {showConn && (
+        <div className="fixed inset-0 z-20 flex items-end bg-black/50" onClick={() => setShowConn(false)}>
+          <div
+            className="mx-auto w-full max-w-md rounded-t-3xl bg-(--card) p-4"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3">
+              <h2 className="text-lg font-bold text-(--text)">{t('calendar.google')}</h2>
+              <button
+                onClick={() => setShowConn(false)}
+                aria-label={t('common.close')}
+                className="px-2 py-1 text-(--text-muted) active:text-(--text)"
+              >
+                <X size={20} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+
+            {connection ? (
+              <>
+                <p className="text-sm text-(--text)">
+                  {t('calendar.connectedAs', { email: connection.google_email ?? '' })}
+                </p>
+                <p className="mt-1 text-xs text-(--text-faint)">
+                  {connection.last_synced_at
+                    ? t('calendar.lastSynced', { when: timeAgo(connection.last_synced_at) })
+                    : t('calendar.neverSynced')}
+                </p>
+                <button
+                  onClick={syncGcal}
+                  disabled={gcalBusy}
+                  className="mt-4 w-full rounded-2xl bg-(--accent) py-3.5 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+                >
+                  {gcalBusy ? t('calendar.syncing') : t('calendar.syncNow')}
+                </button>
+                <button
+                  onClick={disconnectGcal}
+                  disabled={gcalBusy}
+                  className="mt-3 w-full rounded-2xl py-3 font-semibold text-(--expense) active:bg-rose-400/10"
+                >
+                  {t('calendar.disconnect')}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-(--text-muted)">{t('calendar.googleHint')}</p>
+                <p className="mt-1 text-xs text-(--text-faint)">{t('calendar.syncDir')}</p>
+                <button
+                  onClick={() => {
+                    setGcalBusy(true)
+                    void connectGoogleCalendar()
+                  }}
+                  disabled={gcalBusy}
+                  className="mt-4 w-full rounded-2xl bg-(--accent) py-3.5 font-bold text-white active:scale-[0.98] transition-transform disabled:opacity-50"
+                >
+                  {t('calendar.connectGoogle')}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

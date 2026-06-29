@@ -53,6 +53,8 @@ api/scan-bill.ts           Itemized bill photo → line items + tax/tip (Claude 
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
 api/send-ping.ts         Push a household ping to everyone but the sender
 api/suggest-ping.ts      Free text → {kind,emoji,message} ping (Claude)
+api/google-calendar-connect.ts  Store a user's Google OAuth tokens (service role)
+api/google-calendar-sync.ts     Pull Google Calendar events → calendar_events
 public/                    Icons, manifest, family.jpg backdrop photo
   sw.js                    Service worker: push + offline app-shell cache
 src/
@@ -69,6 +71,7 @@ src/
     docs/                  DocumentVault (storage uploads, signed URLs;
                            opt-in Face ID lock via VaultGate + biometric.ts)
     dates/                 ImportantDates (birthday/renewal countdowns)
+    calendar/              Calendar (month grid + agenda; calendar_events; Google sync)
     family/                Family (per-member profiles + avatars)
     calc/                  Calculator (Split a bill evenly/by-item via photo
                            scan, Better deal unit-price, Discount) — no DB
@@ -201,6 +204,41 @@ but seed it from `readCache(key)` and write through with `writeCache(key, …)`.
 Already cached: Hub badges, Budgets, Months, MonthDetail, Family, ShoppingList,
 Admin. Not yet (were mid-edit by another agent): Pet Care, Documents,
 Important Dates.
+
+**Shared Calendar (`/calendar`)**: a hub app (`apps/calendar/Calendar.tsx`) —
+month grid + per-day agenda + create/edit sheet over `calendar_events`
+(migration 035). All-day OR timed events, multi-day spans, simple recurrence
+(none/daily/weekly/monthly/yearly), color-by-member, optional reminders.
+`src/lib/calendar.ts` holds the color palette + `eventColor`/`memberColor`
+(color derived from the owner's position in the household; events may also carry
+an explicit hex `color`), recurrence expansion (`occurrencesByDay`), `formatTime`.
+Events default `owner_email` to the creator; `null` = whole household (clay).
+Household-scoped RLS; `household_id`/`created_by` auto-stamped by column defaults.
+
+**Google Calendar sync** (READ direction live; push = planned follow-up):
+- `google_calendar_connections` (migration 036) — one row per user who links
+  Google. OAuth tokens are written ONLY by the service role; column grants hide
+  `access_token`/`refresh_token` from clients (the app selects status columns
+  only). RLS: own-row select/delete.
+- Connect flow: `src/lib/googleCalendar.ts` `connectGoogleCalendar()` re-runs
+  Google OAuth with the `calendar.events` scope (`access_type=offline` +
+  `prompt=consent`) → redirect to `/calendar`. `useAuth`'s `onAuthStateChange`
+  calls `handleConnectRedirect(session)`, which POSTs the one-time
+  `provider_refresh_token` to `api/google-calendar-connect.ts` (the client can't
+  persist it — RLS denies), then triggers a sync.
+- `api/google-calendar-sync.ts` — refreshes the access token (needs
+  `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` env), pulls events in a -30d..+180d
+  window (`singleEvents=true`), upserts into `calendar_events` (source='google',
+  `owner_email` = the connecting user so they show in that member's color),
+  prunes events removed from Google within the window. Callable by Vercel Cron
+  (`CRON_SECRET`) or a signed-in user (JWT — the "Sync now" button). The Calendar
+  screen also auto-syncs on open if the last sync is >10 min old.
+- Env (Vercel only): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (same as the
+  Supabase Google provider). Supabase Auth → URL Configuration → Redirect URLs
+  must include the app origin with `/**` so the `/calendar` redirect is allowed.
+- KNOWN v1 limits: one-way (Google→One Roof) only; recurring events are imported
+  as expanded instances (no RRULE round-trip); times use Google's wall-clock
+  as-is (no tz conversion); no cron yet (freshness via on-open + manual "Sync now").
 
 **Offline (`src/lib/offline.ts`)**: the shopping list works with no connection.
 `loadLocal`/`saveLocal` are durable (localStorage) JSON helpers; the shopping
