@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   PawPrint,
   FolderLock,
+  CalendarDays,
   CalendarHeart,
   Users,
   Calculator,
@@ -34,6 +35,13 @@ export const APPS: HubApp[] = [
     icon: Bell,
     route: '/pings',
     description: 'A quick nudge to the family',
+  },
+  {
+    id: 'calendar',
+    name: 'Calendar',
+    icon: CalendarDays,
+    route: '/calendar',
+    description: 'Shared family schedule',
   },
   {
     id: 'budget',

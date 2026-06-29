@@ -162,6 +162,39 @@ export interface PingAck {
   created_at: string
 }
 
+export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+
+export interface CalendarEvent {
+  id: string
+  household_id: string
+  title: string
+  /** ISO YYYY-MM-DD. end_date = start_date for a single-day event, later for
+   *  a multi-day span (inclusive). Compare these lexicographically. */
+  start_date: string
+  end_date: string
+  all_day: boolean
+  /** 'HH:MM:SS' wall-clock when timed; null when all_day. */
+  start_time: string | null
+  end_time: string | null
+  location: string | null
+  notes: string | null
+  /** Whom the event belongs to (drives color-by-member). null = whole household. */
+  owner_email: string | null
+  /** Explicit color override (hex); null = derived from the owner. */
+  color: string | null
+  recurrence: EventRecurrence
+  recurrence_until: string | null
+  /** Minutes-before to remind; null = no reminder. */
+  reminder_minutes: number | null
+  /** Where the event came from: created in-app or pulled from Google. */
+  source: 'oneroof' | 'google'
+  google_event_id: string | null
+  google_calendar_id: string | null
+  synced_at: string | null
+  created_by: string | null
+  created_at: string
+}
+
 export type ImportantDateType = 'birthday' | 'anniversary' | 'renewal' | 'other'
 
 export interface ImportantDate {

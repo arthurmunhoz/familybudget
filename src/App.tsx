@@ -14,6 +14,7 @@ const Months = lazy(() => import('./apps/budget/Months'))
 const MonthDetail = lazy(() => import('./apps/budget/MonthDetail'))
 const ShoppingList = lazy(() => import('./apps/shopping/ShoppingList'))
 const Pings = lazy(() => import('./apps/pings/Pings'))
+const Calendar = lazy(() => import('./apps/calendar/Calendar'))
 const PetCare = lazy(() => import('./apps/pets/PetCare'))
 const PetProfile = lazy(() => import('./apps/pets/PetProfile'))
 const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/month/:id" element={<MonthDetail />} />
           <Route path="/shopping" element={<ShoppingList />} />
           <Route path="/pings" element={<Pings />} />
+          <Route path="/calendar" element={<Calendar />} />
           <Route path="/pets" element={<PetCare />} />
           <Route path="/pets/:petId" element={<PetProfile />} />
           <Route
