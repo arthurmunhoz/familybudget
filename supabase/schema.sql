@@ -201,3 +201,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-034-ai-metering-revoke-client.sql (revoke anon/auth execute)
 --   migration-035-calendar.sql (shared calendar_events: events, recurrence, color-by-member)
 --   migration-036-google-calendar.sql (google_calendar_connections: OAuth tokens for sync)
+--   migration-037-calendar-push.sql (two-way push: updated_at, time_zone, calendar_deletions)

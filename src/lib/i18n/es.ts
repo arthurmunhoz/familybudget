@@ -373,7 +373,7 @@ export const es: Record<keyof typeof en, string> = {
   'calendar.lastSynced': 'Última sincronización {when}',
   'calendar.neverSynced': 'Sin sincronizar aún',
   'calendar.connectError': 'No se pudo conectar — inténtalo de nuevo.',
-  'calendar.syncDir': 'Por ahora en un sentido: Google → One Roof.',
+  'calendar.syncDir': 'Se sincroniza con Google en ambos sentidos.',
 
   'family.title': 'Familia',
   'family.editMine': 'Editar mi info',

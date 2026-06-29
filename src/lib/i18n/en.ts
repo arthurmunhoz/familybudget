@@ -375,7 +375,7 @@ export const en = {
   'calendar.lastSynced': 'Last synced {when}',
   'calendar.neverSynced': 'Not synced yet',
   'calendar.connectError': 'Couldn’t connect — please try again.',
-  'calendar.syncDir': 'One-way for now: Google → One Roof.',
+  'calendar.syncDir': 'Syncs both ways with Google.',
 
   'family.title': 'Family',
   'family.editMine': 'Edit my info',

@@ -215,7 +215,7 @@ an explicit hex `color`), recurrence expansion (`occurrencesByDay`), `formatTime
 Events default `owner_email` to the creator; `null` = whole household (clay).
 Household-scoped RLS; `household_id`/`created_by` auto-stamped by column defaults.
 
-**Google Calendar sync** (READ direction live; push = planned follow-up):
+**Google Calendar sync** (two-way):
 - `google_calendar_connections` (migration 036) — one row per user who links
   Google. OAuth tokens are written ONLY by the service role; column grants hide
   `access_token`/`refresh_token` from clients (the app selects status columns
@@ -233,12 +233,21 @@ Household-scoped RLS; `household_id`/`created_by` auto-stamped by column default
   prunes events removed from Google within the window. Callable by Vercel Cron
   (`CRON_SECRET`) or a signed-in user (JWT — the "Sync now" button). The Calendar
   screen also auto-syncs on open if the last sync is >10 min old.
+- Push (One Roof → Google): the same function first pushes events the connecting
+  user created (`source='oneroof'`, `created_by` = user) — `events.insert` for new,
+  `events.patch` when `updated_at > synced_at`, and deletes anything tombstoned in
+  `calendar_deletions` (migration 037). Timed events push with the calendar's
+  `time_zone`; simple recurrence → RRULE. Our own pushed events (and recurring
+  instances, matched via `recurringEventId`) are skipped on pull so they don't
+  re-import as duplicates. The client kicks a sync right after a save/delete when
+  connected; `calendar_events.updated_at` is bumped by the client on every edit.
 - Env (Vercel only): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (same as the
   Supabase Google provider). Supabase Auth → URL Configuration → Redirect URLs
   must include the app origin with `/**` so the `/calendar` redirect is allowed.
-- KNOWN v1 limits: one-way (Google→One Roof) only; recurring events are imported
-  as expanded instances (no RRULE round-trip); times use Google's wall-clock
-  as-is (no tz conversion); no cron yet (freshness via on-open + manual "Sync now").
+- KNOWN v1 limits: only the `primary` Google calendar (no secondary/shared
+  calendars yet); pulled recurring events arrive as expanded instances; `UNTIL`
+  on pushed recurrence is date-granular; no Vercel cron yet (freshness via
+  on-open auto-sync + sync-after-edit + manual "Sync now").
 
 **Offline (`src/lib/offline.ts`)**: the shopping list works with no connection.
 `loadLocal`/`saveLocal` are durable (localStorage) JSON helpers; the shopping

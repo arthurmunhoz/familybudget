@@ -204,6 +204,8 @@ export default function Calendar() {
       reminder_minutes: fRemind ? 0 : null,
       location: fLocation.trim() || null,
       notes: fNotes.trim() || null,
+      // Bump on every edit so the sync push knows this row changed.
+      updated_at: new Date().toISOString(),
     }
     const { error } = editing
       ? await supabase.from('calendar_events').update(fields).eq('id', editing.id)
@@ -216,13 +218,25 @@ export default function Calendar() {
     setSelected(fStart)
     closeForm()
     revalidate()
+    // If Google is linked, push this change up promptly.
+    if (connection) void syncGoogleCalendar().then(() => revalidate()).catch(() => {})
   }
 
   async function remove(ev: CalendarEvent) {
     if (!confirm(t('calendar.deleteConfirm', { title: ev.title }))) return
     closeForm()
+    // If this event was synced to Google, tombstone it so the next push deletes
+    // it there too (the row itself is gone after the delete below).
+    if (ev.google_event_id) {
+      await supabase.from('calendar_deletions').insert({
+        user_email: ev.created_by,
+        google_event_id: ev.google_event_id,
+        google_calendar_id: ev.google_calendar_id,
+      })
+    }
     await supabase.from('calendar_events').delete().eq('id', ev.id)
     revalidate()
+    if (connection) void syncGoogleCalendar().then(() => revalidate()).catch(() => {})
   }
 
   // --- month grid scaffolding ---
