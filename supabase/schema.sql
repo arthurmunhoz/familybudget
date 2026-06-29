@@ -196,3 +196,6 @@ create policy documents_storage_rw on storage.objects
 --   migration-029-app-order.sql (per-user hub app ordering)
 --   migration-030-rename-signals-to-pings.sql (Signals → Pings, +compat views)
 --   migration-031-drop-signals-compat-views.sql (drop the temporary shims)
+--   migration-032-ai-metering.sql (per-household AI scan metering + kill-switch)
+--   migration-033-ai-metering-harden.sql (parameterize RPCs, service-role-only)
+--   migration-034-ai-metering-revoke-client.sql (revoke anon/auth execute)

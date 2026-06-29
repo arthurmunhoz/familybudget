@@ -1,8 +1,31 @@
 // Vercel serverless function: extracts itemized line items from a restaurant /
 // store bill photo using Claude vision + structured outputs, so the app can
-// split a bill item-by-item between people. Requires ANTHROPIC_API_KEY in the
-// Vercel environment. Auth: the caller must send a valid Supabase JWT.
+// split a bill item-by-item between people.
+//
+// Cost control (migration 032-034): tries the cheap Haiku 4.5 model first and
+// only falls back to Opus 4.8 (with adaptive thinking) when Haiku's result is
+// unparseable/has no items. Every successful scan is metered PER HOUSEHOLD via
+// the service-role RPCs ai_scan_allowed / ai_scan_record (free monthly cap +
+// global daily-spend kill-switch).
+//
+// Env: ANTHROPIC_API_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
+// SUPABASE_SERVICE_ROLE_KEY. Auth: the caller must send a valid Supabase JWT.
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
+
+const HAIKU = 'claude-haiku-4-5' // primary: $1/$5 per 1M tokens, no thinking
+const OPUS = 'claude-opus-4-8' // fallback: $5/$25 per 1M, adaptive thinking
+
+const RATES: Record<string, { in: number; out: number }> = {
+  [HAIKU]: { in: 1 / 1e6, out: 5 / 1e6 },
+  [OPUS]: { in: 5 / 1e6, out: 25 / 1e6 },
+}
+function estCost(model: string, usage: any): number {
+  const r = RATES[model] ?? RATES[OPUS]
+  const input = (usage?.input_tokens ?? 0) + (usage?.cache_read_input_tokens ?? 0)
+  const output = usage?.output_tokens ?? 0
+  return input * r.in + output * r.out
+}
 
 const BILL_SCHEMA = {
   type: 'object',
@@ -45,6 +68,21 @@ const BILL_SCHEMA = {
   additionalProperties: false,
 }
 
+/** Normalize the model output into well-formed items + numeric tax/tip/total. */
+function cleanBill(parsed: any) {
+  parsed.items = Array.isArray(parsed.items)
+    ? parsed.items
+        .filter(
+          (it: any) => it && typeof it.name === 'string' && Number.isFinite(it.price),
+        )
+        .map((it: any) => ({ name: it.name.trim(), price: Number(it.price) }))
+    : []
+  for (const k of ['tax', 'tip', 'total']) {
+    parsed[k] = Number.isFinite(parsed[k]) ? Number(parsed[k]) : null
+  }
+  return parsed
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -53,6 +91,7 @@ export default async function handler(req: any, res: any) {
   // Only an authenticated user (valid Supabase session) may burn API credits.
   const supabaseUrl = process.env.VITE_SUPABASE_URL
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const token = (req.headers.authorization ?? '').replace(/^Bearer /, '')
   if (!supabaseUrl || !anonKey || !token) {
     return res.status(401).json({ error: 'Unauthorized' })
@@ -61,6 +100,10 @@ export default async function handler(req: any, res: any) {
     headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
   })
   if (!userRes.ok) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  const email = (await userRes.json())?.email
+  if (!email) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
@@ -73,63 +116,112 @@ export default async function handler(req: any, res: any) {
       error: 'Bill scanning is not configured yet (missing ANTHROPIC_API_KEY).',
     })
   }
+  if (!serviceKey) {
+    return res.status(500).json({
+      error: 'Bill scanning is not configured yet (missing service role).',
+    })
+  }
+
+  // Resolve household + check the per-household cap / kill-switch before spending.
+  const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const { data: caller } = await db
+    .from('allowed_users')
+    .select('household_id')
+    .eq('email', email)
+    .single()
+  const household = caller?.household_id
+  if (!household) {
+    return res.status(403).json({ error: 'No household found for this account.' })
+  }
+
+  const { data: gate, error: gateErr } = await db.rpc('ai_scan_allowed', {
+    p_household: household,
+  })
+  if (gateErr) {
+    return res.status(503).json({ error: 'Scanning is temporarily unavailable.' })
+  }
+  if (!gate?.allowed) {
+    const messages: Record<string, string> = {
+      disabled: 'Scanning is temporarily paused. Please try again later.',
+      daily_cap: 'Scanning is paused for today (daily limit reached). Try again tomorrow.',
+      monthly_cap: `You've used all ${gate?.cap ?? ''} receipt/bill scans for this month.`,
+      no_household: 'No household found for this account.',
+    }
+    return res
+      .status(429)
+      .json({ error: messages[gate?.reason] ?? 'Scanning is unavailable right now.', reason: gate?.reason })
+  }
 
   try {
     const client = new Anthropic()
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 4096,
-      // Adaptive thinking: reading cramped itemized receipts, merging wrapped
-      // lines, and separating items from subtotal/tax/tip benefits from a
-      // little reasoning.
-      thinking: { type: 'adaptive' },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: media_type ?? 'image/jpeg',
-                data: image,
-              },
-            },
-            {
-              type: 'text',
-              text: [
-                'This is a photo of an itemized restaurant or store bill to split between people.',
-                'Extract every ordered line item with its charged price (the line total, with quantity already multiplied in — if a line shows "2 Tacos 8.00" use price 8.00 and name "2× Tacos").',
-                'Do NOT include subtotal, tax, tip, gratuity, service charge, or grand-total lines among the items.',
-                'Return tax, tip (gratuity/service charge), and the grand total separately, or null if a value is not printed.',
-                'All prices as plain numbers in the bill currency.',
-              ].join('\n'),
-            },
-          ],
-        },
-      ],
-      output_config: {
-        format: { type: 'json_schema', schema: BILL_SCHEMA },
-      },
-    })
 
-    const text = response.content.find((b) => b.type === 'text')
-    if (!text || text.type !== 'text') {
-      return res.status(502).json({ error: 'Could not read the bill.' })
+    async function extract(model: string) {
+      const isOpus = model === OPUS
+      const response = await client.messages.create({
+        model,
+        max_tokens: isOpus ? 4096 : 2048,
+        // Opus gets adaptive thinking for cramped/wrapped itemized bills; Haiku
+        // (a 4.5-tier model) does not support adaptive thinking — omit it.
+        ...(isOpus ? { thinking: { type: 'adaptive' as const } } : {}),
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: media_type ?? 'image/jpeg',
+                  data: image,
+                },
+              },
+              {
+                type: 'text',
+                text: [
+                  'This is a photo of an itemized restaurant or store bill to split between people.',
+                  'Extract every ordered line item with its charged price (the line total, with quantity already multiplied in — if a line shows "2 Tacos 8.00" use price 8.00 and name "2× Tacos").',
+                  'Do NOT include subtotal, tax, tip, gratuity, service charge, or grand-total lines among the items.',
+                  'Return tax, tip (gratuity/service charge), and the grand total separately, or null if a value is not printed.',
+                  'All prices as plain numbers in the bill currency.',
+                ].join('\n'),
+              },
+            ],
+          },
+        ],
+        output_config: {
+          format: { type: 'json_schema', schema: BILL_SCHEMA },
+        },
+      })
+      const text = response.content.find((b) => b.type === 'text')
+      if (!text || text.type !== 'text') throw new Error('no_text')
+      return { parsed: cleanBill(JSON.parse(text.text)), usage: response.usage }
     }
-    const parsed = JSON.parse(text.text)
-    // Defensive: keep only well-formed items with a finite price.
-    parsed.items = Array.isArray(parsed.items)
-      ? parsed.items
-          .filter(
-            (it: any) => it && typeof it.name === 'string' && Number.isFinite(it.price),
-          )
-          .map((it: any) => ({ name: it.name.trim(), price: Number(it.price) }))
-      : []
-    for (const k of ['tax', 'tip', 'total']) {
-      parsed[k] = Number.isFinite(parsed[k]) ? Number(parsed[k]) : null
+
+    // Haiku first; escalate to Opus only if it failed or found no items.
+    let result: { parsed: any; usage: any } | null = null
+    let usedModel = HAIKU
+    try {
+      const r = await extract(HAIKU)
+      if (r.parsed.items.length > 0) result = r
+    } catch {
+      result = null
     }
-    return res.status(200).json(parsed)
+    if (!result) {
+      result = await extract(OPUS) // may throw APIError -> mapped below
+      usedModel = OPUS
+    }
+
+    try {
+      await db.rpc('ai_scan_record', {
+        p_household: household,
+        p_kind: 'bill',
+        p_cost: estCost(usedModel, result.usage),
+      })
+    } catch {
+      /* metering write failure must not break a good scan */
+    }
+
+    return res.status(200).json(result.parsed)
   } catch (err: any) {
     if (err instanceof Anthropic.APIError) {
       const msg = err.message ?? ''
