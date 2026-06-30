@@ -1,18 +1,29 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "One Roof",
+    "slug": "one-roof",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "oneroof",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.oneroof.app",
+      "supportsTablet": true,
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Face ID unlocks your private Document Vault.",
+        "NSCameraUsageDescription": "Take photos to scan receipts and bills, and add pet and profile photos.",
+        "NSPhotoLibraryUsageDescription": "Attach photos for receipts, pets, profiles and documents.",
+        "NSCalendarsUsageDescription": "Add your One Roof events to the device calendar.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.oneroof.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#fbf6f0",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -28,15 +39,30 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+          "backgroundColor": "#fbf6f0",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120,
+          "dark": { "backgroundColor": "#1b1714" }
         }
       ],
       "expo-localization",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-apple-authentication",
+      [
+        "expo-local-authentication",
+        { "faceIDPermission": "Face ID unlocks your private Document Vault." }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Attach photos for receipts, pets, profiles and documents.",
+          "cameraPermission": "Take photos to scan receipts and bills, and add pet and profile photos."
+        }
+      ],
+      [
+        "expo-notifications",
+        { "icon": "./assets/images/icon.png", "color": "#c2603f" }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

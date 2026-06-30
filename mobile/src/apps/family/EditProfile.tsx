@@ -1,0 +1,427 @@
+// Edit-my-info sheet. Only the signed-in user can open this (for their own
+// member_profiles row). Handles the avatar (pick → resize → upload to the
+// documents bucket), birthday (native date picker), blood type (chips), and the
+// remaining text fields, then upserts the row.
+import { useMemo, useState } from 'react'
+import {
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native'
+import { Image } from 'expo-image'
+import * as ImagePicker from 'expo-image-picker'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+import { File } from 'expo-file-system'
+import DateTimePicker from '@react-native-community/datetimepicker'
+import { Camera, User, X } from 'lucide-react-native'
+
+import { supabase } from '@/lib/supabase'
+import { getSignedUrl } from '@/lib/signedUrls'
+import { formatPhone, formatDay } from '@/lib/format'
+import { useI18n } from '@/hooks/useI18n'
+import { useTheme, sp, radius } from '@/theme/theme'
+import { Btn, Field, Txt } from '@/components/ui'
+import type { MemberProfile, Profile } from '@/lib/types'
+import { BLOOD_TYPES, EDIT_FIELDS } from './familyShared'
+
+type Form = {
+  avatar_path: string
+  birthday: string
+  blood_type: string
+  phone: string
+  height: string
+  weight: string
+  shoe_size: string
+  pants_size: string
+  shirt_size: string
+  allergies: string
+  notes: string
+}
+
+/** Random-ish file id for the content-addressed avatar path (no crypto dep). */
+function randomId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function emptyForm(p?: MemberProfile): Form {
+  return {
+    avatar_path: p?.avatar_path ?? '',
+    birthday: p?.birthday ?? '',
+    blood_type: p?.blood_type ?? '',
+    phone: p?.phone ?? '',
+    height: p?.height ?? '',
+    weight: p?.weight ?? '',
+    shoe_size: p?.shoe_size ?? '',
+    pants_size: p?.pants_size ?? '',
+    shirt_size: p?.shirt_size ?? '',
+    allergies: p?.allergies ?? '',
+    notes: p?.notes ?? '',
+  }
+}
+
+export function EditProfile({
+  profile,
+  mine,
+  initialPhoto,
+  onClose,
+  onSaved,
+}: {
+  profile: Profile
+  mine?: MemberProfile
+  initialPhoto: string | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { t } = useI18n()
+  const { c } = useTheme()
+
+  const [form, setForm] = useState<Form>(() => emptyForm(mine))
+  const [photoPreview, setPhotoPreview] = useState<string | null>(initialPhoto)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [showDate, setShowDate] = useState(false)
+
+  function set<K extends keyof Form>(k: K, v: string) {
+    setForm((f) => ({ ...f, [k]: v }))
+  }
+
+  // birthday "YYYY-MM-DD" → local Date for the picker (defaults to ~30y ago).
+  const birthdayDate = useMemo(() => {
+    if (form.birthday) {
+      const [y, m, d] = form.birthday.split('-').map(Number)
+      if (y && m && d) return new Date(y, m - 1, d)
+    }
+    const now = new Date()
+    return new Date(now.getFullYear() - 30, now.getMonth(), now.getDate())
+  }, [form.birthday])
+
+  async function pickPhoto() {
+    if (uploadingPhoto) return
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert(t('family.photoFailed'))
+      return
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    })
+    if (res.canceled || !res.assets?.[0]) return
+
+    setUploadingPhoto(true)
+    try {
+      // Downscale to a small square-ish avatar to keep storage light.
+      const manipulated = await ImageManipulator.manipulate(res.assets[0].uri)
+        .resize({ width: 512 })
+        .renderAsync()
+      const saved = await manipulated.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 })
+
+      // Read the resized JPEG's bytes and upload directly (no base64 round-trip).
+      const buffer = await new File(saved.uri).arrayBuffer()
+      const path = `${profile.household_id}/avatars/${randomId()}.jpg`
+      const { error } = await supabase.storage
+        .from('documents')
+        .upload(path, buffer, { contentType: 'image/jpeg', cacheControl: '604800' })
+      if (error) throw error
+
+      set('avatar_path', path)
+      const url = await getSignedUrl(path)
+      setPhotoPreview(url ?? saved.uri)
+    } catch {
+      Alert.alert(t('family.photoFailed'))
+    }
+    setUploadingPhoto(false)
+  }
+
+  function removePhoto() {
+    set('avatar_path', '')
+    setPhotoPreview(null)
+  }
+
+  async function save() {
+    if (saving) return
+    setSaving(true)
+    const clean = (v: string) => (v.trim() ? v.trim() : null)
+    const oldAvatar = mine?.avatar_path ?? null
+    const newAvatar = clean(form.avatar_path)
+
+    const { error } = await supabase.from('member_profiles').upsert(
+      {
+        email: profile.email,
+        avatar_path: newAvatar,
+        birthday: clean(form.birthday),
+        phone: clean(form.phone),
+        blood_type: clean(form.blood_type),
+        height: clean(form.height),
+        weight: clean(form.weight),
+        shoe_size: clean(form.shoe_size),
+        pants_size: clean(form.pants_size),
+        shirt_size: clean(form.shirt_size),
+        allergies: clean(form.allergies),
+        notes: clean(form.notes),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'email' },
+    )
+    setSaving(false)
+    if (error) {
+      Alert.alert(t('family.saveFailed'))
+      return
+    }
+    // Remove the previous photo file if it was replaced or cleared.
+    if (oldAvatar && oldAvatar !== newAvatar) {
+      await supabase.storage.from('documents').remove([oldAvatar])
+    }
+    onSaved()
+  }
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <View style={[styles.sheet, { backgroundColor: c.card }]}>
+          {/* header */}
+          <View style={styles.sheetHead}>
+            <Txt variant="h2">{t('family.editTitle')}</Txt>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+            >
+              <X size={22} color={c.textMuted} />
+            </Pressable>
+          </View>
+
+          {/* avatar with edit / remove controls */}
+          <View style={{ alignItems: 'center', paddingBottom: sp.lg }}>
+            <View style={{ width: 96, height: 96 }}>
+              <View
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 48,
+                  backgroundColor: c.surface,
+                  overflow: 'hidden',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: uploadingPhoto ? 0.5 : 1,
+                }}
+              >
+                {photoPreview ? (
+                  <Image
+                    source={{ uri: photoPreview }}
+                    style={{ width: 96, height: 96 }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <User size={40} color={c.textFaint} />
+                )}
+              </View>
+              {/* edit — bottom-right */}
+              <Pressable
+                onPress={pickPhoto}
+                disabled={uploadingPhoto}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  form.avatar_path ? t('family.changePhoto') : t('family.addPhoto')
+                }
+                style={[
+                  styles.fab,
+                  { right: -2, bottom: -2, backgroundColor: c.accent, borderColor: c.card },
+                ]}
+              >
+                <Camera size={16} color="#fff" />
+              </Pressable>
+              {/* remove — top-right */}
+              {form.avatar_path ? (
+                <Pressable
+                  onPress={removePhoto}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('family.removePhoto')}
+                  style={[
+                    styles.fabSmall,
+                    { right: -2, top: -2, backgroundColor: c.expense, borderColor: c.card },
+                  ]}
+                >
+                  <X size={14} color="#fff" />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
+          {/* scrollable fields */}
+          <ScrollView
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ gap: sp.md, paddingBottom: sp.sm }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* birthday */}
+            <View style={{ gap: 6 }}>
+              <Txt variant="label">{t('family.birthday')}</Txt>
+              <Pressable
+                onPress={() => setShowDate(true)}
+                style={{
+                  backgroundColor: c.card,
+                  borderRadius: radius.md,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: c.border,
+                  paddingHorizontal: sp.md,
+                  paddingVertical: 12,
+                }}
+              >
+                <Txt style={{ color: form.birthday ? c.text : c.textFaint }}>
+                  {form.birthday ? formatDay(form.birthday) : t('family.notSet')}
+                </Txt>
+              </Pressable>
+              {form.birthday ? (
+                <Pressable onPress={() => set('birthday', '')} hitSlop={6}>
+                  <Txt variant="faint">{t('family.removePhoto')}</Txt>
+                </Pressable>
+              ) : null}
+              {showDate ? (
+                <DateTimePicker
+                  value={birthdayDate}
+                  mode="date"
+                  maximumDate={new Date()}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, date) => {
+                    if (Platform.OS !== 'ios') setShowDate(false)
+                    if (event.type === 'dismissed') return
+                    if (date) {
+                      const y = date.getFullYear()
+                      const m = String(date.getMonth() + 1).padStart(2, '0')
+                      const d = String(date.getDate()).padStart(2, '0')
+                      set('birthday', `${y}-${m}-${d}`)
+                    }
+                  }}
+                />
+              ) : null}
+              {Platform.OS === 'ios' && showDate ? (
+                <Btn title={t('common.close')} variant="secondary" onPress={() => setShowDate(false)} />
+              ) : null}
+            </View>
+
+            {/* blood type chips */}
+            <View style={{ gap: 6 }}>
+              <Txt variant="label">{t('family.bloodType')}</Txt>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+                <Chip
+                  label={t('family.notSet')}
+                  active={!form.blood_type}
+                  onPress={() => set('blood_type', '')}
+                />
+                {BLOOD_TYPES.map((b) => (
+                  <Chip
+                    key={b}
+                    label={b}
+                    active={form.blood_type === b}
+                    onPress={() => set('blood_type', b)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {/* remaining text fields */}
+            {EDIT_FIELDS.map(([key, labelKey]) => (
+              <Field
+                key={key}
+                label={t(labelKey)}
+                value={form[key as keyof Form]}
+                onChangeText={(v) => set(key as keyof Form, v)}
+                onBlur={
+                  key === 'phone'
+                    ? () => set('phone', formatPhone(form.phone))
+                    : undefined
+                }
+                keyboardType={key === 'phone' ? 'phone-pad' : 'default'}
+                multiline={key === 'notes' || key === 'allergies'}
+              />
+            ))}
+          </ScrollView>
+
+          {/* save */}
+          <View style={{ paddingTop: sp.md }}>
+            <Btn
+              title={saving ? t('common.saving') : t('common.saveChanges')}
+              onPress={save}
+              loading={saving}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+function Chip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string
+  active: boolean
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: sp.md,
+        paddingVertical: sp.sm,
+        borderRadius: radius.pill,
+        backgroundColor: active ? c.accent : c.surface,
+      }}
+    >
+      <Txt style={{ color: active ? '#fff' : c.text, fontWeight: '600', fontSize: 14 }}>
+        {label}
+      </Txt>
+    </Pressable>
+  )
+}
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    maxHeight: '90%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: sp.lg,
+    paddingTop: sp.lg,
+    paddingBottom: sp.xl,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: sp.lg,
+  },
+  fab: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabSmall: {
+    position: 'absolute',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

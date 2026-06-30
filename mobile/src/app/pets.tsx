@@ -1,10 +1,5 @@
-import { AppHeader, EmptyState, Screen } from '@/components/ui';
+import PetCare from '@/apps/pets/PetCare';
 
 export default function PetsScreen() {
-  return (
-    <Screen>
-      <AppHeader title="Pets" />
-      <EmptyState title="Pets" subtitle="Porting from the PWA…" />
-    </Screen>
-  );
+  return <PetCare />;
 }

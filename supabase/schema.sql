@@ -203,3 +203,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-036-google-calendar.sql (google_calendar_connections: OAuth tokens for sync)
 --   migration-037-calendar-push.sql (two-way push: updated_at, time_zone, calendar_deletions)
 --   migration-038-merge-dates.sql (calendar_events.kind; copy important_dates → calendar)
+--   migration-039-account-deletion-and-push-tokens.sql (expo_push_tokens; delete_my_account RPC)

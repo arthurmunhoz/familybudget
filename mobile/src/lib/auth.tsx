@@ -27,6 +27,8 @@ const DEV_PASSWORD = process.env.EXPO_PUBLIC_DEV_PASSWORD ?? ''
 interface AuthState {
   session: Session | null
   profile: Profile | null
+  /** All members of the signed-in user's household (RLS-scoped). */
+  profiles: Profile[]
   loading: boolean
   signInWithApple: () => Promise<void>
   signInWithGoogle: () => Promise<void>
@@ -39,6 +41,7 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -77,6 +80,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false
     }
   }, [email])
+
+  // Load all household members once we know the household.
+  const householdId = profile?.household_id ?? null
+  useEffect(() => {
+    if (!householdId) {
+      setProfiles([])
+      return
+    }
+    let active = true
+    supabase
+      .from('allowed_users')
+      .select('email, display_name, household_id, is_admin')
+      .eq('household_id', householdId)
+      .then(({ data }) => {
+        if (active) setProfiles((data as Profile[]) ?? [])
+      })
+    return () => {
+      active = false
+    }
+  }, [householdId])
 
   const signInWithApple = useCallback(async () => {
     const credential = await AppleAuthentication.signInAsync({
@@ -127,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, signInWithApple, signInWithGoogle, devSignIn, signOut }}
+      value={{ session, profile, profiles, loading, signInWithApple, signInWithGoogle, devSignIn, signOut }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,10 +1,5 @@
-import { AppHeader, EmptyState, Screen } from '@/components/ui';
+import ShoppingList from '@/apps/shopping/ShoppingList';
 
 export default function ShoppingScreen() {
-  return (
-    <Screen>
-      <AppHeader title="Shopping" />
-      <EmptyState title="Shopping" subtitle="Porting from the PWA…" />
-    </Screen>
-  );
+  return <ShoppingList />;
 }

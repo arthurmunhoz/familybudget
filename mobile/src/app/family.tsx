@@ -1,10 +1,5 @@
-import { AppHeader, EmptyState, Screen } from '@/components/ui';
+import Family from '@/apps/family/Family';
 
 export default function FamilyScreen() {
-  return (
-    <Screen>
-      <AppHeader title="Family" />
-      <EmptyState title="Family" subtitle="Porting from the PWA…" />
-    </Screen>
-  );
+  return <Family />;
 }
