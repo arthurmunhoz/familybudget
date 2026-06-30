@@ -64,3 +64,13 @@ export function useTheme(): Theme {
 // Spacing + radius scale (keeps screens consistent).
 export const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
+
+// Brand type — Fraunces (display serif) + Hanken Grotesk (UI sans). Loaded in
+// _layout via @expo-google-fonts. Falls back to system if a name is missing.
+export const fonts = {
+  display: 'Fraunces_700Bold',
+  displaySemi: 'Fraunces_600SemiBold',
+  body: 'HankenGrotesk_400Regular',
+  medium: 'HankenGrotesk_500Medium',
+  semibold: 'HankenGrotesk_600SemiBold',
+} as const;

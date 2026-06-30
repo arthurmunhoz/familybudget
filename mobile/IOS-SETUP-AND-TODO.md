@@ -55,7 +55,7 @@ npx expo start          # press i for the iOS simulator, or scan the QR with Exp
 
 ### D. App assets / polish
 - **App icon**: currently an **upscaled 512px** icon (`mobile/assets/images/icon.png`). Provide a crisp **1024×1024** PNG (no transparency) for store quality.
-- **Fonts**: the PWA uses Fraunces (display) + Hanken Grotesk (UI). The RN app currently uses **system fonts**. To match the brand, add `@expo-google-fonts/fraunces` + `@expo-google-fonts/hanken-grotesk`, load them in `_layout.tsx`, and point the `Txt` `display`/`title` variants at Fraunces. (Cosmetic; not blocking.)
+- **Fonts**: ✅ done — Fraunces (display) + Hanken Grotesk (UI) are loaded via `@expo-google-fonts/*` and applied through the `Txt` primitive. (Raw `<Text>` in a few sub-screens still uses the system font; minor.)
 - **Splash**: a basic splash is configured (warm paper / espresso); refine if desired.
 
 ### E. Server-side follow-ups (Vercel `api/`, when ready)
@@ -86,4 +86,21 @@ Sign in (dev or Apple), then for each: open it, create/edit/delete something, co
 
 ## 6. Per-module status & known gaps
 
-*(Filled in after the full port + integration — see the final section of this doc / the commit log.)*
+All modules type-check and are in the iOS bundle. "Gap" = not yet ported / needs device work.
+
+| Module | Status | Known gaps to finish later |
+|---|---|---|
+| **Calculator** | ✅ split (even + by-item), tip/tax, better-deal, discount | By-item **photo scan** stubbed (alert); by-item people are manual entry (no household-member suggestions) |
+| **Shopping** | ✅ realtime sync, per-store sections, add/check/delete (optimistic) | **Offline queue** not ported (online-only); delete is an X button (no swipe); store logos are colored monograms (no brand bitmaps) |
+| **Pet Care** | ✅ carousel, profiles, events, next-due reminders, "done/again" re-log, **photo upload** | None functional; verify photo upload on device |
+| **Family** | ✅ member list, profile detail, edit own profile + **avatar upload** | Avatar tap-to-zoom lightbox not ported |
+| **Calendar** | ✅ month grid + Upcoming, recurrence, color-by-member, kind markers + "turns N", add/edit | **Google Calendar connect/sync stubbed** (pulled Google events still display read-only) — see §3.E |
+| **Money/Budget** | ✅ budgets → periods → entries, totals, category breakdown, add/edit/delete, recurring copy-forward, **AI receipt scan** (calls the deployed Haiku endpoint) | Charts simplified to bars (no pie); delete is long-press (no swipe); verify receipt scan on device |
+| **Nudges** | ✅ presets, recipient picker, AI free-text (deployed endpoint + fallback), Realtime list with ack / "seen by" / call | **Background push delivery** pending (server-side, §3.E) — in-app Realtime works now |
+| **Documents** | ✅ Face ID gate (re-locks on blur), category grouping, upload / open / delete | Per-owner filter replaced by category grouping; no image downscale before upload; opens in in-app browser (no custom preview) |
+
+**Cross-cutting done:** auth (Sign in with Apple + Google + dev), i18n (EN/ES/PT-BR), light/dark theme, **brand fonts** (Fraunces + Hanken Grotesk), Settings (language / notifications / account deletion), `delete_my_account` RPC, native push registration + `expo_push_tokens`, app icon/splash, app.json capabilities, eas.json.
+
+**Cross-cutting gaps (most also in §3):** background push send-side (server), Sign-in-with-Apple deletion token revocation (server), Shopping offline queue, no stale-while-revalidate cache yet (screens show a brief loader on open), and the by-item calculator member suggestions.
+
+**Verification done here:** `tsc --noEmit` clean + `expo export` (iOS Metro bundle) succeeds for the whole app. **Not done:** running it on a simulator/device — that's §1 + §5 (your side).

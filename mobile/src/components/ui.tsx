@@ -18,7 +18,7 @@ import { SafeAreaView, type Edge } from 'react-native-safe-area-context'
 import { ChevronLeft } from 'lucide-react-native'
 import { router } from 'expo-router'
 
-import { radius, sp, useTheme } from '../theme/theme'
+import { fonts, radius, sp, useTheme } from '../theme/theme'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
 
@@ -29,13 +29,13 @@ export function Txt({
 }: TextProps & { variant?: TxtVariant }) {
   const { c } = useTheme()
   const map: Record<TxtVariant, object> = {
-    display: { fontSize: 30, fontWeight: '700', color: c.text, letterSpacing: -0.3 },
-    title: { fontSize: 24, fontWeight: '700', color: c.text, letterSpacing: -0.2 },
-    h2: { fontSize: 18, fontWeight: '600', color: c.text },
-    body: { fontSize: 16, fontWeight: '400', color: c.text },
-    muted: { fontSize: 14, fontWeight: '400', color: c.textMuted },
-    faint: { fontSize: 13, fontWeight: '400', color: c.textFaint },
-    label: { fontSize: 13, fontWeight: '600', color: c.textMuted },
+    display: { fontSize: 30, fontFamily: fonts.display, color: c.text, letterSpacing: -0.3 },
+    title: { fontSize: 24, fontFamily: fonts.displaySemi, color: c.text, letterSpacing: -0.2 },
+    h2: { fontSize: 18, fontFamily: fonts.semibold, color: c.text },
+    body: { fontSize: 16, fontFamily: fonts.body, color: c.text },
+    muted: { fontSize: 14, fontFamily: fonts.body, color: c.textMuted },
+    faint: { fontSize: 13, fontFamily: fonts.body, color: c.textFaint },
+    label: { fontSize: 13, fontFamily: fonts.semibold, color: c.textMuted },
   }
   return <Text {...rest} style={[map[variant], style]} />
 }
@@ -166,7 +166,7 @@ export function Btn({
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
-        <Text style={{ color: fg, fontSize: 16, fontWeight: '600' }}>{title}</Text>
+        <Text style={{ color: fg, fontSize: 16, fontFamily: fonts.semibold }}>{title}</Text>
       )}
     </Pressable>
   )
