@@ -1,10 +1,10 @@
-import { AppHeader, EmptyState, Screen } from '@/components/ui';
+import VaultGate from '@/apps/docs/VaultGate';
+import DocumentVault from '@/apps/docs/DocumentVault';
 
 export default function DocumentsScreen() {
   return (
-    <Screen>
-      <AppHeader title="Documents" />
-      <EmptyState title="Documents" subtitle="Porting from the PWA…" />
-    </Screen>
+    <VaultGate>
+      <DocumentVault />
+    </VaultGate>
   );
 }

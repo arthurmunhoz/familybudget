@@ -360,6 +360,8 @@ export const en = {
   'calendar.turns': 'turns {years}',
   'calendar.years': '{years} yr',
   'calendar.upcomingEmpty': 'Nothing coming up.',
+  'calendar.connectGoogleSoon': 'Coming soon on the app.',
+  'calendar.googleRow': 'Connect Google Calendar',
 
   'family.title': 'Family',
   'family.editMine': 'Edit my info',

@@ -1,0 +1,89 @@
+# One Roof — iOS (React Native / Expo) build: status & your to-do list
+
+This is the native iOS rewrite of the One Roof PWA, built with **Expo SDK 56 + expo-router**, reusing the existing **Supabase** backend. It was built autonomously and verified as far as possible **without a simulator** — i.e. it **type-checks (`tsc`) and the iOS bundle builds (`expo export`)**, but on-device behavior has **not** been run yet. Everything below tells you how to run it and exactly what only you can finish (Apple account, secrets, device testing).
+
+Branch: `react-native-rewrite` · App lives in `family-budget/mobile/`.
+
+---
+
+## 1. Run it (5 minutes, on your Mac)
+
+```bash
+cd "Family Apps/family-budget/mobile"
+npx expo start          # press i for the iOS simulator, or scan the QR with Expo Go on your iPhone
+```
+- `.env.local` is already created (Supabase URL/anon key + dev creds + API base). It's gitignored.
+- On the login screen tap **Dev sign in** to enter the seeded test household (the Apple/Google buttons need the config in §3).
+- Note: **Sign in with Apple, native push, and EAS builds require a real device + your Apple/EAS accounts** — the simulator + dev login are enough to click through every screen.
+
+> Some features (Sign in with Apple, camera receipt scan, Face ID, push) only work in a **dev build** (`eas build --profile development`) or on a real device, not always in plain Expo Go. See §4.
+
+---
+
+## 2. What's built
+
+**Foundation:** Warm Hearth theme (light/dark, follows system), tri-lingual i18n (EN/ES/PT-BR, device locale + saved preference), auth (Sign in with Apple + Google OAuth + dev login), shared UI primitives, hub launcher, Settings screen.
+
+**Modules ported (functional, RN-native, reusing the Supabase backend + RLS):**
+- Calculator, Shopping List (realtime), Pet Care (profiles, events, reminders, photos), Family (profiles, avatars), Calendar, Money/Budget, Nudges, Document Vault (Face ID). *(Per-module status + known gaps are in §6.)*
+
+**Apple-required pieces scaffolded:** Sign in with Apple, in-app account deletion (Settings → Delete account, backed by the `delete_my_account` RPC), permission usage strings, native push registration.
+
+---
+
+## 3. YOUR TO-DO — things only you can do
+
+### A. Apple Developer / App Store Connect
+1. **Enroll** in the Apple Developer Program ($99/yr) if not already.
+2. **Bundle identifier**: the app uses `com.oneroof.app` (in `app.json`). Change it if you want a different one (and keep `ios.bundleIdentifier` + `android.package` in sync). Then **register the App ID** in your Apple account with the **Sign in with Apple** capability enabled.
+3. **App Store Connect**: create the app record (name "One Roof", the bundle id, primary language, category **Lifestyle**).
+4. **APNs key** for push: Certificates → Keys → create an **APNs Auth Key (.p8)**; EAS will use it (it can also auto-manage this). Needed only when you wire push (§E).
+5. **Privacy Nutrition Labels** (App Store Connect → App Privacy): declare Contact Info, User Content (receipts/vault/pet photos), Financial Info, Identifiers, and **disclose that receipt/bill images are sent to Anthropic**. Required before submission.
+6. Ship **general-audience 4+** (NOT the Kids Category). The app carries **no ad/tracking SDKs**, so set "Data Not Used to Track You" / no ATT prompt needed.
+
+### B. EAS (Expo Application Services) — builds & the push project id
+1. `npm i -g eas-cli` then `eas login`.
+2. From `mobile/`: **`eas init`** — this creates the EAS project and writes the **projectId** into `app.json` (`extra.eas.projectId`). **Push notifications won't register until this exists** (the Settings → Enable notifications button reports "Run `eas init` first" otherwise).
+3. **Env vars for cloud builds**: `.env.local` is gitignored and is NOT uploaded to EAS. Make the `EXPO_PUBLIC_*` values available to builds either by adding an `env` block per profile in `eas.json`, or `eas env:create` (Supabase URL/anon key + `EXPO_PUBLIC_API_BASE`). (Drop the dev email/password from production builds.)
+4. **Build a dev/preview app**: `eas build -p ios --profile development` (simulator/dev-client) or `--profile preview` (internal/TestFlight-style). Install on your iPhone and run through §6.
+5. **Submit**: `eas submit -p ios` once you've validated.
+
+### C. Supabase auth providers (so Apple/Google buttons work)
+1. **Apple provider**: Supabase → Auth → Providers → Apple → enable; add your **Services ID / Team ID / Key** (from Apple). Native Sign in with Apple uses `signInWithIdToken` (already implemented) — it needs the Apple provider enabled with the **bundle id** as an allowed client.
+2. **Google provider**: already enabled for the PWA. For the **native** OAuth redirect, add these to Supabase → Auth → **URL Configuration → Redirect URLs**: `oneroof://auth-callback` and `oneroof://`. (The app uses the `oneroof` scheme.)
+3. After both, the Login screen's Apple/Google buttons should work on a real device/dev build.
+
+### D. App assets / polish
+- **App icon**: currently an **upscaled 512px** icon (`mobile/assets/images/icon.png`). Provide a crisp **1024×1024** PNG (no transparency) for store quality.
+- **Fonts**: the PWA uses Fraunces (display) + Hanken Grotesk (UI). The RN app currently uses **system fonts**. To match the brand, add `@expo-google-fonts/fraunces` + `@expo-google-fonts/hanken-grotesk`, load them in `_layout.tsx`, and point the `Txt` `display`/`title` variants at Fraunces. (Cosmetic; not blocking.)
+- **Splash**: a basic splash is configured (warm paper / espresso); refine if desired.
+
+### E. Server-side follow-ups (Vercel `api/`, when ready)
+- **Native push delivery**: the daily digest + nudges currently push to **web-push** subscriptions. To deliver to iPhones, add an Expo-push sender that reads the new `expo_push_tokens` table and POSTs to Expo's push API (https://exp.host/--/api/v2/push/send). Until then, in-app Realtime shows nudges but no background push lands on the phone.
+- **Sign in with Apple — account-deletion token revocation**: Apple requires revoking the Apple token when an account is deleted. Add a small serverless endpoint that calls Apple's token-revocation REST API; call it from `delete_my_account` flow. (The local data deletion already works.)
+- **Google Calendar native connect**: the two-way sync endpoints exist for web; the native "Connect Google Calendar" button is stubbed. Wiring it needs the OAuth redirect handled in-app (or a WebBrowser flow) plus the existing `/api/google-calendar-*` endpoints.
+
+### F. Paywall / IAP (when you're ready to charge)
+- Not built yet. Plan (from the strategy): **RevenueCat + Apple IAP**, per-household "One Roof Plus" at $4.99/mo · **$39.99/yr** · $79.99 lifetime, 7-day trial after a value moment. Add `react-native-purchases`, gate the cost-bearing features (unlimited AI scans, vault, calendar, unlimited pets/budgets), and tighten the free AI scan cap (10–20/mo) in `ai_config`.
+
+---
+
+## 4. Apple App Review checklist (status)
+- ✅ **Sign in with Apple** (4.8) — implemented (needs §3 Supabase Apple provider + §A capability).
+- ✅ **In-app account deletion** (5.1.1(v)) — Settings → Delete account (needs §E token-revocation for full compliance).
+- ✅ **Not a website wrapper** (4.2) — true native RN app.
+- ✅ **Permission usage strings** — Face ID, camera, photos, calendar in `app.json`.
+- ⏳ **Privacy Nutrition Labels** — fill in App Store Connect (§A.5).
+- ⏳ **Native push (APNs)** — registration done; **send side pending** (§E).
+- ⏳ **No ad/tracking SDKs** — true today; keep it that way (dodges ATT).
+
+---
+
+## 5. Verify-on-device checklist (per module, once running)
+Sign in (dev or Apple), then for each: open it, create/edit/delete something, confirm it persists (and syncs across two sessions where realtime applies). Specifically: **Shopping** realtime + add/check/delete; **Pets** add pet (+photo), add event, "done/again" reminder; **Family** view + edit your profile + avatar; **Calendar** month/upcoming, add event, recurrence shows; **Money** create budget/period/entry, totals, (receipt scan if wired); **Nudges** send a preset, ack, "seen by", call; **Documents** Face ID unlock, upload a PDF/image, open, delete; **Settings** language switch, account deletion (use a throwaway account!).
+
+---
+
+## 6. Per-module status & known gaps
+
+*(Filled in after the full port + integration — see the final section of this doc / the commit log.)*

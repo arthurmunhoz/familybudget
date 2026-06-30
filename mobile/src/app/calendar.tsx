@@ -1,10 +1,5 @@
-import { AppHeader, EmptyState, Screen } from '@/components/ui';
+import Calendar from '@/apps/calendar/Calendar';
 
 export default function CalendarScreen() {
-  return (
-    <Screen>
-      <AppHeader title="Calendar" />
-      <EmptyState title="Calendar" subtitle="Porting from the PWA…" />
-    </Screen>
-  );
+  return <Calendar />;
 }

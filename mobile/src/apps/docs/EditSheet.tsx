@@ -1,0 +1,151 @@
+// Edit sheet — rename a document and change its category / owner. The file
+// bytes are immutable (content-addressed path); this only updates the row.
+import { useState } from 'react'
+import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { X } from 'lucide-react-native'
+
+import { Btn, Field, Txt } from '@/components/ui'
+import { useI18n } from '@/hooks/useI18n'
+import type { TKey } from '@/lib/i18n'
+import { supabase } from '@/lib/supabase'
+import type { FamilyDocument, DocCategory, Profile } from '@/lib/types'
+import { radius, sp, useTheme } from '@/theme/theme'
+import { CATEGORIES } from './docUtils'
+
+export default function EditSheet({
+  doc,
+  profiles,
+  onClose,
+  onSaved,
+}: {
+  doc: FamilyDocument
+  profiles: Profile[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+
+  const [title, setTitle] = useState(doc.title)
+  const [category, setCategory] = useState<DocCategory>(doc.category)
+  const [owner, setOwner] = useState(doc.owner_email)
+  const [saving, setSaving] = useState(false)
+
+  const ownerOptions = [
+    ...profiles.map((p) => ({ key: p.email, label: p.display_name })),
+    { key: 'shared', label: `🏠 ${t('docs.shared')}` },
+  ]
+
+  async function save() {
+    if (!title.trim() || saving) return
+    setSaving(true)
+    const { error } = await supabase
+      .from('documents')
+      .update({ title: title.trim(), category, owner_email: owner })
+      .eq('id', doc.id)
+    setSaving(false)
+    if (error) {
+      Alert.alert(t('docs.editSaveFailed'))
+      return
+    }
+    onSaved()
+  }
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+        <View
+          style={{
+            maxHeight: '90%',
+            backgroundColor: c.card,
+            borderTopLeftRadius: radius.lg,
+            borderTopRightRadius: radius.lg,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: sp.lg,
+              paddingTop: sp.lg,
+              paddingBottom: sp.sm,
+            }}
+          >
+            <Txt variant="h2">{t('docs.editDoc')}</Txt>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')} disabled={saving}>
+              <X size={22} color={c.textMuted} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Field value={title} onChangeText={setTitle} placeholder={t('docs.titlePlaceholder')} />
+
+            <ChipRow>
+              {CATEGORIES.map((cat) => (
+                <Chip key={cat.id} active={category === cat.id} onPress={() => setCategory(cat.id)}>
+                  {cat.icon} {t(`docCat.${cat.id}` as TKey)}
+                </Chip>
+              ))}
+            </ChipRow>
+
+            <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              {t('docs.belongsTo')}
+            </Txt>
+            <ChipRow>
+              {ownerOptions.map((o) => (
+                <Chip key={o.key} active={owner === o.key} onPress={() => setOwner(o.key)}>
+                  {o.label}
+                </Chip>
+              ))}
+            </ChipRow>
+          </ScrollView>
+
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl }}>
+            <Btn
+              title={saving ? t('common.saving') : t('common.saveChanges')}
+              onPress={save}
+              disabled={!title.trim()}
+              loading={saving}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+function ChipRow({ children }: { children: React.ReactNode }) {
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>{children}</View>
+}
+
+function Chip({
+  active,
+  onPress,
+  children,
+}: {
+  active: boolean
+  onPress: () => void
+  children: React.ReactNode
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: radius.pill,
+        backgroundColor: active ? c.accent : c.surface,
+      }}
+    >
+      <Txt style={{ color: active ? '#fff' : c.textMuted, fontWeight: '600', fontSize: 14 }}>
+        {children}
+      </Txt>
+    </Pressable>
+  )
+}

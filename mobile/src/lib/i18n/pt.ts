@@ -358,6 +358,8 @@ export const pt: Record<keyof typeof en, string> = {
   'calendar.turns': 'faz {years}',
   'calendar.years': '{years} anos',
   'calendar.upcomingEmpty': 'Nada em breve.',
+  'calendar.connectGoogleSoon': 'Em breve no app.',
+  'calendar.googleRow': 'Conectar Google Agenda',
 
   'family.title': 'Família',
   'family.editMine': 'Editar minhas informações',
