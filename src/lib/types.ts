@@ -164,6 +164,9 @@ export interface PingAck {
 
 export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
 
+/** A plain event, or a special dated type carried over from Important Dates. */
+export type EventKind = 'event' | 'birthday' | 'anniversary' | 'renewal' | 'other'
+
 export interface CalendarEvent {
   id: string
   household_id: string
@@ -184,6 +187,8 @@ export interface CalendarEvent {
   color: string | null
   recurrence: EventRecurrence
   recurrence_until: string | null
+  /** Special date type (birthday/anniversary/renewal/other) or a plain 'event'. */
+  kind: EventKind
   /** Minutes-before to remind; null = no reminder. */
   reminder_minutes: number | null
   /** Where the event came from: created in-app or pulled from Google. */
@@ -192,19 +197,5 @@ export interface CalendarEvent {
   google_calendar_id: string | null
   synced_at: string | null
   created_by: string | null
-  created_at: string
-}
-
-export type ImportantDateType = 'birthday' | 'anniversary' | 'renewal' | 'other'
-
-export interface ImportantDate {
-  id: string
-  household_id: string
-  title: string
-  type: ImportantDateType
-  event_date: string
-  /** true = birthdays/anniversaries/yearly renewals; false = one-time deadline */
-  repeats_annually: boolean
-  notes: string | null
   created_at: string
 }

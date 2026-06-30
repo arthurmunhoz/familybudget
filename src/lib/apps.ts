@@ -14,7 +14,6 @@ import {
   PawPrint,
   FolderLock,
   CalendarDays,
-  CalendarHeart,
   Users,
   Calculator,
   Wrench,
@@ -70,13 +69,6 @@ export const APPS: HubApp[] = [
     icon: FolderLock,
     route: '/docs',
     description: 'IDs, insurance & records',
-  },
-  {
-    id: 'dates',
-    name: 'Dates',
-    icon: CalendarHeart,
-    route: '/dates',
-    description: 'Birthdays, renewals & more',
   },
   {
     id: 'family',

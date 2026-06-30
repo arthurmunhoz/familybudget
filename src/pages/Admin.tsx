@@ -6,6 +6,7 @@ import {
   Bell,
   Bug,
   Calculator,
+  CalendarDays,
   CalendarHeart,
   FolderLock,
   Home,
@@ -42,6 +43,8 @@ const APP_META: Record<string, { name: string; icon: LucideIcon }> = {
   pings: { name: 'Nudges', icon: Bell },
   pets: { name: 'Pets', icon: PawPrint },
   docs: { name: 'Documents', icon: FolderLock },
+  calendar: { name: 'Calendar', icon: CalendarDays },
+  // Kept for historical analytics: 'dates' was merged into the calendar.
   dates: { name: 'Dates', icon: CalendarHeart },
   family: { name: 'Family', icon: Users },
   calc: { name: 'Calculator', icon: Calculator },

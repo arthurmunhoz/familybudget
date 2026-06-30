@@ -5,14 +5,17 @@ import { useBack } from '../../hooks/useBack'
 import { useCachedQuery } from '../../hooks/useCachedQuery'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
-import { timeAgo, todayISO } from '../../lib/format'
+import { daysBetweenISO, timeAgo, todayISO } from '../../lib/format'
 import {
   compareOccurrences,
   eventColor,
   formatTime,
   HOUSEHOLD_COLOR,
+  KIND_EMOJI,
   memberColor,
   occurrencesByDay,
+  upcomingOccurrences,
+  yearsAt,
   type Occurrence,
 } from '../../lib/calendar'
 import {
@@ -24,11 +27,12 @@ import {
 } from '../../lib/googleCalendar'
 import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
-import type { CalendarEvent, EventRecurrence } from '../../lib/types'
+import type { CalendarEvent, EventKind, EventRecurrence } from '../../lib/types'
 
 // App language → BCP-47 locale for Intl date/time formatting.
 const LOCALES: Record<string, string> = { en: 'en', es: 'es', pt: 'pt-BR' }
 const RECURRENCES: EventRecurrence[] = ['none', 'daily', 'weekly', 'monthly', 'yearly']
+const KINDS: EventKind[] = ['event', 'birthday', 'anniversary', 'renewal', 'other']
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -52,6 +56,7 @@ export default function Calendar() {
   })
 
   const [selected, setSelected] = useState(today)
+  const [mode, setMode] = useState<'month' | 'upcoming'>('month')
   const [view, setView] = useState(() => {
     const [y, m] = today.split('-').map(Number)
     return { y, m } // m is 1-indexed
@@ -72,6 +77,9 @@ export default function Calendar() {
     return (m.get(selected) ?? []).sort(compareOccurrences)
   }, [events, selected])
 
+  // The next occurrence of each event, soonest first — the "what's coming up" list.
+  const upcoming = useMemo(() => upcomingOccurrences(events, today), [events, today])
+
   // --- add / edit form ---
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
@@ -82,6 +90,7 @@ export default function Calendar() {
   const [fStartTime, setFStartTime] = useState('09:00')
   const [fEndTime, setFEndTime] = useState('10:00')
   const [fOwner, setFOwner] = useState<string | null>(null)
+  const [fKind, setFKind] = useState<EventKind>('event')
   const [fRepeat, setFRepeat] = useState<EventRecurrence>('none')
   const [fRemind, setFRemind] = useState(false)
   const [fLocation, setFLocation] = useState('')
@@ -160,6 +169,7 @@ export default function Calendar() {
     setFStartTime('09:00')
     setFEndTime('10:00')
     setFOwner(profile?.email ?? null)
+    setFKind('event')
     setFRepeat('none')
     setFRemind(false)
     setFLocation('')
@@ -176,6 +186,7 @@ export default function Calendar() {
     setFStartTime(ev.start_time?.slice(0, 5) ?? '09:00')
     setFEndTime(ev.end_time?.slice(0, 5) ?? '10:00')
     setFOwner(ev.owner_email)
+    setFKind(ev.kind)
     setFRepeat(ev.recurrence)
     setFRemind(ev.reminder_minutes != null)
     setFLocation(ev.location ?? '')
@@ -200,6 +211,7 @@ export default function Calendar() {
       start_time: fAllDay ? null : fStartTime,
       end_time: fAllDay ? null : fEndTime,
       owner_email: fOwner,
+      kind: fKind,
       recurrence: fRepeat,
       reminder_minutes: fRemind ? 0 : null,
       location: fLocation.trim() || null,
@@ -295,6 +307,22 @@ export default function Calendar() {
     return `${start}${end}`
   }
 
+  function countdownLabel(days: number): string {
+    if (days <= 0) return t('calendar.dueToday')
+    if (days === 1) return t('calendar.tomorrow')
+    if (days <= 45) return t('calendar.inDays', { days })
+    return t('calendar.inMonths', { months: Math.round(days / 30) })
+  }
+
+  function shortDate(iso: string): string {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString(locale, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
       <header className="sticky top-0 z-10 -mx-4 -mt-[env(safe-area-inset-top)] flex items-center gap-2 bg-(--bg) px-4 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-4 mb-2">
@@ -329,8 +357,25 @@ export default function Calendar() {
         <p className="mt-12 text-center text-(--text-faint) animate-pulse">{t('common.loading')}</p>
       ) : (
         <>
-          {/* month grid */}
-          <div className="mb-4 rounded-2xl bg-(--card) p-3">
+          {/* Month / Upcoming toggle */}
+          <div className="mb-3 flex gap-1 rounded-full bg-(--surface) p-1">
+            {(['month', 'upcoming'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`flex-1 rounded-full py-1.5 text-sm font-semibold transition-colors ${
+                  mode === m ? 'bg-(--accent) text-white' : 'text-(--text-muted)'
+                }`}
+              >
+                {t(m === 'month' ? 'calendar.tabMonth' : 'calendar.tabUpcoming')}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'month' ? (
+            <>
+              {/* month grid */}
+              <div className="mb-4 rounded-2xl bg-(--card) p-3">
             <div className="flex items-center justify-between px-1 pb-2">
               <button
                 onClick={() => shift(-1)}
@@ -429,7 +474,10 @@ export default function Calendar() {
                         aria-hidden="true"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-(--text)">{o.event.title}</p>
+                        <p className="truncate font-medium text-(--text)">
+                          {KIND_EMOJI[o.event.kind] ? `${KIND_EMOJI[o.event.kind]} ` : ''}
+                          {o.event.title}
+                        </p>
                         <p className="truncate text-xs text-(--text-faint)">{sub}</p>
                         {o.event.location && (
                           <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-(--text-muted)">
@@ -438,6 +486,64 @@ export default function Calendar() {
                           </p>
                         )}
                       </div>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+            </>
+          ) : upcoming.length === 0 ? (
+            <div className="mt-2 text-center text-(--text-muted)">
+              <p>{t('calendar.upcomingEmpty')}</p>
+              <p className="text-sm text-(--text-faint)">{t('calendar.emptyHint')}</p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {upcoming.map((o) => {
+                const color = eventColor(o.event, memberEmails)
+                const days = daysBetweenISO(today, o.start)
+                const emoji = KIND_EMOJI[o.event.kind]
+                const age =
+                  o.event.kind === 'birthday' || o.event.kind === 'anniversary'
+                    ? yearsAt(o.event, o.start)
+                    : 0
+                const sub = [
+                  shortDate(o.start),
+                  age > 0 ? t('calendar.turns', { years: age }) : !o.event.all_day ? timeLabel(o.event) : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+                return (
+                  <li key={`${o.event.id}:${o.start}`}>
+                    <button
+                      onClick={() => {
+                        setMode('month')
+                        setView({ y: Number(o.start.slice(0, 4)), m: Number(o.start.slice(5, 7)) })
+                        setSelected(o.start)
+                        openEdit(o.event)
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl bg-(--card) px-3 py-3 text-left active:bg-(--card-active) transition-colors"
+                    >
+                      <span
+                        className="w-1.5 self-stretch shrink-0 rounded-full"
+                        style={{ background: color }}
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-(--text)">
+                          {emoji ? `${emoji} ` : ''}
+                          {o.event.title}
+                        </p>
+                        <p className="truncate text-xs text-(--text-faint)">{sub}</p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                          days <= 14 ? 'bg-(--accent) text-white' : 'bg-(--surface) text-(--text-muted)'
+                        }`}
+                      >
+                        {countdownLabel(days)}
+                      </span>
                     </button>
                   </li>
                 )
@@ -488,6 +594,33 @@ export default function Calendar() {
                 autoFocus={!editing}
                 className="w-full rounded-xl bg-(--surface) px-4 py-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
               />
+
+              <label className="mt-3 block text-xs font-semibold text-(--text-faint)">
+                {t('calendar.typeLabel')}
+              </label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {KINDS.map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      setFKind(k)
+                      // Special dated types behave like the old Important Dates:
+                      // all-day, household-wide, and yearly for birthdays/anniversaries.
+                      if (k !== 'event') {
+                        setFAllDay(true)
+                        setFOwner(null)
+                        if (k === 'birthday' || k === 'anniversary') setFRepeat('yearly')
+                      }
+                    }}
+                    className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                      fKind === k ? 'bg-(--accent) text-white' : 'bg-(--surface) text-(--text-muted)'
+                    }`}
+                  >
+                    {KIND_EMOJI[k] ? `${KIND_EMOJI[k]} ` : ''}
+                    {t(`calendar.kind.${k}` as TKey)}
+                  </button>
+                ))}
+              </div>
 
               <label className="mt-3 flex items-center justify-between rounded-xl bg-(--surface) px-4 py-3">
                 <span className="text-(--text)">{t('calendar.allDay')}</span>

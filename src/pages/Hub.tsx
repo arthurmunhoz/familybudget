@@ -12,12 +12,12 @@ import { useHousehold } from '../hooks/useHousehold'
 import { useI18n } from '../hooks/useI18n'
 import { useNotificationsActive } from '../hooks/useNotificationsActive'
 import { ADMIN_APP } from '../lib/apps'
+import { upcomingOccurrences } from '../lib/calendar'
 import { todayISO } from '../lib/format'
 import type { TKey } from '../lib/i18n'
-import { dueSoonCount } from '../lib/importantDates'
 import { overdueEvents } from '../lib/petCare'
 import { supabase } from '../lib/supabase'
-import type { ImportantDate, PetEvent } from '../lib/types'
+import type { CalendarEvent, PetEvent } from '../lib/types'
 
 export default function Hub() {
   const { profile } = useAuth()
@@ -73,16 +73,17 @@ export default function Hub() {
     return overdueEvents((data ?? []) as PetEvent[], todayISO()).length
   })
 
-  // Dates due within ~30 days (or an expired one-time) → amber badge.
-  const { data: dueSoonDates = 0 } = useCachedQuery<number>('hub:dueSoonDates', async () => {
-    const { data } = await supabase.from('important_dates').select('*')
-    return dueSoonCount((data ?? []) as ImportantDate[], todayISO())
+  // Upcoming birthdays/anniversaries/renewals within ~30 days → amber badge.
+  const { data: calendarSoon = 0 } = useCachedQuery<number>('hub:calendarSoon', async () => {
+    const { data } = await supabase.from('calendar_events').select('*')
+    const special = ((data ?? []) as CalendarEvent[]).filter((e) => e.kind !== 'event')
+    return upcomingOccurrences(special, todayISO(), 30).length
   })
 
   const badges: Record<string, number> = {
     shopping: shoppingCount,
     pets: overduePets,
-    dates: dueSoonDates,
+    calendar: calendarSoon,
   }
 
   const tiles = [
@@ -97,7 +98,7 @@ export default function Hub() {
     const color =
       appId === 'pets'
         ? 'bg-(--expense)'
-        : appId === 'dates'
+        : appId === 'calendar'
           ? 'bg-amber-500'
           : 'bg-(--accent)'
     return (

@@ -20,12 +20,13 @@ type PetEvent = {
   event_date: string
   next_due: string | null
 }
-type ImportantDate = {
+type CalEvent = {
   household_id: string
   title: string
-  type: string
-  event_date: string
-  repeats_annually: boolean
+  kind: string
+  start_date: string
+  recurrence: string
+  reminder_minutes: number | null
 }
 type Subscription = {
   endpoint: string
@@ -80,7 +81,8 @@ const DATE_ICON: Record<string, string> = {
   birthday: '🎂',
   anniversary: '💍',
   renewal: '🔁',
-  other: '📅',
+  other: '📌',
+  event: '📅',
 }
 
 // Heads-up cadence for important dates: day-of, the day before, a week out.
@@ -100,14 +102,31 @@ function daysBetween(fromISO: string, toISO: string): number {
   return Math.round((b - a) / MS_PER_DAY)
 }
 
-/** Next occurrence of an important date: the date itself for one-offs, or the
- *  next month/day rollover for things that repeat every year. */
-function nextOccurrence(d: ImportantDate, today: string): string {
-  if (!d.repeats_annually) return d.event_date
-  const [, mm, dd] = d.event_date.split('-')
-  const year = Number(today.slice(0, 4))
-  const thisYear = `${year}-${mm}-${dd}`
-  return thisYear >= today ? thisYear : `${year + 1}-${mm}-${dd}`
+const pad = (n: number) => String(n).padStart(2, '0')
+function addDaysUTC(iso: string, n: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + n * MS_PER_DAY).toISOString().slice(0, 10)
+}
+function addMonthsUTC(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const base = new Date(Date.UTC(y, m - 1 + n, 1))
+  const last = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + 1, 0)).getUTCDate()
+  return `${base.getUTCFullYear()}-${pad(base.getUTCMonth() + 1)}-${pad(Math.min(d, last))}`
+}
+/** Next occurrence (>= today) of an event given its recurrence; the start date
+ *  itself for one-offs (which may be in the past). */
+function nextOcc(startISO: string, recurrence: string, today: string): string {
+  if (recurrence === 'none' || startISO >= today) return startISO
+  if (recurrence === 'daily') return today
+  if (recurrence === 'weekly') {
+    const rem = daysBetween(startISO, today) % 7
+    return rem === 0 ? today : addDaysUTC(today, 7 - rem)
+  }
+  let cur = startISO
+  let guard = 0
+  while (cur < today && guard++ < 1000) {
+    cur = recurrence === 'monthly' ? addMonthsUTC(cur, 1) : addMonthsUTC(cur, 12)
+  }
+  return cur
 }
 
 /** Latest event per (pet, type, title) — re-logging a treatment retires the
@@ -152,15 +171,15 @@ export default async function handler(req: any, res: any) {
       .not('next_due', 'is', null)
       .order('event_date', { ascending: false }),
     db
-      .from('important_dates')
-      .select('household_id, title, type, event_date, repeats_annually'),
+      .from('calendar_events')
+      .select('household_id, title, kind, start_date, recurrence, reminder_minutes'),
     db.from('push_subscriptions').select('endpoint, p256dh, auth, household_id, user_email'),
     db.from('user_settings').select('email, language'),
   ])
 
   const pets = (petsRes.data ?? []) as Pet[]
   const events = (eventsRes.data ?? []) as PetEvent[]
-  const dates = (datesRes.data ?? []) as ImportantDate[]
+  const dates = (datesRes.data ?? []) as CalEvent[]
   const subs = (subsRes.data ?? []) as Subscription[]
   // Each recipient gets the digest in their own chosen language (default en).
   const settings = (settingsRes.data ?? []) as { email: string; language: string | null }[]
@@ -197,11 +216,17 @@ export default async function handler(req: any, res: any) {
   // Important-date reminders at the lead-day marks, keyed by household.
   const dateRemindersByHousehold = new Map<string, DateReminder[]>()
   for (const d of dates) {
-    const occ = nextOccurrence(d, today)
+    const occ = nextOcc(d.start_date, d.recurrence, today)
     const days = daysBetween(today, occ)
-    if (!DATE_LEAD_DAYS.includes(days)) continue
+    // Special dates (birthdays, anniversaries, renewals) remind at 7d/1d/day-of;
+    // plain events only if they carry a reminder and land today.
+    const special = !!d.kind && d.kind !== 'event'
+    const include = special
+      ? DATE_LEAD_DAYS.includes(days)
+      : d.reminder_minutes != null && days === 0
+    if (!include) continue
     const list = dateRemindersByHousehold.get(d.household_id) ?? []
-    list.push({ icon: DATE_ICON[d.type] ?? '📅', title: d.title, days })
+    list.push({ icon: DATE_ICON[d.kind] ?? '📅', title: d.title, days })
     dateRemindersByHousehold.set(d.household_id, list)
   }
 
@@ -216,7 +241,7 @@ export default async function handler(req: any, res: any) {
     households++
 
     // Deep-link to the most relevant screen (same for everyone in the household).
-    const link = petR.length && dateR.length ? '/' : petR.length ? '/pets' : '/dates'
+    const link = petR.length && dateR.length ? '/' : petR.length ? '/pets' : '/calendar'
 
     for (const s of householdSubs) {
       const L = I18N[langByEmail.get(s.user_email) ?? 'en']

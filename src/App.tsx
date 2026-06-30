@@ -18,7 +18,6 @@ const Calendar = lazy(() => import('./apps/calendar/Calendar'))
 const PetCare = lazy(() => import('./apps/pets/PetCare'))
 const PetProfile = lazy(() => import('./apps/pets/PetProfile'))
 const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
-const ImportantDates = lazy(() => import('./apps/dates/ImportantDates'))
 const Family = lazy(() => import('./apps/family/Family'))
 const Calculator = lazy(() => import('./apps/calc/Calculator'))
 const Admin = lazy(() => import('./pages/Admin'))
@@ -96,7 +95,8 @@ export default function App() {
               </VaultGate>
             }
           />
-          <Route path="/dates" element={<ImportantDates />} />
+          {/* Important Dates merged into the calendar — keep old links working. */}
+          <Route path="/dates" element={<Navigate to="/calendar" replace />} />
           <Route path="/family" element={<Family />} />
           <Route path="/calc" element={<Calculator />} />
           <Route path="/admin" element={<Admin />} />

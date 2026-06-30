@@ -6,7 +6,7 @@
  * times are `HH:MM[:SS]` wall-clock strings. We never build Date objects to
  * compare dates — only to step months/years where the math needs it.
  */
-import type { CalendarEvent, EventRecurrence } from './types'
+import type { CalendarEvent, EventKind, EventRecurrence } from './types'
 
 /** "Everyone" / no-owner events take the brand clay so they read as household-
  *  wide; members get the rest of the palette. All mid-tone so they stay legible
@@ -22,6 +22,16 @@ export const MEMBER_PALETTE = [
   '#c2783f', // orange
   '#6f8e3f', // olive
 ]
+
+/** Emoji marker for the special date kinds carried over from Important Dates.
+ *  A plain 'event' has none. */
+export const KIND_EMOJI: Record<EventKind, string> = {
+  event: '',
+  birthday: '🎂',
+  anniversary: '💍',
+  renewal: '📋',
+  other: '📌',
+}
 
 /** Stable color for a member: sort the household's emails and index into the
  *  palette, so each person keeps the same color across every screen + device. */
@@ -150,6 +160,32 @@ export function occurrencesByDay(
     }
   }
   return map
+}
+
+/** Years marked at an occurrence — age for a birthday, years for an anniversary.
+ *  0 or negative if the stored start year wasn't a real past year. */
+export function yearsAt(ev: CalendarEvent, occurrenceStartISO: string): number {
+  return Number(occurrenceStartISO.slice(0, 4)) - Number(ev.start_date.slice(0, 4))
+}
+
+/** The single next occurrence (on/after today) of each event within `withinDays`,
+ *  soonest first — the "what's coming up" list. Ongoing multi-day events count as
+ *  upcoming until they end. */
+export function upcomingOccurrences(
+  events: CalendarEvent[],
+  today: string,
+  withinDays = 365,
+): Occurrence[] {
+  const all = occurrencesInRange(events, today, addDays(today, withinDays))
+  const earliest = new Map<string, Occurrence>()
+  for (const o of all) {
+    if (o.end < today) continue
+    const cur = earliest.get(o.event.id)
+    if (!cur || o.start < cur.start) earliest.set(o.event.id, o)
+  }
+  return [...earliest.values()].sort((a, b) =>
+    a.start !== b.start ? (a.start < b.start ? -1 : 1) : a.event.title.localeCompare(b.event.title),
+  )
 }
 
 /** Sort occurrences for an agenda: all-day first, then by start time. */

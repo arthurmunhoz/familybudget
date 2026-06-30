@@ -28,7 +28,7 @@ this doc is the contract for every agent that follows you.
     in `apps.ts` as `LucideIcon` components (`HubApp.icon`), rendered `<app.icon/>`.
     Chrome must use Lucide, NOT emoji. Emoji are kept ONLY as *content* markers:
     budget categories (`categories.ts`), pet species (`pets/petMeta.ts`), ping
-    presets (`pings.ts`), important-date types, store monograms, and language flags.
+    presets (`pings.ts`), calendar event kinds, store monograms, and language flags.
   - App tile display names are localized via `app.<id>.name` (e.g. Budget→"Money",
     Pings→"Nudges", Document Vault→"Documents"); the `pings` slug/route/tables stay
     internal — only the display label changed to Nudges.
@@ -70,8 +70,7 @@ src/
     pets/                  PetCare (events + next-due reminders)
     docs/                  DocumentVault (storage uploads, signed URLs;
                            opt-in Face ID lock via VaultGate + biometric.ts)
-    dates/                 ImportantDates (birthday/renewal countdowns)
-    calendar/              Calendar (month grid + agenda; calendar_events; Google sync)
+    calendar/              Calendar (month + Upcoming; calendar_events; dates + Google sync)
     family/                Family (per-member profiles + avatars)
     calc/                  Calculator (Split a bill evenly/by-item via photo
                            scan, Better deal unit-price, Discount) — no DB
@@ -145,8 +144,9 @@ morning notification per household. Pieces:
   defaults (don't pass them from the client).
 - `api/send-digest.ts` — Vercel **Cron** target (`vercel.json` → daily 11:00
   UTC ≈ 8am BRT / 7am ET). Reads every household with the **service role**
-  (bypasses RLS), collects pet events due/overdue + important dates at 7d/1d/
-  day-of lead marks, sends via `web-push`, prunes 404/410 subscriptions.
+  (bypasses RLS), collects pet events due/overdue + calendar special dates
+  (birthdays/anniversaries/renewals) at 7d/1d/day-of lead marks + plain events
+  with a reminder due today, sends via `web-push`, prunes 404/410 subscriptions.
 - Env (Vercel only): `VITE_VAPID_PUBLIC_KEY` (also needed at BUILD time for the
   client), `VAPID_PRIVATE_KEY`, `CRON_SECRET` (Cron sends it as a Bearer token;
   the route rejects anything else), `SUPABASE_SERVICE_ROLE_KEY`. Generate VAPID
@@ -202,18 +202,21 @@ multiple queries into one object per screen (one cache key); call the returned
 their own optimistic/Realtime local state (e.g. ShoppingList), keep that state
 but seed it from `readCache(key)` and write through with `writeCache(key, …)`.
 Already cached: Hub badges, Budgets, Months, MonthDetail, Family, ShoppingList,
-Admin. Not yet (were mid-edit by another agent): Pet Care, Documents,
-Important Dates.
+Admin. Not yet (were mid-edit by another agent): Pet Care, Documents.
 
-**Shared Calendar (`/calendar`)**: a hub app (`apps/calendar/Calendar.tsx`) —
-month grid + per-day agenda + create/edit sheet over `calendar_events`
-(migration 035). All-day OR timed events, multi-day spans, simple recurrence
-(none/daily/weekly/monthly/yearly), color-by-member, optional reminders.
-`src/lib/calendar.ts` holds the color palette + `eventColor`/`memberColor`
-(color derived from the owner's position in the household; events may also carry
-an explicit hex `color`), recurrence expansion (`occurrencesByDay`), `formatTime`.
-Events default `owner_email` to the creator; `null` = whole household (clay).
-Household-scoped RLS; `household_id`/`created_by` auto-stamped by column defaults.
+**Shared Calendar (`/calendar`)**: a hub app (`apps/calendar/Calendar.tsx`) and the
+single date surface — it absorbed the old Important Dates feature (migration 038
+copied those rows in; the `important_dates` table is dormant, drop later). A
+**Month / Upcoming** toggle: Month is a grid + per-day agenda; Upcoming is the
+"what's coming up" countdown list. Over `calendar_events` (migration 035): all-day
+OR timed, multi-day spans, recurrence (none/daily/weekly/monthly/yearly),
+color-by-member, reminders, and a `kind` (event/birthday/anniversary/renewal/other)
+— special kinds show a 🎂/💍/📋/📌 marker and birthday/anniversary "turns N" age,
+and default to all-day + yearly + household-owned. `src/lib/calendar.ts` holds
+`KIND_EMOJI`, the color palette + `eventColor`/`memberColor`, recurrence expansion
+(`occurrencesByDay`, `upcomingOccurrences`), `yearsAt`, `formatTime`. Events default
+`owner_email` to the creator; `null` = whole household (clay). Household-scoped RLS;
+`household_id`/`created_by` auto-stamped by column defaults.
 
 **Google Calendar sync** (two-way):
 - `google_calendar_connections` (migration 036) — one row per user who links
