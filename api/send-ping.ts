@@ -5,6 +5,31 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
+// Best-effort Expo (native) push, sent alongside web-push. Errors swallowed so
+// a push failure never breaks the request. Only well-formed Expo tokens are sent.
+async function sendExpoPush(
+  messages: { to: string; title: string; body: string; data?: Record<string, unknown>; sound?: 'default' }[],
+): Promise<number> {
+  const valid = messages.filter(
+    (m) => typeof m.to === 'string' && m.to.startsWith('ExponentPushToken'),
+  )
+  let sent = 0
+  for (let i = 0; i < valid.length; i += 100) {
+    const chunk = valid.slice(i, i + 100)
+    try {
+      const r = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(chunk),
+      })
+      if (r.ok) sent += chunk.length
+    } catch {
+      /* swallow */
+    }
+  }
+  return sent
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -104,5 +129,25 @@ export default async function handler(req: any, res: any) {
   }
   if (stale.length) await db.from('push_subscriptions').delete().in('endpoint', stale)
 
-  return res.status(200).json({ ok: true, sent })
+  // Native (Expo) devices for the same recipients — best-effort, alongside web push.
+  let expoQuery = db
+    .from('expo_push_tokens')
+    .select('token')
+    .eq('household_id', ping.household_id)
+    .neq('user_email', ping.sender_email)
+  if (Array.isArray(ping.recipients) && ping.recipients.length > 0) {
+    expoQuery = expoQuery.in('user_email', ping.recipients)
+  }
+  const { data: expoTokens } = await expoQuery
+  const expoSent = await sendExpoPush(
+    (expoTokens ?? []).map((t: any) => ({
+      to: t.token,
+      title: `${ping.emoji} ${senderName}`,
+      body: ping.message,
+      data: { url: '/pings', tel },
+      sound: 'default' as const,
+    })),
+  )
+
+  return res.status(200).json({ ok: true, sent, expoSent })
 }

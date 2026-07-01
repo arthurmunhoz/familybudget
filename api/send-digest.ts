@@ -12,6 +12,37 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
+type ExpoMessage = {
+  to: string
+  title: string
+  body: string
+  data?: Record<string, unknown>
+  sound?: 'default'
+}
+
+// Best-effort Expo (native) push, sent alongside web-push. Errors swallowed so
+// a push failure never breaks the digest. Only well-formed Expo tokens are sent.
+async function sendExpoPush(messages: ExpoMessage[]): Promise<number> {
+  const valid = messages.filter(
+    (m) => typeof m.to === 'string' && m.to.startsWith('ExponentPushToken'),
+  )
+  let sent = 0
+  for (let i = 0; i < valid.length; i += 100) {
+    const chunk = valid.slice(i, i + 100)
+    try {
+      const r = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(chunk),
+      })
+      if (r.ok) sent += chunk.length
+    } catch {
+      /* swallow */
+    }
+  }
+  return sent
+}
+
 type Pet = { id: string; name: string; emoji: string; household_id: string }
 type PetEvent = {
   pet_id: string
@@ -163,7 +194,7 @@ export default async function handler(req: any, res: any) {
   const today = todayUTC()
 
   // Pull everything once, then group in memory (the data set is tiny).
-  const [petsRes, eventsRes, datesRes, subsRes, settingsRes] = await Promise.all([
+  const [petsRes, eventsRes, datesRes, subsRes, settingsRes, expoRes] = await Promise.all([
     db.from('pets').select('id, name, emoji, household_id'),
     db
       .from('pet_events')
@@ -175,6 +206,7 @@ export default async function handler(req: any, res: any) {
       .select('household_id, title, kind, start_date, recurrence, reminder_minutes'),
     db.from('push_subscriptions').select('endpoint, p256dh, auth, household_id, user_email'),
     db.from('user_settings').select('email, language'),
+    db.from('expo_push_tokens').select('token, household_id, user_email'),
   ])
 
   const pets = (petsRes.data ?? []) as Pet[]
@@ -194,6 +226,15 @@ export default async function handler(req: any, res: any) {
     const list = subsByHousehold.get(s.household_id) ?? []
     list.push(s)
     subsByHousehold.set(s.household_id, list)
+  }
+
+  // Native (Expo) push tokens grouped by household, same shape as web subs.
+  type ExpoTok = { token: string; household_id: string; user_email: string }
+  const expoByHousehold = new Map<string, ExpoTok[]>()
+  for (const t of (expoRes.data ?? []) as ExpoTok[]) {
+    const list = expoByHousehold.get(t.household_id) ?? []
+    list.push(t)
+    expoByHousehold.set(t.household_id, list)
   }
 
   // Pet reminders due today or overdue, keyed by household. Stored as data so
@@ -231,10 +272,17 @@ export default async function handler(req: any, res: any) {
   }
 
   let sent = 0
+  let expoSent = 0
   let households = 0
   const stale: string[] = []
 
-  for (const [householdId, householdSubs] of subsByHousehold) {
+  // Iterate every household that has reminders — covers households with web
+  // subscriptions, native (Expo) tokens, or both.
+  const householdIds = new Set<string>([
+    ...petRemindersByHousehold.keys(),
+    ...dateRemindersByHousehold.keys(),
+  ])
+  for (const householdId of householdIds) {
     const petR = petRemindersByHousehold.get(householdId) ?? []
     const dateR = dateRemindersByHousehold.get(householdId) ?? []
     if (petR.length + dateR.length === 0) continue
@@ -243,18 +291,20 @@ export default async function handler(req: any, res: any) {
     // Deep-link to the most relevant screen (same for everyone in the household).
     const link = petR.length && dateR.length ? '/' : petR.length ? '/pets' : '/calendar'
 
-    for (const s of householdSubs) {
-      const L = I18N[langByEmail.get(s.user_email) ?? 'en']
+    // Build the digest title/body in a given recipient's language.
+    const build = (email: string) => {
+      const L = I18N[langByEmail.get(email) ?? 'en']
       const petLines = petR.map((r) => `${r.icon} ${r.name} — ${r.title} (${L.petLabel(r.days)})`)
       const dateLines = dateR.map((r) => `${r.icon} ${r.title} (${L.dateLabel(r.days)})`)
       const lines = [...petLines, ...dateLines]
       const title = lines.length === 1 ? '🏠 One Roof' : `🏠 ${L.remindersTitle(lines.length)}`
-      const payload = JSON.stringify({
-        title,
-        body: lines.join('\n'),
-        url: link,
-        tag: 'one-roof-digest',
-      })
+      return { title, body: lines.join('\n') }
+    }
+
+    // Web push
+    for (const s of subsByHousehold.get(householdId) ?? []) {
+      const { title, body } = build(s.user_email)
+      const payload = JSON.stringify({ title, body, url: link, tag: 'one-roof-digest' })
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
@@ -266,11 +316,18 @@ export default async function handler(req: any, res: any) {
         if (err?.statusCode === 404 || err?.statusCode === 410) stale.push(s.endpoint)
       }
     }
+
+    // Native (Expo) push
+    const expoMsgs: ExpoMessage[] = (expoByHousehold.get(householdId) ?? []).map((t) => {
+      const { title, body } = build(t.user_email)
+      return { to: t.token, title, body, data: { url: link }, sound: 'default' as const }
+    })
+    expoSent += await sendExpoPush(expoMsgs)
   }
 
   if (stale.length) {
     await db.from('push_subscriptions').delete().in('endpoint', stale)
   }
 
-  return res.status(200).json({ ok: true, households, sent, pruned: stale.length })
+  return res.status(200).json({ ok: true, households, sent, expoSent, pruned: stale.length })
 }

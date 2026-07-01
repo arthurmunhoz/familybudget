@@ -59,7 +59,7 @@ npx expo start          # press i for the iOS simulator, or scan the QR with Exp
 - **Splash**: a basic splash is configured (warm paper / espresso); refine if desired.
 
 ### E. Server-side follow-ups (Vercel `api/`, when ready)
-- **Native push delivery**: the daily digest + nudges currently push to **web-push** subscriptions. To deliver to iPhones, add an Expo-push sender that reads the new `expo_push_tokens` table and POSTs to Expo's push API (https://exp.host/--/api/v2/push/send). Until then, in-app Realtime shows nudges but no background push lands on the phone.
+- **Native push delivery**: ✅ implemented in code — `api/send-ping.ts` and `api/send-digest.ts` now also send to `expo_push_tokens` via Expo's push API, alongside web-push (per-recipient language, best-effort). **Pending: a Vercel deploy** (`npx vercel deploy --prod`) for it to go live, plus APNs (EAS provisions the APNs key during the iOS build, and the device must be registered via Settings → Enable notifications). Follow-up: prune stale Expo tokens from the send receipts.
 - **Sign in with Apple — account-deletion token revocation**: Apple requires revoking the Apple token when an account is deleted. Add a small serverless endpoint that calls Apple's token-revocation REST API; call it from `delete_my_account` flow. (The local data deletion already works.)
 - **Google Calendar native connect**: the two-way sync endpoints exist for web; the native "Connect Google Calendar" button is stubbed. Wiring it needs the OAuth redirect handled in-app (or a WebBrowser flow) plus the existing `/api/google-calendar-*` endpoints.
 
@@ -74,7 +74,7 @@ npx expo start          # press i for the iOS simulator, or scan the QR with Exp
 - ✅ **Not a website wrapper** (4.2) — true native RN app.
 - ✅ **Permission usage strings** — Face ID, camera, photos, calendar in `app.json`.
 - ⏳ **Privacy Nutrition Labels** — fill in App Store Connect (§A.5).
-- ⏳ **Native push (APNs)** — registration done; **send side pending** (§E).
+- ⏳ **Native push (APNs)** — device registration done; **send side implemented in code, pending a Vercel deploy** (§E).
 - ⏳ **No ad/tracking SDKs** — true today; keep it that way (dodges ATT).
 
 ---
