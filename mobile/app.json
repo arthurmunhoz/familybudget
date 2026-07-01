@@ -28,7 +28,12 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "single",
@@ -42,7 +47,9 @@
           "backgroundColor": "#fbf6f0",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 120,
-          "dark": { "backgroundColor": "#1b1714" }
+          "dark": {
+            "backgroundColor": "#1b1714"
+          }
         }
       ],
       "expo-localization",
@@ -50,7 +57,9 @@
       "expo-apple-authentication",
       [
         "expo-local-authentication",
-        { "faceIDPermission": "Face ID unlocks your private Document Vault." }
+        {
+          "faceIDPermission": "Face ID unlocks your private Document Vault."
+        }
       ],
       [
         "expo-image-picker",
@@ -61,12 +70,22 @@
       ],
       [
         "expo-notifications",
-        { "icon": "./assets/images/icon.png", "color": "#c2603f" }
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#c2603f"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "643b1295-f7d6-4228-8b92-277790bedd16"
+      }
+    },
+    "owner": "arthurmunhoz"
   }
 }
