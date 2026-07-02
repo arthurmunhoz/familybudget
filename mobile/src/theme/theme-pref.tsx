@@ -1,6 +1,5 @@
-// Persisted appearance override: Light / Dark / System (follow the device).
-// Re-adds the theme choice the PWA had. Stored in AsyncStorage so it survives
-// restarts. Mirrors the useI18n provider pattern.
+// Persisted appearance choice: Light / Dark (default Light, like the PWA).
+// Stored in AsyncStorage so it survives restarts. Mirrors the useI18n pattern.
 import {
   createContext,
   useCallback,
@@ -11,24 +10,24 @@ import {
 } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-export type ThemeMode = 'system' | 'light' | 'dark'
+export type ThemeMode = 'light' | 'dark'
 
 interface ThemePrefState {
   mode: ThemeMode
   setMode: (m: ThemeMode) => void
 }
 
-// Default 'system' so an unwrapped useTheme() still resolves (before hydration).
-const ThemePrefContext = createContext<ThemePrefState>({ mode: 'system', setMode: () => {} })
+// Default 'light' so an unwrapped useTheme() still resolves (before hydration).
+const ThemePrefContext = createContext<ThemePrefState>({ mode: 'light', setMode: () => {} })
 const CACHE = 'oneroof-theme'
 
 export function ThemePrefProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>('system')
+  const [mode, setModeState] = useState<ThemeMode>('light')
 
   useEffect(() => {
     let active = true
     AsyncStorage.getItem(CACHE).then((v) => {
-      if (active && (v === 'light' || v === 'dark' || v === 'system')) setModeState(v)
+      if (active && (v === 'light' || v === 'dark')) setModeState(v)
     })
     return () => {
       active = false

@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -48,9 +47,8 @@ export default function RootLayout() {
 
 // Navigation chrome + status bar, resolved from the saved appearance override.
 function Chrome() {
-  const colorScheme = useColorScheme();
   const { mode } = useThemePref();
-  const isDark = (mode === 'system' ? colorScheme : mode) === 'dark';
+  const isDark = mode === 'dark';
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }} />

@@ -13,7 +13,6 @@ import { radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
 
 const APPEARANCE: { id: ThemeMode; label: string }[] = [
-  { id: 'system', label: 'System' },
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },
 ]
