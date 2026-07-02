@@ -4,9 +4,9 @@
 // occurrencesByDay / upcomingOccurrences; events are colored by member. Special
 // kinds (birthday/anniversary/renewal/other) show an emoji marker and a
 // "turns N" age. Tapping an event opens the add/edit form. Google Calendar
-// connect/sync is STUBBED (disabled row, "coming soon") — it needs web OAuth +
-// Vercel /api endpoints not available in the app yet. Google-sourced rows
-// (source='google') still render but are read-only.
+// connect/sync is wired via in-app OAuth (see GoogleConnect + @/lib/googleCalendar),
+// reusing the deployed /api/google-calendar-* endpoints. Google-sourced rows
+// (source='google') render read-only.
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -31,6 +31,7 @@ import { supabase } from '@/lib/supabase'
 import type { CalendarEvent } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import EventForm, { type EventDraft } from './EventForm'
+import { GoogleConnect } from './GoogleConnect'
 
 // App language → BCP-47 locale for Intl date/time formatting.
 const LOCALES: Record<string, string> = { en: 'en', es: 'es', pt: 'pt-BR' }
@@ -460,25 +461,8 @@ export default function Calendar() {
             </View>
           )}
 
-          {/* Google Calendar connect — stubbed (needs web OAuth + Vercel /api) */}
-          <Pressable
-            disabled
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: c.card,
-              borderRadius: radius.md,
-              padding: sp.md,
-              opacity: 0.6,
-              marginTop: sp.sm,
-            }}
-          >
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontWeight: '600' }}>{t('calendar.googleRow')}</Txt>
-              <Txt variant="faint">{t('calendar.connectGoogleSoon')}</Txt>
-            </View>
-          </Pressable>
+          {/* Google Calendar connect — in-app OAuth, reuses the deployed sync API */}
+          <GoogleConnect onChanged={load} />
         </ScrollView>
       )}
 
