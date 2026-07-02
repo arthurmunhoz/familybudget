@@ -5,8 +5,9 @@
 // inserts get household_id / added_by stamped server-side, so the client never
 // passes household_id.
 //
-// OFFLINE: not ported yet (the PWA's localStorage outbox). This is online-only
-// realtime + optimistic UI. AsyncStorage-backed offline can come later.
+// OFFLINE: fully supported (RN port of the PWA's outbox, see @/lib/offline).
+// Mutations are queued in AsyncStorage and replayed on reconnect; the list stays
+// editable and readable with no connection and survives an app restart.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
@@ -27,6 +28,14 @@ import { AppHeader, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { readCache, writeCache } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import {
+  enqueueOp,
+  flushShoppingOutbox,
+  loadLocal,
+  saveLocal,
+  LOCAL_ITEMS,
+  LOCAL_STORES,
+} from '@/lib/offline'
 import { supabase } from '@/lib/supabase'
 import { STORE_CATALOG, type StoreCatalogEntry } from '@/lib/stores'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
@@ -52,17 +61,64 @@ export default function ShoppingList() {
   const { t } = useI18n()
   const { profile } = useAuth()
 
-  // Seed from the in-memory cache so the list renders instantly on return
-  // (write-through happens in load()); realtime + optimistic edits below keep it
-  // live. loading is true only on the very first visit (no cache yet).
-  const [items, setItems] = useState<ShoppingItem[]>(
-    () => readCache<ShoppingItem[]>('shopping:items') ?? [],
+  // Seed from the in-memory cache so the list renders instantly on return; a
+  // durable AsyncStorage copy (below) hydrates it on a cold start / offline.
+  const [items, setItemsState] = useState<ShoppingItem[]>(
+    () => readCache<ShoppingItem[]>(LOCAL_ITEMS) ?? [],
   )
-  const [stores, setStores] = useState<ShoppingStore[]>(
-    () => readCache<ShoppingStore[]>('shopping:stores') ?? [],
+  const [stores, setStoresState] = useState<ShoppingStore[]>(
+    () => readCache<ShoppingStore[]>(LOCAL_STORES) ?? [],
   )
   const [label, setLabel] = useState('')
-  const [loading, setLoading] = useState(() => readCache('shopping:items') === undefined)
+  const [loading, setLoading] = useState(() => readCache(LOCAL_ITEMS) === undefined)
+
+  // Every update writes through to the in-memory cache AND the durable store, so
+  // the next mount restores it and the list stays readable with no connection.
+  const setItems = useCallback(
+    (updater: ShoppingItem[] | ((prev: ShoppingItem[]) => ShoppingItem[])) => {
+      setItemsState((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        writeCache(LOCAL_ITEMS, next)
+        void saveLocal(LOCAL_ITEMS, next)
+        return next
+      })
+    },
+    [],
+  )
+  const setStores = useCallback(
+    (updater: ShoppingStore[] | ((prev: ShoppingStore[]) => ShoppingStore[])) => {
+      setStoresState((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater
+        writeCache(LOCAL_STORES, next)
+        void saveLocal(LOCAL_STORES, next)
+        return next
+      })
+    },
+    [],
+  )
+
+  // Cold start with an empty in-memory cache: hydrate from durable storage so
+  // the list is visible offline before (or without) a network fetch resolves.
+  useEffect(() => {
+    if (readCache(LOCAL_ITEMS) !== undefined) return
+    let active = true
+    void loadLocal<ShoppingItem[]>(LOCAL_ITEMS).then((v) => {
+      if (active && v && v.length) {
+        setItemsState(v)
+        writeCache(LOCAL_ITEMS, v)
+        setLoading(false)
+      }
+    })
+    void loadLocal<ShoppingStore[]>(LOCAL_STORES).then((v) => {
+      if (active && v && v.length) {
+        setStoresState(v)
+        writeCache(LOCAL_STORES, v)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Which store new items go to (null = "Anywhere").
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null)
@@ -70,25 +126,19 @@ export default function ShoppingList() {
   const [storeInput, setStoreInput] = useState('')
 
   const load = useCallback(async () => {
+    // Push any queued offline edits first, then pull the reconciled state. Both
+    // steps fail silently when offline — the queue and the local list survive.
+    await flushShoppingOutbox()
     const [itemsRes, storesRes] = await Promise.all([
       supabase.from('shopping_items').select('*').order('created_at'),
       supabase.from('shopping_stores').select('*').order('created_at'),
     ])
     // Only overwrite local state when the fetch actually succeeded — a failed
-    // request must not wipe optimistic edits off the screen. Write through to
-    // the cache so the next mount seeds instantly (no loader flash).
-    if (!itemsRes.error) {
-      const data = (itemsRes.data as ShoppingItem[]) ?? []
-      setItems(data)
-      writeCache('shopping:items', data)
-    }
-    if (!storesRes.error) {
-      const data = (storesRes.data as ShoppingStore[]) ?? []
-      setStores(data)
-      writeCache('shopping:stores', data)
-    }
+    // request (offline / captive wifi) must not wipe the list.
+    if (!itemsRes.error) setItems((itemsRes.data as ShoppingItem[]) ?? [])
+    if (!storesRes.error) setStores((storesRes.data as ShoppingStore[]) ?? [])
     setLoading(false)
-  }, [])
+  }, [setItems, setStores])
 
   // Coalesce bursts of refresh triggers (a mutation + its own Realtime echo, or
   // several quick toggles) into a single fetch.
@@ -126,8 +176,11 @@ export default function ShoppingList() {
     if (activeStoreId && !stores.some((s) => s.id === activeStoreId)) setActiveStoreId(null)
   }, [stores, loading, activeStoreId])
 
-  // ── Mutations: optimistic local update, write to Supabase, then refetch. ────
-  async function add() {
+  // ── Mutations: offline-first. Update local state, queue the change, then
+  // scheduleLoad() — which flushes the queue + refetches when online, or just
+  // keeps the local list when offline. Single write path (the outbox) works
+  // identically on- and offline; nothing writes to Supabase directly here. ────
+  function add() {
     const trimmed = label.trim()
     if (!trimmed || !profile) return
     setLabel('')
@@ -142,18 +195,11 @@ export default function ShoppingList() {
       store_id: activeStoreId,
     }
     setItems((list) => [...list, optimistic])
-    const { error } = await supabase
-      .from('shopping_items')
-      .insert({ label: trimmed, added_by: profile.email, store_id: activeStoreId })
-    if (error) {
-      setItems((list) => list.filter((i) => i.id !== id)) // roll back
-      Alert.alert(t('shopping.addFailed'))
-      return
-    }
+    void enqueueOp({ k: 'item.add', tempId: id, label: trimmed, store_id: activeStoreId, added_by: profile.email })
     scheduleLoad()
   }
 
-  async function toggle(item: ShoppingItem) {
+  function toggle(item: ShoppingItem) {
     const checked = !item.checked
     setItems((list) =>
       list.map((i) =>
@@ -162,97 +208,61 @@ export default function ShoppingList() {
           : i,
       ),
     )
-    if (item.id.startsWith('tmp-')) {
-      scheduleLoad()
-      return
-    }
-    const { error } = await supabase
-      .from('shopping_items')
-      .update({ checked, checked_at: checked ? new Date().toISOString() : null })
-      .eq('id', item.id)
-    if (error) {
-      setItems((list) => list.map((i) => (i.id === item.id ? { ...i, checked: item.checked } : i)))
-      return
-    }
+    void enqueueOp({ k: 'item.toggle', id: item.id, checked })
     scheduleLoad()
   }
 
-  async function remove(item: ShoppingItem) {
+  function remove(item: ShoppingItem) {
     setItems((list) => list.filter((i) => i.id !== item.id))
-    if (item.id.startsWith('tmp-')) return
-    const { error } = await supabase.from('shopping_items').delete().eq('id', item.id)
-    if (error) {
-      setItems((list) => [...list, item]) // restore
-      return
-    }
+    void enqueueOp({ k: 'item.remove', id: item.id })
     scheduleLoad()
   }
 
-  async function clearChecked() {
-    const removed = items.filter((i) => i.checked)
-    if (!removed.length) return
+  function clearChecked() {
+    if (!items.some((i) => i.checked)) return
     setItems((list) => list.filter((i) => !i.checked))
-    const { error } = await supabase.from('shopping_items').delete().eq('checked', true)
-    if (error) {
-      setItems((list) => [...list, ...removed])
-      return
-    }
+    void enqueueOp({ k: 'item.clearChecked' })
     scheduleLoad()
   }
 
-  async function addCatalogStore(entry: StoreCatalogEntry) {
+  /** Build an offline-friendly store row with a temp id. */
+  function newStore(name: string, slug: string | null): ShoppingStore | null {
+    if (!profile) return null
+    return {
+      id: tempId(),
+      household_id: profile.household_id,
+      name,
+      slug,
+      created_at: new Date().toISOString(),
+    }
+  }
+
+  function addCatalogStore(entry: StoreCatalogEntry) {
     const existing = stores.find((s) => s.slug === entry.slug)
     if (existing) {
       selectStore(existing.id)
       setPicking(false)
       return
     }
-    if (!profile) return
-    const id = tempId()
-    const optimistic: ShoppingStore = {
-      id,
-      household_id: profile.household_id,
-      name: entry.name,
-      slug: entry.slug,
-      created_at: new Date().toISOString(),
-    }
-    setStores((prev) => [...prev, optimistic])
-    selectStore(id)
+    const store = newStore(entry.name, entry.slug)
+    if (!store) return
+    setStores((prev) => [...prev, store])
+    void enqueueOp({ k: 'store.add', tempId: store.id, name: entry.name, slug: entry.slug })
+    selectStore(store.id)
     setPicking(false)
-    const { error } = await supabase
-      .from('shopping_stores')
-      .insert({ name: entry.name, slug: entry.slug })
-    if (error) {
-      setStores((prev) => prev.filter((s) => s.id !== id))
-      selectStore(null)
-      Alert.alert(t('shopping.storeAddFailed'))
-      return
-    }
     scheduleLoad()
   }
 
-  async function addCustomStore() {
+  function addCustomStore() {
     const name = storeInput.trim()
-    if (!name || !profile) return
+    if (!name) return
     setStoreInput('')
-    const id = tempId()
-    const optimistic: ShoppingStore = {
-      id,
-      household_id: profile.household_id,
-      name,
-      slug: null,
-      created_at: new Date().toISOString(),
-    }
-    setStores((prev) => [...prev, optimistic])
-    selectStore(id)
+    const store = newStore(name, null)
+    if (!store) return
+    setStores((prev) => [...prev, store])
+    void enqueueOp({ k: 'store.add', tempId: store.id, name, slug: null })
+    selectStore(store.id)
     setPicking(false)
-    const { error } = await supabase.from('shopping_stores').insert({ name, slug: null })
-    if (error) {
-      setStores((prev) => prev.filter((s) => s.id !== id))
-      selectStore(null)
-      Alert.alert(t('shopping.storeAddFailed'))
-      return
-    }
     scheduleLoad()
   }
 
@@ -265,15 +275,14 @@ export default function ShoppingList() {
         {
           text: t('common.remove'),
           style: 'destructive',
-          onPress: async () => {
+          onPress: () => {
             setStores((prev) => prev.filter((s) => s.id !== store.id))
             setItems((prev) =>
               prev.map((i) => (i.store_id === store.id ? { ...i, store_id: null } : i)),
             )
             if (activeStoreId === store.id) selectStore(null)
-            if (store.id.startsWith('tmp-')) return
-            const { error } = await supabase.from('shopping_stores').delete().eq('id', store.id)
-            if (!error) scheduleLoad()
+            void enqueueOp({ k: 'store.remove', id: store.id })
+            scheduleLoad()
           },
         },
       ],

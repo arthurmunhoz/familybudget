@@ -96,7 +96,7 @@ All modules type-check and are in the iOS bundle. "Gap" = not yet ported / needs
 | Module | Status | Known gaps to finish later |
 |---|---|---|
 | **Calculator** | ✅ split (even + by-item), tip/tax, better-deal, discount, **tap-to-add household members** in by-item split | By-item **photo scan** stubbed (alert) |
-| **Shopping** | ✅ realtime sync, per-store sections, add/check/delete (optimistic) | **Offline queue** not ported (online-only); delete is an X button (no swipe); store logos are colored monograms (no brand bitmaps) |
+| **Shopping** | ✅ realtime sync, per-store sections, add/check/delete (optimistic), **offline queue** (AsyncStorage outbox, replays on reconnect) | delete is an X button (no swipe); store logos are colored monograms (no brand bitmaps) |
 | **Pet Care** | ✅ carousel, profiles, events, next-due reminders, "done/again" re-log, **photo upload** | None functional; verify photo upload on device |
 | **Family** | ✅ member list, profile detail, edit own profile + **avatar upload** | Avatar tap-to-zoom lightbox not ported |
 | **Calendar** | ✅ month grid + Upcoming, recurrence, color-by-member, kind markers + "turns N", add/edit | **Google Calendar connect/sync stubbed** (pulled Google events still display read-only) — see §3.E |
