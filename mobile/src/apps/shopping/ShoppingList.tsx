@@ -25,6 +25,7 @@ import { Check, Plus, ShoppingCart, Store, X } from 'lucide-react-native'
 
 import { AppHeader, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { readCache, writeCache } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { STORE_CATALOG, type StoreCatalogEntry } from '@/lib/stores'
@@ -51,10 +52,17 @@ export default function ShoppingList() {
   const { t } = useI18n()
   const { profile } = useAuth()
 
-  const [items, setItems] = useState<ShoppingItem[]>([])
-  const [stores, setStores] = useState<ShoppingStore[]>([])
+  // Seed from the in-memory cache so the list renders instantly on return
+  // (write-through happens in load()); realtime + optimistic edits below keep it
+  // live. loading is true only on the very first visit (no cache yet).
+  const [items, setItems] = useState<ShoppingItem[]>(
+    () => readCache<ShoppingItem[]>('shopping:items') ?? [],
+  )
+  const [stores, setStores] = useState<ShoppingStore[]>(
+    () => readCache<ShoppingStore[]>('shopping:stores') ?? [],
+  )
   const [label, setLabel] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => readCache('shopping:items') === undefined)
 
   // Which store new items go to (null = "Anywhere").
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null)
@@ -67,9 +75,18 @@ export default function ShoppingList() {
       supabase.from('shopping_stores').select('*').order('created_at'),
     ])
     // Only overwrite local state when the fetch actually succeeded — a failed
-    // request must not wipe optimistic edits off the screen.
-    if (!itemsRes.error) setItems((itemsRes.data as ShoppingItem[]) ?? [])
-    if (!storesRes.error) setStores((storesRes.data as ShoppingStore[]) ?? [])
+    // request must not wipe optimistic edits off the screen. Write through to
+    // the cache so the next mount seeds instantly (no loader flash).
+    if (!itemsRes.error) {
+      const data = (itemsRes.data as ShoppingItem[]) ?? []
+      setItems(data)
+      writeCache('shopping:items', data)
+    }
+    if (!storesRes.error) {
+      const data = (storesRes.data as ShoppingStore[]) ?? []
+      setStores(data)
+      writeCache('shopping:stores', data)
+    }
     setLoading(false)
   }, [])
 

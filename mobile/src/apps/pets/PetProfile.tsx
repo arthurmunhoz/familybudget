@@ -1,7 +1,7 @@
 // A single pet's profile: hero photo (or emoji), detail rows (only the filled-in
 // ones), and that pet's event history. Edit opens the shared PetForm; delete
 // removes the pet (and cascades its events server-side).
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Alert, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -9,6 +9,7 @@ import { Image } from 'expo-image'
 import { ChevronLeft, Pencil } from 'lucide-react-native'
 
 import { Loader, Txt } from '@/components/ui'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { formatDay, todayISO } from '@/lib/format'
@@ -23,31 +24,31 @@ import PetForm from './PetForm'
 export default function PetProfile({ petId }: { petId: string }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const [pet, setPet] = useState<Pet | null>(null)
-  const [events, setEvents] = useState<PetEvent[]>([])
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
 
-  const load = useCallback(async () => {
-    const [petRes, evRes] = await Promise.all([
-      supabase.from('pets').select('*').eq('id', petId).single(),
-      supabase
-        .from('pet_events')
-        .select('*')
-        .eq('pet_id', petId)
-        .order('event_date', { ascending: false }),
-    ])
-    const p = (petRes.data as Pet | null) ?? null
-    setPet(p)
-    setEvents((evRes.data ?? []) as PetEvent[])
-    setPhotoUrl(p?.photo_path ? await getSignedUrl(p.photo_path) : null)
-    setLoading(false)
-  }, [petId])
-
-  useEffect(() => {
-    load()
-  }, [load])
+  const {
+    data: { pet, events, photoUrl } = { pet: null, events: [], photoUrl: null },
+    loading,
+    revalidate: load,
+  } = useCachedQuery<{ pet: Pet | null; events: PetEvent[]; photoUrl: string | null }>(
+    `pet:${petId}`,
+    async () => {
+      const [petRes, evRes] = await Promise.all([
+        supabase.from('pets').select('*').eq('id', petId).single(),
+        supabase
+          .from('pet_events')
+          .select('*')
+          .eq('pet_id', petId)
+          .order('event_date', { ascending: false }),
+      ])
+      const p = (petRes.data as Pet | null) ?? null
+      return {
+        pet: p,
+        events: (evRes.data ?? []) as PetEvent[],
+        photoUrl: p?.photo_path ? await getSignedUrl(p.photo_path) : null,
+      }
+    },
+  )
 
   function goBack() {
     if (router.canGoBack()) router.back()

@@ -1,7 +1,7 @@
 // Family module: list every household member (avatar + name + a hint line), tap
 // one to view their full profile. The signed-in user can edit their own profile
 // and avatar; everyone can read all profiles (RLS scopes both reads and writes).
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { View } from 'react-native'
 import { ChevronRight } from 'lucide-react-native'
 
@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
 import { formatPhone, todayISO } from '@/lib/format'
 import { useAuth } from '@/lib/auth'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useTheme, sp } from '@/theme/theme'
 import { Screen, AppHeader, Card, Txt, Loader, EmptyState } from '@/components/ui'
@@ -24,8 +25,6 @@ export default function Family() {
   const { c } = useTheme()
   const today = todayISO()
 
-  const [byEmail, setByEmail] = useState<Record<string, MemberProfile>>({})
-  const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [initialPhoto, setInitialPhoto] = useState<string | null>(null)
@@ -38,19 +37,17 @@ export default function Family() {
     .map((p) => ({ email: p.email, display_name: p.display_name, is_admin: p.is_admin }))
     .sort((a, b) => a.display_name.localeCompare(b.display_name))
 
-  const load = useCallback(async () => {
-    // Member profile rows (RLS scopes member_profiles to my household).
+  // Member profile rows (RLS scopes member_profiles to my household), cached so
+  // the screen renders instantly on return; revalidate() refetches after edits.
+  const {
+    data: byEmail = {},
+    loading,
+    revalidate: load,
+  } = useCachedQuery<Record<string, MemberProfile>>('family:profiles', async () => {
     const { data: rowsData } = await supabase.from('member_profiles').select('*')
     const rows = (rowsData ?? []) as MemberProfile[]
-    const map = Object.fromEntries(rows.map((p) => [p.email, p]))
-
-    setByEmail(map)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+    return Object.fromEntries(rows.map((p) => [p.email, p]))
+  })
 
   async function openEditMine() {
     if (!profile) return

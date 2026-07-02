@@ -1,13 +1,14 @@
 // Money — the module's home: a list of budgets. Tapping one opens its periods.
 // The bottom bar opens a "new budget" sheet (name + period grouping). RN port of
 // the PWA's budget/Budgets.tsx.
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Modal, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { ChevronRight, Wallet, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
@@ -21,23 +22,15 @@ export default function Budgets() {
   const { c } = useTheme()
   const { t } = useI18n()
 
-  const [budgets, setBudgets] = useState<Budget[]>([])
-  const [loading, setLoading] = useState(true)
-
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [period, setPeriod] = useState<Period>('monthly')
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
+  const { data: budgets = [], loading, revalidate: load } = useCachedQuery<Budget[]>('budgets', async () => {
     const { data } = await supabase.from('budgets').select('*').order('created_at')
-    setBudgets((data as Budget[]) ?? [])
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+    return (data as Budget[]) ?? []
+  })
 
   async function create() {
     const trimmed = name.trim()

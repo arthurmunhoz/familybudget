@@ -3,7 +3,7 @@
 // icon. Tapping a row opens the file via a signed URL in the in-app browser;
 // the pencil edits the row; the X deletes (with an Alert confirm). The bottom
 // bar picks a file (images + PDF only) → shows the UploadSheet.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
@@ -14,6 +14,7 @@ import { FileText, Pencil, Plus, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { formatDay } from '@/lib/format'
@@ -33,8 +34,6 @@ export default function DocumentVault() {
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
 
-  const [docs, setDocs] = useState<FamilyDocument[]>([])
-  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<DocCategory | 'all'>('all')
 
   const [pending, setPending] = useState<PickedFile | null>(null)
@@ -42,18 +41,19 @@ export default function DocumentVault() {
   const [picking, setPicking] = useState(false)
   const [opening, setOpening] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  // Stale-while-revalidate: the last-loaded docs render instantly on return
+  // (no loader flash); revalidate() refetches after a mutation.
+  const {
+    data: docs = [],
+    loading,
+    revalidate: load,
+  } = useCachedQuery<FamilyDocument[]>('docs', async () => {
     const { data } = await supabase
       .from('documents')
       .select('*')
       .order('created_at', { ascending: false })
-    setDocs((data ?? []) as FamilyDocument[])
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+    return (data ?? []) as FamilyDocument[]
+  })
 
   // Documents that match the active category filter.
   const visible = useMemo(
@@ -151,9 +151,9 @@ export default function DocumentVault() {
         text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
-          setDocs((list) => list.filter((d) => d.id !== doc.id))
           await supabase.storage.from('documents').remove([doc.file_path])
           await supabase.from('documents').delete().eq('id', doc.id)
+          load()
         },
       },
     ])

@@ -3,13 +3,14 @@
 // to-date balance, opens one on tap, and creates a new period via a sheet that
 // suggests the current/next period and copies recurring entries forward. The
 // header menu renames or deletes the budget. RN port of budget/Months.tsx.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { ChevronRight, MoreHorizontal, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import {
@@ -36,10 +37,6 @@ export default function Months({ budgetId }: { budgetId: string }) {
   const { c } = useTheme()
   const { t } = useI18n()
 
-  const [budget, setBudget] = useState<Budget | null>(null)
-  const [months, setMonths] = useState<Month[]>([])
-  const [entries, setEntries] = useState<EntryBalance[]>([])
-  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
 
   const [createOpen, setCreateOpen] = useState(false)
@@ -50,21 +47,25 @@ export default function Months({ budgetId }: { budgetId: string }) {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    const [b, m, e] = await Promise.all([
-      supabase.from('budgets').select('*').eq('id', budgetId).single(),
-      supabase.from('months').select('*').eq('budget_id', budgetId).order('start_date', { ascending: false }),
-      supabase.from('entries').select('month_id, type, amount, entry_date'),
-    ])
-    setBudget((b.data as Budget) ?? null)
-    setMonths((m.data as Month[]) ?? [])
-    setEntries((e.data as EntryBalance[]) ?? [])
-    setLoading(false)
-  }, [budgetId])
-
-  useEffect(() => {
-    load()
-  }, [load])
+  const {
+    data: { budget, months, entries } = { budget: null, months: [], entries: [] },
+    loading,
+    revalidate: load,
+  } = useCachedQuery<{ budget: Budget | null; months: Month[]; entries: EntryBalance[] }>(
+    `months:${budgetId}`,
+    async () => {
+      const [b, m, e] = await Promise.all([
+        supabase.from('budgets').select('*').eq('id', budgetId).single(),
+        supabase.from('months').select('*').eq('budget_id', budgetId).order('start_date', { ascending: false }),
+        supabase.from('entries').select('month_id, type, amount, entry_date'),
+      ])
+      return {
+        budget: (b.data as Budget) ?? null,
+        months: (m.data as Month[]) ?? [],
+        entries: (e.data as EntryBalance[]) ?? [],
+      }
+    },
+  )
 
   const period = budget?.period ?? 'monthly'
   const pk = CAP[period]

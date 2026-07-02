@@ -7,7 +7,7 @@
 // connect/sync is STUBBED (disabled row, "coming soon") — it needs web OAuth +
 // Vercel /api endpoints not available in the app yet. Google-sourced rows
 // (source='google') still render but are read-only.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { CalendarDays, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
@@ -15,6 +15,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-na
 import { AppHeader, Btn, Card, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { daysBetweenISO, todayISO } from '@/lib/format'
 import {
   compareOccurrences,
@@ -63,17 +64,16 @@ export default function Calendar() {
   const ownerName = (email: string) =>
     profiles.find((p) => p.email === email)?.display_name ?? email
 
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const load = useCallback(async () => {
+  const {
+    data: events = [],
+    loading,
+    revalidate: load,
+  } = useCachedQuery<CalendarEvent[]>('calendar', async () => {
     const { data } = await supabase.from('calendar_events').select('*')
-    setEvents((data ?? []) as CalendarEvent[])
-    setLoading(false)
-  }, [])
+    return (data ?? []) as CalendarEvent[]
+  })
 
   useEffect(() => {
-    load()
     // Realtime: refetch when any household row changes (RLS scopes the stream).
     const channel = supabase
       .channel('calendar_events')

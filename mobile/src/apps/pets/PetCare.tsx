@@ -4,7 +4,7 @@
 // upcoming) with a "✓ Done" re-log button; "History" lists every logged event.
 // The bottom bar adds a new event (or the first pet). Pet add/edit and event
 // add/edit are bottom-sheet modals.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -13,6 +13,7 @@ import { Check, PawPrint, Pencil, Plus, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { addDaysISO, daysBetweenISO, formatDay, todayISO } from '@/lib/format'
@@ -40,10 +41,6 @@ export default function PetCare() {
   const { t } = useI18n()
   const { profile } = useAuth()
 
-  const [pets, setPets] = useState<Pet[]>([])
-  const [events, setEvents] = useState<PetEvent[]>([])
-  const [petPhotoUrls, setPetPhotoUrls] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(true)
   const [petFilter, setPetFilter] = useState<string>('all')
 
   const [showPetForm, setShowPetForm] = useState(false)
@@ -51,33 +48,32 @@ export default function PetCare() {
   const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null)
   const [draft, setDraft] = useState<EventDraft>(emptyDraft)
 
-  const load = useCallback(async () => {
-    const [petsRes, eventsRes] = await Promise.all([
-      supabase.from('pets').select('*').order('name'),
-      supabase.from('pet_events').select('*').order('event_date', { ascending: false }),
-    ])
-    const petRows = (petsRes.data ?? []) as Pet[]
-    setPets(petRows)
-    setEvents((eventsRes.data ?? []) as PetEvent[])
-    const paths = petRows.map((p) => p.photo_path).filter(Boolean) as string[]
-    if (paths.length) {
-      const byPath = await getSignedUrls(paths)
-      setPetPhotoUrls(
-        Object.fromEntries(
+  const {
+    data: { pets, events, petPhotoUrls } = { pets: [], events: [], petPhotoUrls: {} },
+    loading,
+    revalidate: load,
+  } = useCachedQuery<{ pets: Pet[]; events: PetEvent[]; petPhotoUrls: Record<string, string> }>(
+    'pets',
+    async () => {
+      const [petsRes, eventsRes] = await Promise.all([
+        supabase.from('pets').select('*').order('name'),
+        supabase.from('pet_events').select('*').order('event_date', { ascending: false }),
+      ])
+      const petRows = (petsRes.data ?? []) as Pet[]
+      const eventRows = (eventsRes.data ?? []) as PetEvent[]
+      const paths = petRows.map((p) => p.photo_path).filter(Boolean) as string[]
+      let photoUrls: Record<string, string> = {}
+      if (paths.length) {
+        const byPath = await getSignedUrls(paths)
+        photoUrls = Object.fromEntries(
           petRows
             .filter((p) => p.photo_path && byPath[p.photo_path])
             .map((p) => [p.id, byPath[p.photo_path as string]]),
-        ),
-      )
-    } else {
-      setPetPhotoUrls({})
-    }
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+        )
+      }
+      return { pets: petRows, events: eventRows, petPhotoUrls: photoUrls }
+    },
+  )
 
   const petById = useMemo(() => Object.fromEntries(pets.map((p) => [p.id, p])), [pets])
 
@@ -146,8 +142,8 @@ export default function PetCare() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
-            setEvents((list) => list.filter((e) => e.id !== event.id))
             await supabase.from('pet_events').delete().eq('id', event.id)
+            await load()
           },
         },
       ],

@@ -2,7 +2,7 @@
 // a person filter, sort controls (by date / by amount), a future-entries toggle,
 // and the entry list (grouped by day when sorting by date). The bottom bar adds
 // an entry or scans a receipt photo. RN port of budget/MonthDetail.tsx.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -12,6 +12,7 @@ import { Camera, Check, ChevronDown } from 'lucide-react-native'
 
 import { AppHeader, Btn, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { categoryById } from '@/lib/categories'
 import { formatDay, formatDayHeading, formatMoney, periodEndISO, periodTitle, todayISO } from '@/lib/format'
@@ -31,12 +32,6 @@ export default function MonthDetail({ monthId }: { monthId: string }) {
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
 
-  const [month, setMonth] = useState<MonthWithBudget | null>(null)
-  const [entries, setEntries] = useState<Entry[]>([])
-  const [rules, setRules] = useState<CategoryRule[]>([])
-  const [subcatSuggestions, setSubcatSuggestions] = useState<Record<string, string[]>>({})
-  const [loading, setLoading] = useState(true)
-
   const [person, setPerson] = useState<string>('all')
   const [personMenuOpen, setPersonMenuOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortBy>('date')
@@ -48,16 +43,28 @@ export default function MonthDetail({ monthId }: { monthId: string }) {
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
   const [scanning, setScanning] = useState(false)
 
-  const load = useCallback(async () => {
+  // Cached (stale-while-revalidate) so the period renders instantly on return.
+  const {
+    data: { month, entries, rules, subcatSuggestions } = {
+      month: null,
+      entries: [],
+      rules: [],
+      subcatSuggestions: {},
+    },
+    loading,
+    revalidate: load,
+  } = useCachedQuery<{
+    month: MonthWithBudget | null
+    entries: Entry[]
+    rules: CategoryRule[]
+    subcatSuggestions: Record<string, string[]>
+  }>(`month:${monthId}`, async () => {
     const [m, e, r, subs] = await Promise.all([
       supabase.from('months').select('*, budgets(name, period)').eq('id', monthId).single(),
       supabase.from('entries').select('*').eq('month_id', monthId),
       supabase.from('category_rules').select('keyword, category'),
       supabase.from('entries').select('category, subcategory').not('subcategory', 'is', null),
     ])
-    setMonth((m.data as MonthWithBudget) ?? null)
-    setEntries((e.data as Entry[]) ?? [])
-    setRules((r.data as CategoryRule[]) ?? [])
 
     // Household-wide subcategory vocabulary (most-used first) for the entry form.
     const counts = new Map<string, Map<string, number>>()
@@ -74,13 +81,14 @@ export default function MonthDetail({ monthId }: { monthId: string }) {
     for (const [cat, bucket] of counts) {
       map[cat] = [...bucket.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s)
     }
-    setSubcatSuggestions(map)
-    setLoading(false)
-  }, [monthId])
 
-  useEffect(() => {
-    load()
-  }, [load])
+    return {
+      month: (m.data as MonthWithBudget) ?? null,
+      entries: (e.data as Entry[]) ?? [],
+      rules: (r.data as CategoryRule[]) ?? [],
+      subcatSuggestions: map,
+    }
+  })
 
   const period = month?.budgets?.period ?? 'monthly'
 
@@ -117,14 +125,9 @@ export default function MonthDetail({ monthId }: { monthId: string }) {
         text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
-          setEntries((list) => list.filter((x) => x.id !== e.id)) // optimistic
           const { error } = await supabase.from('entries').delete().eq('id', e.id)
-          if (error) {
-            Alert.alert(t('detail.deleteFailed'))
-            load()
-          } else {
-            load()
-          }
+          if (error) Alert.alert(t('detail.deleteFailed'))
+          load()
         },
       },
     ])

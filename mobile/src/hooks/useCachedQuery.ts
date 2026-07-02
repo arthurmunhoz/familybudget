@@ -1,0 +1,90 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+/**
+ * Stale-while-revalidate data fetching with an in-memory cache. Ported verbatim
+ * from the PWA (src/hooks/useCachedQuery.ts) — pure React, no web deps.
+ *
+ * On mount it returns the last cached value for `key` immediately (no empty
+ * loader flash when a screen re-mounts), then re-fetches in the background and
+ * only updates state if the result actually changed — so unchanged data causes
+ * no re-render and no "blink". The cache is module-level: it survives component
+ * unmount/remount within a session and clears on a full app reload.
+ *
+ * `loading` is true only on the very first fetch for a key (when there's no
+ * cache yet). `revalidate()` forces a refresh (e.g. from a Realtime handler or
+ * after a mutation).
+ */
+const cache = new Map<string, unknown>()
+
+/** Read/write the same in-memory cache directly. For screens that keep their
+ *  own optimistic/Realtime state but still want instant render on return
+ *  (seed from readCache, write-through on every update). */
+export function readCache<T>(key: string): T | undefined {
+  return cache.get(key) as T | undefined
+}
+export function writeCache<T>(key: string, value: T): void {
+  cache.set(key, value)
+}
+/** Wipe the whole cache. Called on sign-out: unlike the PWA (which reloads the
+ *  page on logout), the native app keeps its JS context alive, so without this a
+ *  second account signing in on the same session would see the first's cached
+ *  data before revalidation. */
+export function clearCache(): void {
+  cache.clear()
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  } catch {
+    return false
+  }
+}
+
+export function useCachedQuery<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+): { data: T | undefined; loading: boolean; revalidate: () => Promise<void> } {
+  const [data, setData] = useState<T | undefined>(() => cache.get(key) as T | undefined)
+  const [loading, setLoading] = useState(!cache.has(key))
+
+  // Keep the latest fetcher without making it an effect dependency (callers
+  // pass inline closures; we don't want to refetch on every render).
+  const fetcherRef = useRef(fetcher)
+  fetcherRef.current = fetcher
+
+  const revalidate = useCallback(async () => {
+    const result = await fetcherRef.current()
+    const prev = cache.get(key)
+    cache.set(key, result)
+    if (!sameValue(prev, result)) setData(result)
+    setLoading(false)
+  }, [key])
+
+  useEffect(() => {
+    let cancelled = false
+    if (cache.has(key)) {
+      setData(cache.get(key) as T)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+    fetcherRef.current()
+      .then((result) => {
+        if (cancelled) return
+        const prev = cache.get(key)
+        cache.set(key, result)
+        if (!sameValue(prev, result)) setData(result)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [key])
+
+  return { data, loading, revalidate }
+}

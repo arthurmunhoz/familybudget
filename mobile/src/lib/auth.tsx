@@ -17,6 +17,7 @@ import { makeRedirectUri } from 'expo-auth-session'
 import type { Session } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
+import { clearCache } from '@/hooks/useCachedQuery'
 import type { Profile } from './types'
 
 WebBrowser.maybeCompleteAuthSession()
@@ -165,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    clearCache()
     await supabase.auth.signOut()
   }, [])
 
