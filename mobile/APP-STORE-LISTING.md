@@ -46,7 +46,7 @@ Character limits are Apple's; I've kept everything within them. Tweak to taste.
 > One roof. One app. Everything your household needs to run smoothly.
 
 ## What's New (v1.0)
-`Welcome to One Roof! Your family's calendar, shopping, budget, pets, documents, and nudges — all in one shared app. We'd love your feedback: arthur@peek.us`
+`Welcome to One Roof! Your family's calendar, shopping, budget, pets, documents, and nudges — all in one shared app. We'd love your feedback: arthurmunhoz@hotmail.com`
 
 ---
 
