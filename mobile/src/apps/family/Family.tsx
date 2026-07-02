@@ -88,8 +88,7 @@ export default function Family() {
   }
 
   return (
-    <Screen scroll>
-      <AppHeader title={t('family.title')} />
+    <Screen scroll header={<AppHeader title={t('family.title')} />}>
       {loading || profiles.length === 0 ? (
         <Loader />
       ) : members.length === 0 ? (

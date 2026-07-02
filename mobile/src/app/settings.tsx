@@ -70,9 +70,7 @@ export default function Settings() {
   }
 
   return (
-    <Screen scroll>
-      <AppHeader title="Settings" />
-
+    <Screen scroll header={<AppHeader title="Settings" />}>
       <View style={{ gap: sp.lg }}>
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">Language</Txt>

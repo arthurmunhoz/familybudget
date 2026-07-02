@@ -42,8 +42,7 @@ export default function CalculatorScreen() {
     : () => (router.canGoBack() ? router.back() : router.replace('/'))
 
   return (
-    <Screen scroll>
-      <AppHeader title={title} onBack={onBack} />
+    <Screen scroll header={<AppHeader title={title} onBack={onBack} />}>
       {tool === 'split' ? (
         <SplitBill />
       ) : tool === 'unit' ? (

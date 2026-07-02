@@ -2,7 +2,7 @@
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { LogOut, Settings } from 'lucide-react-native'
+import { Settings } from 'lucide-react-native'
 
 import { Card, Txt } from './ui'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
@@ -13,29 +13,34 @@ import { radius, sp, useTheme } from '../theme/theme'
 
 export default function Hub() {
   const { c } = useTheme()
-  const { profile, signOut } = useAuth()
+  const { profile } = useAuth()
   const { t } = useI18n()
 
   const apps: HubApp[] = profile?.is_admin ? [...APPS, ADMIN_APP] : APPS
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={{ padding: sp.lg, paddingBottom: sp.xxl }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: sp.lg }}>
-          <View>
-            <Txt variant="display">One Roof</Txt>
-            {profile?.display_name ? <Txt variant="muted">Hi, {profile.display_name}</Txt> : null}
-          </View>
-          <View style={{ flexDirection: 'row', gap: sp.md }}>
-            <Pressable accessibilityLabel="Settings" hitSlop={10} onPress={() => router.push('/settings')} style={{ padding: 6 }}>
-              <Settings size={22} color={c.textMuted} />
-            </Pressable>
-            <Pressable accessibilityLabel="Sign out" hitSlop={10} onPress={signOut} style={{ padding: 6 }}>
-              <LogOut size={22} color={c.textMuted} />
-            </Pressable>
-          </View>
+      {/* Fixed header — stays put while the app grid scrolls. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          paddingHorizontal: sp.lg,
+          paddingTop: sp.lg,
+          paddingBottom: sp.md,
+        }}
+      >
+        <View>
+          <Txt variant="display">One Roof</Txt>
+          {profile?.display_name ? <Txt variant="muted">Hi, {profile.display_name}</Txt> : null}
         </View>
+        <Pressable accessibilityLabel="Settings" hitSlop={10} onPress={() => router.push('/settings')} style={{ padding: 6 }}>
+          <Settings size={22} color={c.textMuted} />
+        </Pressable>
+      </View>
 
+      <ScrollView contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xxl }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.md }}>
           {apps.map((app) => {
             const Icon = app.icon

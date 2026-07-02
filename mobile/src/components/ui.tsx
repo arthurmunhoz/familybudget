@@ -45,16 +45,22 @@ export function Screen({
   scroll = false,
   pad = true,
   edges = ['top', 'left', 'right'],
+  header,
 }: {
   children: ReactNode
   scroll?: boolean
   pad?: boolean
   edges?: Edge[]
+  /** Rendered fixed above the scroll area — stays put while `children` scroll.
+   *  Pass an <AppHeader/> here instead of as the first child so it doesn't
+   *  scroll away. */
+  header?: ReactNode
 }) {
   const { c } = useTheme()
   const inner = pad ? { paddingHorizontal: sp.lg } : undefined
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={edges}>
+      {header ? <View style={inner}>{header}</View> : null}
       {scroll ? (
         <ScrollView
           style={{ flex: 1 }}

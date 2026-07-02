@@ -10,8 +10,7 @@ import PingComposer from '@/apps/pings/PingComposer'
 
 export default function NudgesScreen() {
   return (
-    <Screen scroll>
-      <AppHeader title="Nudges" />
+    <Screen scroll header={<AppHeader title="Nudges" />}>
       <PingsList />
       <PingComposer />
     </Screen>

@@ -98,8 +98,10 @@ export function DateField({
   return (
     <View style={{ gap: 6, flex: 1 }}>
       <Txt variant="label">{label}</Txt>
-      <Pressable
-        onPress={() => setOpen((o) => !o)}
+      {/* The open-picker target and the clear (✕) are SEPARATE siblings — not
+          nested — so tapping ✕ reliably clears without also toggling the
+          picker. Clearing an optional field is how you remove a next-due date. */}
+      <View
         style={{
           backgroundColor: c.card,
           borderRadius: radius.md,
@@ -110,17 +112,29 @@ export function DateField({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: sp.sm,
         }}
       >
-        <Txt style={{ color: value ? c.text : c.textFaint }}>
-          {value ? formatDay(value) : placeholder}
-        </Txt>
+        <Pressable onPress={() => setOpen((o) => !o)} style={{ flex: 1 }}>
+          <Txt style={{ color: value ? c.text : c.textFaint }}>
+            {value ? formatDay(value) : placeholder}
+          </Txt>
+        </Pressable>
         {value && optional ? (
-          <Pressable hitSlop={8} onPress={() => onChange('')}>
+          <Pressable
+            hitSlop={10}
+            onPress={() => {
+              onChange('')
+              setOpen(false)
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Clear"
+            style={{ paddingLeft: sp.sm }}
+          >
             <Txt variant="muted">✕</Txt>
           </Pressable>
         ) : null}
-      </Pressable>
+      </View>
       {open && (
         <DateTimePicker
           mode="date"

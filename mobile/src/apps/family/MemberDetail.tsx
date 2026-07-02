@@ -49,9 +49,7 @@ export function MemberDetail({
   }
 
   return (
-    <Screen scroll>
-      <AppHeader title={t('family.title')} onBack={onBack} />
-
+    <Screen scroll header={<AppHeader title={t('family.title')} onBack={onBack} />}>
       <View style={{ alignItems: 'center', gap: sp.md, paddingVertical: sp.lg }}>
         <Avatar name={member.display_name} avatarPath={profile?.avatar_path} size={104} zoomable />
         <View style={{ alignItems: 'center', gap: 4 }}>
