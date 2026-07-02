@@ -8,6 +8,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
 import { File } from 'expo-file-system'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as WebBrowser from 'expo-web-browser'
 import { FileText, Pencil, Plus, X } from 'lucide-react-native'
 
@@ -90,23 +91,40 @@ export default function DocumentVault() {
       })
       if (result.canceled || !result.assets[0]) return
       const asset = result.assets[0]
-      const size = asset.size ?? new File(asset.uri).size ?? 0
-      if (size > MAX_SIZE) {
-        Alert.alert(t('docs.tooBig', { size: formatBytes(size) }))
+      const initialSize = asset.size ?? new File(asset.uri).size ?? 0
+      if (initialSize > MAX_SIZE) {
+        Alert.alert(t('docs.tooBig', { size: formatBytes(initialSize) }))
         return
       }
-      // Read the picked file's bytes for upload (SDK 56 File API).
-      const buffer = await new File(asset.uri).arrayBuffer()
-      const bytes = new Uint8Array(buffer)
       const rawExt = (asset.name.split('.').pop() ?? '').toLowerCase()
       const isImage = (asset.mimeType?.startsWith('image/') ?? false) || IMAGE_EXTS.includes(rawExt)
       // The bucket only accepts image/* + application/pdf, so when the picker
       // doesn't report a type, infer it from the extension.
-      const ext = rawExt || (isImage ? 'jpg' : 'pdf')
-      const mime =
+      let uri = asset.uri
+      let ext = rawExt || (isImage ? 'jpg' : 'pdf')
+      let mime =
         asset.mimeType ||
         (ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`)
-      setPending({ name: asset.name, uri: asset.uri, size, bytes, mime, ext })
+      // Downscale big photos before upload (cap the long edge ~2048px, re-encode
+      // JPEG) — keeps the vault light and uploads fast. Only for images clearly
+      // over ~0.6MB, so small screenshots and all PDFs upload untouched (avoids
+      // upscaling / needless recompression). Falls back to the original on error.
+      if (isImage && initialSize > 600 * 1024) {
+        try {
+          const ref = await ImageManipulator.manipulate(asset.uri).resize({ width: 2048 }).renderAsync()
+          const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
+          uri = out.uri
+          ext = 'jpg'
+          mime = 'image/jpeg'
+        } catch {
+          /* keep the original file if manipulation fails */
+        }
+      }
+      // Read the (possibly downscaled) file's bytes for upload (SDK 56 File API).
+      const buffer = await new File(uri).arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      const size = bytes.byteLength
+      setPending({ name: asset.name, uri, size, bytes, mime, ext })
     } catch {
       Alert.alert(t('docs.uploadFailed'))
     } finally {
@@ -147,11 +165,19 @@ export default function DocumentVault() {
         <AppHeader title={t('docs.title')} right={<FileText size={22} color={c.accent} />} />
       </View>
 
-      {/* category filter */}
+      {/* category filter — flexGrow:0 stops the horizontal ScrollView from
+          filling the parent's height (which would stretch the chips tall);
+          alignItems:center keeps each chip at its natural height. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: sp.lg, gap: sp.sm, paddingBottom: sp.md }}
+        style={{ flexGrow: 0, flexShrink: 0 }}
+        contentContainerStyle={{
+          paddingHorizontal: sp.lg,
+          gap: sp.sm,
+          paddingBottom: sp.md,
+          alignItems: 'center',
+        }}
       >
         <FilterChip active={filter === 'all'} onPress={() => setFilter('all')}>
           {t('common.all')}

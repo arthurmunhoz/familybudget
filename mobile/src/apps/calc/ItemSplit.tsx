@@ -4,13 +4,18 @@
 // for now — see scanComingSoon(). Items are entered/edited by hand instead.
 import { useRef, useState } from 'react'
 import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { Camera, X } from 'lucide-react-native'
 
 import { Btn, Card, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
 import { formatMoney } from '@/lib/format'
+import { supabase } from '@/lib/supabase'
 import { radius, sp, useTheme } from '@/theme/theme'
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
 import {
   Avatar,
@@ -42,6 +47,7 @@ export function ItemSplit() {
   const [tipPct, setTipPct] = useState(20)
   const [people, setPeople] = useState<string[]>([])
   const [nameInput, setNameInput] = useState('')
+  const [scanning, setScanning] = useState(false)
 
   // Quick-add chips for the signed-in user's household members (not yet added).
   const memberNames = profiles
@@ -49,8 +55,69 @@ export function ItemSplit() {
     .filter((n): n is string => !!n)
   const suggestions = memberNames.filter((n) => !people.includes(n))
 
-  function scanComingSoon() {
-    Alert.alert(t('bill.takePhoto'), 'Scanning a bill from a photo is coming soon on the app. For now, add the items by hand below.')
+  // Bill scan: pick/capture a photo, resize + base64, POST to the deployed
+  // scan-bill endpoint, then fill the item list (+ tax/tip) with the result.
+  async function scanBill(fromCamera: boolean) {
+    const perm = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert(t('bill.scanFailed'))
+      return
+    }
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({ quality: 1 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 })
+    if (result.canceled || !result.assets[0]) return
+
+    setScanning(true)
+    try {
+      const ctx = ImageManipulator.manipulate(result.assets[0].uri).resize({ width: 1200 })
+      const ref = await ctx.renderAsync()
+      const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7, base64: true })
+      if (!out.base64) throw new Error('no base64')
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch(`${API_BASE}/api/scan-bill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ image: out.base64, media_type: 'image/jpeg' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? t('bill.scanFailed'))
+
+      const scanned: BillItem[] = (json.items ?? [])
+        .filter((it: { name?: string; price?: number }) => it && typeof it.name === 'string')
+        .map((it: { name: string; price: number }) => ({
+          id: nextId(),
+          name: it.name,
+          price: Number.isFinite(it.price) ? String(it.price) : '',
+          people: [],
+        }))
+      if (scanned.length === 0) {
+        Alert.alert(t('bill.scanFailed'))
+        return
+      }
+      setItems(scanned)
+      if (Number.isFinite(json.tax) && json.tax > 0) setTax(String(json.tax))
+      if (Number.isFinite(json.tip) && json.tip > 0) {
+        setTipMode('amount')
+        setTip(String(json.tip))
+      }
+    } catch (err) {
+      Alert.alert(err instanceof Error ? err.message : t('bill.scanFailed'))
+    } finally {
+      setScanning(false)
+    }
+  }
+
+  function startScan() {
+    Alert.alert(t('bill.takePhoto'), t('bill.scanTip'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('bill.scanCamera'), onPress: () => scanBill(true) },
+      { text: t('bill.scanLibrary'), onPress: () => scanBill(false) },
+    ])
   }
 
   function addPerson(name: string) {
@@ -101,16 +168,18 @@ export function ItemSplit() {
 
   return (
     <View style={{ gap: sp.xl }}>
-      {/* Scan stub */}
+      {/* Scan a bill photo → line items (Claude vision, deployed endpoint) */}
       <Btn
-        title={t('bill.takePhoto')}
-        onPress={scanComingSoon}
+        title={scanning ? t('bill.scanning') : t('bill.takePhoto')}
+        onPress={startScan}
         variant="secondary"
+        loading={scanning}
+        disabled={scanning}
         style={{ flexDirection: 'row' }}
       />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: -sp.md }}>
         <Camera size={14} color={c.textFaint} />
-        <Txt variant="faint">Photo scan coming soon — add items by hand below.</Txt>
+        <Txt variant="faint">{t('bill.scanHint')}</Txt>
       </View>
 
       {/* who's splitting */}
