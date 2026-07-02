@@ -189,7 +189,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'Digest is not configured (missing env).' })
   }
 
-  webpush.setVapidDetails('mailto:arthur@peek.us', vapidPublic, vapidPrivate)
+  webpush.setVapidDetails('mailto:arthurmunhoz@hotmail.com', vapidPublic, vapidPrivate)
   const db = createClient(url, serviceKey, { auth: { persistSession: false } })
   const today = todayUTC()
 
