@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>One Roof — Privacy Policy</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+        max-width: 720px; margin: 0 auto; padding: 32px 20px 64px;
+        line-height: 1.65; color: #2b2521; background: #fbf6f0;
+      }
+      @media (prefers-color-scheme: dark) { body { color: #f3ebe0; background: #1b1714; } }
+      h1 { font-size: 28px; margin: 0 0 4px; }
+      h2 { font-size: 19px; margin: 32px 0 8px; }
+      a { color: #c2603f; }
+      .muted { opacity: 0.7; font-size: 14px; }
+      ul { padding-left: 20px; }
+      li { margin: 4px 0; }
+    </style>
+  </head>
+  <body>
+    <h1>One Roof — Privacy Policy</h1>
+    <p class="muted">Last updated: 2 July 2026</p>
+
+    <p>
+      One Roof ("the app", "we") is a private family organizer — a shared space for your
+      household's calendar, shopping list, budget, pets, documents, family profiles and
+      quick nudges. This policy explains what we collect, how it's used, and your choices.
+      Questions: <a href="mailto:arthur@peek.us">arthur@peek.us</a>.
+    </p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li><strong>Account details</strong> — your email and display name, provided when you sign in
+        with Apple, Google, or email.</li>
+      <li><strong>Content you create</strong> — the information you and your household add: budget
+        entries, shopping items, pet profiles and care events, calendar events, family member
+        profiles, one-tap nudges, and any documents or photos you choose to upload.</li>
+      <li><strong>A notification token</strong>, only if you turn on reminders, so we can send them.</li>
+    </ul>
+    <p>We do <strong>not</strong> use advertising or analytics tracking SDKs, we do not track you
+      across other apps or websites, and we do not sell your data.</p>
+
+    <h2>How your data is stored</h2>
+    <p>
+      Your data lives in our backend (Supabase / PostgreSQL) and, for files, in private storage.
+      It is transmitted over encrypted connections. Access is restricted by row-level security so
+      that only members of your own household can read your household's data.
+    </p>
+
+    <h2>AI features (receipt/bill scanning &amp; nudge suggestions)</h2>
+    <p>
+      When you use the camera to scan a receipt or bill, or use the "just type it" nudge box, the
+      image or text is sent to our AI provider, <strong>Anthropic (Claude)</strong>, to extract the
+      details (amount, date, category, or a suggested message) and return them to you. Per
+      Anthropic's API terms, this content is processed to serve your request and is not used to
+      train their models. Scanning is optional — you can always add entries by hand.
+    </p>
+
+    <h2>Who we share data with</h2>
+    <ul>
+      <li><strong>Your household</strong> — content you add is shared with the members of your household.</li>
+      <li><strong>Service providers</strong> that operate the app on our behalf: Supabase (database &amp;
+        file storage), Anthropic (AI extraction, as above), Apple &amp; Google (sign-in), Expo
+        (push-notification delivery), and Vercel (hosting). We share only what's needed to provide
+        the service.</li>
+    </ul>
+
+    <h2>Notifications</h2>
+    <p>
+      Reminders (pet-care due dates, upcoming calendar dates, family nudges) are optional. If you
+      enable them, we store a push token for your device to deliver them, and remove it when you
+      disable them or delete your account.
+    </p>
+
+    <h2>Deleting your account and data</h2>
+    <p>
+      You can delete your account at any time in the app: <strong>Settings → Delete account</strong>.
+      This permanently removes your account and your personal records. If you are the last member of
+      your household, the entire household and its data are deleted. This cannot be undone.
+    </p>
+
+    <h2>Children</h2>
+    <p>
+      One Roof is a general-audience app and is not directed to children under 13. Any information
+      about children in the app (for example a family member's or pet's details) is entered by a
+      parent or guardian who manages the household.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      We may update this policy; we'll revise the date above when we do. Continued use after a change
+      means you accept the updated policy.
+    </p>
+
+    <h2>Contact</h2>
+    <p>Questions or requests: <a href="mailto:arthur@peek.us">arthur@peek.us</a>.</p>
+  </body>
+</html>
