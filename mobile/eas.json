@@ -8,6 +8,18 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://murtukhmajyvovwputrx.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11cnR1a2htYWp5dm92d3B1dHJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTY0NTUsImV4cCI6MjA5Njc5MjQ1NX0.jBRkKIUk_Nl8i4v209vTdhEIXGb4xUFKIR9JBEMVq3U",
+        "EXPO_PUBLIC_API_BASE": "https://one-roof-app.vercel.app"
+      }
+    },
+    "development-simulator": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
         "simulator": true
       },
       "env": {
