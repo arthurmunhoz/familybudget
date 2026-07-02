@@ -53,7 +53,7 @@ export function MemberDetail({
       <AppHeader title={t('family.title')} onBack={onBack} />
 
       <View style={{ alignItems: 'center', gap: sp.md, paddingVertical: sp.lg }}>
-        <Avatar name={member.display_name} avatarPath={profile?.avatar_path} size={104} />
+        <Avatar name={member.display_name} avatarPath={profile?.avatar_path} size={104} zoomable />
         <View style={{ alignItems: 'center', gap: 4 }}>
           <Txt variant="title">{member.display_name}</Txt>
           {isMe ? (

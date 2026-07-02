@@ -5,6 +5,7 @@
 // with proportional bars and a tap-to-expand subcategory drill-down.
 import { useMemo, useState } from 'react'
 import { Pressable, View } from 'react-native'
+import Svg, { Circle } from 'react-native-svg'
 import { Calendar, ChevronDown, ChevronRight, Hourglass } from 'lucide-react-native'
 
 import { Card, Txt } from '@/components/ui'
@@ -80,46 +81,43 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
 
   return (
     <Card style={{ gap: sp.md }}>
-      {/* balance + received/spent */}
-      <View style={{ flexDirection: 'row', gap: sp.lg }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt
-            style={{
-              fontSize: 11,
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              color: c.textFaint,
-            }}
-          >
-            {t('chart.currentBalance')}
-          </Txt>
-          <Txt
-            style={{
-              marginTop: 2,
-              fontSize: 26,
-              fontWeight: '800',
-              fontVariant: ['tabular-nums'],
-              color: balance >= 0 ? c.income : c.expense,
-            }}
-          >
-            {formatMoney(balance)}
-          </Txt>
+      {/* balance + received/spent donut */}
+      <View style={{ flexDirection: 'row', gap: sp.lg, alignItems: 'center' }}>
+        <View style={{ flex: 1, minWidth: 0, gap: sp.sm }}>
+          <View>
+            <Txt
+              style={{
+                fontSize: 11,
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                color: c.textFaint,
+              }}
+            >
+              {t('chart.currentBalance')}
+            </Txt>
+            <Txt
+              style={{
+                marginTop: 2,
+                fontSize: 26,
+                fontWeight: '800',
+                fontVariant: ['tabular-nums'],
+                color: balance >= 0 ? c.income : c.expense,
+              }}
+            >
+              {formatMoney(balance)}
+            </Txt>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Legend color={c.income} label={t('chart.received')} value={formatMoney(income)} />
+            <Legend color={c.expense} label={t('chart.spent')} value={formatMoney(spent)} />
+          </View>
         </View>
 
-        <View style={{ gap: 6, justifyContent: 'center' }}>
-          <Legend color={c.income} label={t('chart.received')} value={formatMoney(income)} />
-          <Legend color={c.expense} label={t('chart.spent')} value={formatMoney(spent)} />
-        </View>
+        {(income > 0 || spent > 0) && (
+          <Donut income={income} spent={spent} incomeColor={c.income} spentColor={c.expense} track={c.surface} />
+        )}
       </View>
-
-      {/* received vs spent bar */}
-      {(income > 0 || spent > 0) && (
-        <View style={{ flexDirection: 'row', height: 8, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: c.surface }}>
-          {income > 0 && <View style={{ flex: income, backgroundColor: c.income }} />}
-          {spent > 0 && <View style={{ flex: spent, backgroundColor: c.expense }} />}
-        </View>
-      )}
 
       {/* upcoming projection */}
       {hasUpcoming && (
@@ -254,6 +252,62 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
         </View>
       )}
     </Card>
+  )
+}
+
+/** A 2-slice donut ring of received (income) vs spent — the RN equivalent of
+ *  the PWA's Recharts pie. Income arc starts at 12 o'clock; spent follows it. */
+function Donut({
+  income,
+  spent,
+  incomeColor,
+  spentColor,
+  track,
+}: {
+  income: number
+  spent: number
+  incomeColor: string
+  spentColor: string
+  track: string
+}) {
+  const size = 76
+  const stroke = 13
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const total = income + spent
+  const incFrac = total > 0 ? income / total : 0
+  const spFrac = total > 0 ? spent / total : 0
+  const center = size / 2
+  const rot = `rotate(-90 ${center} ${center})`
+  return (
+    <Svg width={size} height={size}>
+      <Circle cx={center} cy={center} r={r} stroke={track} strokeWidth={stroke} fill="none" />
+      {income > 0 && (
+        <Circle
+          cx={center}
+          cy={center}
+          r={r}
+          stroke={incomeColor}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${incFrac * circ} ${circ}`}
+          transform={rot}
+        />
+      )}
+      {spent > 0 && (
+        <Circle
+          cx={center}
+          cy={center}
+          r={r}
+          stroke={spentColor}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${spFrac * circ} ${circ}`}
+          strokeDashoffset={-incFrac * circ}
+          transform={rot}
+        />
+      )}
+    </Svg>
   )
 }
 
