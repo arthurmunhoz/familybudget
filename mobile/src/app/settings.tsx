@@ -42,6 +42,21 @@ export default function Settings() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            // Revoke the Apple token first (Apple requirement for Sign in with
+            // Apple). Best-effort — a no-op until the Apple env vars are set.
+            const apiBase = process.env.EXPO_PUBLIC_API_BASE
+            try {
+              const { data: sess } = await supabase.auth.getSession()
+              const accessToken = sess.session?.access_token
+              if (apiBase && accessToken) {
+                await fetch(`${apiBase}/api/apple-revoke`, {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                })
+              }
+            } catch {
+              /* best-effort */
+            }
             const { error } = await supabase.rpc('delete_my_account')
             if (error) {
               Alert.alert('Could not delete account', error.message)

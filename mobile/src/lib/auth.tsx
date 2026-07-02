@@ -114,6 +114,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: credential.identityToken,
     })
     if (error) throw error
+    // Send the one-time authorization code to the server so it can capture the
+    // Apple refresh token (needed to revoke it on account deletion). Best-effort:
+    // never blocks sign-in, and is a no-op until the Apple env vars are set.
+    const code = credential.authorizationCode
+    const apiBase = process.env.EXPO_PUBLIC_API_BASE
+    if (code && apiBase) {
+      try {
+        const { data: sess } = await supabase.auth.getSession()
+        const accessToken = sess.session?.access_token
+        if (accessToken) {
+          await fetch(`${apiBase}/api/apple-connect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({ code }),
+          })
+        }
+      } catch {
+        /* best-effort */
+      }
+    }
   }, [])
 
   const signInWithGoogle = useCallback(async () => {

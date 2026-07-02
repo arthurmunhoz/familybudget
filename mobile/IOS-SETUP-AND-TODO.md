@@ -60,7 +60,12 @@ npx expo start          # press i for the iOS simulator, or scan the QR with Exp
 
 ### E. Server-side follow-ups (Vercel `api/`, when ready)
 - **Native push delivery**: ✅ implemented in code — `api/send-ping.ts` and `api/send-digest.ts` now also send to `expo_push_tokens` via Expo's push API, alongside web-push (per-recipient language, best-effort). **Pending: a Vercel deploy** (`npx vercel deploy --prod`) for it to go live, plus APNs (EAS provisions the APNs key during the iOS build, and the device must be registered via Settings → Enable notifications). Follow-up: prune stale Expo tokens from the send receipts.
-- **Sign in with Apple — account-deletion token revocation**: Apple requires revoking the Apple token when an account is deleted. Add a small serverless endpoint that calls Apple's token-revocation REST API; call it from `delete_my_account` flow. (The local data deletion already works.)
+- **Sign in with Apple — account-deletion token revocation**: ✅ implemented — `api/apple-connect.ts` captures the Apple refresh token at sign-in and `api/apple-revoke.ts` revokes it during account deletion (wired into the app at sign-in + Settings → Delete; migration 040 stores the token, service-role only). **You must set 4 Vercel env vars** for it to actually revoke (until then it's a safe no-op and deletion still works):
+  - `APPLE_TEAM_ID` — your 10-char Apple Team ID.
+  - `APPLE_KEY_ID` — the Key ID of a **"Sign in with Apple" key** (Apple Developer → Certificates, Identifiers & Keys → Keys → +, enable Sign in with Apple, download the `.p8`).
+  - `APPLE_CLIENT_ID` — `com.oneroof.app` (your bundle id).
+  - `APPLE_PRIVATE_KEY` — the **contents of the `.p8` file** (paste the whole `-----BEGIN PRIVATE KEY----- … -----END PRIVATE KEY-----`; literal `\n` escapes are fine).
+  Then deploy the PWA. Untested end-to-end — verify on a device once the env vars are set.
 - **Google Calendar native connect**: the two-way sync endpoints exist for web; the native "Connect Google Calendar" button is stubbed. Wiring it needs the OAuth redirect handled in-app (or a WebBrowser flow) plus the existing `/api/google-calendar-*` endpoints.
 
 ### F. Paywall / IAP (when you're ready to charge)
@@ -70,7 +75,7 @@ npx expo start          # press i for the iOS simulator, or scan the QR with Exp
 
 ## 4. Apple App Review checklist (status)
 - ✅ **Sign in with Apple** (4.8) — implemented (needs §3 Supabase Apple provider + §A capability).
-- ✅ **In-app account deletion** (5.1.1(v)) — Settings → Delete account (needs §E token-revocation for full compliance).
+- ✅ **In-app account deletion** (5.1.1(v)) — Settings → Delete account; Apple token revocation now implemented (needs the 4 `APPLE_*` env vars in §3.E to fully activate).
 - ✅ **Not a website wrapper** (4.2) — true native RN app.
 - ✅ **Permission usage strings** — Face ID, camera, photos, calendar in `app.json`.
 - ⏳ **Privacy Nutrition Labels** — fill in App Store Connect (§A.5).
