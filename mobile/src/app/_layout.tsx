@@ -14,11 +14,11 @@ import {
 
 import { AuthProvider } from '@/lib/auth';
 import { I18nProvider } from '@/hooks/useI18n';
+import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [fontsLoaded] = useFonts({
     Fraunces_600SemiBold,
     Fraunces_700Bold,
@@ -37,12 +37,24 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <I18nProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack screenOptions={{ headerShown: false }} />
-            <StatusBar style="auto" />
-          </ThemeProvider>
+          <ThemePrefProvider>
+            <Chrome />
+          </ThemePrefProvider>
         </I18nProvider>
       </AuthProvider>
     </SafeAreaProvider>
+  );
+}
+
+// Navigation chrome + status bar, resolved from the saved appearance override.
+function Chrome() {
+  const colorScheme = useColorScheme();
+  const { mode } = useThemePref();
+  const isDark = (mode === 'system' ? colorScheme : mode) === 'dark';
+  return (
+    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <Stack screenOptions={{ headerShown: false }} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+    </ThemeProvider>
   );
 }

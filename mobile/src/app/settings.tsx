@@ -10,9 +10,17 @@ import { LANGUAGES } from '@/lib/i18n'
 import { registerForPush } from '@/lib/notifications'
 import { supabase } from '@/lib/supabase'
 import { radius, sp, useTheme } from '@/theme/theme'
+import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
+
+const APPEARANCE: { id: ThemeMode; label: string }[] = [
+  { id: 'system', label: 'System' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+]
 
 export default function Settings() {
   const { c } = useTheme()
+  const { mode, setMode } = useThemePref()
   const { profile, signOut } = useAuth()
   const { lang, setLang } = useI18n()
   const [pushMsg, setPushMsg] = useState<string | null>(null)
@@ -95,6 +103,31 @@ export default function Settings() {
                 >
                   <Txt>{l.flag}</Txt>
                   <Txt variant={active ? 'body' : 'muted'}>{l.label}</Txt>
+                </Pressable>
+              )
+            })}
+          </View>
+        </View>
+
+        <View style={{ gap: sp.sm }}>
+          <Txt variant="label">Appearance</Txt>
+          <View style={{ flexDirection: 'row', gap: sp.sm }}>
+            {APPEARANCE.map((a) => {
+              const active = a.id === mode
+              return (
+                <Pressable
+                  key={a.id}
+                  onPress={() => setMode(a.id)}
+                  style={{
+                    paddingHorizontal: sp.md,
+                    paddingVertical: sp.sm,
+                    borderRadius: radius.md,
+                    backgroundColor: active ? c.accentSoft : c.card,
+                    borderWidth: 1,
+                    borderColor: active ? c.accent : c.border,
+                  }}
+                >
+                  <Txt variant={active ? 'body' : 'muted'}>{a.label}</Txt>
                 </Pressable>
               )
             })}

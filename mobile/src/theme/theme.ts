@@ -1,6 +1,9 @@
 // "Warm Hearth" design tokens, ported from the PWA's index.css. Light = "Paper",
-// dark = "Dusk" (warm espresso). useTheme() follows the system color scheme.
+// dark = "Dusk" (warm espresso). useTheme() respects the saved appearance
+// override (Light/Dark/System) from theme-pref, falling back to the device.
 import { useColorScheme } from 'react-native';
+
+import { useThemePref } from './theme-pref';
 
 export interface ThemeTokens {
   bg: string;
@@ -57,7 +60,9 @@ export interface Theme {
 
 export function useTheme(): Theme {
   const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
+  const { mode } = useThemePref();
+  const effective = mode === 'system' ? scheme : mode;
+  const isDark = effective === 'dark';
   return { dark: isDark, c: isDark ? dark : light };
 }
 
