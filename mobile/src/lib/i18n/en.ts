@@ -102,6 +102,7 @@ export const en = {
   'bill.scanFailed': 'Couldn’t read that bill — try a clearer photo.',
   'bill.people': 'Who’s splitting?',
   'bill.addName': 'Add a name',
+  'bill.fromHousehold': 'Tap to add',
   'bill.items': 'Items',
   'bill.itemName': 'Item',
   'bill.itemsCount': '{count} item|{count} items',

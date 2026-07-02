@@ -8,6 +8,7 @@ import { Camera, X } from 'lucide-react-native'
 
 import { Btn, Card, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
+import { useAuth } from '@/lib/auth'
 import { formatMoney } from '@/lib/format'
 import { radius, sp, useTheme } from '@/theme/theme'
 
@@ -27,6 +28,7 @@ type BillItem = { id: string; name: string; price: string; people: string[] }
 export function ItemSplit() {
   const { c } = useTheme()
   const { t } = useI18n()
+  const { profiles } = useAuth()
   const idRef = useRef(1)
   const nextId = () => `it-${idRef.current++}`
 
@@ -40,6 +42,12 @@ export function ItemSplit() {
   const [tipPct, setTipPct] = useState(20)
   const [people, setPeople] = useState<string[]>([])
   const [nameInput, setNameInput] = useState('')
+
+  // Quick-add chips for the signed-in user's household members (not yet added).
+  const memberNames = profiles
+    .map((p) => p.display_name?.trim() || p.email)
+    .filter((n): n is string => !!n)
+  const suggestions = memberNames.filter((n) => !people.includes(n))
 
   function scanComingSoon() {
     Alert.alert(t('bill.takePhoto'), 'Scanning a bill from a photo is coming soon on the app. For now, add the items by hand below.')
@@ -148,6 +156,26 @@ export function ItemSplit() {
             <Txt style={{ fontSize: 22, fontWeight: '700', color: c.textMuted }}>+</Txt>
           </Pressable>
         </View>
+        {suggestions.length > 0 && (
+          <View style={{ marginTop: sp.sm }}>
+            <Txt variant="faint" style={{ marginBottom: 6 }}>
+              {t('bill.fromHousehold')}
+            </Txt>
+            <View style={styles.peopleWrap}>
+              {suggestions.map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => addPerson(n)}
+                  style={[styles.suggestChip, { backgroundColor: c.surface, borderColor: c.border }]}
+                >
+                  <Avatar name={n} sm />
+                  <Txt style={{ fontWeight: '600', color: c.textMuted }}>{firstName(n)}</Txt>
+                  <Txt style={{ fontSize: 16, fontWeight: '700', color: c.textFaint }}>+</Txt>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
       </View>
 
       {/* items */}
@@ -337,6 +365,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  suggestChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: 'dashed',
+    paddingLeft: 4,
+    paddingRight: sp.sm,
+    paddingVertical: 4,
   },
   itemCard: {
     borderRadius: radius.lg,

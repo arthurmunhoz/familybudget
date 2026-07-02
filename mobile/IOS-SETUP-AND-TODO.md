@@ -95,7 +95,7 @@ All modules type-check and are in the iOS bundle. "Gap" = not yet ported / needs
 
 | Module | Status | Known gaps to finish later |
 |---|---|---|
-| **Calculator** | ✅ split (even + by-item), tip/tax, better-deal, discount | By-item **photo scan** stubbed (alert); by-item people are manual entry (no household-member suggestions) |
+| **Calculator** | ✅ split (even + by-item), tip/tax, better-deal, discount, **tap-to-add household members** in by-item split | By-item **photo scan** stubbed (alert) |
 | **Shopping** | ✅ realtime sync, per-store sections, add/check/delete (optimistic) | **Offline queue** not ported (online-only); delete is an X button (no swipe); store logos are colored monograms (no brand bitmaps) |
 | **Pet Care** | ✅ carousel, profiles, events, next-due reminders, "done/again" re-log, **photo upload** | None functional; verify photo upload on device |
 | **Family** | ✅ member list, profile detail, edit own profile + **avatar upload** | Avatar tap-to-zoom lightbox not ported |
@@ -106,6 +106,6 @@ All modules type-check and are in the iOS bundle. "Gap" = not yet ported / needs
 
 **Cross-cutting done:** auth (Sign in with Apple + Google + dev), i18n (EN/ES/PT-BR), light/dark theme, **brand fonts** (Fraunces + Hanken Grotesk), Settings (language / notifications / account deletion), `delete_my_account` RPC, native push registration + `expo_push_tokens`, app icon/splash, app.json capabilities, eas.json.
 
-**Cross-cutting gaps (most also in §3):** background push send-side (server), Sign-in-with-Apple deletion token revocation (server), Shopping offline queue, no stale-while-revalidate cache yet (screens show a brief loader on open), and the by-item calculator member suggestions.
+**Cross-cutting gaps (most also in §3):** background push send-side (server), Sign-in-with-Apple deletion token revocation (server), Shopping offline queue, and no stale-while-revalidate cache yet (screens show a brief loader on open).
 
 **Verification done here:** `tsc --noEmit` clean + `expo export` (iOS Metro bundle) succeeds for the whole app. **Not done:** running it on a simulator/device — that's §1 + §5 (your side).

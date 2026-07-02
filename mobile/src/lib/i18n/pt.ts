@@ -100,6 +100,7 @@ export const pt: Record<keyof typeof en, string> = {
   'bill.scanFailed': 'Não consegui ler essa conta — tente uma foto mais nítida.',
   'bill.people': 'Quem vai dividir?',
   'bill.addName': 'Adicionar um nome',
+  'bill.fromHousehold': 'Toque para adicionar',
   'bill.items': 'Itens',
   'bill.itemName': 'Item',
   'bill.itemsCount': '{count} item|{count} itens',
