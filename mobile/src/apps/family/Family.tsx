@@ -19,32 +19,31 @@ import { EditProfile } from './EditProfile'
 import { ageOf, type Member } from './familyShared'
 
 export default function Family() {
-  const { profile } = useAuth()
+  const { profile, profiles } = useAuth()
   const { t } = useI18n()
   const { c } = useTheme()
   const today = todayISO()
 
-  const [members, setMembers] = useState<Member[]>([])
   const [byEmail, setByEmail] = useState<Record<string, MemberProfile>>({})
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [initialPhoto, setInitialPhoto] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    // Household members (RLS scopes allowed_users to my household).
-    const { data: usersData } = await supabase
-      .from('allowed_users')
-      .select('email, display_name, is_admin')
-      .order('display_name')
-    const list = (usersData ?? []) as Member[]
+  // The member list comes from useAuth().profiles, which is scoped to MY
+  // household. Do NOT query allowed_users directly here — its RLS lets an admin
+  // read every household, so a raw select would leak other households into this
+  // screen (member_profiles below is safe: its RLS has no admin exception).
+  const members: Member[] = [...profiles]
+    .map((p) => ({ email: p.email, display_name: p.display_name, is_admin: p.is_admin }))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name))
 
-    // Their profile rows (RLS scopes member_profiles to my household).
+  const load = useCallback(async () => {
+    // Member profile rows (RLS scopes member_profiles to my household).
     const { data: rowsData } = await supabase.from('member_profiles').select('*')
     const rows = (rowsData ?? []) as MemberProfile[]
     const map = Object.fromEntries(rows.map((p) => [p.email, p]))
 
-    setMembers(list)
     setByEmail(map)
     setLoading(false)
   }, [])
@@ -94,7 +93,7 @@ export default function Family() {
   return (
     <Screen scroll>
       <AppHeader title={t('family.title')} />
-      {loading ? (
+      {loading || profiles.length === 0 ? (
         <Loader />
       ) : members.length === 0 ? (
         <EmptyState title={t('family.title')} subtitle={t('family.empty')} />
