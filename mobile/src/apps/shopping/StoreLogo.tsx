@@ -11,14 +11,18 @@ import { useTheme } from '@/theme/theme'
 export default function StoreLogo({
   slug,
   name,
+  color,
   size = 36,
 }: {
   slug: string | null
   name: string
+  /** Custom store color — overrides the catalog color when set. */
+  color?: string | null
   size?: number
 }) {
   const { c } = useTheme()
   const cat = catalogBySlug(slug)
+  const bg = color ?? cat?.color ?? null
   const radius = Math.round(size * 0.24)
 
   return (
@@ -29,14 +33,14 @@ export default function StoreLogo({
         borderRadius: radius,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: cat?.color ?? c.surface2,
+        backgroundColor: bg ?? c.surface2,
       }}
     >
       <Text
         style={{
           fontSize: Math.round(size * 0.42),
           fontWeight: '600',
-          color: cat ? '#ffffff' : c.textMuted,
+          color: bg ? '#ffffff' : c.textMuted,
         }}
       >
         {monogram(name)}

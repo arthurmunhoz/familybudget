@@ -207,3 +207,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-040-apple-refresh-tokens.sql (Sign in with Apple token revocation storage)
 --   migration-041-one-roof-plus.sql (household_subscriptions + Plus AI-scan bypass; RevenueCat)
 --   migration-042-custom-categories.sql (household-defined budget categories)
+--   migration-043-store-color.sql (shopping_stores.color for custom store tiles)

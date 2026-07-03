@@ -22,7 +22,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check, Plus, ShoppingCart, Store, X } from 'lucide-react-native'
+import { Check, ChevronLeft, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
 
 import { AppHeader, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -37,7 +37,8 @@ import {
   LOCAL_STORES,
 } from '@/lib/offline'
 import { supabase } from '@/lib/supabase'
-import { STORE_CATALOG, type StoreCatalogEntry } from '@/lib/stores'
+import { STORE_CATALOG, STORE_COLORS, type StoreCatalogEntry } from '@/lib/stores'
+import { fetchStoreSuggestions, type SuggestedStore } from '@/lib/storeSuggest'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import StoreLogo from './StoreLogo'
@@ -51,6 +52,7 @@ interface Section {
   id: string
   title: string
   slug: string | null
+  color: string | null
   isStore: boolean
   data: ShoppingItem[]
 }
@@ -124,6 +126,26 @@ export default function ShoppingList() {
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
   const [storeInput, setStoreInput] = useState('')
+  const [customColor, setCustomColor] = useState<string | null>(null)
+
+  // Editing an existing store (rename / recolor / delete) inside the sheet.
+  const [editingStore, setEditingStore] = useState<ShoppingStore | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState<string | null>(null)
+
+  // Location-aware suggestions (AI + IP-geo, cached ~1 week on device). Loaded
+  // the first time the store sheet opens; [] falls back to the built-in catalog.
+  const [suggestions, setSuggestions] = useState<SuggestedStore[] | null>(null)
+  useEffect(() => {
+    if (!picking || suggestions !== null) return
+    let active = true
+    fetchStoreSuggestions().then((s) => {
+      if (active) setSuggestions(s)
+    })
+    return () => {
+      active = false
+    }
+  }, [picking, suggestions])
 
   const load = useCallback(async () => {
     // Push any queued offline edits first, then pull the reconciled state. Both
@@ -226,43 +248,64 @@ export default function ShoppingList() {
   }
 
   /** Build an offline-friendly store row with a temp id. */
-  function newStore(name: string, slug: string | null): ShoppingStore | null {
+  function newStore(name: string, slug: string | null, color: string | null): ShoppingStore | null {
     if (!profile) return null
     return {
       id: tempId(),
       household_id: profile.household_id,
       name,
       slug,
+      color,
       created_at: new Date().toISOString(),
     }
   }
 
-  function addCatalogStore(entry: StoreCatalogEntry) {
-    const existing = stores.find((s) => s.slug === entry.slug)
+  /** Shared add path: dedupe by slug/name, optimistic insert, queue, select. */
+  function addStore(name: string, slug: string | null, color: string | null) {
+    const existing = stores.find(
+      (s) =>
+        (slug && s.slug === slug) || s.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    )
     if (existing) {
       selectStore(existing.id)
       setPicking(false)
       return
     }
-    const store = newStore(entry.name, entry.slug)
+    const store = newStore(name, slug, color)
     if (!store) return
     setStores((prev) => [...prev, store])
-    void enqueueOp({ k: 'store.add', tempId: store.id, name: entry.name, slug: entry.slug })
+    void enqueueOp({ k: 'store.add', tempId: store.id, name, slug, color })
     selectStore(store.id)
     setPicking(false)
     scheduleLoad()
   }
 
+  const addCatalogStore = (entry: StoreCatalogEntry) => addStore(entry.name, entry.slug, null)
+  const addSuggestedStore = (s: SuggestedStore) => addStore(s.name, null, s.color)
+
   function addCustomStore() {
     const name = storeInput.trim()
     if (!name) return
     setStoreInput('')
-    const store = newStore(name, null)
-    if (!store) return
-    setStores((prev) => [...prev, store])
-    void enqueueOp({ k: 'store.add', tempId: store.id, name, slug: null })
-    selectStore(store.id)
-    setPicking(false)
+    addStore(name, null, customColor)
+    setCustomColor(null)
+  }
+
+  function openEditStore(store: ShoppingStore) {
+    setEditingStore(store)
+    setEditName(store.name)
+    setEditColor(store.color)
+  }
+
+  function saveStoreEdit() {
+    if (!editingStore) return
+    const name = editName.trim()
+    if (!name) return
+    setStores((prev) =>
+      prev.map((s) => (s.id === editingStore.id ? { ...s, name, color: editColor } : s)),
+    )
+    void enqueueOp({ k: 'store.update', id: editingStore.id, name, color: editColor })
+    setEditingStore(null)
     scheduleLoad()
   }
 
@@ -276,6 +319,7 @@ export default function ShoppingList() {
           text: t('common.remove'),
           style: 'destructive',
           onPress: () => {
+            setEditingStore(null)
             setStores((prev) => prev.filter((s) => s.id !== store.id))
             setItems((prev) =>
               prev.map((i) => (i.store_id === store.id ? { ...i, store_id: null } : i)),
@@ -308,11 +352,12 @@ export default function ShoppingList() {
     const out: Section[] = []
     for (const s of stores) {
       const data = bucket(s.id)
-      if (data.length) out.push({ id: s.id, title: s.name, slug: s.slug, isStore: true, data })
+      if (data.length)
+        out.push({ id: s.id, title: s.name, slug: s.slug, color: s.color, isStore: true, data })
     }
     const anywhere = bucket(null)
     if (anywhere.length)
-      out.push({ id: '__any', title: t('shopping.anywhere'), slug: null, isStore: false, data: anywhere })
+      out.push({ id: '__any', title: t('shopping.anywhere'), slug: null, color: null, isStore: false, data: anywhere })
     return out
   }, [items, stores, t])
 
@@ -323,6 +368,10 @@ export default function ShoppingList() {
   const catalogToAdd = STORE_CATALOG.filter(
     (e) => !stores.some((s) => s.slug === e.slug),
   ).sort((a, b) => a.name.localeCompare(b.name))
+  // AI suggestions not already on the list (matched by name).
+  const suggestedToAdd = (suggestions ?? []).filter(
+    (sg) => !stores.some((s) => s.name.trim().toLowerCase() === sg.name.trim().toLowerCase()),
+  )
 
   const renderItem = ({ item }: { item: ShoppingItem }) => (
     <View style={[styles.row, { backgroundColor: c.card }, item.checked && { opacity: 0.6 }]}>
@@ -368,7 +417,7 @@ export default function ShoppingList() {
     return (
       <View style={[styles.sectionHeader, { backgroundColor: c.bg }]}>
         {section.isStore ? (
-          <StoreLogo slug={section.slug} name={section.title} size={20} />
+          <StoreLogo slug={section.slug} name={section.title} color={section.color} size={20} />
         ) : (
           <ShoppingCart size={18} strokeWidth={2} color={c.textFaint} />
         )}
@@ -475,7 +524,7 @@ export default function ShoppingList() {
                     onPress={() => selectStore(s.id)}
                     active={activeStoreId === s.id}
                     c={c}
-                    icon={<StoreLogo slug={s.slug} name={s.name} size={20} />}
+                    icon={<StoreLogo slug={s.slug} name={s.name} color={s.color} size={20} />}
                     label={s.name}
                   />
                 ))}
@@ -539,86 +588,218 @@ export default function ShoppingList() {
               </Pressable>
             </View>
 
-            <ScrollView
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ paddingBottom: sp.md }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {stores.length > 0 ? (
-                <>
-                  <Txt variant="label" style={[styles.groupLabel, { color: c.accent }]}>
-                    {t('shopping.onYourList').toUpperCase()}
+            {editingStore ? (
+              /* ── Edit a store: rename, recolor, delete ── */
+              <View style={{ gap: sp.md, paddingBottom: sp.md }}>
+                <Pressable
+                  onPress={() => setEditingStore(null)}
+                  hitSlop={8}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' }}
+                >
+                  <ChevronLeft size={18} color={c.textMuted} />
+                  <Txt variant="muted">{t('shopping.stores')}</Txt>
+                </Pressable>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                  <StoreLogo
+                    slug={editingStore.slug}
+                    name={editName || editingStore.name}
+                    color={editColor}
+                    size={40}
+                  />
+                  <TextInput
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder={t('shopping.storeName')}
+                    placeholderTextColor={c.textFaint}
+                    style={[styles.input, { flex: 1, backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
+                  />
+                </View>
+
+                <Txt variant="label">{t('shopping.color')}</Txt>
+                <ColorDots value={editColor} onChange={setEditColor} c={c} />
+
+                <Pressable
+                  onPress={saveStoreEdit}
+                  disabled={!editName.trim()}
+                  style={[
+                    styles.addBtn,
+                    { backgroundColor: c.accent, paddingVertical: 12, opacity: editName.trim() ? 1 : 0.5 },
+                  ]}
+                >
+                  <Txt style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
+                    {t('common.save')}
+                  </Txt>
+                </Pressable>
+                <Pressable
+                  onPress={() => removeStore(editingStore)}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 }}
+                >
+                  <Trash2 size={16} color={c.expense} />
+                  <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('shopping.deleteStore')}</Txt>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <ScrollView
+                  style={{ maxHeight: 420 }}
+                  contentContainerStyle={{ paddingBottom: sp.md }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {stores.length > 0 ? (
+                    <>
+                      <Txt variant="label" style={[styles.groupLabel, { color: c.accent }]}>
+                        {t('shopping.onYourList').toUpperCase()}
+                      </Txt>
+                      <View style={styles.grid}>
+                        {stores.map((s) => (
+                          <View key={s.id} style={[styles.storeTile, { backgroundColor: c.surface }]}>
+                            <Pressable
+                              onPress={() => {
+                                selectStore(s.id)
+                                setPicking(false)
+                              }}
+                              style={styles.storeTileMain}
+                            >
+                              <StoreLogo slug={s.slug} name={s.name} color={s.color} size={28} />
+                              <Txt numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>
+                                {s.name}
+                              </Txt>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => openEditStore(s)}
+                              hitSlop={8}
+                              accessibilityLabel={`${t('shopping.editStore')}: ${s.name}`}
+                            >
+                              <Pencil size={15} strokeWidth={2} color={c.textFaint} />
+                            </Pressable>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  ) : null}
+
+                  {/* AI, location-aware suggestions (loading → dots; empty → hidden) */}
+                  {suggestions === null || suggestedToAdd.length > 0 ? (
+                    <>
+                      <Txt variant="label" style={[styles.groupLabel, { color: c.textFaint }]}>
+                        {t('shopping.suggested').toUpperCase()}
+                      </Txt>
+                      {suggestions === null ? (
+                        <Txt variant="faint" style={{ paddingVertical: sp.sm }}>
+                          …
+                        </Txt>
+                      ) : (
+                        <View style={styles.grid}>
+                          {suggestedToAdd.map((sg) => (
+                            <Pressable
+                              key={sg.name}
+                              onPress={() => addSuggestedStore(sg)}
+                              style={[styles.storeTile, { backgroundColor: c.surface }]}
+                            >
+                              <StoreLogo slug={null} name={sg.name} color={sg.color} size={28} />
+                              <Txt numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>
+                                {sg.name}
+                              </Txt>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  ) : null}
+
+                  <Txt variant="label" style={[styles.groupLabel, { color: c.textFaint }]}>
+                    {t('shopping.allStores').toUpperCase()}
                   </Txt>
                   <View style={styles.grid}>
-                    {stores.map((s) => (
-                      <View key={s.id} style={[styles.storeTile, { backgroundColor: c.surface }]}>
-                        <Pressable
-                          onPress={() => {
-                            selectStore(s.id)
-                            setPicking(false)
-                          }}
-                          style={styles.storeTileMain}
-                        >
-                          <StoreLogo slug={s.slug} name={s.name} size={28} />
-                          <Txt numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>
-                            {s.name}
-                          </Txt>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => removeStore(s)}
-                          hitSlop={8}
-                          accessibilityLabel={t('common.removeName', { name: s.name })}
-                        >
-                          <X size={16} strokeWidth={2} color={c.textFaint} />
-                        </Pressable>
-                      </View>
+                    {catalogToAdd.map((e) => (
+                      <Pressable
+                        key={e.slug}
+                        onPress={() => addCatalogStore(e)}
+                        style={[styles.storeTile, { backgroundColor: c.surface }]}
+                      >
+                        <StoreLogo slug={e.slug} name={e.name} size={28} />
+                        <Txt numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>
+                          {e.name}
+                        </Txt>
+                      </Pressable>
                     ))}
                   </View>
-                </>
-              ) : null}
+                </ScrollView>
 
-              <Txt variant="label" style={[styles.groupLabel, { color: c.textFaint }]}>
-                {t('shopping.allStores').toUpperCase()}
-              </Txt>
-              <View style={styles.grid}>
-                {catalogToAdd.map((e) => (
+                {/* custom store: name + optional color */}
+                <ColorDots value={customColor} onChange={setCustomColor} c={c} compact />
+                <View style={styles.inputRow}>
+                  <TextInput
+                    value={storeInput}
+                    onChangeText={setStoreInput}
+                    onSubmitEditing={addCustomStore}
+                    returnKeyType="done"
+                    placeholder={t('shopping.otherStore')}
+                    placeholderTextColor={c.textFaint}
+                    style={[styles.input, { backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
+                  />
                   <Pressable
-                    key={e.slug}
-                    onPress={() => addCatalogStore(e)}
-                    style={[styles.storeTile, { backgroundColor: c.surface }]}
+                    onPress={addCustomStore}
+                    disabled={!storeInput.trim()}
+                    style={[styles.addBtn, { backgroundColor: c.accent, opacity: storeInput.trim() ? 1 : 0.5 }]}
                   >
-                    <StoreLogo slug={e.slug} name={e.name} size={28} />
-                    <Txt numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>
-                      {e.name}
+                    <Txt style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
+                      {t('common.add')}
                     </Txt>
                   </Pressable>
-                ))}
-              </View>
-            </ScrollView>
-
-            <View style={styles.inputRow}>
-              <TextInput
-                value={storeInput}
-                onChangeText={setStoreInput}
-                onSubmitEditing={addCustomStore}
-                returnKeyType="done"
-                placeholder={t('shopping.otherStore')}
-                placeholderTextColor={c.textFaint}
-                style={[styles.input, { backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
-              />
-              <Pressable
-                onPress={addCustomStore}
-                disabled={!storeInput.trim()}
-                style={[styles.addBtn, { backgroundColor: c.accent, opacity: storeInput.trim() ? 1 : 0.5 }]}
-              >
-                <Txt style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
-                  {t('common.add')}
-                </Txt>
-              </Pressable>
-            </View>
+                </View>
+              </>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
+    </View>
+  )
+}
+
+// Color swatch row for store tiles. First dot = "auto" (null → catalog color
+// or neutral monogram); the rest are the preset palette. Selection = ring.
+function ColorDots({
+  value,
+  onChange,
+  c,
+  compact,
+}: {
+  value: string | null
+  onChange: (color: string | null) => void
+  c: ReturnType<typeof useTheme>['c']
+  compact?: boolean
+}) {
+  const size = compact ? 24 : 30
+  const dot = (col: string | null) => {
+    const selected = value === col
+    return (
+      <Pressable
+        key={col ?? 'auto'}
+        onPress={() => onChange(col)}
+        accessibilityRole="button"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: col ?? c.surface2,
+          borderWidth: selected ? 3 : col ? 0 : StyleSheet.hairlineWidth,
+          borderColor: selected ? c.text : c.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {!col ? (
+          <Txt style={{ fontSize: compact ? 10 : 12, color: c.textMuted, fontWeight: '600' }}>A</Txt>
+        ) : null}
+      </Pressable>
+    )
+  }
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: compact ? 6 : sp.sm, marginTop: compact ? sp.sm : 0 }}>
+      {dot(null)}
+      {STORE_COLORS.map((col) => dot(col))}
     </View>
   )
 }

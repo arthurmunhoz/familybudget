@@ -223,6 +223,10 @@ export const pt: Record<keyof typeof en, string> = {
   'shopping.onYourList': 'Na sua lista',
   'shopping.allStores': 'Todos os mercados',
   'shopping.otherStore': 'Outro mercado…',
+  'shopping.suggested': 'Sugeridas para você',
+  'shopping.editStore': 'Editar loja',
+  'shopping.deleteStore': 'Excluir loja',
+  'shopping.color': 'Cor',
 
   'pets.title': 'Pets',
   'pets.all': 'Todos',

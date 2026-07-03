@@ -53,3 +53,17 @@ export function monogram(name: string): string {
   const c = name.trim()[0]
   return c ? c.toUpperCase() : '?'
 }
+
+/** Preset palette for custom store tiles (edit sheet color picker). */
+export const STORE_COLORS = [
+  '#C8102E', // red
+  '#E86A33', // clay orange
+  '#D97706', // amber
+  '#007A33', // green
+  '#00746B', // teal
+  '#0071CE', // blue
+  '#0F4B8F', // navy
+  '#6D28D9', // purple
+  '#BE185D', // magenta
+  '#7C4A2D', // brown
+]

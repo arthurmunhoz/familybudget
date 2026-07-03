@@ -225,6 +225,10 @@ export const en = {
   'shopping.onYourList': 'On your list',
   'shopping.allStores': 'All stores',
   'shopping.otherStore': 'Other store…',
+  'shopping.suggested': 'Suggested for you',
+  'shopping.editStore': 'Edit store',
+  'shopping.deleteStore': 'Delete store',
+  'shopping.color': 'Color',
 
   'pets.title': 'Pet Care',
   'pets.all': 'All',

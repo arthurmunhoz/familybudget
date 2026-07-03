@@ -69,6 +69,8 @@ export interface ShoppingStore {
   household_id: string
   name: string
   slug: string | null
+  /** Custom tile color (#rrggbb); null = catalog color (by slug) or neutral. */
+  color: string | null
   created_at: string
 }
 

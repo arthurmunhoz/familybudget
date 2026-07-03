@@ -223,6 +223,10 @@ export const es: Record<keyof typeof en, string> = {
   'shopping.onYourList': 'En tu lista',
   'shopping.allStores': 'Todas las tiendas',
   'shopping.otherStore': 'Otra tienda…',
+  'shopping.suggested': 'Sugeridas para ti',
+  'shopping.editStore': 'Editar tienda',
+  'shopping.deleteStore': 'Eliminar tienda',
+  'shopping.color': 'Color',
 
   'pets.title': 'Mascotas',
   'pets.all': 'Todas',

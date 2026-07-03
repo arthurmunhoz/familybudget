@@ -37,7 +37,8 @@ export type ShoppingOp =
   | { k: 'item.toggle'; id: string; checked: boolean }
   | { k: 'item.remove'; id: string }
   | { k: 'item.clearChecked' }
-  | { k: 'store.add'; tempId: string; name: string; slug: string | null }
+  | { k: 'store.add'; tempId: string; name: string; slug: string | null; color?: string | null }
+  | { k: 'store.update'; id: string; name: string; color: string | null }
   | { k: 'store.remove'; id: string }
 
 export async function enqueueOp(op: ShoppingOp): Promise<void> {
@@ -60,7 +61,7 @@ const isTemp = (id: string) => id.startsWith('tmp-')
 function remapTemp(op: ShoppingOp, tempId: string, realId: string): ShoppingOp {
   if (op.k === 'item.add' && op.store_id === tempId) return { ...op, store_id: realId }
   if (
-    (op.k === 'item.toggle' || op.k === 'item.remove' || op.k === 'store.remove') &&
+    (op.k === 'item.toggle' || op.k === 'item.remove' || op.k === 'store.update' || op.k === 'store.remove') &&
     op.id === tempId
   ) {
     return { ...op, id: realId }
@@ -112,11 +113,19 @@ export async function flushShoppingOutbox(): Promise<void> {
         } else if (op.k === 'store.add') {
           const { data, error } = await supabase
             .from('shopping_stores')
-            .insert({ name: op.name, slug: op.slug })
+            .insert({ name: op.name, slug: op.slug, color: op.color ?? null })
             .select('id')
             .single()
           if (error) throw error
           if (data) mapped = { tempId: op.tempId, realId: (data as { id: string }).id }
+        } else if (op.k === 'store.update') {
+          if (!isTemp(op.id)) {
+            const { error } = await supabase
+              .from('shopping_stores')
+              .update({ name: op.name, color: op.color })
+              .eq('id', op.id)
+            if (error) throw error
+          }
         } else if (op.k === 'store.remove') {
           if (!isTemp(op.id)) {
             const { error } = await supabase.from('shopping_stores').delete().eq('id', op.id)
