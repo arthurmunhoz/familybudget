@@ -1,27 +1,21 @@
-// Money — the module's home. Each budget renders as a live dashboard card:
-// current-period balance, received/spent bars, an upcoming-entries projection,
-// and a "＋ New entry" button that deep-links into the period with the entry
-// form already open. Tapping the card opens the current period; the period
-// pill opens the budget's history (Months). RN port of the PWA's redesigned
-// budget/Budgets.tsx.
-import { useMemo, useState } from 'react'
-import { Modal, Pressable, ScrollView, View } from 'react-native'
+// Money — the module's home. Each budget renders as a card: the budget name +
+// a details chevron on top (opens the budget's period history), then a
+// divided "overview" section for one period — a labelled balance on the left,
+// an in-card period dropdown on the right, received/spent bars, and a
+// "＋ New entry" button that deep-links into that period with the form open.
+// The dropdown switches which period the section previews. RN app.
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Dimensions, Modal, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { ChevronDown, Wallet, X } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronRight, Wallet, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
-import {
-  daysBetweenISO,
-  formatMoney,
-  periodEndISO,
-  periodLabel,
-  todayISO,
-} from '@/lib/format'
+import { formatMoney, periodEndISO, periodLabel, todayISO } from '@/lib/format'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Segmented } from './shared'
@@ -30,17 +24,13 @@ const PERIODS: Period[] = ['monthly', 'weekly', 'daily']
 
 type EntryLite = Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>
 
-interface BudgetStats {
-  /** The period shown on the card: the one containing today, else the latest. */
-  month: Month | null
+interface MonthStat {
   income: number
   spent: number
   balance: number
   /** Balance once all future-dated entries land; only meaningful if hasUpcoming. */
   expected: number
   hasUpcoming: boolean
-  /** Days left in the shown period (null when it isn't the current one). */
-  daysLeft: number | null
 }
 
 export default function Budgets() {
@@ -73,8 +63,9 @@ export default function Budgets() {
   })
   const { budgets, months, entries } = data
 
-  // Per-budget snapshot of the period shown on its card.
-  const stats = useMemo(() => {
+  // Per-month stats (for whichever period a card previews) + each budget's own
+  // periods (newest-first) and the default one to show (current, else latest).
+  const { statsById, byBudget } = useMemo(() => {
     const today = todayISO()
     const byMonth = new Map<string, EntryLite[]>()
     for (const e of entries) {
@@ -82,46 +73,39 @@ export default function Budgets() {
       if (list) list.push(e)
       else byMonth.set(e.month_id, [e])
     }
-    const map = new Map<string, BudgetStats>()
+    const statsById = new Map<string, MonthStat>()
+    const byBudget = new Map<string, { months: Month[]; defaultId: string | null }>()
     for (const b of budgets) {
       const own = months.filter((m) => m.budget_id === b.id) // already newest-first
-      const current = own.find(
-        (m) => m.start_date <= today && today <= periodEndISO(b.period, m.start_date),
-      )
-      const month = current ?? own[0] ?? null
-      if (!month) {
-        map.set(b.id, {
-          month: null, income: 0, spent: 0, balance: 0,
-          expected: 0, hasUpcoming: false, daysLeft: null,
+      let defaultId: string | null = null
+      for (const m of own) {
+        let income = 0
+        let spent = 0
+        let comingIn = 0
+        let due = 0
+        for (const e of byMonth.get(m.id) ?? []) {
+          const amount = Number(e.amount)
+          if (e.entry_date > today) {
+            if (e.type === 'income') comingIn += amount
+            else due += amount
+          } else if (e.type === 'income') income += amount
+          else spent += amount
+        }
+        const end = periodEndISO(b.period, m.start_date)
+        const isCurrent = m.start_date <= today && today <= end
+        if (isCurrent && !defaultId) defaultId = m.id
+        const balance = income - spent
+        statsById.set(m.id, {
+          income,
+          spent,
+          balance,
+          expected: balance + comingIn - due,
+          hasUpcoming: comingIn > 0 || due > 0,
         })
-        continue
       }
-      let income = 0
-      let spent = 0
-      let comingIn = 0
-      let due = 0
-      for (const e of byMonth.get(month.id) ?? []) {
-        const amount = Number(e.amount)
-        if (e.entry_date > today) {
-          if (e.type === 'income') comingIn += amount
-          else due += amount
-        } else if (e.type === 'income') income += amount
-        else spent += amount
-      }
-      const balance = income - spent
-      map.set(b.id, {
-        month,
-        income,
-        spent,
-        balance,
-        expected: balance + comingIn - due,
-        hasUpcoming: comingIn > 0 || due > 0,
-        daysLeft: current
-          ? daysBetweenISO(today, periodEndISO(b.period, current.start_date))
-          : null,
-      })
+      byBudget.set(b.id, { months: own, defaultId: defaultId ?? own[0]?.id ?? null })
     }
-    return map
+    return { statsById, byBudget }
   }, [budgets, months, entries])
 
   async function create() {
@@ -151,9 +135,18 @@ export default function Budgets() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.md }}
         >
-          {budgets.map((b) => (
-            <BudgetCard key={b.id} budget={b} stats={stats.get(b.id)} />
-          ))}
+          {budgets.map((b) => {
+            const info = byBudget.get(b.id)
+            return (
+              <BudgetCard
+                key={b.id}
+                budget={b}
+                months={info?.months ?? []}
+                defaultId={info?.defaultId ?? null}
+                statsById={statsById}
+              />
+            )
+          })}
         </ScrollView>
       )}
 
@@ -219,87 +212,96 @@ export default function Budgets() {
   )
 }
 
-function BudgetCard({ budget: b, stats }: { budget: Budget; stats: BudgetStats | undefined }) {
+function BudgetCard({
+  budget: b,
+  months,
+  defaultId,
+  statsById,
+}: {
+  budget: Budget
+  months: Month[]
+  defaultId: string | null
+  statsById: Map<string, MonthStat>
+}) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const m = stats?.month ?? null
+
+  // Which period this card previews. Defaults to current/latest; resets if the
+  // selected one disappears after a revalidate.
+  const [selectedId, setSelectedId] = useState<string | null>(defaultId)
+  useEffect(() => {
+    if (!selectedId || !months.some((m) => m.id === selectedId)) setSelectedId(defaultId)
+  }, [defaultId, months, selectedId])
+
+  const selected = months.find((m) => m.id === selectedId) ?? null
+  const stats = selected ? statsById.get(selected.id) : undefined
   const { income = 0, spent = 0, balance = 0, expected = 0, hasUpcoming = false } = stats ?? {}
-  const daysLeft = stats?.daysLeft ?? null
   const barMax = Math.max(income, spent, 1)
 
-  const openPeriod = () => m && router.push(`/budget/${b.id}/${m.id}`)
   const openHistory = () => router.push(`/budget/${b.id}`)
+  const openPeriod = () => selected && router.push(`/budget/${b.id}/${selected.id}`)
 
   return (
     <Card style={{ gap: sp.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-        <Pressable onPress={m ? openPeriod : openHistory} style={{ flex: 1, minWidth: 0 }}>
-          <Txt style={{ fontFamily: fonts.semibold, fontSize: 17 }} numberOfLines={1}>
-            {b.name}
-          </Txt>
-        </Pressable>
-        <Pressable
-          onPress={openHistory}
-          hitSlop={6}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 3,
-            backgroundColor: c.accentSoft,
-            borderRadius: radius.pill,
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: c.accent }}>
-            {m ? periodLabel(b.period, m.start_date) : t(`budget.${b.period}` as TKey)}
-          </Txt>
-          <ChevronDown size={12} color={c.accent} strokeWidth={2.5} />
-        </Pressable>
-      </View>
+      {/* title row: budget name + details chevron */}
+      <Pressable
+        onPress={openHistory}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
+      >
+        <Txt style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold, fontSize: 18 }} numberOfLines={1}>
+          {b.name}
+        </Txt>
+        <ChevronRight size={22} color={c.textFaint} />
+      </Pressable>
 
-      {m ? (
-        <>
-          <Pressable onPress={openPeriod} style={{ gap: 2 }}>
-            <Txt
-              style={{
-                fontSize: 30,
-                fontFamily: fonts.display,
-                fontVariant: ['tabular-nums'],
-                letterSpacing: -0.3,
-                color: balance >= 0 ? c.income : c.expense,
-              }}
-            >
-              {formatMoney(balance)}
-            </Txt>
-            <Txt style={{ fontSize: 12, color: c.textFaint }}>
-              {t('home.balanceToday')}
-              {daysLeft !== null && daysLeft >= 1 ? ` · ${t('home.daysLeft', { count: daysLeft })}` : ''}
-            </Txt>
-            {hasUpcoming && (
-              <Txt style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>
-                {t('home.withUpcoming')}{' '}
-                <Txt
-                  style={{
-                    fontSize: 12,
-                    fontFamily: fonts.semibold,
-                    fontVariant: ['tabular-nums'],
-                    color: expected >= 0 ? c.income : c.expense,
-                  }}
-                >
-                  {formatMoney(expected)}
-                </Txt>
+      {selected ? (
+        <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.sm }}>
+          {/* overview header: labelled balance (left) + period dropdown (right) */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm }}>
+            <Pressable onPress={openPeriod} style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontSize: 12, color: c.textFaint }}>{t('chart.currentBalance')}</Txt>
+              <Txt
+                style={{
+                  fontSize: 22,
+                  fontFamily: fonts.semibold,
+                  fontVariant: ['tabular-nums'],
+                  color: balance >= 0 ? c.income : c.expense,
+                }}
+              >
+                {formatMoney(balance)}
               </Txt>
-            )}
-            <View style={{ gap: 6, marginTop: sp.sm }}>
-              <BarRow label={t('chart.received')} value={income} max={barMax} color={c.income} />
-              <BarRow label={t('chart.spent')} value={spent} max={barMax} color={c.expense} />
-            </View>
-          </Pressable>
+            </Pressable>
+            <PeriodDropdown
+              value={selected.id}
+              options={months.map((m) => ({ id: m.id, label: periodLabel(b.period, m.start_date) }))}
+              onChange={setSelectedId}
+            />
+          </View>
+
+          {hasUpcoming && (
+            <Txt style={{ fontSize: 12, color: c.textMuted }}>
+              {t('home.withUpcoming')}{' '}
+              <Txt
+                style={{
+                  fontSize: 12,
+                  fontFamily: fonts.semibold,
+                  fontVariant: ['tabular-nums'],
+                  color: expected >= 0 ? c.income : c.expense,
+                }}
+              >
+                {formatMoney(expected)}
+              </Txt>
+            </Txt>
+          )}
+
+          <View style={{ gap: 6 }}>
+            <BarRow label={t('chart.received')} value={income} max={barMax} color={c.income} />
+            <BarRow label={t('chart.spent')} value={spent} max={barMax} color={c.expense} />
+          </View>
+
           <Pressable
             accessibilityRole="button"
-            onPress={() => m && router.push(`/budget/${b.id}/${m.id}?add=1`)}
+            onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?add=1`)}
             style={({ pressed }) => ({
               backgroundColor: c.accent,
               borderRadius: radius.md,
@@ -313,15 +315,119 @@ function BudgetCard({ budget: b, stats }: { budget: Budget; stats: BudgetStats |
               {t('detail.newEntry')}
             </Txt>
           </Pressable>
-        </>
+        </View>
       ) : (
-        <Pressable onPress={openHistory}>
+        <Pressable onPress={openHistory} style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.sm }}>
           <Txt variant="muted" style={{ fontSize: 14 }}>
             {t('home.noneYet')}
           </Txt>
         </Pressable>
       )}
     </Card>
+  )
+}
+
+/** In-card period picker: a pill that opens a dropdown of the budget's periods,
+ *  anchored below the pill (measured in-window so it never clips the card). */
+function PeriodDropdown({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: { id: string; label: string }[]
+  onChange: (id: string) => void
+}) {
+  const { c } = useTheme()
+  const ref = useRef<View>(null)
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const winW = Dimensions.get('window').width
+  const current = options.find((o) => o.id === value)
+
+  const openMenu = () => {
+    ref.current?.measureInWindow((x, y, w, h) => {
+      setPos({ top: y + h + 6, right: Math.max(8, winW - (x + w)) })
+      setOpen(true)
+    })
+  }
+
+  return (
+    <>
+      <Pressable
+        ref={ref}
+        onPress={openMenu}
+        hitSlop={6}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+          backgroundColor: c.accentSoft,
+          borderRadius: radius.pill,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: c.accent }}>
+          {current?.label ?? ''}
+        </Txt>
+        <ChevronDown size={12} color={c.accent} strokeWidth={2.5} />
+      </Pressable>
+
+      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
+          <View
+            style={{
+              position: 'absolute',
+              top: pos.top,
+              right: pos.right,
+              minWidth: 180,
+              maxHeight: 280,
+              backgroundColor: c.card,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: c.border,
+              overflow: 'hidden',
+              shadowColor: '#000',
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 8,
+            }}
+          >
+            <ScrollView>
+              {options.map((o) => {
+                const active = o.id === value
+                return (
+                  <Pressable
+                    key={o.id}
+                    onPress={() => {
+                      onChange(o.id)
+                      setOpen(false)
+                    }}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: sp.md,
+                      paddingHorizontal: sp.md,
+                      paddingVertical: 12,
+                      backgroundColor: pressed ? c.surface : 'transparent',
+                    })}
+                  >
+                    <Txt style={{ fontFamily: active ? fonts.semibold : fonts.body, color: active ? c.accent : c.text }}>
+                      {o.label}
+                    </Txt>
+                    {active ? <Check size={16} color={c.accent} /> : null}
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   )
 }
 
