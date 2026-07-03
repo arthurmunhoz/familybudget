@@ -1,4 +1,11 @@
-// Better deal: compare two options by price per unit; highlight the cheaper one.
+// Better deal: compare two options by price-per-unit; highlight the cheaper one.
+//
+// UX note: the unit is ONLY a label. The winner is decided by price ÷ amount for
+// each side (both assumed in the same unit), so switching kg↔lb never changes
+// which is cheaper. To make that obvious we (1) attach the unit to the amount
+// input as a suffix (it reads as part of the quantity, not a calc input),
+// (2) reframe the selector as "Compare price per", and (3) say outright it won't
+// change the result. The per-unit price under each card is the hero number.
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { Check } from 'lucide-react-native'
@@ -29,16 +36,6 @@ export function BetterDeal() {
   const pct =
     both && winner !== 'tie' ? Math.round((Math.abs(uA - uB) / Math.max(uA, uB)) * 100) : 0
 
-  const inputStyle = {
-    flex: 1,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: sp.md,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: c.text,
-  }
-
   function OptionCard({
     side,
     price,
@@ -57,13 +54,7 @@ export function BetterDeal() {
     const isWinner = winner === side
     return (
       <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: c.card,
-            borderColor: isWinner ? c.income : 'transparent',
-          },
-        ]}
+        style={[styles.card, { backgroundColor: c.card, borderColor: isWinner ? c.income : 'transparent' }]}
       >
         <View style={styles.cardHead}>
           <Txt style={{ fontSize: 14, fontWeight: '700', color: c.text }}>
@@ -78,32 +69,45 @@ export function BetterDeal() {
             </View>
           )}
         </View>
+
         <View style={{ flexDirection: 'row', gap: sp.sm }}>
-          <TextInput
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="decimal-pad"
-            placeholder={t('calc.price')}
-            placeholderTextColor={c.textFaint}
-            style={inputStyle}
-          />
-          <TextInput
-            value={qty}
-            onChangeText={setQty}
-            keyboardType="decimal-pad"
-            placeholder={t('calc.amount')}
-            placeholderTextColor={c.textFaint}
-            style={inputStyle}
-          />
+          {/* price */}
+          <View style={[styles.field, { backgroundColor: c.surface }]}>
+            <Txt style={{ color: c.textFaint, fontWeight: '700' }}>$</Txt>
+            <TextInput
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="decimal-pad"
+              placeholder={t('calc.price')}
+              placeholderTextColor={c.textFaint}
+              style={[styles.fieldInput, { color: c.text }]}
+            />
+          </View>
+          {/* amount, with the shared unit shown as a suffix (it's a label) */}
+          <View style={[styles.field, { backgroundColor: c.surface }]}>
+            <TextInput
+              value={qty}
+              onChangeText={setQty}
+              keyboardType="decimal-pad"
+              placeholder={t('calc.amount')}
+              placeholderTextColor={c.textFaint}
+              style={[styles.fieldInput, { color: c.text }]}
+            />
+            <Txt style={{ color: c.textMuted, fontWeight: '700' }}>{unitLabel}</Txt>
+          </View>
         </View>
-        <Txt variant="muted" style={{ marginTop: sp.sm }}>
-          {Number.isFinite(unitPrice) ? (
-            <Txt style={{ fontWeight: '700', color: c.text }}>
-              {formatPerUnit(unitPrice)} / {unitLabel}
-            </Txt>
-          ) : (
-            '—'
-          )}
+
+        {/* per-unit price — the number that actually decides the winner */}
+        <Txt
+          style={{
+            marginTop: sp.md,
+            fontSize: 18,
+            fontWeight: '800',
+            fontVariant: ['tabular-nums'],
+            color: isWinner ? c.income : Number.isFinite(unitPrice) ? c.text : c.textFaint,
+          }}
+        >
+          {Number.isFinite(unitPrice) ? `${formatPerUnit(unitPrice)} / ${unitLabel}` : '—'}
         </Txt>
       </View>
     )
@@ -111,9 +115,10 @@ export function BetterDeal() {
 
   return (
     <View style={{ gap: sp.md }}>
+      {/* unit — a shared label, not a calc input */}
       <View>
         <Txt variant="label" style={{ color: c.textFaint }}>
-          {t('calc.unit')}
+          {t('calc.perUnit')}
         </Txt>
         <ScrollView
           horizontal
@@ -135,6 +140,9 @@ export function BetterDeal() {
             )
           })}
         </ScrollView>
+        <Txt variant="faint" style={{ marginTop: sp.sm }}>
+          {t('calc.unitNote')}
+        </Txt>
       </View>
 
       <OptionCard side="A" price={pA} setPrice={setPA} qty={qA} setQty={setQA} unitPrice={uA} />
@@ -173,6 +181,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: sp.sm,
     paddingVertical: 2,
   },
+  field: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: radius.md,
+    paddingHorizontal: sp.md,
+  },
+  fieldInput: { flex: 1, paddingVertical: 12, fontSize: 16, minWidth: 0 },
   unitChip: {
     borderRadius: radius.sm,
     paddingHorizontal: sp.md,

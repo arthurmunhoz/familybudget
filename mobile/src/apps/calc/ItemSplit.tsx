@@ -1,7 +1,8 @@
-// Split a bill by item: list each line item, add the people splitting, tap who
-// had each item, then it apportions tax + tip by each person's share. The
-// "scan a photo of the bill" flow (PWA → /api/scan-bill) is STUBBED on native
-// for now — see scanComingSoon(). Items are entered/edited by hand instead.
+// Split a bill by item — a One Roof Plus feature (gated in SplitBill). Items
+// come ONLY from a photo scan (/api/scan-bill); there is no manual "add item".
+// You take a picture, it lists the line items (still editable to fix a misread),
+// then you add the people, tap who had each item, and it apportions tax + tip by
+// each person's share.
 import { useRef, useState } from 'react'
 import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
@@ -38,9 +39,8 @@ export function ItemSplit() {
   const idRef = useRef(1)
   const nextId = () => `it-${idRef.current++}`
 
-  const [items, setItems] = useState<BillItem[]>(() => [
-    { id: 'it-0', name: '', price: '', people: [] },
-  ])
+  // Items are populated only by a scan (no manual add) — start empty.
+  const [items, setItems] = useState<BillItem[]>([])
   const [tax, setTax] = useState('')
   const [tip, setTip] = useState('')
   // Tip can be a flat amount or a % of the (pre-tax) subtotal.
@@ -158,7 +158,6 @@ export function ItemSplit() {
   const setField = (id: string, field: 'name' | 'price', val: string) =>
     setItems((its) => its.map((it) => (it.id === id ? { ...it, [field]: val } : it)))
   const removeItem = (id: string) => setItems((its) => its.filter((it) => it.id !== id))
-  const addItem = () => setItems((its) => [...its, { id: nextId(), name: '', price: '', people: [] }])
 
   const itemsSubtotal = items.reduce((s, it) => s + num(it.price), 0)
   const tipAmount = tipMode === 'percent' ? (itemsSubtotal * tipPct) / 100 : num(tip)
@@ -270,6 +269,11 @@ export function ItemSplit() {
             </Txt>
           )}
         </View>
+        {items.length === 0 ? (
+          <Card style={{ marginTop: sp.sm }}>
+            <Txt variant="muted">{t('bill.scanEmpty')}</Txt>
+          </Card>
+        ) : (
         <View style={{ gap: sp.sm, marginTop: sp.sm }}>
           {items.map((it) => {
             const unassigned = it.people.length === 0
@@ -339,9 +343,7 @@ export function ItemSplit() {
             )
           })}
         </View>
-        <Pressable onPress={addItem} style={[styles.addItemBtn, { backgroundColor: c.surface }]}>
-          <Txt style={{ fontSize: 14, fontWeight: '600', color: c.textMuted }}>{t('bill.addItem')}</Txt>
-        </Pressable>
+        )}
       </View>
 
       {/* tax / tip / total */}
