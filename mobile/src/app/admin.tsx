@@ -3,7 +3,7 @@
 // admin_app_usage/time, admin_recent_errors) — RLS + the security-definer guards
 // keep this cross-household data admin-only.
 import { useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native'
+import { Alert, Pressable, ScrollView, Switch, TextInput, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
 import {
   BarChart3,
@@ -27,6 +27,7 @@ import {
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { formatDuration, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
@@ -77,7 +78,26 @@ type AnalyticsData = { stats: AppStat[]; errors: ErrorRow[] }
 export default function Admin() {
   const { c } = useTheme()
   const { profile } = useAuth()
+  const { isPlus, refresh: refreshPlus } = usePlus()
+  const [planBusy, setPlanBusy] = useState(false)
   const [tab, setTab] = useState<Tab>('households')
+
+  // Toggle this household's Plus plan (admin_set_plan RPC) to preview the Free
+  // experience. Flips the server plan + app gating; refresh() re-reads it.
+  async function togglePlus(next: boolean) {
+    if (planBusy) return
+    setPlanBusy(true)
+    try {
+      const { error } = await supabase.rpc('admin_set_plan', { p_plan: next ? 'plus' : 'free' })
+      if (error) {
+        Alert.alert('Could not change the plan — please try again.')
+        return
+      }
+      await refreshPlus()
+    } finally {
+      setPlanBusy(false)
+    }
+  }
   const [days, setDays] = useState(30)
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('active')
@@ -188,6 +208,25 @@ export default function Admin() {
 
   return (
     <Screen scroll header={<AppHeader title="Admin" />}>
+      {/* Testing: toggle Plus for this household to preview the Free experience */}
+      <Card style={{ marginBottom: sp.md, gap: sp.sm, borderColor: c.accentSoft }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={{ fontWeight: '700' }}>One Roof Plus (this household)</Txt>
+            <Txt variant="faint">
+              Turn off to preview the Free experience — changes this household&apos;s plan (app
+              gating + server limits). {planBusy ? 'Updating…' : ''}
+            </Txt>
+          </View>
+          <Switch
+            value={isPlus}
+            onValueChange={togglePlus}
+            disabled={planBusy}
+            trackColor={{ true: c.accent }}
+          />
+        </View>
+      </Card>
+
       {/* tabs */}
       <View style={{ flexDirection: 'row', gap: sp.sm, backgroundColor: c.surface, borderRadius: radius.md, padding: 4, marginBottom: sp.md }}>
         {([

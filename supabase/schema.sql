@@ -208,3 +208,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-041-one-roof-plus.sql (household_subscriptions + Plus AI-scan bypass; RevenueCat)
 --   migration-042-custom-categories.sql (household-defined budget categories)
 --   migration-043-store-color.sql (shopping_stores.color for custom store tiles)
+--   migration-044-admin-set-plan.sql (admin_set_plan RPC: toggle household Plus for testing)
