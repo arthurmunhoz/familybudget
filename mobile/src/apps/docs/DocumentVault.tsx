@@ -40,6 +40,8 @@ export default function DocumentVault() {
   const { isPlus } = usePlus()
 
   const [filter, setFilter] = useState<DocCategory | 'all'>('all')
+  // 'all' = everyone · a member email · 'shared' (household-owned docs).
+  const [person, setPerson] = useState<string>('all')
 
   const [pending, setPending] = useState<PickedFile | null>(null)
   const [editing, setEditing] = useState<FamilyDocument | null>(null)
@@ -105,10 +107,23 @@ export default function DocumentVault() {
     return (data ?? []) as FamilyDocument[]
   })
 
-  // Documents that match the active category filter.
+  // Member first name for a doc's owner — used by the person chips and the row
+  // subtitle. 'shared' is the sentinel owner for household-wide documents.
+  const nameOf = (ownerEmail: string) => {
+    if (ownerEmail === 'shared') return t('docs.shared')
+    const p = profiles.find((x) => x.email === ownerEmail)
+    return (p?.display_name || ownerEmail).trim().split(/\s+/)[0]
+  }
+
+  // Documents matching BOTH the active category and person filters.
   const visible = useMemo(
-    () => (filter === 'all' ? docs : docs.filter((d) => d.category === filter)),
-    [docs, filter],
+    () =>
+      docs.filter(
+        (d) =>
+          (filter === 'all' || d.category === filter) &&
+          (person === 'all' || d.owner_email === person),
+      ),
+    [docs, filter, person],
   )
 
   /** Grouped by category in the canonical order; only non-empty groups show.
@@ -250,6 +265,34 @@ export default function DocumentVault() {
         </View>
       ) : null}
 
+      {/* person filter — only for households with more than one member (nothing
+          to narrow otherwise). Everyone · each member · Shared. */}
+      {profiles.length > 1 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0, flexShrink: 0 }}
+          contentContainerStyle={{
+            paddingHorizontal: sp.lg,
+            gap: sp.sm,
+            paddingBottom: sp.sm,
+            alignItems: 'center',
+          }}
+        >
+          <FilterChip active={person === 'all'} onPress={() => setPerson('all')}>
+            {t('common.everyone')}
+          </FilterChip>
+          {profiles.map((p) => (
+            <FilterChip key={p.email} active={person === p.email} onPress={() => setPerson(p.email)}>
+              {nameOf(p.email)}
+            </FilterChip>
+          ))}
+          <FilterChip active={person === 'shared'} onPress={() => setPerson('shared')}>
+            🏠 {t('docs.shared')}
+          </FilterChip>
+        </ScrollView>
+      ) : null}
+
       {/* category filter — flexGrow:0 stops the horizontal ScrollView from
           filling the parent's height (which would stretch the chips tall);
           alignItems:center keeps each chip at its natural height. */}
@@ -300,6 +343,7 @@ export default function DocumentVault() {
                 <DocRow
                   key={doc.id}
                   doc={doc}
+                  ownerName={person === 'all' ? nameOf(doc.owner_email) : null}
                   opening={opening === doc.id}
                   onOpen={() => openDoc(doc)}
                   onEdit={() => setEditing(doc)}
@@ -354,12 +398,15 @@ export default function DocumentVault() {
 
 function DocRow({
   doc,
+  ownerName,
   opening,
   onOpen,
   onEdit,
   onDelete,
 }: {
   doc: FamilyDocument
+  /** Owner's first name, shown in the subtitle only in the "Everyone" view. */
+  ownerName?: string | null
   opening: boolean
   onOpen: () => void
   onEdit: () => void
@@ -391,6 +438,7 @@ function DocRow({
             {doc.title}
           </Txt>
           <Txt variant="faint" numberOfLines={1}>
+            {ownerName ? `${ownerName} · ` : ''}
             {formatDay(doc.created_at.slice(0, 10))} · {formatBytes(doc.size_bytes)}
           </Txt>
         </View>
