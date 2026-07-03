@@ -5,7 +5,8 @@
 This is the React Native / Expo rewrite of the One Roof PWA (which lives in the
 parent `family-budget/` repo). It reuses the same **Supabase** backend (same
 project, same tables, same RLS). Goal: PWA parity on iOS + App Store readiness.
-Status, gaps, and the human setup steps are in `IOS-SETUP-AND-TODO.md` — read it.
+Architecture, systems, remaining setup, and the improvement backlog are in
+`DOCUMENTATION.md` (the official app doc) — read it.
 
 ## Stack
 - **Expo SDK 56 + expo-router** (file routes in `src/app/`), TypeScript, React 19.
