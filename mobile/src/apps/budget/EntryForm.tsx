@@ -7,7 +7,18 @@
 // button announces what it does ("Add expense · $12.50"). Supports an `initial`
 // prefill (e.g. a scanned receipt) and learns label→category on save.
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, Switch, TextInput, View } from 'react-native'
+import {
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Switch,
+  TextInput,
+  View,
+} from 'react-native'
 import { Plus, X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
@@ -235,15 +246,25 @@ export default function EntryForm({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
-        <View
-          style={{
-            maxHeight: '92%',
-            backgroundColor: c.card,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-          }}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        {/* Tap the dimmed area to dismiss the keyboard. */}
+        <Pressable
+          onPress={() => Keyboard.dismiss()}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
         >
+          {/* Swallow taps so pressing the sheet doesn't dismiss the keyboard. */}
+          <Pressable
+            onPress={() => {}}
+            style={{
+              maxHeight: '92%',
+              backgroundColor: c.card,
+              borderTopLeftRadius: radius.lg,
+              borderTopRightRadius: radius.lg,
+            }}
+          >
           {/* header */}
           <View
             style={{
@@ -670,8 +691,9 @@ export default function EntryForm({
               </Pressable>
             ) : null}
           </View>
-        </View>
-      </View>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

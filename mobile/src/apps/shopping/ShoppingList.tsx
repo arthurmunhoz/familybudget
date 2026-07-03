@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -573,6 +574,10 @@ export default function ShoppingList() {
 
       {/* Store picker sheet */}
       <Modal visible={picking} transparent animationType="slide" onRequestClose={() => setPicking(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
         <Pressable style={styles.backdrop} onPress={() => setPicking(false)}>
           <Pressable
             style={[styles.sheet, { backgroundColor: c.card, paddingBottom: insets.bottom + sp.md }]}
@@ -753,6 +758,7 @@ export default function ShoppingList() {
             )}
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   )
