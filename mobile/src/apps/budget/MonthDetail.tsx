@@ -163,7 +163,17 @@ export default function MonthDetail({ monthId }: { monthId: string }) {
         body: JSON.stringify({ image: out.base64, media_type: 'image/jpeg' }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? t('detail.scanFailed'))
+      if (!res.ok) {
+        // Free households hit a monthly scan cap — offer Plus instead of erroring.
+        if (json.reason === 'monthly_cap') {
+          Alert.alert('Scan limit reached', json.error ?? '', [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: 'Get One Roof Plus', onPress: () => router.push('/paywall') },
+          ])
+          return
+        }
+        throw new Error(json.error ?? t('detail.scanFailed'))
+      }
       setEditing(null)
       setPrefill({
         label: json.label,

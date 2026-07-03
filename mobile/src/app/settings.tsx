@@ -1,10 +1,12 @@
 // Settings: language, notifications, sign out, and in-app account deletion
 // (required by Apple Guideline 5.1.1(v)).
 import { useState } from 'react'
-import { Alert, Pressable, View } from 'react-native'
+import { Alert, Linking, Pressable, View } from 'react-native'
+import { router } from 'expo-router'
 
 import { AppHeader, Btn, Card, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import { LANGUAGES } from '@/lib/i18n'
 import { registerForPush } from '@/lib/notifications'
@@ -21,8 +23,21 @@ export default function Settings() {
   const { c } = useTheme()
   const { mode, setMode } = useThemePref()
   const { profile, signOut } = useAuth()
+  const { isPlus, restore } = usePlus()
   const { lang, setLang } = useI18n()
   const [pushMsg, setPushMsg] = useState<string | null>(null)
+
+  async function doRestore() {
+    try {
+      const ok = await restore()
+      Alert.alert(
+        ok ? 'Purchases restored' : 'Nothing to restore',
+        ok ? "You're on One Roof Plus." : 'No previous purchase was found for this Apple ID.',
+      )
+    } catch {
+      Alert.alert('Restore failed', 'Please try again.')
+    }
+  }
 
   async function enablePush() {
     const r = await registerForPush()
@@ -146,6 +161,31 @@ export default function Settings() {
               </Txt>
             ) : null}
           </Card>
+        </View>
+
+        <View style={{ gap: sp.sm }}>
+          <Txt variant="label">One Roof Plus</Txt>
+          <Card>
+            <Txt variant="muted">
+              {isPlus
+                ? "You're on One Roof Plus ✓ — unlimited AI scans, Document Vault, and Google Calendar sync for your whole household."
+                : 'Unlock unlimited AI receipt & bill scans, the Document Vault, and Google Calendar sync.'}
+            </Txt>
+          </Card>
+          {isPlus ? (
+            <Btn
+              title="Manage subscription"
+              variant="secondary"
+              onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
+            />
+          ) : (
+            <>
+              <Btn title="Get One Roof Plus" onPress={() => router.push('/paywall')} />
+              <Pressable onPress={doRestore} style={{ paddingVertical: sp.sm, alignItems: 'center' }}>
+                <Txt style={{ color: c.accent, fontWeight: '600' }}>Restore purchases</Txt>
+              </Pressable>
+            </>
+          )}
         </View>
 
         <View style={{ gap: sp.sm }}>

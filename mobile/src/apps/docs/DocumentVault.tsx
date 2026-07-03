@@ -10,10 +10,12 @@ import * as DocumentPicker from 'expo-document-picker'
 import { File } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as WebBrowser from 'expo-web-browser'
+import { router } from 'expo-router'
 import { FileText, Pencil, Plus, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
@@ -33,6 +35,7 @@ export default function DocumentVault() {
   const { c } = useTheme()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
+  const { isPlus } = usePlus()
 
   const [filter, setFilter] = useState<DocCategory | 'all'>('all')
 
@@ -82,6 +85,12 @@ export default function DocumentVault() {
 
   async function pickFile() {
     if (picking || !profile) return
+    // Document Vault uploads are a One Roof Plus feature. Existing docs stay
+    // viewable for everyone; adding new ones needs Plus.
+    if (!isPlus) {
+      router.push('/paywall')
+      return
+    }
     setPicking(true)
     try {
       const result = await DocumentPicker.getDocumentAsync({

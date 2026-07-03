@@ -3,9 +3,11 @@
 // server-side; onChanged() revalidates the calendar so pulled events appear.
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native'
+import { router } from 'expo-router'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
+import { usePlus } from '@/lib/plus'
 import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
@@ -18,6 +20,7 @@ import { radius, sp, useTheme } from '@/theme/theme'
 export function GoogleConnect({ onChanged }: { onChanged: () => void }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const { isPlus } = usePlus()
   const [conn, setConn] = useState<GoogleConnection | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -37,6 +40,10 @@ export function GoogleConnect({ onChanged }: { onChanged: () => void }) {
 
   async function connect() {
     if (busy) return
+    if (!isPlus) {
+      router.push('/paywall')
+      return
+    }
     setBusy(true)
     try {
       const ok = await connectGoogleCalendar()

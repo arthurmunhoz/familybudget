@@ -6,6 +6,7 @@ import { useRef, useState } from 'react'
 import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+import { router } from 'expo-router'
 import { Camera, X } from 'lucide-react-native'
 
 import { Btn, Card, Txt } from '@/components/ui'
@@ -85,7 +86,17 @@ export function ItemSplit() {
         body: JSON.stringify({ image: out.base64, media_type: 'image/jpeg' }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? t('bill.scanFailed'))
+      if (!res.ok) {
+        // Free households hit a monthly scan cap — offer Plus instead of erroring.
+        if (json.reason === 'monthly_cap') {
+          Alert.alert('Scan limit reached', json.error ?? '', [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: 'Get One Roof Plus', onPress: () => router.push('/paywall') },
+          ])
+          return
+        }
+        throw new Error(json.error ?? t('bill.scanFailed'))
+      }
 
       const scanned: BillItem[] = (json.items ?? [])
         .filter((it: { name?: string; price?: number }) => it && typeof it.name === 'string')

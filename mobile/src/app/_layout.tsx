@@ -12,6 +12,7 @@ import {
 } from '@expo-google-fonts/hanken-grotesk';
 
 import { AuthProvider } from '@/lib/auth';
+import { PlusProvider } from '@/lib/plus';
 import { I18nProvider } from '@/hooks/useI18n';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 
@@ -35,11 +36,13 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <I18nProvider>
-          <ThemePrefProvider>
-            <Chrome />
-          </ThemePrefProvider>
-        </I18nProvider>
+        <PlusProvider>
+          <I18nProvider>
+            <ThemePrefProvider>
+              <Chrome />
+            </ThemePrefProvider>
+          </I18nProvider>
+        </PlusProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
@@ -51,7 +54,9 @@ function Chrome() {
   const isDark = mode === 'dark';
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+      </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>
   );
