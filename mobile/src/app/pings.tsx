@@ -9,7 +9,8 @@
 // directly and the subscription reflects it. RLS scopes everything to the
 // household; ack inserts get user_email stamped server-side.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Linking, Pressable, View } from 'react-native'
+import { Linking, Pressable, ScrollView, View } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
 
 import { AppHeader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -57,7 +58,11 @@ export default function NudgesScreen() {
   const { profile, profiles } = useAuth()
   const myEmail = profile?.email
 
-  const [tab, setTab] = useState<'send' | 'past'>('send')
+  // Deep-link from a Hub banner: ?tab=past&focus=<pingId> opens the history and
+  // highlights that nudge.
+  const params = useLocalSearchParams<{ tab?: string; focus?: string }>()
+  const focus = typeof params.focus === 'string' ? params.focus : null
+  const [tab, setTab] = useState<'send' | 'past'>(params.tab === 'past' ? 'past' : 'send')
   const [pings, setPings] = useState<PingWithAcks[]>([])
   const [phones, setPhones] = useState<Record<string, string>>({})
   // Optimistic ack: mark handled immediately, before the round-trip lands.
@@ -124,7 +129,6 @@ export default function NudgesScreen() {
 
   return (
     <Screen
-      scroll
       header={
         <>
           <AppHeader title="Nudges" />
@@ -141,7 +145,13 @@ export default function NudgesScreen() {
       }
     >
       {tab === 'send' ? (
-        <PingComposer />
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: sp.xxl }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <PingComposer />
+        </ScrollView>
       ) : (
         <PingsHistory
           pings={pings}
@@ -151,6 +161,7 @@ export default function NudgesScreen() {
           senderName={senderName}
           onAck={ack}
           onCall={call}
+          focusId={focus}
         />
       )}
     </Screen>
