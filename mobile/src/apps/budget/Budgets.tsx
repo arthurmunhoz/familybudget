@@ -5,7 +5,16 @@
 // "＋ New entry" button that deep-links into that period with the form open.
 // The dropdown switches which period the section previews. RN app.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Dimensions, Modal, Pressable, ScrollView, View } from 'react-native'
+import {
+  Dimensions,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Check, ChevronDown, ChevronRight, Wallet, X } from 'lucide-react-native'
@@ -180,32 +189,52 @@ export default function Budgets() {
 
       {createOpen && (
         <Modal visible animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
-            <View style={{ backgroundColor: c.card, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Txt variant="h2">{t('budget.newTitle')}</Txt>
-                <Pressable onPress={() => setCreateOpen(false)} hitSlop={10}>
-                  <X size={22} color={c.textMuted} />
-                </Pressable>
-              </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1 }}
+          >
+            {/* Tap the dimmed area to dismiss the keyboard. */}
+            <Pressable
+              onPress={() => Keyboard.dismiss()}
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}
+            >
+              {/* Swallow taps so pressing the card doesn't dismiss the keyboard. */}
+              <Pressable
+                onPress={() => {}}
+                style={{ backgroundColor: c.card, borderRadius: 18, padding: sp.lg, gap: sp.md }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Txt variant="h2">{t('budget.newTitle')}</Txt>
+                  <Pressable onPress={() => setCreateOpen(false)} hitSlop={10}>
+                    <X size={22} color={c.textMuted} />
+                  </Pressable>
+                </View>
 
-              <Field value={name} onChangeText={setName} placeholder={t('budget.namePlaceholder')} autoFocus />
-
-              <View style={{ gap: 6 }}>
-                <Txt variant="label">{t('budget.groupedBy')}</Txt>
-                <Segmented<Period>
-                  options={PERIODS.map((p) => ({ id: p, label: t(`budget.${p}` as TKey) }))}
-                  value={period}
-                  onChange={setPeriod}
+                <Field
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={t('budget.namePlaceholder')}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={() => name.trim() && create()}
                 />
-              </View>
 
-              <View style={{ flexDirection: 'row', gap: sp.md, marginTop: sp.sm }}>
-                <Btn title={t('common.cancel')} variant="secondary" onPress={() => setCreateOpen(false)} style={{ flex: 1 }} />
-                <Btn title={t('common.create')} onPress={create} loading={saving} disabled={!name.trim()} style={{ flex: 1 }} />
-              </View>
-            </View>
-          </View>
+                <View style={{ gap: 6 }}>
+                  <Txt variant="label">{t('budget.groupedBy')}</Txt>
+                  <Segmented<Period>
+                    options={PERIODS.map((p) => ({ id: p, label: t(`budget.${p}` as TKey) }))}
+                    value={period}
+                    onChange={setPeriod}
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: sp.md, marginTop: sp.sm }}>
+                  <Btn title={t('common.cancel')} variant="secondary" onPress={() => setCreateOpen(false)} style={{ flex: 1 }} />
+                  <Btn title={t('common.create')} onPress={create} loading={saving} disabled={!name.trim()} style={{ flex: 1 }} />
+                </View>
+              </Pressable>
+            </Pressable>
+          </KeyboardAvoidingView>
         </Modal>
       )}
     </SafeAreaView>
