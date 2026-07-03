@@ -1,22 +1,40 @@
-// Settings: language, notifications, sign out, and in-app account deletion
-// (required by Apple Guideline 5.1.1(v)).
-import { useState } from 'react'
-import { Alert, Linking, Pressable, View } from 'react-native'
+// Settings: language, appearance, notifications, One Roof Plus, sign out, and
+// in-app account deletion (required by Apple Guideline 5.1.1(v)). Sections are
+// separated by dividers; Plus shows a certificate badge + the included feature
+// list when active, and notifications shows a live on/off status.
+import { useEffect, useState } from 'react'
+import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
+import {
+  Award,
+  Bell,
+  BellRing,
+  CalendarDays,
+  Check,
+  FolderLock,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import { LANGUAGES } from '@/lib/i18n'
-import { registerForPush } from '@/lib/notifications'
+import { getPushEnabled, registerForPush } from '@/lib/notifications'
 import { supabase } from '@/lib/supabase'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
 
 const APPEARANCE: { id: ThemeMode; label: string }[] = [
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },
+]
+
+const PLUS_FEATURES: { icon: LucideIcon; label: string }[] = [
+  { icon: Sparkles, label: 'Unlimited AI receipt & bill scans' },
+  { icon: FolderLock, label: 'Document Vault with Face ID lock' },
+  { icon: CalendarDays, label: 'Google Calendar two-way sync' },
 ]
 
 export default function Settings() {
@@ -26,6 +44,18 @@ export default function Settings() {
   const { isPlus, restore } = usePlus()
   const { lang, setLang } = useI18n()
   const [pushMsg, setPushMsg] = useState<string | null>(null)
+  const [pushOn, setPushOn] = useState<boolean | null>(null)
+
+  // Reflect the current OS permission from the start (no prompt).
+  useEffect(() => {
+    let active = true
+    getPushEnabled().then((on) => {
+      if (active) setPushOn(on)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
   async function doRestore() {
     try {
@@ -41,6 +71,7 @@ export default function Settings() {
 
   async function enablePush() {
     const r = await registerForPush()
+    setPushOn(r.ok ? true : await getPushEnabled())
     setPushMsg(
       r.ok
         ? 'Notifications enabled on this device.'
@@ -49,7 +80,7 @@ export default function Settings() {
           : r.reason === 'no-project'
             ? 'Run `eas init` first (needs an EAS project id).'
             : r.reason === 'denied'
-              ? 'Notifications permission was declined.'
+              ? 'Notifications are off in iOS Settings — turn them on there.'
               : 'Could not enable notifications.',
     )
   }
@@ -93,7 +124,8 @@ export default function Settings() {
 
   return (
     <Screen scroll header={<AppHeader title="Settings" />}>
-      <View style={{ gap: sp.lg }}>
+      <View style={{ gap: sp.xl }}>
+        {/* Language */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">Language</Txt>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
@@ -123,6 +155,9 @@ export default function Settings() {
           </View>
         </View>
 
+        <Divider />
+
+        {/* Appearance */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">Appearance</Txt>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
@@ -148,30 +183,95 @@ export default function Settings() {
           </View>
         </View>
 
+        <Divider />
+
+        {/* Notifications */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">Notifications</Txt>
-          <Card>
-            <Txt variant="muted" style={{ marginBottom: sp.sm }}>
-              Reminders for pet care, calendar dates and family nudges.
-            </Txt>
-            <Btn title="Enable notifications" variant="secondary" onPress={enablePush} />
+          <Card style={{ gap: sp.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <View
+                style={{
+                  height: 40,
+                  width: 40,
+                  borderRadius: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: pushOn ? c.accentSoft : c.surface,
+                }}
+              >
+                {pushOn ? (
+                  <BellRing size={20} color={c.accent} />
+                ) : (
+                  <Bell size={20} color={c.textMuted} />
+                )}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt style={{ fontFamily: fonts.semibold }}>Push reminders</Txt>
+                <Txt variant="faint">Pet care, calendar dates and family nudges</Txt>
+              </View>
+              <StatusPill on={!!pushOn} />
+            </View>
+
+            {pushOn ? (
+              <Pressable onPress={() => Linking.openSettings()}>
+                <Txt style={{ color: c.accent, fontFamily: fonts.semibold }}>
+                  Manage in iOS Settings
+                </Txt>
+              </Pressable>
+            ) : (
+              <Btn title="Enable notifications" variant="secondary" onPress={enablePush} />
+            )}
             {pushMsg ? (
-              <Txt variant="faint" style={{ marginTop: sp.sm }}>
-                {pushMsg}
-              </Txt>
+              <Txt variant="faint">{pushMsg}</Txt>
             ) : null}
           </Card>
         </View>
 
+        <Divider />
+
+        {/* One Roof Plus */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">One Roof Plus</Txt>
-          <Card>
-            <Txt variant="muted">
-              {isPlus
-                ? "You're on One Roof Plus ✓ — unlimited AI scans, Document Vault, and Google Calendar sync for your whole household."
-                : 'Unlock unlimited AI receipt & bill scans, the Document Vault, and Google Calendar sync.'}
-            </Txt>
-          </Card>
+          {isPlus ? (
+            <Card style={{ gap: sp.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                <View
+                  style={{
+                    height: 48,
+                    width: 48,
+                    borderRadius: 24,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: c.accentSoft,
+                  }}
+                >
+                  <Award size={26} color={c.accent} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>One Roof Plus</Txt>
+                  <Txt variant="faint">Active · your whole household</Txt>
+                </View>
+                <StatusPill on label="ACTIVE" />
+              </View>
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+              <View style={{ gap: sp.sm }}>
+                {PLUS_FEATURES.map((f) => (
+                  <FeatureRow key={f.label} icon={f.icon} label={f.label} included />
+                ))}
+              </View>
+            </Card>
+          ) : (
+            <Card style={{ gap: sp.md }}>
+              <Txt variant="muted">Unlock the whole household with One Roof Plus:</Txt>
+              <View style={{ gap: sp.sm }}>
+                {PLUS_FEATURES.map((f) => (
+                  <FeatureRow key={f.label} icon={f.icon} label={f.label} />
+                ))}
+              </View>
+            </Card>
+          )}
+
           {isPlus ? (
             <Btn
               title="Manage subscription"
@@ -188,6 +288,9 @@ export default function Settings() {
           )}
         </View>
 
+        <Divider />
+
+        {/* Account */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">Account</Txt>
           <Card>
@@ -200,5 +303,66 @@ export default function Settings() {
         </View>
       </View>
     </Screen>
+  )
+}
+
+function Divider() {
+  const { c } = useTheme()
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+}
+
+function StatusPill({ on, label }: { on: boolean; label?: string }) {
+  const { c } = useTheme()
+  const text = label ?? (on ? 'ON' : 'OFF')
+  return (
+    <View
+      style={{
+        borderRadius: radius.pill,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        backgroundColor: on ? c.accentSoft : c.surface,
+      }}
+    >
+      <Txt
+        style={{
+          fontSize: 11,
+          fontFamily: fonts.semibold,
+          letterSpacing: 0.5,
+          color: on ? c.accent : c.textMuted,
+        }}
+      >
+        {text}
+      </Txt>
+    </View>
+  )
+}
+
+function FeatureRow({
+  icon: Icon,
+  label,
+  included,
+}: {
+  icon: LucideIcon
+  label: string
+  included?: boolean
+}) {
+  const { c } = useTheme()
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+      <View
+        style={{
+          height: 28,
+          width: 28,
+          borderRadius: 8,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: c.surface,
+        }}
+      >
+        <Icon size={16} color={c.accent} />
+      </View>
+      <Txt style={{ flex: 1, minWidth: 0 }}>{label}</Txt>
+      {included ? <Check size={16} color={c.income} strokeWidth={2.5} /> : null}
+    </View>
   )
 }

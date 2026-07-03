@@ -17,6 +17,17 @@ function projectId(): string | undefined {
   return fromConfig ?? fromEas
 }
 
+/** Current OS-level push permission for this device: true = notifications are
+ *  allowed. Used to show the on/off status without prompting. */
+export async function getPushEnabled(): Promise<boolean> {
+  try {
+    const perm = await Notifications.getPermissionsAsync()
+    return perm.status === 'granted'
+  } catch {
+    return false
+  }
+}
+
 export async function registerForPush(): Promise<PushResult> {
   try {
     if (!Device.isDevice) return { ok: false, reason: 'simulator' }
