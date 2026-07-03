@@ -48,6 +48,7 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
 | **Nudges** | One-tap household pings + AI free-text, realtime list with ack / "seen by" / call |
 | **Documents** | Face ID-gated vault, category grouping, upload / open / delete |
 | **Settings** | Language, appearance, notifications, One Roof Plus, account (sign out, delete) |
+| **Admin** (admin-only) | Usage analytics (per-app views/time, recent errors) + household/member management, via admin-guarded RPCs |
 
 ---
 
