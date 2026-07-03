@@ -205,3 +205,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-038-merge-dates.sql (calendar_events.kind; copy important_dates → calendar)
 --   migration-039-account-deletion-and-push-tokens.sql (expo_push_tokens; delete_my_account RPC)
 --   migration-040-apple-refresh-tokens.sql (Sign in with Apple token revocation storage)
+--   migration-041-one-roof-plus.sql (household_subscriptions + Plus AI-scan bypass; RevenueCat)
