@@ -8,10 +8,10 @@
 // in-app OAuth via @/lib/googleCalendar, reusing the deployed /api/google-calendar-*
 // endpoints). Google-sourced rows (source='google') render read-only; pulled
 // events arrive via the calendar_events Realtime subscription.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, Loader, Txt } from '@/components/ui'
@@ -32,6 +32,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { CalendarEvent } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
+import { getGoogleConnection } from '@/lib/googleCalendar'
 import EventForm, { type EventDraft } from './EventForm'
 import { GoogleIcon } from './GoogleIcon'
 
@@ -86,6 +87,21 @@ export default function Calendar() {
       supabase.removeChannel(channel)
     }
   }, [load])
+
+  // Colors the header Google button: full-color when a Google account is linked,
+  // grey otherwise. Re-checked on focus so it updates after connect/disconnect.
+  const [googleConnected, setGoogleConnected] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      getGoogleConnection().then((v) => {
+        if (active) setGoogleConnected(!!v)
+      })
+      return () => {
+        active = false
+      }
+    }, []),
+  )
 
   const [selected, setSelected] = useState(today)
   const [mode, setMode] = useState<'month' | 'upcoming'>('month')
@@ -258,7 +274,7 @@ export default function Calendar() {
                   justifyContent: 'center',
                 }}
               >
-                <GoogleIcon size={18} />
+                <GoogleIcon size={18} color={googleConnected ? undefined : c.textFaint} />
               </Pressable>
             </View>
           }
