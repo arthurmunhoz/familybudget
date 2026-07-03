@@ -9,7 +9,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Image } from 'expo-image'
-import { Check, PawPrint, Pencil, Plus, X } from 'lucide-react-native'
+import { Check, PawPrint, Pencil, Plus } from 'lucide-react-native'
 
 import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -370,46 +370,35 @@ export default function PetCare() {
                   const Icon = TYPE_ICON[e.type]
                   const pet = petById[e.pet_id]
                   return (
-                    <View
+                    <Pressable
                       key={e.id}
-                      style={{
+                      onPress={() => openEditEvent(e)}
+                      style={({ pressed }) => ({
                         flexDirection: 'row',
                         alignItems: 'flex-start',
                         gap: sp.md,
-                        backgroundColor: c.card,
+                        backgroundColor: pressed ? c.cardActive : c.card,
                         borderRadius: radius.md,
                         paddingHorizontal: sp.lg,
                         paddingVertical: sp.md,
-                      }}
+                      })}
                     >
-                      <Pressable
-                        onPress={() => openEditEvent(e)}
-                        style={{ flexDirection: 'row', gap: sp.md, flex: 1, minWidth: 0 }}
-                      >
-                        <Icon size={20} color={c.textMuted} />
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
-                            {e.title}
+                      <Icon size={20} color={c.textMuted} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
+                          {e.title}
+                        </Txt>
+                        <Txt variant="faint">
+                          {pet?.emoji} {pet?.name} · {formatDay(e.event_date)}
+                          {e.next_due ? ` · ${t('pets.next')} ${formatDay(e.next_due)}` : ''}
+                        </Txt>
+                        {e.notes ? (
+                          <Txt variant="muted" style={{ marginTop: 4 }}>
+                            {e.notes}
                           </Txt>
-                          <Txt variant="faint">
-                            {pet?.emoji} {pet?.name} · {formatDay(e.event_date)}
-                            {e.next_due ? ` · ${t('pets.next')} ${formatDay(e.next_due)}` : ''}
-                          </Txt>
-                          {e.notes ? (
-                            <Txt variant="muted" style={{ marginTop: 4 }}>
-                              {e.notes}
-                            </Txt>
-                          ) : null}
-                        </View>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => removeEvent(e)}
-                        hitSlop={8}
-                        accessibilityLabel={t('common.deleteName', { name: e.title })}
-                      >
-                        <X size={18} color={c.textFaint} />
-                      </Pressable>
-                    </View>
+                        ) : null}
+                      </View>
+                    </Pressable>
                   )
                 })}
               </View>
