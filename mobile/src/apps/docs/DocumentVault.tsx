@@ -3,15 +3,16 @@
 // icon. Tapping a row opens the file via a signed URL in the in-app browser;
 // the pencil edits the row; the X deletes (with an Alert confirm). The bottom
 // bar picks a file (images + PDF only) → shows the UploadSheet.
-import { useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { Alert, Pressable, ScrollView, Switch, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
 import { File } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
-import { FileText, Pencil, Plus, X } from 'lucide-react-native'
+import { FileText, Lock, Pencil, Plus, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -23,6 +24,7 @@ import { formatDay } from '@/lib/format'
 import { getSignedUrl } from '@/lib/signedUrls'
 import { supabase } from '@/lib/supabase'
 import type { DocCategory, FamilyDocument } from '@/lib/types'
+import { biometricAvailable, isVaultLockEnabled, setVaultLockEnabled } from '@/lib/vaultLock'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { CATEGORIES, CAT_LUCIDE, formatBytes } from './docUtils'
 import UploadSheet, { type PickedFile } from './UploadSheet'
@@ -43,6 +45,51 @@ export default function DocumentVault() {
   const [editing, setEditing] = useState<FamilyDocument | null>(null)
   const [picking, setPicking] = useState(false)
   const [opening, setOpening] = useState<string | null>(null)
+
+  // Opt-in Face ID lock (per user + device, like the PWA). The toggle only
+  // shows where a biometric is available; enabling verifies with Face ID first.
+  const [canLock, setCanLock] = useState(false)
+  const [lockOn, setLockOn] = useState(false)
+  const email = profile?.email ?? null
+  useEffect(() => {
+    let active = true
+    biometricAvailable().then((v) => {
+      if (active) setCanLock(v)
+    })
+    if (email) {
+      isVaultLockEnabled(email).then((v) => {
+        if (active) setLockOn(v)
+      })
+    }
+    return () => {
+      active = false
+    }
+  }, [email])
+
+  async function toggleLock(next: boolean) {
+    if (!email) return
+    if (!next) {
+      await setVaultLockEnabled(email, false)
+      setLockOn(false)
+      return
+    }
+    // Prove it's the owner before turning the lock on (mirrors the PWA).
+    try {
+      const r = await LocalAuthentication.authenticateAsync({
+        promptMessage: t('vault.lockTitle'),
+        cancelLabel: t('common.cancel'),
+      })
+      if (!r.success) {
+        Alert.alert(t('vault.enableFailed'))
+        return
+      }
+    } catch {
+      Alert.alert(t('vault.enableFailed'))
+      return
+    }
+    await setVaultLockEnabled(email, true)
+    setLockOn(true)
+  }
 
   // Stale-while-revalidate: the last-loaded docs render instantly on return
   // (no loader flash); revalidate() refetches after a mutation.
@@ -173,6 +220,35 @@ export default function DocumentVault() {
       <View style={{ paddingHorizontal: sp.lg }}>
         <AppHeader title={t('docs.title')} right={<FileText size={22} color={c.accent} />} />
       </View>
+
+      {/* Face ID lock toggle — only where the device supports biometrics */}
+      {canLock ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: sp.md,
+            marginHorizontal: sp.lg,
+            marginBottom: sp.md,
+            paddingHorizontal: sp.md,
+            paddingVertical: 10,
+            borderRadius: radius.md,
+            backgroundColor: c.card,
+          }}
+        >
+          <Lock size={20} color={lockOn ? c.accent : c.textFaint} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={{ fontWeight: '600' }}>{t('vault.lockTitle')}</Txt>
+            <Txt variant="faint">{t('vault.lockDesc')}</Txt>
+          </View>
+          <Switch
+            value={lockOn}
+            onValueChange={toggleLock}
+            trackColor={{ true: c.accent }}
+            accessibilityLabel={lockOn ? t('vault.disableLock') : t('vault.enableLock')}
+          />
+        </View>
+      ) : null}
 
       {/* category filter — flexGrow:0 stops the horizontal ScrollView from
           filling the parent's height (which would stretch the chips tall);
