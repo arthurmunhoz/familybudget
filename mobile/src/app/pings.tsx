@@ -1,18 +1,205 @@
-// Nudges screen — the household one-tap nudge module ("pings" internally).
-// Shows the live list of active nudges up top (with 👍 ack / 📞 call), then the
-// composer (presets + recipient picker + AI box). In-app Realtime is the
-// delivery channel here; native push fan-out is intentionally skipped (it needs
-// a server change), so nudges show up live on every member's screen via the
-// Supabase Realtime subscription in PingsList.
-import { AppHeader, Screen } from '@/components/ui'
-import PingsList from '@/apps/pings/PingsList'
+// Nudges screen — two tabs:
+//   • Send new  — the composer (presets + recipient picker + AI box).
+//   • Past nudges — the household nudge history (All / Sent / Received), showing
+//     who sent each, when, and who acknowledged; active nudges to me stay
+//     actionable (Got it / Call). A badge on the tab counts unacked incoming.
+//
+// This screen owns the ping data + a single Supabase Realtime subscription
+// (pings + ping_acks) and hands it to the history tab; the composer inserts
+// directly and the subscription reflects it. RLS scopes everything to the
+// household; ack inserts get user_email stamped server-side.
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Linking, Pressable, View } from 'react-native'
+
+import { AppHeader, Screen, Txt } from '@/components/ui'
+import { useAuth } from '@/lib/auth'
+import { useI18n } from '@/hooks/useI18n'
+import { supabase } from '@/lib/supabase'
+import type { Ping, PingAck } from '@/lib/types'
+import { radius, sp, useTheme } from '@/theme/theme'
 import PingComposer from '@/apps/pings/PingComposer'
+import PingsHistory, { type PingWithAcks } from '@/apps/pings/PingsHistory'
+
+/** Recent household nudges (newest first), each with its acks attached. */
+async function fetchPings(): Promise<PingWithAcks[]> {
+  const { data: rows, error } = await supabase
+    .from('pings')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(60)
+  if (error) throw error
+  const pings = (rows ?? []) as Ping[]
+  if (!pings.length) return []
+  const { data: acks } = await supabase
+    .from('ping_acks')
+    .select('*')
+    .in(
+      'ping_id',
+      pings.map((p) => p.id),
+    )
+  const ackList = (acks ?? []) as PingAck[]
+  return pings.map((p) => ({ ...p, acks: ackList.filter((a) => a.ping_id === p.id) }))
+}
+
+/** Member phone numbers keyed by email (Call button). Missing phones omitted. */
+async function fetchMemberPhones(): Promise<Record<string, string>> {
+  const { data } = await supabase.from('member_profiles').select('email, phone')
+  const out: Record<string, string> = {}
+  for (const r of (data ?? []) as { email: string; phone: string | null }[]) {
+    if (r.phone) out[r.email] = r.phone
+  }
+  return out
+}
 
 export default function NudgesScreen() {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const { profile, profiles } = useAuth()
+  const myEmail = profile?.email
+
+  const [tab, setTab] = useState<'send' | 'past'>('send')
+  const [pings, setPings] = useState<PingWithAcks[]>([])
+  const [phones, setPhones] = useState<Record<string, string>>({})
+  // Optimistic ack: mark handled immediately, before the round-trip lands.
+  const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
+
+  const load = useCallback(async () => {
+    try {
+      setPings(await fetchPings())
+    } catch {
+      // keep whatever we had — a failed refresh must not wipe the list
+    }
+  }, [])
+
+  // Coalesce a mutation + its own Realtime echo into one fetch.
+  const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleLoad = useCallback(() => {
+    if (loadTimer.current) clearTimeout(loadTimer.current)
+    loadTimer.current = setTimeout(() => void load(), 250)
+  }, [load])
+
+  useEffect(() => {
+    void load()
+    void fetchMemberPhones().then(setPhones)
+    const channel = supabase
+      .channel('nudges_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pings' }, () => scheduleLoad())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ping_acks' }, () => scheduleLoad())
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+      if (loadTimer.current) clearTimeout(loadTimer.current)
+    }
+  }, [load, scheduleLoad])
+
+  const senderName = useCallback(
+    (email: string) =>
+      email === myEmail
+        ? t('pings.you')
+        : (profiles.find((p) => p.email === email)?.display_name ?? email.split('@')[0]),
+    [myEmail, profiles, t],
+  )
+
+  const ack = useCallback(
+    async (id: string) => {
+      setAckedLocal((s) => new Set(s).add(id))
+      await supabase.from('ping_acks').insert({ ping_id: id })
+      scheduleLoad()
+    },
+    [scheduleLoad],
+  )
+
+  const call = useCallback((phone: string) => {
+    void Linking.openURL(`tel:${phone}`)
+  }, [])
+
+  // Active nudges sent to me that I haven't acked → the "Past" tab badge.
+  const now = Date.now()
+  const unread = pings.filter(
+    (p) =>
+      p.sender_email !== myEmail &&
+      new Date(p.expires_at).getTime() > now &&
+      !(ackedLocal.has(p.id) || p.acks.some((a) => a.user_email === myEmail)),
+  ).length
+
   return (
-    <Screen scroll header={<AppHeader title="Nudges" />}>
-      <PingsList />
-      <PingComposer />
+    <Screen
+      scroll
+      header={
+        <>
+          <AppHeader title="Nudges" />
+          <View style={{ flexDirection: 'row', gap: sp.sm, marginBottom: sp.md }}>
+            <TabBtn active={tab === 'send'} onPress={() => setTab('send')} label={t('pings.tabSend')} />
+            <TabBtn
+              active={tab === 'past'}
+              onPress={() => setTab('past')}
+              label={t('pings.tabPast')}
+              badge={unread}
+            />
+          </View>
+        </>
+      }
+    >
+      {tab === 'send' ? (
+        <PingComposer />
+      ) : (
+        <PingsHistory
+          pings={pings}
+          phones={phones}
+          ackedLocal={ackedLocal}
+          myEmail={myEmail}
+          senderName={senderName}
+          onAck={ack}
+          onCall={call}
+        />
+      )}
     </Screen>
+  )
+}
+
+function TabBtn({
+  active,
+  onPress,
+  label,
+  badge = 0,
+}: {
+  active: boolean
+  onPress: () => void
+  label: string
+  badge?: number
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: radius.md,
+        backgroundColor: active ? c.accentSoft : c.surface,
+      }}
+    >
+      <Txt style={{ fontWeight: '700', color: active ? c.accent : c.textMuted }}>{label}</Txt>
+      {badge > 0 ? (
+        <View
+          style={{
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            paddingHorizontal: 5,
+            backgroundColor: c.expense,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Txt style={{ color: '#ffffff', fontSize: 11, fontWeight: '700' }}>{badge}</Txt>
+        </View>
+      ) : null}
+    </Pressable>
   )
 }
