@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Camera, Check, Receipt } from 'lucide-react'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import { fileToResizedBase64 } from '../../lib/image'
@@ -19,7 +19,14 @@ import {
   todayISO,
 } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
-import type { CategoryRule, Entry, Month, Period, Profile } from '../../lib/types'
+import type {
+  CategoryRule,
+  CustomCategory,
+  Entry,
+  Month,
+  Period,
+  Profile,
+} from '../../lib/types'
 
 type MonthWithBudget = Month & {
   budgets: { name: string; period: Period } | null
@@ -56,25 +63,44 @@ export default function MonthDetail() {
     entries: Entry[]
     rules: CategoryRule[]
     subcatSuggestions: Record<string, string[]>
+    customCats: CustomCategory[]
+    topCategories: string[]
+  }
+  const EMPTY: DetailData = {
+    month: null,
+    entries: [],
+    rules: [],
+    subcatSuggestions: {},
+    customCats: [],
+    topCategories: [],
   }
   // Cached per period: detail renders instantly on return, revalidates quietly.
   const {
-    data = { month: null, entries: [], rules: [], subcatSuggestions: {} },
+    data = EMPTY,
     loading,
     revalidate,
   } = useCachedQuery<DetailData>(`monthDetail:${id ?? ''}`, async () => {
-    if (!id) return { month: null, entries: [], rules: [], subcatSuggestions: {} }
-    const [m, e, r, subs] = await Promise.all([
+    if (!id) return EMPTY
+    const [m, e, r, subs, custom] = await Promise.all([
       supabase.from('months').select('*, budgets(name, period)').eq('id', id).single(),
       supabase.from('entries').select('*').eq('month_id', id),
       supabase.from('category_rules').select('keyword, category'),
-      // Household-wide subcategory vocabulary for the entry-form autocomplete
-      // (RLS scopes this to the family). Most-used suggestions surface first.
-      supabase.from('entries').select('category, subcategory').not('subcategory', 'is', null),
+      // Household-wide usage (RLS scopes this to the family): feeds both the
+      // subcategory autocomplete and the entry form's most-used category chips.
+      supabase.from('entries').select('type, category, subcategory'),
+      supabase.from('custom_categories').select('*').order('created_at'),
     ])
     const counts = new Map<string, Map<string, number>>()
-    for (const row of (subs.data ?? []) as { category: string; subcategory: string }[]) {
-      const key = row.subcategory.trim()
+    const catCounts = new Map<string, number>()
+    for (const row of (subs.data ?? []) as {
+      type: string
+      category: string
+      subcategory: string | null
+    }[]) {
+      if (row.type === 'expense' && row.category !== 'salary') {
+        catCounts.set(row.category, (catCounts.get(row.category) ?? 0) + 1)
+      }
+      const key = row.subcategory?.trim()
       if (!key) continue
       if (!counts.has(row.category)) counts.set(row.category, new Map())
       const bucket = counts.get(row.category)!
@@ -87,8 +113,28 @@ export default function MonthDetail() {
     for (const [cat, bucket] of counts) {
       map[cat] = [...bucket.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s)
     }
-    return { month: m.data, entries: e.data ?? [], rules: r.data ?? [], subcatSuggestions: map }
+    return {
+      month: m.data,
+      entries: e.data ?? [],
+      rules: r.data ?? [],
+      subcatSuggestions: map,
+      customCats: custom.data ?? [],
+      topCategories: [...catCounts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c),
+    }
   })
+
+  // ?add=1 (the home card's "＋ New entry") opens the form on arrival, then
+  // clears the param so back/refresh doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (loading || !data.month) return
+    if (searchParams.get('add') === '1') {
+      setEditing(null)
+      setPrefill(undefined)
+      setFormOpen(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [loading, data.month, searchParams, setSearchParams])
 
   const month = data.month
   const rules = data.rules
@@ -239,7 +285,7 @@ export default function MonthDetail() {
       </header>
 
       <div className="mt-1">
-        <SummaryChart entries={filtered} />
+        <SummaryChart entries={filtered} customCats={data.customCats} />
       </div>
 
       {/* Sort controls */}
@@ -284,6 +330,7 @@ export default function MonthDetail() {
       <EntryColumn
         entries={sortEntries(listVisible(filtered))}
         nameOf={nameOf}
+        customCats={data.customCats}
         showPerson={person === 'all'}
         groupByDay={sortBy === 'date'}
         onSelect={(e) => {
@@ -398,6 +445,9 @@ export default function MonthDetail() {
           myEmail={profile.email}
           rules={rules}
           subcategorySuggestions={subcatSuggestions}
+          customCategories={data.customCats}
+          topCategories={data.topCategories}
+          onCategoryCreated={revalidate}
           entry={editing}
           initial={prefill}
           onClose={() => {
@@ -418,6 +468,7 @@ export default function MonthDetail() {
 function EntryColumn({
   entries,
   nameOf,
+  customCats,
   showPerson,
   groupByDay = false,
   compact = false,
@@ -426,6 +477,7 @@ function EntryColumn({
 }: {
   entries: Entry[]
   nameOf: (email: string) => string
+  customCats: CustomCategory[]
   showPerson: boolean
   groupByDay?: boolean
   compact?: boolean
@@ -464,6 +516,7 @@ function EntryColumn({
                   key={e.id}
                   entry={e}
                   nameOf={nameOf}
+                  customCats={customCats}
                   showPerson={showPerson}
                   showDate={false}
                   compact={compact}
@@ -485,6 +538,7 @@ function EntryColumn({
           key={e.id}
           entry={e}
           nameOf={nameOf}
+          customCats={customCats}
           showPerson={showPerson}
           showDate
           compact={compact}
@@ -499,6 +553,7 @@ function EntryColumn({
 function EntryRow({
   entry: e,
   nameOf,
+  customCats,
   showPerson,
   showDate,
   compact,
@@ -507,6 +562,7 @@ function EntryRow({
 }: {
   entry: Entry
   nameOf: (email: string) => string
+  customCats: CustomCategory[]
   showPerson: boolean
   showDate: boolean
   compact: boolean
@@ -525,7 +581,7 @@ function EntryRow({
     setDx(0)
   }
 
-  const cat = categoryById(e.category)
+  const cat = categoryById(e.category, customCats)
   const isIncome = e.type === 'income'
   const secondary = [
     e.subcategory,

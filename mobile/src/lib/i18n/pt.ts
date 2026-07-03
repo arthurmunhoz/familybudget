@@ -375,6 +375,7 @@ export const pt: Record<keyof typeof en, string> = {
   'family.saveFailed': 'Não foi possível salvar — tente novamente.',
   'family.birthday': 'Aniversário',
   'family.phone': 'Telefone',
+  'family.call': 'Ligar',
   'family.bloodType': 'Tipo sanguíneo',
   'family.height': 'Altura',
   'family.weight': 'Peso',

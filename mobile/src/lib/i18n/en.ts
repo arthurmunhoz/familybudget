@@ -377,6 +377,7 @@ export const en = {
   'family.saveFailed': 'Could not save — please try again.',
   'family.birthday': 'Birthday',
   'family.phone': 'Phone',
+  'family.call': 'Call',
   'family.bloodType': 'Blood type',
   'family.height': 'Height',
   'family.weight': 'Weight',

@@ -54,6 +54,14 @@ export interface CategoryRule {
   category: string
 }
 
+/** A household-defined budget category (entries store its uuid in `category`). */
+export interface CustomCategory {
+  id: string
+  name: string
+  icon: string
+  created_at: string
+}
+
 export interface ShoppingItem {
   id: string
   label: string

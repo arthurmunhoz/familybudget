@@ -1,7 +1,8 @@
 // Full profile for one household member: large avatar, name, and every filled
-// member_profiles field formatted. The signed-in user sees an "Edit my info"
-// button on their own profile.
-import { View } from 'react-native'
+// member_profiles field formatted. The phone row gets a call button (tel:).
+// The signed-in user sees an "Edit my info" button on their own profile.
+import { Linking, Pressable, View } from 'react-native'
+import { Phone } from 'lucide-react-native'
 
 import { formatPhone, formatDay, todayISO } from '@/lib/format'
 import { useI18n } from '@/hooks/useI18n'
@@ -29,7 +30,8 @@ export function MemberDetail({
   const today = todayISO()
   const age = ageOf(profile?.birthday ?? null, today)
 
-  const items: { label: string; value: string }[] = []
+  // `phone` carries the raw dialable number for the row's call button.
+  const items: { label: string; value: string; phone?: string }[] = []
   if (profile?.birthday) {
     items.push({
       label: t('family.birthday'),
@@ -44,8 +46,15 @@ export function MemberDetail({
       items.push({
         label: t(labelKey),
         value: key === 'phone' ? formatPhone(String(v)) : String(v),
+        ...(key === 'phone' ? { phone: String(v) } : {}),
       })
     }
+  }
+
+  // Keep digits and a leading + so formatted numbers dial cleanly.
+  function call(raw: string) {
+    const dialable = raw.trim().replace(/[^\d+]/g, '')
+    if (dialable) void Linking.openURL(`tel:${dialable}`)
   }
 
   return (
@@ -76,11 +85,29 @@ export function MemberDetail({
           <View style={{ gap: sp.md }}>
             {items.map((it, i) => (
               <View key={it.label}>
-                <View style={{ flexDirection: 'row', gap: sp.md }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
                   <Txt variant="faint" style={{ width: 96 }}>
                     {it.label}
                   </Txt>
                   <Txt style={{ flex: 1 }}>{it.value}</Txt>
+                  {it.phone ? (
+                    <Pressable
+                      onPress={() => call(it.phone!)}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t('family.call')} ${member.display_name}`}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: c.accentSoft,
+                      }}
+                    >
+                      <Phone size={16} color={c.accent} />
+                    </Pressable>
+                  ) : null}
                 </View>
                 {i < items.length - 1 ? (
                   <View
