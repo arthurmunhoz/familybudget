@@ -3,6 +3,12 @@
 **Status:** IMPLEMENTED (DB + functions), verified, **pending prod deploy**
 **Owner:** Arthur (solo)
 
+> **SUPERSEDED (2026-07): the Opus fallback described below was REMOVED.** Owner
+> rule: every AI call in the app uses **Haiku only** — never Opus or a pricier
+> model. Unreadable photos fail with "try a clearer photo" instead of
+> escalating. Do not reintroduce the fallback from this doc; the metering /
+> kill-switch parts remain accurate.
+
 > **As-built note (differs from the original sketch below):** the metering RPCs were
 > hardened to be **service-role-only** instead of user-JWT-callable. The scan functions now
 > resolve the caller's household server-side (`email → allowed_users.household_id`, same pattern as

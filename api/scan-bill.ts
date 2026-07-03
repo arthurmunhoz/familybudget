@@ -2,26 +2,25 @@
 // store bill photo using Claude vision + structured outputs, so the app can
 // split a bill item-by-item between people.
 //
-// Cost control (migration 032-034): tries the cheap Haiku 4.5 model first and
-// only falls back to Opus 4.8 (with adaptive thinking) when Haiku's result is
-// unparseable/has no items. Every successful scan is metered PER HOUSEHOLD via
-// the service-role RPCs ai_scan_allowed / ai_scan_record (free monthly cap +
-// global daily-spend kill-switch).
+// Cost control (migration 032-034): HAIKU ONLY — do NOT add a fallback to Opus
+// or any pricier model (owner decision, 2026-07: always the cheapest model). If
+// Haiku finds no items, we return "try a clearer photo" instead of escalating.
+// Every successful scan is metered PER HOUSEHOLD via the service-role RPCs
+// ai_scan_allowed / ai_scan_record (free monthly cap + global daily-spend
+// kill-switch).
 //
 // Env: ANTHROPIC_API_KEY, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
 // SUPABASE_SERVICE_ROLE_KEY. Auth: the caller must send a valid Supabase JWT.
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 
-const HAIKU = 'claude-haiku-4-5' // primary: $1/$5 per 1M tokens, no thinking
-const OPUS = 'claude-opus-4-8' // fallback: $5/$25 per 1M, adaptive thinking
+const HAIKU = 'claude-haiku-4-5' // $1/$5 per 1M tokens — the ONLY model used
 
 const RATES: Record<string, { in: number; out: number }> = {
   [HAIKU]: { in: 1 / 1e6, out: 5 / 1e6 },
-  [OPUS]: { in: 5 / 1e6, out: 25 / 1e6 },
 }
 function estCost(model: string, usage: any): number {
-  const r = RATES[model] ?? RATES[OPUS]
+  const r = RATES[model] ?? RATES[HAIKU]
   const input = (usage?.input_tokens ?? 0) + (usage?.cache_read_input_tokens ?? 0)
   const output = usage?.output_tokens ?? 0
   return input * r.in + output * r.out
@@ -156,13 +155,9 @@ export default async function handler(req: any, res: any) {
     const client = new Anthropic()
 
     async function extract(model: string) {
-      const isOpus = model === OPUS
       const response = await client.messages.create({
         model,
-        max_tokens: isOpus ? 4096 : 2048,
-        // Opus gets adaptive thinking for cramped/wrapped itemized bills; Haiku
-        // (a 4.5-tier model) does not support adaptive thinking — omit it.
-        ...(isOpus ? { thinking: { type: 'adaptive' as const } } : {}),
+        max_tokens: 2048,
         messages: [
           {
             role: 'user',
@@ -197,18 +192,14 @@ export default async function handler(req: any, res: any) {
       return { parsed: cleanBill(JSON.parse(text.text)), usage: response.usage }
     }
 
-    // Haiku first; escalate to Opus only if it failed or found no items.
-    let result: { parsed: any; usage: any } | null = null
-    let usedModel = HAIKU
-    try {
-      const r = await extract(HAIKU)
-      if (r.parsed.items.length > 0) result = r
-    } catch {
-      result = null
-    }
-    if (!result) {
-      result = await extract(OPUS) // may throw APIError -> mapped below
-      usedModel = OPUS
+    // Haiku only — no items found fails with the friendly message below
+    // (NO fallback to a pricier model; see the header comment).
+    const usedModel = HAIKU
+    const result = await extract(HAIKU) // may throw APIError -> mapped below
+    if (result.parsed.items.length === 0) {
+      return res.status(502).json({
+        error: "Couldn't read that bill — try a clearer, well-lit photo.",
+      })
     }
 
     try {

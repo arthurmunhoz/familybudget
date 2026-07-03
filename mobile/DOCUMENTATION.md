@@ -21,7 +21,7 @@ sold via **One Roof Plus** (RevenueCat in-app purchase).
 | Backend | Supabase — Postgres with **RLS as the security boundary**, Auth, Storage, Realtime |
 | Serverless | Vercel functions in `api/` (AI scans, push fan-out, Google/Apple/RevenueCat integrations) |
 | Payments | RevenueCat (`react-native-purchases`) → Apple IAP |
-| AI | Anthropic Claude (Haiku-first, Opus fallback) for receipt/bill scanning |
+| AI | Anthropic Claude — **Haiku only, always** (owner rule: never Opus/pricier models) |
 | Design | "Warm Hearth" theme (light/dark, follows system); Fraunces + Hanken Grotesk fonts |
 | i18n | English, Spanish, Portuguese (BR) — device locale + saved preference |
 
@@ -64,8 +64,10 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
   entitlement with the server plan (`household_subscriptions`, stamped by
   `api/revenuecat-webhook`). Generous-free gates route to `/paywall`: Document
   Vault uploads, Google Calendar connect, and the AI-scan cap.
-- **AI scans** (`api/scan-receipt`, `api/scan-bill`): Haiku-first → Opus fallback,
-  per-household metering + a global daily-spend kill-switch (`ai_scan_allowed`),
+- **AI scans** (`api/scan-receipt`, `api/scan-bill`): **Claude Haiku only** — an
+  unreadable photo fails with "try a clearer photo"; never escalate to Opus or
+  any pricier model (owner rule, applies to every AI call in the app).
+  Per-household metering + a global daily-spend kill-switch (`ai_scan_allowed`),
   **unlimited for Plus**.
 - **Push** (`api/send-ping`, `api/send-digest`): Expo push tokens + web-push,
   per-recipient language.
