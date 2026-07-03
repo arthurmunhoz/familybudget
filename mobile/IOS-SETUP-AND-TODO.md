@@ -68,8 +68,20 @@ npx expo start          # press i for the iOS simulator, or scan the QR with Exp
   Then deploy the PWA. Untested end-to-end — verify on a device once the env vars are set.
 - **Google Calendar native connect**: ✅ implemented — the Calendar screen's "Connect Google Calendar" row now runs Google OAuth in an in-app browser (WebBrowser) with the calendar scope, captures the refresh token, and calls the deployed `/api/google-calendar-*` endpoints (then Sync now / Disconnect). **You must**: (1) ensure the `calendar.events` scope is enabled/allowed on your Google OAuth consent screen (Google Cloud Console) — the same Google project the Supabase Google provider uses; (2) keep `oneroof://auth-callback` in Supabase → Auth → Redirect URLs (already added). Then test on a device: tap Connect, grant the calendar permission, confirm events pull in. Untested end-to-end (OAuth can't be verified in the build harness).
 
-### F. Paywall / IAP (when you're ready to charge)
-- Not built yet. Plan (from the strategy): **RevenueCat + Apple IAP**, per-household "One Roof Plus" at $4.99/mo · **$39.99/yr** · $79.99 lifetime, 7-day trial after a value moment. Add `react-native-purchases`, gate the cost-bearing features (unlimited AI scans, vault, calendar, unlimited pets/budgets), and tighten the free AI scan cap (10–20/mo) in `ai_config`.
+### F. Paywall / IAP — One Roof Plus (✅ built; needs your account setup)
+**Built (RevenueCat):** entitlement is **per household** (RevenueCat `app_user_id` = `household_id`, so any member's purchase covers everyone). Client: `usePlus()` + a `/paywall` modal that renders the live RevenueCat offering (prices come from App Store Connect), Subscribe, Restore, Terms/Privacy. Gated behind Plus (generous-free): **Document Vault uploads, Google Calendar connect, unlimited AI scans** (free stays capped, server-enforced). Server: `household_subscriptions` table (migration 041, service-role-only write), `ai_scan_allowed` bypasses the cap for Plus, and `api/revenuecat-webhook.ts` stamps entitlement from RevenueCat events.
+
+**YOUR SETUP (nothing sells until these are done):**
+1. **App Store Connect → Agreements, Tax & Banking**: sign the **Paid Applications Agreement** + tax/banking.
+2. **App Store Connect → your app → In-App Purchases / Subscriptions**: create a subscription group "One Roof Plus" with **Monthly $4.99**, **Yearly $39.99** (add a 7-day free intro offer), and optionally a **Lifetime $79.99** non-consumable. (Suggested product ids `com.oneroof.app.plus.monthly` / `.yearly` / `.lifetime` — exact ids don't need to match app code, the app reads the RevenueCat offering.)
+3. **RevenueCat**: create the project + iOS app (bundle `com.oneroof.app`), connect App Store. Create an **Entitlement with identifier exactly `plus`** (this MUST match the code). Import the products and attach them to `plus`. Create the **current Offering** with the packages — the paywall renders whatever's in it. Copy the **iOS public SDK key**.
+4. **EAS env**: add `EXPO_PUBLIC_REVENUECAT_IOS_KEY` = that key to `eas.json` env per profile (or `eas env:create`), then `eas build -p ios --profile preview`.
+5. **RevenueCat → Webhooks**: URL `https://one-roof-app.vercel.app/api/revenuecat-webhook`, Authorization header = a strong random secret.
+6. **Vercel env**: `REVENUECAT_WEBHOOK_SECRET` = that same secret, then `npx vercel deploy --prod`.
+7. **Sandbox test** on device: subscribe → Plus unlocks; test **Restore**; confirm a row appears in `household_subscriptions`.
+8. **Launch lever**: when Plus is purchasable, lower the free scan cap so Plus has value — `update public.ai_config set free_monthly_cap = 15;` (it's 100 now). Your own household is comped to Plus already.
+
+*(Apple review needs the app submitted WITH the IAP the first time, and a Restore button — both handled.)*
 
 ---
 
