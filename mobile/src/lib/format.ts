@@ -109,6 +109,13 @@ export function formatDayHeading(isoDate: string): string {
   })
 }
 
+/** "Arthur Munhoz Silva" → "Arthur S." — first name plus last-name initial. */
+export function shortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length < 2) return parts[0] ?? ''
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+}
+
 export function todayISO(): string {
   const now = new Date()
   const m = String(now.getMonth() + 1).padStart(2, '0')

@@ -211,13 +211,17 @@ export default function EntryForm({
     onSaved()
   }
 
+  const addLabel = t(type === 'expense' ? 'entry.addExpense' : 'entry.addIncome')
   const saveLabel = saving
     ? t('common.saving')
     : entry
       ? t('entry.saveChanges')
       : amountValid
-        ? `${t(type === 'expense' ? 'entry.addExpense' : 'entry.addIncome')} · ${formatMoney(parsedAmount)}`
-        : t('entry.addEntry')
+        ? `${addLabel} · ${formatMoney(parsedAmount)}`
+        : addLabel
+  const title = entry
+    ? t(type === 'expense' ? 'entry.editExpenseTitle' : 'entry.editIncomeTitle')
+    : t(type === 'expense' ? 'entry.newExpenseTitle' : 'entry.newIncomeTitle')
 
   const chip = (active: boolean) =>
     `rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
@@ -229,9 +233,7 @@ export default function EntryForm({
       <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-(--card)">
         {/* static header */}
         <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-2">
-          <h2 className="text-lg font-bold text-(--text)">
-            {entry ? t('entry.editTitle') : t('entry.newTitle')}
-          </h2>
+          <h2 className="text-lg font-bold text-(--text)">{title}</h2>
           <button
             onClick={onClose}
             aria-label={t('common.cancel')}
@@ -244,28 +246,30 @@ export default function EntryForm({
         {/* scrollable body */}
         <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 pb-2">
 
-        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-(--surface) p-1">
-          {(['expense', 'income'] as const).map((ty) => (
-            <button
-              key={ty}
-              onClick={() => setType(ty)}
-              className={`rounded-lg py-2 text-sm font-semibold capitalize transition-colors ${
-                type === ty
-                  ? ty === 'expense'
-                    ? 'bg-rose-500/90 text-white'
-                    : 'bg-emerald-500/90 text-white'
-                  : 'text-(--text-muted)'
-              }`}
-            >
-              {ty === 'expense' ? t('entry.expense') : t('entry.income')}
-            </button>
-          ))}
+        <div className="mt-2 flex justify-center">
+          <div className="flex gap-1 rounded-full bg-(--surface) p-1">
+            {(['expense', 'income'] as const).map((ty) => (
+              <button
+                key={ty}
+                onClick={() => setType(ty)}
+                className={`rounded-full px-5 py-2 text-sm font-semibold capitalize transition-colors ${
+                  type === ty
+                    ? ty === 'expense'
+                      ? 'bg-rose-500/90 text-white'
+                      : 'bg-emerald-500/90 text-white'
+                    : 'text-(--text-muted)'
+                }`}
+              >
+                {ty === 'expense' ? t('entry.expense') : t('entry.income')}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Amount first — it's what you know when you open the form. */}
-        <div className="mt-5 flex items-baseline justify-center">
+        <div className="mt-6 mb-1 flex items-baseline justify-center">
           <span
-            className={`text-2xl font-semibold ${
+            className={`text-4xl font-semibold ${
               amount ? 'text-(--text)' : 'text-(--text-faint)'
             }`}
           >
@@ -278,8 +282,14 @@ export default function EntryForm({
             placeholder="0.00"
             autoFocus={!entry && !initial?.amount}
             aria-label={t('entry.amount')}
-            style={{ width: `${Math.max(4, amount.length + 1)}ch` }}
-            className="bg-transparent text-center text-4xl font-bold tabular-nums font-display text-(--text) outline-none placeholder:text-(--text-faint)"
+            // Inline font-size: the global unlayered `input { font-size: 16px }`
+            // (iOS zoom guard) beats Tailwind's layered text-* utilities here.
+            style={{
+              width: `${Math.max(4, amount.length + 1)}ch`,
+              fontSize: '3.5rem',
+              lineHeight: 1.1,
+            }}
+            className="bg-transparent text-center font-bold tabular-nums font-display text-(--text) outline-none placeholder:text-(--text-faint)"
           />
         </div>
 

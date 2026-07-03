@@ -1,4 +1,4 @@
-import type { CategoryRule } from './types'
+import type { CategoryRule, CustomCategory } from './types'
 
 export interface Category {
   id: string
@@ -23,8 +23,18 @@ export const CATEGORIES: Category[] = [
   { id: 'other', name: 'Other', icon: '📦' },
 ]
 
-export function categoryById(id: string): Category {
-  return CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[CATEGORIES.length - 1]
+/** Resolve built-in first, then the household's custom categories, then 'other'
+ *  (so entries keep rendering if a custom category is deleted). */
+export function categoryById(id: string, custom?: CustomCategory[]): Category {
+  const builtin = CATEGORIES.find((c) => c.id === id)
+  if (builtin) return builtin
+  const c = custom?.find((cc) => cc.id === id)
+  if (c) return { id: c.id, name: c.name, icon: c.icon }
+  return CATEGORIES[CATEGORIES.length - 1]
+}
+
+export function isBuiltinCategory(id: string): boolean {
+  return CATEGORIES.some((c) => c.id === id)
 }
 
 const KEYWORD_DEFAULTS: Record<string, string> = {

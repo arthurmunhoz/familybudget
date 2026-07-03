@@ -44,7 +44,7 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
 | **Pet Care** | Pet profiles + photos, care events, next-due reminders, "done / again" re-log |
 | **Family** | Per-member profiles, avatars (tap-to-zoom), edit your own |
 | **Calendar** | Month + Upcoming, recurrence, color-by-member, birthdays/anniversaries; **Google Calendar two-way sync** |
-| **Money / Budget** | Budgets → periods → entries, totals + category breakdown, recurring copy-forward, **AI receipt scan** |
+| **Money / Budget** | Home = per-budget dashboard cards (current-period balance, received/spent bars, upcoming projection, quick-add via `?add=1`); period history behind the card's period pill → entries, totals + category breakdown, recurring copy-forward, **AI receipt scan**. Amount-first entry form: live auto-suggested category chips, household **custom categories** (`custom_categories`, migration 042), Today/Yesterday date chips |
 | **Nudges** | One-tap household pings + AI free-text, realtime list with ack / "seen by" / call |
 | **Documents** | Face ID-gated vault, category grouping, upload / open / delete |
 | **Settings** | Language, appearance, notifications, One Roof Plus, account (sign out, delete) |

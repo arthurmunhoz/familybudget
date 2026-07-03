@@ -63,8 +63,16 @@ src/
   index.css                Theme tokens + global CSS (READ THE COMMENTS)
   pages/                   Hub-level screens: Hub (launcher), Login, Admin
   apps/<id>/               One folder per family app:
-    budget/                Budgets → Months → MonthDetail (+ EntryForm,
-                           SummaryChart) — note: a "month" = one budget period
+    budget/                Budgets (home: per-budget dashboard cards — current
+                           period balance/bars + "New entry" → /month/:id?add=1
+                           which auto-opens the form) → Months (period history,
+                           reached from the card's period pill) → MonthDetail
+                           (+ EntryForm, SummaryChart). EntryForm is amount-first
+                           with category chips + an "All" grid that can create
+                           household custom_categories (migration 042; entries
+                           store the uuid as text — always resolve icons/names
+                           via categoryById(id, customCats)). A "month" = one
+                           budget period (month/week/day per budgets.period).
     shopping/              ShoppingList (Realtime-synced) + optional per-store
                            sections (StoreLogo, lib/stores.ts catalog)
     pets/                  PetCare (events + next-due reminders)

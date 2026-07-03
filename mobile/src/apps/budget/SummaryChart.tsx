@@ -12,10 +12,16 @@ import { Card, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { categoryById } from '@/lib/categories'
 import { formatMoney, todayISO } from '@/lib/format'
-import type { Entry } from '@/lib/types'
+import type { CustomCategory, Entry } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 
-export default function SummaryChart({ entries }: { entries: Entry[] }) {
+export default function SummaryChart({
+  entries,
+  customCats = [],
+}: {
+  entries: Entry[]
+  customCats?: CustomCategory[]
+}) {
   const { t } = useI18n()
   const { c } = useTheme()
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
@@ -166,7 +172,7 @@ export default function SummaryChart({ entries }: { entries: Entry[] }) {
       {categories.length > 0 && (
         <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.surface, paddingTop: sp.md }}>
           {categories.map(([catId, amount]) => {
-            const cat = categoryById(catId)
+            const cat = categoryById(catId, customCats)
             const subs = [...(bySub.get(catId)?.entries() ?? [])].sort((a, b) => b[1] - a[1])
             const hasSubs = subs.some(([k]) => k !== '')
             const expanded = expandedCat === catId
