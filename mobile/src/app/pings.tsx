@@ -15,7 +15,10 @@ import { useLocalSearchParams } from 'expo-router'
 import { AppHeader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
+import type { TKey } from '@/lib/i18n'
+import { PING_PRESETS } from '@/lib/pings'
 import { supabase } from '@/lib/supabase'
+import { syncNudgeWidget } from '@/lib/widget'
 import type { Ping, PingAck } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import PingComposer from '@/apps/pings/PingComposer'
@@ -96,6 +99,29 @@ export default function NudgesScreen() {
       if (loadTimer.current) clearTimeout(loadTimer.current)
     }
   }, [load, scheduleLoad])
+
+  // Feed the Home-Screen Nudges widget: provision this device's send token, and
+  // hand it the household members (person selector) + localized presets. The
+  // widget stores its own selected recipients as they're toggled.
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      const { data } = await supabase.rpc('widget_token')
+      const token = typeof data === 'string' ? data : null
+      const members = profiles
+        .filter((p) => p.email !== myEmail)
+        .map((p) => ({ email: p.email, name: p.display_name || p.email.split('@')[0] }))
+      const presets = PING_PRESETS.map((p) => ({
+        kind: p.kind,
+        emoji: p.emoji,
+        label: t(`pings.preset.${p.kind}` as TKey),
+      }))
+      if (active) syncNudgeWidget({ token, members, presets })
+    })()
+    return () => {
+      active = false
+    }
+  }, [profiles, myEmail, t])
 
   const senderName = useCallback(
     (email: string) =>

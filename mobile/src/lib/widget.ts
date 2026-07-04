@@ -28,13 +28,43 @@ function store(): ExtensionStorage | null {
   }
 }
 
-/** Write the budget snapshot for the home-screen widget + reload it. The first
- *  budget is shown until the widget is made budget-selectable. */
+/** Write the budget snapshot for the home-screen widget + reload it. The widget
+ *  is budget-selectable; it picks by id from this list (default = first). */
 export function syncBudgetWidget(budgets: BudgetWidgetItem[]): void {
   const s = store()
   if (!s) return
   try {
     s.set('budgets', JSON.stringify(budgets))
+    ExtensionStorage.reloadWidget()
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
+export interface NudgeMember {
+  email: string
+  name: string
+}
+export interface NudgePreset {
+  kind: string
+  emoji: string
+  label: string
+}
+
+/** Feed the Nudges widget: the send token, the members it can target (the
+ *  person selector), and the presets it can send. The widget owns the selected
+ *  recipients (stored in the App Group as it's toggled). */
+export function syncNudgeWidget(data: {
+  token: string | null
+  members: NudgeMember[]
+  presets: NudgePreset[]
+}): void {
+  const s = store()
+  if (!s) return
+  try {
+    if (data.token) s.set('widget_token', data.token)
+    s.set('nudge_members', JSON.stringify(data.members))
+    s.set('nudge_presets', JSON.stringify(data.presets))
     ExtensionStorage.reloadWidget()
   } catch {
     /* native module unavailable — ignore */

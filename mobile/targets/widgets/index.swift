@@ -158,5 +158,6 @@ struct BudgetWidget: Widget {
 struct OneRoofWidgets: WidgetBundle {
   var body: some Widget {
     BudgetWidget()
+    NudgesWidget()
   }
 }
