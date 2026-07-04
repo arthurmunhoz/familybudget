@@ -25,6 +25,7 @@ import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
+import { syncBudgetWidget, type BudgetWidgetItem } from '@/lib/widget'
 import { formatMoney, periodEndISO, periodLabel, todayISO } from '@/lib/format'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
@@ -117,6 +118,25 @@ export default function Budgets() {
     }
     return { statsById, byBudget }
   }, [budgets, months, entries])
+
+  // Feed the Home-Screen budget widget: each budget's current-period summary.
+  useEffect(() => {
+    if (loading) return
+    const items: BudgetWidgetItem[] = budgets.map((b) => {
+      const defaultId = byBudget.get(b.id)?.defaultId ?? null
+      const stat = defaultId ? statsById.get(defaultId) : undefined
+      return {
+        id: b.id,
+        name: b.name,
+        period: b.period,
+        balance: stat?.balance ?? 0,
+        income: stat?.income ?? 0,
+        spent: stat?.spent ?? 0,
+        currency: '$',
+      }
+    })
+    syncBudgetWidget(items)
+  }, [loading, budgets, byBudget, statsById])
 
   async function create() {
     const trimmed = name.trim()

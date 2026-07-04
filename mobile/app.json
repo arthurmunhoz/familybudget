@@ -12,6 +12,9 @@
       "bundleIdentifier": "com.oneroof.app",
       "supportsTablet": true,
       "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.oneroof.app"]
+      },
       "infoPlist": {
         "NSFaceIDUsageDescription": "Face ID unlocks your private Document Vault.",
         "NSCameraUsageDescription": "Take photos to scan receipts and bills, and add pet and profile photos.",
@@ -74,7 +77,8 @@
           "icon": "./assets/images/icon.png",
           "color": "#c2603f"
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,
