@@ -3,6 +3,8 @@ module.exports = {
   type: 'widget',
   name: 'OneRoofWidgets',
   displayName: 'One Roof',
+  // iOS 17 for configurable + interactive widgets (App Intents).
+  deploymentTarget: '17.0',
   colors: {
     // Warm Hearth clay accent (light / dark).
     $accent: { color: '#C2603F', darkColor: '#E4855F' },

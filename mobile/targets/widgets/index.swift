@@ -1,10 +1,23 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
-// The main app writes this JSON array into the shared App Group under "budgets"
-// (see mobile/src/lib/widget.ts). The widget renders the first one for now;
-// budget selection (a configurable widget) is the next step.
-struct BudgetInfo: Codable {
+// ── Shared ───────────────────────────────────────────────────────────────────
+let APP_GROUP = "group.com.oneroof.app"
+
+func groupDefaults() -> UserDefaults? { UserDefaults(suiteName: APP_GROUP) }
+
+func money(_ v: Double, _ symbol: String) -> String {
+  let n = NumberFormatter()
+  n.numberStyle = .decimal
+  n.maximumFractionDigits = 0
+  let num = n.string(from: NSNumber(value: v.rounded())) ?? "\(Int(v.rounded()))"
+  return symbol + num
+}
+
+// The app writes this JSON array into the App Group under "budgets"
+// (see mobile/src/lib/widget.ts).
+struct BudgetInfo: Codable, Identifiable {
   let id: String
   let name: String
   let period: String
@@ -14,25 +27,47 @@ struct BudgetInfo: Codable {
   let currency: String
 }
 
-let APP_GROUP = "group.com.oneroof.app"
-
 func loadBudgets() -> [BudgetInfo] {
   guard
-    let defaults = UserDefaults(suiteName: APP_GROUP),
-    let raw = defaults.string(forKey: "budgets"),
+    let raw = groupDefaults()?.string(forKey: "budgets"),
     let data = raw.data(using: .utf8),
     let list = try? JSONDecoder().decode([BudgetInfo].self, from: data)
   else { return [] }
   return list
 }
 
-func money(_ v: Double, _ symbol: String) -> String {
-  let rounded = (v).rounded()
-  let n = NumberFormatter()
-  n.numberStyle = .decimal
-  n.maximumFractionDigits = 0
-  let num = n.string(from: NSNumber(value: rounded)) ?? "\(Int(rounded))"
-  return symbol + num
+private let sampleBudget = BudgetInfo(
+  id: "", name: "Our Home Budget", period: "monthly",
+  balance: 1240, income: 3200, spent: 1960, currency: "$")
+
+// ── Budget selection (configurable widget) ──────────────────────────────────
+struct BudgetEntity: AppEntity {
+  let id: String
+  let name: String
+
+  static var typeDisplayRepresentation: TypeDisplayRepresentation { "Budget" }
+  var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+  static var defaultQuery = BudgetQuery()
+}
+
+struct BudgetQuery: EntityQuery {
+  func entities(for identifiers: [String]) async throws -> [BudgetEntity] {
+    loadBudgets().filter { identifiers.contains($0.id) }.map { BudgetEntity(id: $0.id, name: $0.name) }
+  }
+  func suggestedEntities() async throws -> [BudgetEntity] {
+    loadBudgets().map { BudgetEntity(id: $0.id, name: $0.name) }
+  }
+  func defaultResult() async -> BudgetEntity? {
+    loadBudgets().first.map { BudgetEntity(id: $0.id, name: $0.name) }
+  }
+}
+
+struct SelectBudgetIntent: WidgetConfigurationIntent {
+  static var title: LocalizedStringResource { "Select budget" }
+  static var description: IntentDescription { "Choose which budget to show." }
+
+  @Parameter(title: "Budget") var budget: BudgetEntity?
+  init() {}
 }
 
 struct BudgetEntry: TimelineEntry {
@@ -40,24 +75,26 @@ struct BudgetEntry: TimelineEntry {
   let budget: BudgetInfo?
 }
 
-struct BudgetProvider: TimelineProvider {
-  private let sample = BudgetInfo(
-    id: "", name: "Our Home Budget", period: "monthly",
-    balance: 1240, income: 3200, spent: 1960, currency: "$")
-
+struct BudgetProvider: AppIntentTimelineProvider {
   func placeholder(in context: Context) -> BudgetEntry {
-    BudgetEntry(date: Date(), budget: sample)
+    BudgetEntry(date: Date(), budget: sampleBudget)
   }
 
-  func getSnapshot(in context: Context, completion: @escaping (BudgetEntry) -> Void) {
-    let b = context.isPreview ? sample : loadBudgets().first
-    completion(BudgetEntry(date: Date(), budget: b))
+  func snapshot(for configuration: SelectBudgetIntent, in context: Context) async -> BudgetEntry {
+    let picked = resolve(configuration)
+    return BudgetEntry(date: Date(), budget: context.isPreview && picked == nil ? sampleBudget : picked)
   }
 
-  func getTimeline(in context: Context, completion: @escaping (Timeline<BudgetEntry>) -> Void) {
-    let entry = BudgetEntry(date: Date(), budget: loadBudgets().first)
+  func timeline(for configuration: SelectBudgetIntent, in context: Context) async -> Timeline<BudgetEntry> {
+    let entry = BudgetEntry(date: Date(), budget: resolve(configuration))
     let next = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date().addingTimeInterval(3600)
-    completion(Timeline(entries: [entry], policy: .after(next)))
+    return Timeline(entries: [entry], policy: .after(next))
+  }
+
+  private func resolve(_ configuration: SelectBudgetIntent) -> BudgetInfo? {
+    let all = loadBudgets()
+    if let sel = configuration.budget, let match = all.first(where: { $0.id == sel.id }) { return match }
+    return all.first
   }
 }
 
@@ -106,20 +143,17 @@ struct BudgetWidgetView: View {
 
 struct BudgetWidget: Widget {
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: "BudgetWidget", provider: BudgetProvider()) { entry in
-      if #available(iOS 17.0, *) {
-        BudgetWidgetView(entry: entry)
-          .containerBackground(.fill.tertiary, for: .widget)
-      } else {
-        BudgetWidgetView(entry: entry).padding()
-      }
+    AppIntentConfiguration(kind: "BudgetWidget", intent: SelectBudgetIntent.self, provider: BudgetProvider()) { entry in
+      BudgetWidgetView(entry: entry)
+        .containerBackground(.fill.tertiary, for: .widget)
     }
     .configurationDisplayName("Budget")
-    .description("Your household budget at a glance.")
+    .description("Pick a budget to show its balance.")
     .supportedFamilies([.systemSmall, .systemMedium])
   }
 }
 
+// ── Bundle ───────────────────────────────────────────────────────────────────
 @main
 struct OneRoofWidgets: WidgetBundle {
   var body: some Widget {
