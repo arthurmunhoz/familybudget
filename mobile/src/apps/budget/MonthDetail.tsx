@@ -37,10 +37,13 @@ type SortBy = 'date' | 'amount'
 export default function MonthDetail({
   monthId,
   autoAdd = false,
+  autoScan = false,
 }: {
   monthId: string
   /** True when arriving from the home card's "＋ New entry" (?add=1). */
   autoAdd?: boolean
+  /** True when arriving from the home card's scan button (?scan=1). */
+  autoScan?: boolean
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -130,6 +133,15 @@ export default function MonthDetail({
     setPrefill(undefined)
     setFormOpen(true)
   }, [autoAdd, loading, month])
+
+  // Arriving via the home card's scan button starts the receipt scan once (per
+  // mount) as soon as the period has loaded.
+  const autoScanDone = useRef(false)
+  useEffect(() => {
+    if (!autoScan || autoScanDone.current || loading || !month) return
+    autoScanDone.current = true
+    startScan()
+  }, [autoScan, loading, month])
 
   const period = month?.budgets?.period ?? 'monthly'
 

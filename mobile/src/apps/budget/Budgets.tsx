@@ -13,11 +13,12 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { Check, ChevronDown, ChevronRight, Wallet, X } from 'lucide-react-native'
+import { Camera, Check, ChevronDown, ChevronRight, Wallet, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -159,32 +160,34 @@ export default function Budgets() {
         </ScrollView>
       )}
 
-      {/* bottom action bar — ghost style: creating a budget is a rare action */}
-      <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-        <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={loading}
-            onPress={() => {
-              setName('')
-              setPeriod('monthly')
-              setCreateOpen(true)
-            }}
-            style={({ pressed }) => ({
-              backgroundColor: c.card,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: c.accent,
-              paddingVertical: 13,
-              alignItems: 'center',
-              opacity: loading ? 0.5 : pressed ? 0.85 : 1,
-            })}
-          >
-            <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>
-              {t('budget.new')}
-            </Txt>
-          </Pressable>
-        </View>
+      {/* bottom action bar — a minimalist full-width strip: just a hairline
+          divider + centered accent label, so creating a budget (a rare action)
+          stays quiet but has a big, easy tap target. */}
+      <SafeAreaView
+        edges={['bottom']}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}
+      >
+        <Pressable
+          accessibilityRole="button"
+          disabled={loading}
+          onPress={() => {
+            setName('')
+            setPeriod('monthly')
+            setCreateOpen(true)
+          }}
+          style={({ pressed }) => ({
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 18,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: c.border,
+            opacity: loading ? 0.5 : pressed ? 0.6 : 1,
+          })}
+        >
+          <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>
+            {t('budget.new')}
+          </Txt>
+        </Pressable>
       </SafeAreaView>
 
       {createOpen && (
@@ -271,7 +274,7 @@ function BudgetCard({
   const openPeriod = () => selected && router.push(`/budget/${b.id}/${selected.id}`)
 
   return (
-    <Card style={{ gap: sp.sm }}>
+    <Card style={{ gap: sp.md }}>
       {/* title row: budget name + details chevron */}
       <Pressable
         onPress={openHistory}
@@ -284,7 +287,7 @@ function BudgetCard({
       </Pressable>
 
       {selected ? (
-        <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.sm }}>
+        <View style={{ gap: sp.md, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>
           {/* overview header: labelled balance (left) + period dropdown (right) */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm }}>
             <Pressable onPress={openPeriod} style={{ flex: 1, minWidth: 0 }}>
@@ -328,25 +331,43 @@ function BudgetCard({
             <BarRow label={t('chart.spent')} value={spent} max={barMax} color={c.expense} />
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?add=1`)}
-            style={({ pressed }) => ({
-              backgroundColor: c.accent,
-              borderRadius: radius.md,
-              paddingVertical: 11,
-              alignItems: 'center',
-              marginTop: sp.xs,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>
-              {t('detail.newEntry')}
-            </Txt>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: sp.sm }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('detail.scanAria')}
+              onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?scan=1`)}
+              style={({ pressed }) => ({
+                width: 46,
+                borderRadius: radius.md,
+                backgroundColor: c.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Camera size={20} color={c.text} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?add=1`)}
+              style={({ pressed }) => ({
+                flex: 1,
+                backgroundColor: c.accent,
+                borderRadius: radius.md,
+                paddingVertical: 11,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>
+                {t('detail.newEntry')}
+              </Txt>
+            </Pressable>
+          </View>
         </View>
       ) : (
-        <Pressable onPress={openHistory} style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.sm }}>
+        <Pressable onPress={openHistory} style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>
           <Txt variant="muted" style={{ fontSize: 14 }}>
             {t('home.noneYet')}
           </Txt>
