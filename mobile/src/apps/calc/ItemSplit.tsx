@@ -1,8 +1,9 @@
-// Split a bill by item — a One Roof Plus feature (gated in SplitBill). Items
-// come ONLY from a photo scan (/api/scan-bill); there is no manual "add item".
-// You take a picture, it lists the line items (still editable to fix a misread),
-// then you add the people, tap who had each item, and it apportions tax + tip by
-// each person's share.
+// Split a bill by item — a One Roof Plus feature (gated in SplitBill). The bill
+// itself (line items + tax) comes ONLY from a photo scan (/api/scan-bill) and is
+// READ-ONLY: no manual add, edit, or typing of bill data. You take a picture,
+// the AI lists the items and tax, then you add the people, tap who had each item,
+// and pick a tip — it apportions tax + tip by each person's share. (A mis-scanned
+// line can be dropped with ✕; re-scan to redo the whole bill.)
 import { useRef, useState } from 'react'
 import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
@@ -155,8 +156,6 @@ export function ItemSplit() {
       ),
     )
   }
-  const setField = (id: string, field: 'name' | 'price', val: string) =>
-    setItems((its) => its.map((it) => (it.id === id ? { ...it, [field]: val } : it)))
   const removeItem = (id: string) => setItems((its) => its.filter((it) => it.id !== id))
 
   const itemsSubtotal = items.reduce((s, it) => s + num(it.price), 0)
@@ -290,20 +289,15 @@ export function ItemSplit() {
                 ]}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                  <TextInput
-                    value={it.name}
-                    onChangeText={(v) => setField(it.id, 'name', v)}
-                    placeholder={t('bill.itemName')}
-                    placeholderTextColor={c.textFaint}
+                  <Txt
                     style={{ flex: 1, fontSize: 16, fontWeight: '600', color: c.text }}
-                  />
-                  <Txt variant="faint">$</Txt>
-                  <MiniInput
-                    value={it.price}
-                    onChangeText={(v) => setField(it.id, 'price', v)}
-                    placeholder="0.00"
-                    width={68}
-                  />
+                    numberOfLines={1}
+                  >
+                    {it.name}
+                  </Txt>
+                  <Txt style={{ fontWeight: '600', fontVariant: ['tabular-nums'], color: c.text }}>
+                    {formatMoney(num(it.price))}
+                  </Txt>
                   <Pressable onPress={() => removeItem(it.id)} hitSlop={6} style={{ paddingHorizontal: 2 }}>
                     <X size={18} color={c.textFaint} />
                   </Pressable>
@@ -351,7 +345,11 @@ export function ItemSplit() {
         <ResultRow label={t('bill.subtotal')} value={formatMoney(itemsSubtotal)} />
         <View style={styles.lineRow}>
           <Txt variant="muted">{t('bill.tax')}</Txt>
-          <MiniInput value={tax} onChangeText={setTax} placeholder="0.00" />
+          <Txt
+            style={{ width: 96, textAlign: 'right', fontWeight: '600', fontVariant: ['tabular-nums'], color: c.text }}
+          >
+            {formatMoney(num(tax))}
+          </Txt>
         </View>
         <View style={{ paddingVertical: 3 }}>
           <View style={styles.lineRow}>
