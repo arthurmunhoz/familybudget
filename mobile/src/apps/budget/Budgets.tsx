@@ -133,7 +133,7 @@ export default function Budgets() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader title={t('app.budget.name')} right={<Wallet size={22} color={c.accent} />} />
+        <AppHeader title={t('app.budget.name')} icon={<Wallet size={22} color={c.accent} />} />
       </View>
 
       {loading ? (

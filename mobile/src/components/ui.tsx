@@ -80,10 +80,14 @@ export function AppHeader({
   title,
   onBack,
   right,
+  icon,
 }: {
   title: string
   onBack?: () => void
   right?: ReactNode
+  /** App/section icon shown between the back arrow and the title (PWA standard).
+   *  Use this for the screen's identity icon; keep `right` for action buttons. */
+  icon?: ReactNode
 }) {
   const { c } = useTheme()
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')))
@@ -99,6 +103,7 @@ export function AppHeader({
         >
           <ChevronLeft size={26} color={c.text} />
         </Pressable>
+        {icon ? <View style={{ marginRight: 2 }}>{icon}</View> : null}
         <Txt variant="title">{title}</Txt>
       </View>
       {right}
