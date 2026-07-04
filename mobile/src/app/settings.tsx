@@ -12,16 +12,18 @@ import {
   CalendarDays,
   Check,
   FolderLock,
+  MapPin,
   Sparkles,
   type LucideIcon,
 } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, Screen, Txt } from '@/components/ui'
+import { AppHeader, Btn, Card, Field, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import { LANGUAGES } from '@/lib/i18n'
 import { getPushEnabled, registerForPush } from '@/lib/notifications'
+import { geocodeCity, loadHomeLocation, saveHomeLocation, type HomeLocation } from '@/lib/weather'
 import { supabase } from '@/lib/supabase'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
@@ -53,16 +55,46 @@ export default function Settings() {
   const [pushMsg, setPushMsg] = useState<string | null>(null)
   const [pushOn, setPushOn] = useState<boolean | null>(null)
 
+  const [homeLoc, setHomeLoc] = useState<HomeLocation | null>(null)
+  const [cityInput, setCityInput] = useState('')
+  const [savingCity, setSavingCity] = useState(false)
+  const [cityMsg, setCityMsg] = useState<string | null>(null)
+
   // Reflect the current OS permission from the start (no prompt).
   useEffect(() => {
     let active = true
     getPushEnabled().then((on) => {
       if (active) setPushOn(on)
     })
+    loadHomeLocation().then((loc) => {
+      if (active) setHomeLoc(loc)
+    })
     return () => {
       active = false
     }
   }, [])
+
+  async function saveCity() {
+    const q = cityInput.trim()
+    if (!q) return
+    setSavingCity(true)
+    setCityMsg(null)
+    const loc = await geocodeCity(q)
+    setSavingCity(false)
+    if (!loc) {
+      setCityMsg("Couldn't find that city. Try a different spelling.")
+      return
+    }
+    await saveHomeLocation(loc)
+    setHomeLoc(loc)
+    setCityInput('')
+  }
+
+  async function clearCity() {
+    await saveHomeLocation(null)
+    setHomeLoc(null)
+    setCityMsg(null)
+  }
 
   async function doRestore() {
     try {
@@ -263,6 +295,61 @@ export default function Settings() {
             {pushMsg ? (
               <Txt variant="faint">{pushMsg}</Txt>
             ) : null}
+          </Card>
+        </View>
+
+        <Divider />
+
+        {/* Weather / home city (drives the Today section on the home screen) */}
+        <View style={{ gap: sp.sm }}>
+          <Txt variant="label">Weather</Txt>
+          <Card style={{ gap: sp.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <View
+                style={{
+                  height: 40,
+                  width: 40,
+                  borderRadius: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: homeLoc ? c.accentSoft : c.surface,
+                }}
+              >
+                <MapPin size={20} color={homeLoc ? c.accent : c.textMuted} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt style={{ fontFamily: fonts.semibold }}>Home city</Txt>
+                <Txt variant="faint" numberOfLines={1}>
+                  {homeLoc ? homeLoc.city : "Set your city for today's weather at home"}
+                </Txt>
+              </View>
+              {homeLoc ? (
+                <Pressable onPress={clearCity} hitSlop={8}>
+                  <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 13 }}>
+                    Remove
+                  </Txt>
+                </Pressable>
+              ) : null}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: sp.sm }}>
+              <View style={{ flex: 1 }}>
+                <Field
+                  value={cityInput}
+                  onChangeText={setCityInput}
+                  placeholder="e.g. Austin"
+                  autoCapitalize="words"
+                  returnKeyType="search"
+                  onSubmitEditing={saveCity}
+                />
+              </View>
+              <Btn
+                title="Set"
+                onPress={saveCity}
+                loading={savingCity}
+                disabled={!cityInput.trim()}
+              />
+            </View>
+            {cityMsg ? <Txt variant="faint">{cityMsg}</Txt> : null}
           </Card>
         </View>
 

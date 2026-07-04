@@ -41,3 +41,19 @@ categories** (migration 042), and the new i18n keys — all shipped to the PWA
 already.
 
 Files: `src/apps/budget/Budgets.tsx` (+ maybe a small dropdown helper).
+
+## 2. Home "Today" section + home nudges (2026-07-03)
+
+The iOS Hub gained a home dashboard the PWA doesn't have yet:
+
+- **Sent nudges on the home banner** — the PWA's `PingsBanner` shows received
+  nudges only; iOS `NudgesBanner` also lists nudges I *sent* with ack status
+  ("seen by …") and a ✕ to dismiss (persisted per-device). Port to
+  `src/components/PingsBanner.tsx` (dismiss via `localStorage`).
+- **"Today" section** (`mobile/src/components/TodaySection.tsx`) between the
+  greeting and the app grid: date + current weather (home city set in Settings,
+  Open-Meteo, no geolocation permission — see `mobile/src/lib/weather.ts`), plus
+  today's calendar events (birthdays/anniversaries highlighted) and pet-care
+  due/overdue items. A "Weather / home city" control was added to iOS Settings.
+  Port needs a web weather fetch + a home-city setting (localStorage or
+  user_settings) and reuse of the PWA's calendar/petCare helpers.

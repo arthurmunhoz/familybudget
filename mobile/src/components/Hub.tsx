@@ -8,6 +8,7 @@ import { Settings } from 'lucide-react-native'
 
 import { Card, Txt } from './ui'
 import NudgesBanner from '../apps/pings/NudgesBanner'
+import TodaySection from './TodaySection'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { useAuth } from '../lib/auth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -76,6 +77,8 @@ export default function Hub() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xxl }}>
+        {/* Today: weather + agenda (calendar + pet care due). */}
+        <TodaySection />
         {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
         <NudgesBanner />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: compact ? sp.sm : sp.md }}>
