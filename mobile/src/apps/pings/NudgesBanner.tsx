@@ -1,15 +1,19 @@
-// Home-screen nudge banners (the RN equivalent of the PWA's PingsBanner). Shows
-// active nudges sent TO me that I haven't acknowledged, each with a respond CTA
-// (Got it / Call). Tapping the banner body deep-links to the Nudges "Past" tab
-// with the nudge highlighted (router → /pings?tab=past&focus=<id>).
+// Home-screen nudge banners (the RN equivalent of the PWA's PingsBanner). Two
+// groups, both between the Hub header and the app grid:
+//  • RECEIVED — active nudges sent TO me I haven't acknowledged, each with a
+//    respond CTA (Got it / Call). Tapping the body deep-links to the Nudges
+//    "Past" tab with the nudge highlighted.
+//  • SENT — active nudges I sent, showing who has acknowledged ("seen by …"),
+//    each with an ✕ to dismiss from my home (persisted per-device via
+//    AsyncStorage; the nudge itself still lives until it expires).
 //
 // Its own lightweight Realtime subscription (distinct channel from the Nudges
-// screen) so it stays live on the Hub. Renders nothing when there's nothing to
-// respond to.
+// screen) so it stays live on the Hub. Renders nothing when both groups empty.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Linking, Pressable, StyleSheet, View } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { router } from 'expo-router'
-import { Phone, ThumbsUp } from 'lucide-react-native'
+import { Phone, ThumbsUp, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -61,6 +65,9 @@ export default function NudgesBanner() {
   const [pings, setPings] = useState<ActivePing[]>([])
   const [phones, setPhones] = useState<Record<string, string>>({})
   const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+
+  const dismissKey = myEmail ? `nudges-dismissed:${myEmail}` : null
 
   const load = useCallback(async () => {
     try {
@@ -90,7 +97,24 @@ export default function NudgesBanner() {
     }
   }, [load, scheduleLoad])
 
-  const senderName = useCallback(
+  // Load this device's dismissed-sent set for the signed-in user.
+  useEffect(() => {
+    if (!dismissKey) return
+    let active = true
+    AsyncStorage.getItem(dismissKey).then((raw) => {
+      if (!active || !raw) return
+      try {
+        setDismissed(new Set(JSON.parse(raw) as string[]))
+      } catch {
+        /* ignore corrupt value */
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [dismissKey])
+
+  const nameOf = useCallback(
     (email: string) =>
       profiles.find((p) => p.email === email)?.display_name ?? email.split('@')[0],
     [profiles],
@@ -102,13 +126,24 @@ export default function NudgesBanner() {
     scheduleLoad()
   }
 
+  function dismiss(id: string) {
+    setDismissed((prev) => {
+      const next = new Set(prev).add(id)
+      if (dismissKey) void AsyncStorage.setItem(dismissKey, JSON.stringify([...next]))
+      return next
+    })
+  }
+
   // Nudges sent to me that I haven't acknowledged yet.
   const incoming = pings.filter(
     (p) =>
       p.sender_email !== myEmail &&
       !(ackedLocal.has(p.id) || p.acks.some((a) => a.user_email === myEmail)),
   )
-  if (incoming.length === 0) return null
+  // Nudges I sent that are still active and I haven't dismissed from home.
+  const sent = pings.filter((p) => p.sender_email === myEmail && !dismissed.has(p.id))
+
+  if (incoming.length === 0 && sent.length === 0) return null
 
   return (
     <View style={{ gap: sp.sm, marginBottom: sp.lg }}>
@@ -132,7 +167,7 @@ export default function NudgesBanner() {
                   {p.message}
                 </Txt>
                 <Txt variant="faint" numberOfLines={1}>
-                  {senderName(p.sender_email)} · {timeAgo(p.created_at)}
+                  {nameOf(p.sender_email)} · {timeAgo(p.created_at)}
                 </Txt>
               </View>
             </Pressable>
@@ -161,6 +196,44 @@ export default function NudgesBanner() {
           </View>
         )
       })}
+
+      {sent.map((p) => {
+        const ackers = p.acks
+          .filter((a) => a.user_email !== myEmail)
+          .map((a) => nameOf(a.user_email))
+        const seen = ackers.length
+          ? t('pings.seenBy', { names: ackers.join(', ') })
+          : t('pings.noAcks')
+        return (
+          <View key={p.id} style={[styles.row, { backgroundColor: c.surface }]}>
+            <Pressable
+              onPress={() => router.push({ pathname: '/pings', params: { tab: 'past', focus: p.id } })}
+              style={styles.body}
+              accessibilityRole="button"
+            >
+              <Txt style={styles.emoji}>{p.emoji}</Txt>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt numberOfLines={2} style={{ fontWeight: '600', color: c.text }}>
+                  {p.message}
+                </Txt>
+                <Txt variant="faint" numberOfLines={1}>
+                  {t('pings.you')} · {seen}
+                </Txt>
+              </View>
+            </Pressable>
+            {/* ✕ dismiss from my home (persists on this device). */}
+            <Pressable
+              onPress={() => dismiss(p.id)}
+              hitSlop={8}
+              style={styles.dismissBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+            >
+              <X size={18} color={c.textFaint} />
+            </Pressable>
+          </View>
+        )
+      })}
     </View>
   )
 }
@@ -172,6 +245,7 @@ const styles = StyleSheet.create({
     gap: sp.sm,
     borderRadius: radius.md,
     borderLeftWidth: 4,
+    borderLeftColor: 'transparent',
     paddingVertical: 10,
     paddingHorizontal: sp.md,
   },
@@ -186,4 +260,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   actionTxt: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
+  dismissBtn: {
+    height: 30,
+    width: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 })
