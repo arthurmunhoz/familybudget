@@ -14,6 +14,7 @@ import {
 import { AuthProvider } from '@/lib/auth';
 import { PlusProvider } from '@/lib/plus';
 import { I18nProvider } from '@/hooks/useI18n';
+import { TilePrefProvider } from '@/hooks/useTilePref';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -39,7 +40,9 @@ export default function RootLayout() {
         <PlusProvider>
           <I18nProvider>
             <ThemePrefProvider>
-              <Chrome />
+              <TilePrefProvider>
+                <Chrome />
+              </TilePrefProvider>
             </ThemePrefProvider>
           </I18nProvider>
         </PlusProvider>

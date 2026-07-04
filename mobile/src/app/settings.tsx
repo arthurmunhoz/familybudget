@@ -25,10 +25,16 @@ import { getPushEnabled, registerForPush } from '@/lib/notifications'
 import { supabase } from '@/lib/supabase'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
+import { useTilePref, type TileStyle } from '@/hooks/useTilePref'
 
 const APPEARANCE: { id: ThemeMode; label: string }[] = [
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },
+]
+
+const TILES: { id: TileStyle; label: string }[] = [
+  { id: 'large', label: 'Large' },
+  { id: 'compact', label: 'Compact' },
 ]
 
 const PLUS_FEATURES: { icon: LucideIcon; label: string }[] = [
@@ -40,6 +46,7 @@ const PLUS_FEATURES: { icon: LucideIcon; label: string }[] = [
 export default function Settings() {
   const { c } = useTheme()
   const { mode, setMode } = useThemePref()
+  const { tile, setTile } = useTilePref()
   const { profile, signOut } = useAuth()
   const { isPlus, restore } = usePlus()
   const { lang, setLang } = useI18n()
@@ -181,6 +188,37 @@ export default function Settings() {
               )
             })}
           </View>
+        </View>
+
+        <Divider />
+
+        {/* App cards (home screen tile density) */}
+        <View style={{ gap: sp.sm }}>
+          <Txt variant="label">App cards</Txt>
+          <View style={{ flexDirection: 'row', gap: sp.sm }}>
+            {TILES.map((tl) => {
+              const active = tl.id === tile
+              return (
+                <Pressable
+                  key={tl.id}
+                  onPress={() => setTile(tl.id)}
+                  style={{
+                    paddingHorizontal: sp.md,
+                    paddingVertical: sp.sm,
+                    borderRadius: radius.md,
+                    backgroundColor: active ? c.accentSoft : c.card,
+                    borderWidth: 1,
+                    borderColor: active ? c.accent : c.border,
+                  }}
+                >
+                  <Txt variant={active ? 'body' : 'muted'}>{tl.label}</Txt>
+                </Pressable>
+              )
+            })}
+          </View>
+          <Txt variant="faint">
+            Compact fits more apps per row on the home screen (icon + name only).
+          </Txt>
         </View>
 
         <Divider />

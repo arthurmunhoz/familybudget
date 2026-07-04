@@ -12,6 +12,7 @@ import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { useAuth } from '../lib/auth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
+import { useTilePref } from '../hooks/useTilePref'
 import type { TKey } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
 import { radius, sp, useTheme } from '../theme/theme'
@@ -20,6 +21,8 @@ export default function Hub() {
   const { c } = useTheme()
   const { profile } = useAuth()
   const { t } = useI18n()
+  const { tile } = useTilePref()
+  const compact = tile === 'compact'
 
   const apps: HubApp[] = profile?.is_admin ? [...APPS, ADMIN_APP] : APPS
 
@@ -75,7 +78,7 @@ export default function Hub() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xxl }}>
         {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
         <NudgesBanner />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: compact ? sp.sm : sp.md }}>
           {apps.map((app) => {
             const Icon = app.icon
             const name = t(`app.${app.id}.name` as TKey) || app.name
@@ -84,46 +87,56 @@ export default function Hub() {
               <Card
                 key={app.id}
                 onPress={() => router.push(app.route as never)}
-                style={{ width: '47.5%', gap: 10, minHeight: 120, justifyContent: 'space-between' }}
+                style={
+                  compact
+                    ? { width: '31%', gap: 8, minHeight: 96, alignItems: 'center', justifyContent: 'center', paddingVertical: sp.md }
+                    : { width: '47.5%', gap: 10, minHeight: 120, justifyContent: 'space-between' }
+                }
               >
                 {badges[app.id] ? (
                   <View
                     style={{
                       position: 'absolute',
-                      top: 10,
-                      right: 10,
-                      minWidth: 22,
-                      height: 22,
-                      borderRadius: 11,
-                      paddingHorizontal: 6,
+                      top: 8,
+                      right: 8,
+                      minWidth: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      paddingHorizontal: 5,
                       backgroundColor: c.accent,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Txt style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }}>
+                    <Txt style={{ color: '#ffffff', fontSize: 11, fontWeight: '700' }}>
                       {badges[app.id]}
                     </Txt>
                   </View>
                 ) : null}
                 <View
                   style={{
-                    width: 44,
-                    height: 44,
+                    width: compact ? 40 : 44,
+                    height: compact ? 40 : 44,
                     borderRadius: radius.md,
                     backgroundColor: c.accentSoft,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Icon size={24} color={c.accent} />
+                  <Icon size={compact ? 22 : 24} color={c.accent} />
                 </View>
-                <View style={{ gap: 2 }}>
-                  <Txt variant="h2">{name}</Txt>
-                  <Txt variant="faint" numberOfLines={2}>
-                    {desc}
+                {compact ? (
+                  <Txt variant="h2" numberOfLines={1} style={{ fontSize: 13, textAlign: 'center' }}>
+                    {name}
                   </Txt>
-                </View>
+                ) : (
+                  <View style={{ gap: 2 }}>
+                    <Txt variant="h2">{name}</Txt>
+                    <Txt variant="faint" numberOfLines={2}>
+                      {desc}
+                    </Txt>
+                  </View>
+                )}
               </Card>
             )
           })}
