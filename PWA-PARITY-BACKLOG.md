@@ -92,3 +92,15 @@ still has a list → detail page; make it expand inline.
 (with All) → selected pet's info card (edit + a per-pet calendar color) → a
 month calendar of all pets' events with per-pet colored dots + the upcoming
 list. Adds `pets.tag_color` (migration). Port to PWA `src/apps/pets/`.
+
+## 7. Nudges: editable presets + general high-priority type (2026-07-04)
+
+`mobile/src/apps/pings/PingComposer.tsx` + `NudgesBanner.tsx` + `PingsHistory.tsx`
++ `lib/pings.ts`. Presets are now an editable per-household table (`ping_presets`,
+migration 050, seeded via `seed_ping_presets()`); the composer has an "Edit
+presets" mode (add/edit/delete emoji + label + a high-priority toggle). A general
+`pings.high_priority` flag (replaces the old `kind='help'` special-casing) drives
+the red UI + Call CTA + always-to-everyone send + urgent push (`api/send-ping.ts`
+now keys `urgent` off `high_priority`) + an in-app `Vibration` buzz on arrival.
+Port to the PWA: `src/apps/pings/` composer + PingsBanner + `lib/pings.ts`, and
+the PWA web-push already flows through the same `send-ping`.

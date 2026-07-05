@@ -170,7 +170,7 @@ function HistoryRow({
   }, [highlighted, anim])
 
   const mine = p.sender_email === myEmail
-  const isHelp = p.kind === 'help'
+  const isHigh = p.high_priority
   const active = new Date(p.expires_at).getTime() > Date.now()
   const ackedByMe = ackedLocal.has(p.id) || p.acks.some((a) => a.user_email === myEmail)
   const ackNames = p.acks.map((a) => senderName(a.user_email)).join(', ')
@@ -182,7 +182,7 @@ function HistoryRow({
   return (
     <Animated.View
       onLayout={(e) => onLayout(e.nativeEvent.layout.y)}
-      style={[styles.row, { backgroundColor: bg, borderLeftColor: isHelp ? c.expense : c.accent }]}
+      style={[styles.row, { backgroundColor: bg, borderLeftColor: isHigh ? c.expense : c.accent }]}
     >
       <Txt style={styles.emoji}>{p.emoji}</Txt>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -197,7 +197,7 @@ function HistoryRow({
         </Txt>
       </View>
       {actionable ? (
-        isHelp && phone ? (
+        isHigh && phone ? (
           <Pressable
             onPress={() => onCall(phone)}
             style={[styles.actionBtn, { backgroundColor: c.expense }]}

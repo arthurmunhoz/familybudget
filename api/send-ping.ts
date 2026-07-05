@@ -61,7 +61,7 @@ export default async function handler(req: any, res: any) {
 
   const { data: ping } = await db
     .from('pings')
-    .select('id, household_id, sender_email, kind, emoji, message, recipients')
+    .select('id, household_id, sender_email, kind, emoji, message, recipients, high_priority')
     .eq('id', ping_id)
     .single()
   if (!ping) return res.status(404).json({ error: 'Ping not found' })
@@ -110,8 +110,9 @@ export default async function handler(req: any, res: any) {
     url: '/pings',
     tag: `ping-${ping.id}`,
     tel,
-    // "Need help" is urgent: sound + persistent + vibrate (where supported).
-    urgent: ping.kind === 'help',
+    // High-priority nudges are urgent: sound + persistent + vibrate (where
+    // supported). Generalizes the old "Need help"-only behavior.
+    urgent: ping.high_priority === true,
   })
 
   let sent = 0

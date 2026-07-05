@@ -10,7 +10,7 @@
 // Its own lightweight Realtime subscription (distinct channel from the Nudges
 // screen) so it stays live on the Hub. Renders nothing when both groups empty.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Linking, Pressable, StyleSheet, View } from 'react-native'
+import { Linking, Pressable, StyleSheet, Vibration, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { router } from 'expo-router'
 import { Phone, ThumbsUp, X } from 'lucide-react-native'
@@ -143,17 +143,29 @@ export default function NudgesBanner() {
   // Nudges I sent that are still active and I haven't dismissed from home.
   const sent = pings.filter((p) => p.sender_email === myEmail && !dismissed.has(p.id))
 
+  // Buzz once when a new high-priority nudge arrives (in-app vibration; sound
+  // rides the push notification when that's wired).
+  const buzzed = useRef<Set<string>>(new Set())
+  const highIds = incoming.filter((p) => p.high_priority).map((p) => p.id).join(',')
+  useEffect(() => {
+    const fresh = incoming.filter((p) => p.high_priority && !buzzed.current.has(p.id))
+    if (fresh.length === 0) return
+    fresh.forEach((p) => buzzed.current.add(p.id))
+    Vibration.vibrate([0, 400, 200, 400])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highIds])
+
   if (incoming.length === 0 && sent.length === 0) return null
 
   return (
     <View style={{ gap: sp.sm, marginBottom: sp.lg }}>
       {incoming.map((p) => {
-        const isHelp = p.kind === 'help'
+        const isHigh = p.high_priority
         const phone = phones[p.sender_email]
         return (
           <View
             key={p.id}
-            style={[styles.row, { backgroundColor: c.card, borderLeftColor: isHelp ? c.expense : c.accent }]}
+            style={[styles.row, { backgroundColor: c.card, borderLeftColor: isHigh ? c.expense : c.accent }]}
           >
             {/* Body → deep-link to the Past tab, highlighting this nudge. */}
             <Pressable
@@ -176,7 +188,7 @@ export default function NudgesBanner() {
                 and dismiss the banner — without having to call. Other nudges just
                 get Got it. */}
             <View style={styles.actions}>
-              {isHelp && phone ? (
+              {isHigh && phone ? (
                 <Pressable
                   onPress={() => void Linking.openURL(`tel:${phone}`)}
                   style={[styles.actionBtn, { backgroundColor: c.expense }]}

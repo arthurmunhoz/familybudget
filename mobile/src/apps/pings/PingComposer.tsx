@@ -1,37 +1,45 @@
-// Composer for household nudges — RN port of the PWA's Pings page composer.
-// Three ways to send:
-//  1. Six one-tap presets (PING_PRESETS: kind + emoji; text from i18n).
-//  2. A recipient picker (multi-select; default Everyone). The 🆘 help kind
-//     ALWAYS goes to everyone, regardless of the picker.
-//  3. An AI "just type it" box: POSTs the text to /api/suggest-ping, which maps
-//     it to {kind, emoji, message}; on any failure we fall back to sending the
-//     typed text verbatim as a custom nudge.
+// Composer for household nudges. Sends three ways:
+//  1. The household's editable one-tap presets (ping_presets — shared per
+//     household, seeded from the built-in defaults). High-priority presets show
+//     a red treatment and always go to everyone with sound/vibration + Call.
+//  2. A recipient picker (multi-select; default Everyone). High-priority ALWAYS
+//     goes to everyone, ignoring the picker.
+//  3. An AI "just type it" box → /api/suggest-ping → {kind, emoji, message}.
 //
-// Sending is a DIRECT supabase insert into `pings` — household_id + sender_email
-// are stamped server-side by column defaults (don't pass them). `recipients` is
-// null for everyone, else an array of member emails.
+// "Edit presets" flips the list into a manage mode: tap a preset to edit it,
+// delete it, or add a new one (emoji + label + high-priority). Sending is a
+// direct insert into `pings` (household_id + sender_email stamped by defaults).
 import { useMemo, useState } from 'react'
-import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
-import { Check, ChevronDown, ChevronUp, Send, Sparkles } from 'lucide-react-native'
+import { Alert, Modal, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native'
+import { Check, ChevronDown, ChevronUp, Pencil, Plus, Send, Sparkles, Trash2, X } from 'lucide-react-native'
 
-import { Txt } from '@/components/ui'
+import { Btn, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
-import { PING_PRESETS } from '@/lib/pings'
-import type { TKey } from '@/lib/i18n'
-import { radius, sp, useTheme } from '@/theme/theme'
+import {
+  createPingPreset,
+  deletePingPreset,
+  fetchPingPresets,
+  presetText,
+  updatePingPreset,
+} from '@/lib/pings'
+import type { PingPreset } from '@/lib/types'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
-/** Insert a nudge. household_id + sender_email are stamped by column defaults. */
 async function insertPing(
   kind: string,
   emoji: string,
   message: string,
   recipients: string[] | null,
+  highPriority: boolean,
 ): Promise<void> {
-  const { error } = await supabase.from('pings').insert({ kind, emoji, message, recipients })
+  const { error } = await supabase
+    .from('pings')
+    .insert({ kind, emoji, message, recipients, high_priority: highPriority })
   if (error) throw error
 }
 
@@ -41,27 +49,25 @@ export default function PingComposer() {
   const { profile, profiles } = useAuth()
   const myEmail = profile?.email
 
-  // Other household members are the targetable recipients.
-  const members = useMemo(
-    () => profiles.filter((p) => p.email !== myEmail),
-    [profiles, myEmail],
+  const members = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
+
+  const { data: presets = [], revalidate: reloadPresets } = useCachedQuery<PingPreset[]>(
+    'ping:presets',
+    fetchPingPresets,
   )
 
-  // Default: everyone selected. all-or-none selected → treated as "everyone".
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pickerOpen, setPickerOpen] = useState(false)
   const [text, setText] = useState('')
-  const [busyKind, setBusyKind] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
-  const sending = busyKind !== null || aiBusy
+  const sending = busyId !== null || aiBusy
+
+  const [editMode, setEditMode] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editing, setEditing] = useState<PingPreset | null>(null)
 
   const everyone = selected.size === 0 || selected.size === members.length
-
-  /** null = whole household; else the chosen emails. `help` always = everyone. */
-  function recipientsFor(kind: string): string[] | null {
-    if (kind === 'help' || everyone) return null
-    return [...selected]
-  }
 
   function toggle(email: string) {
     setSelected((prev) => {
@@ -79,19 +85,19 @@ export default function PingComposer() {
         .map((m) => m.display_name)
         .join(', ') || t('pings.everyone')
 
-  async function preset(kind: string, emoji: string) {
+  async function sendPreset(p: PingPreset) {
     if (sending) return
-    setBusyKind(kind)
+    setBusyId(p.id)
     try {
-      await insertPing(kind, emoji, t(`pings.preset.${kind}` as TKey), recipientsFor(kind))
+      // High priority always goes to everyone; otherwise honor the picker.
+      const recipients = p.high_priority || everyone ? null : [...selected]
+      await insertPing(p.preset_key ?? 'custom', p.emoji, presetText(p, t), recipients, p.high_priority)
     } catch {
       Alert.alert(t('pings.failed'))
     }
-    setBusyKind(null)
+    setBusyId(null)
   }
 
-  // AI: map free text → {kind, emoji, message} via /api/suggest-ping, then send.
-  // Best-effort: if the call fails, just send the typed text as a custom nudge.
   async function sendAI() {
     const value = text.trim()
     if (!value || sending) return
@@ -105,10 +111,7 @@ export default function PingComposer() {
         const token = data.session?.access_token ?? ''
         const res = await fetch(`${API_BASE}/api/suggest-ping`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ text: value, lang }),
         })
         if (res.ok) {
@@ -120,7 +123,7 @@ export default function PingComposer() {
       } catch {
         // AI unreachable — fall back to the typed text verbatim.
       }
-      await insertPing(kind, emoji, message, recipientsFor(kind))
+      await insertPing(kind, emoji, message, everyone ? null : [...selected], false)
       setText('')
     } catch {
       Alert.alert(t('pings.failed'))
@@ -128,9 +131,31 @@ export default function PingComposer() {
     setAiBusy(false)
   }
 
+  function openNewPreset() {
+    setEditing(null)
+    setEditorOpen(true)
+  }
+  function openEditPreset(p: PingPreset) {
+    setEditing(p)
+    setEditorOpen(true)
+  }
+  function confirmDeletePreset(p: PingPreset) {
+    Alert.alert(t('pings.deletePresetConfirm'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('pings.deletePreset'),
+        style: 'destructive',
+        onPress: async () => {
+          await deletePingPreset(p.id)
+          reloadPresets()
+        },
+      },
+    ])
+  }
+
   return (
     <View>
-      {/* Recipient picker — a compact, recessed control. */}
+      {/* Recipient picker */}
       {members.length > 0 && (
         <View style={{ marginBottom: sp.lg }}>
           <Pressable
@@ -152,25 +177,14 @@ export default function PingComposer() {
           </Pressable>
           {pickerOpen && (
             <View style={[styles.pickerBody, { backgroundColor: c.surface }]}>
-              <Pressable
-                onPress={() => setSelected(new Set())}
-                style={styles.pickerRow}
-                accessibilityRole="button"
-              >
-                <Txt style={{ flex: 1, fontWeight: '600', color: c.text }}>
-                  {t('pings.everyone')}
-                </Txt>
+              <Pressable onPress={() => setSelected(new Set())} style={styles.pickerRow}>
+                <Txt style={{ flex: 1, fontWeight: '600', color: c.text }}>{t('pings.everyone')}</Txt>
                 {everyone && <Check size={16} strokeWidth={2.5} color={c.accent} />}
               </Pressable>
               {members.map((m) => {
                 const on = !everyone && selected.has(m.email)
                 return (
-                  <Pressable
-                    key={m.email}
-                    onPress={() => toggle(m.email)}
-                    style={styles.pickerRow}
-                    accessibilityRole="button"
-                  >
+                  <Pressable key={m.email} onPress={() => toggle(m.email)} style={styles.pickerRow}>
                     <Txt numberOfLines={1} style={{ flex: 1, color: c.text }}>
                       {m.display_name}
                     </Txt>
@@ -183,32 +197,76 @@ export default function PingComposer() {
         </View>
       )}
 
-      {/* Preset nudges — one per line, full width. */}
+      {/* Presets header + edit toggle */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: sp.sm }}>
+        <Txt variant="label" style={{ textTransform: 'uppercase', color: c.textFaint }}>
+          {t('app.pings.name')}
+        </Txt>
+        <Pressable
+          onPress={() => setEditMode((v) => !v)}
+          hitSlop={8}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+          accessibilityRole="button"
+        >
+          <Pencil size={13} color={c.accent} />
+          <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
+            {editMode ? t('pings.donePresets') : t('pings.editPresets')}
+          </Txt>
+        </Pressable>
+      </View>
+
+      {/* Preset list */}
       <View style={{ gap: sp.sm }}>
-        {PING_PRESETS.map((p) => {
-          const isHelp = p.kind === 'help'
+        {presets.map((p) => {
+          const high = p.high_priority
           return (
             <Pressable
-              key={p.kind}
-              onPress={() => preset(p.kind, p.emoji)}
-              disabled={sending}
+              key={p.id}
+              onPress={() => (editMode ? openEditPreset(p) : sendPreset(p))}
+              disabled={sending && !editMode}
               style={({ pressed }) => [
                 styles.presetRow,
                 {
                   backgroundColor: c.card,
-                  borderColor: isHelp ? c.expense : 'transparent',
-                  opacity: sending ? 0.5 : pressed ? 0.85 : 1,
+                  borderColor: high ? c.expense : 'transparent',
+                  opacity: !editMode && sending ? 0.5 : pressed ? 0.85 : 1,
                 },
               ]}
               accessibilityRole="button"
             >
-              <Txt style={styles.presetEmoji}>{busyKind === p.kind ? '…' : p.emoji}</Txt>
-              <Txt style={{ fontWeight: '600', fontSize: 16, color: c.text }}>
-                {t(`pings.preset.${p.kind}` as TKey)}
+              <Txt style={styles.presetEmoji}>{busyId === p.id ? '…' : p.emoji}</Txt>
+              <Txt style={{ fontWeight: '600', fontSize: 16, color: c.text, flex: 1 }} numberOfLines={1}>
+                {presetText(p, t)}
               </Txt>
+              {editMode ? (
+                <Pressable
+                  onPress={() => confirmDeletePreset(p)}
+                  hitSlop={8}
+                  accessibilityLabel={t('pings.deletePreset')}
+                >
+                  <Trash2 size={18} color={c.textFaint} />
+                </Pressable>
+              ) : high ? (
+                <Txt style={{ color: c.expense, fontSize: 11, fontWeight: '700' }}>
+                  {t('pings.highPriority').toUpperCase()}
+                </Txt>
+              ) : null}
             </Pressable>
           )
         })}
+
+        {editMode ? (
+          <Pressable
+            onPress={openNewPreset}
+            style={[styles.presetRow, { backgroundColor: 'transparent', borderColor: c.textFaint, borderStyle: 'dashed', justifyContent: 'center' }]}
+            accessibilityRole="button"
+          >
+            <Plus size={18} color={c.textMuted} />
+            <Txt style={{ fontWeight: '600', fontSize: 15, color: c.textMuted }}>
+              {t('pings.addPreset')}
+            </Txt>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Divider */}
@@ -233,10 +291,7 @@ export default function PingComposer() {
         <Pressable
           onPress={sendAI}
           disabled={!text.trim() || sending}
-          style={[
-            styles.sendBtn,
-            { backgroundColor: c.accent, opacity: !text.trim() || sending ? 0.5 : 1 },
-          ]}
+          style={[styles.sendBtn, { backgroundColor: c.accent, opacity: !text.trim() || sending ? 0.5 : 1 }]}
           accessibilityRole="button"
           accessibilityLabel={t('pings.send')}
         >
@@ -249,7 +304,142 @@ export default function PingComposer() {
           {t('pings.aiHint')}
         </Txt>
       </View>
+
+      {editorOpen ? (
+        <PresetEditor
+          preset={editing}
+          onClose={() => setEditorOpen(false)}
+          onSaved={() => {
+            setEditorOpen(false)
+            reloadPresets()
+          }}
+        />
+      ) : null}
     </View>
+  )
+}
+
+function PresetEditor({
+  preset,
+  onClose,
+  onSaved,
+}: {
+  preset: PingPreset | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const [emoji, setEmoji] = useState(preset?.emoji ?? '📣')
+  const [label, setLabel] = useState(preset ? presetText(preset, t) : '')
+  const [high, setHigh] = useState(preset?.high_priority ?? false)
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (!label.trim() || saving) return
+    setSaving(true)
+    try {
+      const fields = { emoji, label, high_priority: high }
+      if (preset) await updatePingPreset(preset.id, fields)
+      else await createPingPreset(fields)
+      onSaved()
+    } catch {
+      Alert.alert(t('pings.presetSaveFailed'))
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
+        <View
+          style={{
+            backgroundColor: c.card,
+            borderTopLeftRadius: radius.lg,
+            borderTopRightRadius: radius.lg,
+            padding: sp.lg,
+            paddingBottom: sp.xl,
+            gap: sp.md,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Txt variant="h2">{preset ? t('pings.editPreset') : t('pings.newPreset')}</Txt>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.cancel')}>
+              <X size={22} color={c.textMuted} />
+            </Pressable>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: sp.md }}>
+            <View style={{ gap: 6 }}>
+              <Txt variant="label">{t('pings.presetEmoji')}</Txt>
+              <TextInput
+                value={emoji}
+                onChangeText={setEmoji}
+                maxLength={4}
+                style={{
+                  width: 64,
+                  textAlign: 'center',
+                  fontSize: 24,
+                  backgroundColor: c.surface,
+                  borderRadius: radius.md,
+                  paddingVertical: 10,
+                  color: c.text,
+                }}
+              />
+            </View>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Txt variant="label">{t('pings.presetLabel')}</Txt>
+              <TextInput
+                value={label}
+                onChangeText={setLabel}
+                placeholder={t('pings.presetLabelPlaceholder')}
+                placeholderTextColor={c.textFaint}
+                autoFocus={!preset}
+                style={{
+                  backgroundColor: c.surface,
+                  borderRadius: radius.md,
+                  paddingHorizontal: sp.md,
+                  paddingVertical: 12,
+                  fontSize: 16,
+                  color: c.text,
+                }}
+              />
+            </View>
+          </View>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: sp.md,
+              backgroundColor: c.surface,
+              borderRadius: radius.md,
+              paddingHorizontal: sp.md,
+              paddingVertical: 10,
+              borderWidth: high ? 2 : 0,
+              borderColor: c.expense,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontWeight: '600', color: high ? c.expense : c.text }}>
+                {t('pings.highPriority')}
+              </Txt>
+              <Txt variant="faint" style={{ fontSize: 11 }}>
+                {t('pings.highPriorityHint')}
+              </Txt>
+            </View>
+            <Switch value={high} onValueChange={setHigh} trackColor={{ true: c.expense }} />
+          </View>
+
+          <Btn
+            title={preset ? t('common.saveChanges') : t('pings.newPreset')}
+            onPress={save}
+            loading={saving}
+            disabled={!label.trim()}
+          />
+        </View>
+      </View>
+    </Modal>
   )
 }
 

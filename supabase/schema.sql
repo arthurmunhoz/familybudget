@@ -214,3 +214,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-047-free-plan-limits.sql (free plan: 1 budget max trigger + free_monthly_cap=3)
 --   migration-048-admin-comp-plan.sql (admin_set_household_plan + admin_household_is_plus: comp any household to Plus)
 --   migration-049-pet-tag-color.sql (pets.tag_color: per-pet calendar dot color)
+--   migration-050-nudge-presets.sql (ping_presets table + pings.high_priority + seed_ping_presets)
