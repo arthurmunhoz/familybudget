@@ -69,7 +69,9 @@ export default function Hub() {
       >
         <View>
           <Txt variant="display">One Roof</Txt>
-          {profile?.display_name ? <Txt variant="muted">Hi, {profile.display_name}</Txt> : null}
+          {profile?.display_name ? (
+            <Txt variant="muted">{t('home.greeting', { name: profile.display_name })}</Txt>
+          ) : null}
         </View>
         <Pressable accessibilityLabel="Settings" hitSlop={10} onPress={() => router.push('/settings')} style={{ padding: 6 }}>
           <Settings size={22} color={c.textMuted} />

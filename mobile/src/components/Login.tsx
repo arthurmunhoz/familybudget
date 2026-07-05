@@ -6,10 +6,12 @@ import * as AppleAuthentication from 'expo-apple-authentication'
 
 import { Btn, Screen, Txt } from './ui'
 import { appleAuthSupported, useAuth } from '../lib/auth'
+import { useI18n } from '../hooks/useI18n'
 import { sp, useTheme } from '../theme/theme'
 
 export default function Login() {
   const { c, dark } = useTheme()
+  const { t } = useI18n()
   const { signInWithApple, signInWithGoogle, devSignIn } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -52,11 +54,11 @@ export default function Login() {
           />
         ) : null}
 
-        <Btn title="Continue with Google" variant="secondary" onPress={() => run(signInWithGoogle)} />
+        <Btn title={t('login.continueGoogle')} variant="secondary" onPress={() => run(signInWithGoogle)} />
 
         {__DEV__ ? (
           <Btn
-            title="Dev sign in"
+            title={t('login.devSignIn')}
             variant="ghost"
             loading={busy}
             onPress={() =>

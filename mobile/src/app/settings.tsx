@@ -21,7 +21,7 @@ import { AppHeader, Btn, Card, Field, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
-import { LANGUAGES } from '@/lib/i18n'
+import { LANGUAGES, type TKey } from '@/lib/i18n'
 import { getPushEnabled, registerForPush } from '@/lib/notifications'
 import { geocodeCity, loadHomeLocation, saveHomeLocation, type HomeLocation } from '@/lib/weather'
 import { supabase } from '@/lib/supabase'
@@ -29,20 +29,20 @@ import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
 import { useTilePref, type TileStyle } from '@/hooks/useTilePref'
 
-const APPEARANCE: { id: ThemeMode; label: string }[] = [
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
+const APPEARANCE: { id: ThemeMode; key: TKey }[] = [
+  { id: 'light', key: 'settings.light' },
+  { id: 'dark', key: 'settings.dark' },
 ]
 
-const TILES: { id: TileStyle; label: string }[] = [
-  { id: 'large', label: 'Large' },
-  { id: 'compact', label: 'Compact' },
+const TILES: { id: TileStyle; key: TKey }[] = [
+  { id: 'large', key: 'settings.large' },
+  { id: 'compact', key: 'settings.compact' },
 ]
 
-const PLUS_FEATURES: { icon: LucideIcon; label: string }[] = [
-  { icon: Sparkles, label: 'Unlimited AI receipt & bill scans' },
-  { icon: FolderLock, label: 'Document Vault with Face ID lock' },
-  { icon: CalendarDays, label: 'Google Calendar two-way sync' },
+const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
+  { icon: Sparkles, key: 'settings.plusFeatureScans' },
+  { icon: FolderLock, key: 'settings.plusFeatureVault' },
+  { icon: CalendarDays, key: 'settings.plusFeatureCalendar' },
 ]
 
 export default function Settings() {
@@ -51,14 +51,14 @@ export default function Settings() {
   const { tile, setTile } = useTilePref()
   const { profile, signOut } = useAuth()
   const { isPlus, restore } = usePlus()
-  const { lang, setLang } = useI18n()
-  const [pushMsg, setPushMsg] = useState<string | null>(null)
+  const { t, lang, setLang } = useI18n()
+  const [pushMsg, setPushMsg] = useState<TKey | null>(null)
   const [pushOn, setPushOn] = useState<boolean | null>(null)
 
   const [homeLoc, setHomeLoc] = useState<HomeLocation | null>(null)
   const [cityInput, setCityInput] = useState('')
   const [savingCity, setSavingCity] = useState(false)
-  const [cityMsg, setCityMsg] = useState<string | null>(null)
+  const [cityMsg, setCityMsg] = useState<TKey | null>(null)
 
   // Deep-link from the Hub's "Set city" button (?highlight=weather): scroll to
   // the Weather section and briefly outline it.
@@ -101,7 +101,7 @@ export default function Settings() {
     const loc = await geocodeCity(q)
     setSavingCity(false)
     if (!loc) {
-      setCityMsg("Couldn't find that city. Try a different spelling.")
+      setCityMsg('settings.cityNotFound')
       return
     }
     await saveHomeLocation(loc)
@@ -119,11 +119,11 @@ export default function Settings() {
     try {
       const ok = await restore()
       Alert.alert(
-        ok ? 'Purchases restored' : 'Nothing to restore',
-        ok ? "You're on One Roof Plus." : 'No previous purchase was found for this Apple ID.',
+        ok ? t('settings.restoredTitle') : t('settings.nothingRestoreTitle'),
+        ok ? t('settings.restoredBody') : t('settings.nothingRestoreBody'),
       )
     } catch {
-      Alert.alert('Restore failed', 'Please try again.')
+      Alert.alert(t('settings.restoreFailedTitle'), t('settings.restoreFailedBody'))
     }
   }
 
@@ -132,14 +132,14 @@ export default function Settings() {
     setPushOn(r.ok ? true : await getPushEnabled())
     setPushMsg(
       r.ok
-        ? 'Notifications enabled on this device.'
+        ? 'settings.pushEnabled'
         : r.reason === 'simulator'
-          ? 'Push needs a real device.'
+          ? 'settings.pushSimulator'
           : r.reason === 'no-project'
-            ? 'Run `eas init` first (needs an EAS project id).'
+            ? 'settings.pushNoProject'
             : r.reason === 'denied'
-              ? 'Notifications are off in iOS Settings — turn them on there.'
-              : 'Could not enable notifications.',
+              ? 'settings.pushDenied'
+              : 'settings.pushFailed',
     )
   }
 
@@ -154,12 +154,12 @@ export default function Settings() {
 
   function confirmDelete() {
     Alert.alert(
-      'Delete account',
-      'This permanently deletes your account and your data. If you are the last member of your household, the whole household and its data are deleted. This cannot be undone.',
+      t('settings.deleteAccount'),
+      t('settings.deleteConfirmBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             // Revoke the Apple token first (Apple requirement for Sign in with
@@ -179,7 +179,7 @@ export default function Settings() {
             }
             const { error } = await supabase.rpc('delete_my_account')
             if (error) {
-              Alert.alert('Could not delete account', error.message)
+              Alert.alert(t('settings.deleteFailedTitle'), error.message)
               return
             }
             await doSignOut()
@@ -190,11 +190,11 @@ export default function Settings() {
   }
 
   return (
-    <Screen scroll scrollRef={scrollRef} header={<AppHeader title="Settings" />}>
+    <Screen scroll scrollRef={scrollRef} header={<AppHeader title={t('settings.title')} />}>
       <View style={{ gap: sp.xl }}>
         {/* One Roof Plus */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">One Roof Plus</Txt>
+          <Txt variant="label">{t('settings.plus')}</Txt>
           {isPlus ? (
             <Card style={{ gap: sp.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
@@ -211,24 +211,24 @@ export default function Settings() {
                   <Award size={26} color={c.accent} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>One Roof Plus</Txt>
-                  <Txt variant="faint">Active · your whole household</Txt>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>{t('settings.plus')}</Txt>
+                  <Txt variant="faint">{t('settings.plusActive')}</Txt>
                 </View>
-                <StatusPill on label="ACTIVE" />
+                <StatusPill on label={t('settings.active')} />
               </View>
               <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
               <View style={{ gap: sp.sm }}>
                 {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.label} icon={f.icon} label={f.label} included />
+                  <FeatureRow key={f.key} icon={f.icon} label={t(f.key)} included />
                 ))}
               </View>
             </Card>
           ) : (
             <Card style={{ gap: sp.md }}>
-              <Txt variant="muted">Unlock the whole household with One Roof Plus:</Txt>
+              <Txt variant="muted">{t('settings.plusUnlock')}</Txt>
               <View style={{ gap: sp.sm }}>
                 {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.label} icon={f.icon} label={f.label} />
+                  <FeatureRow key={f.key} icon={f.icon} label={t(f.key)} />
                 ))}
               </View>
             </Card>
@@ -236,15 +236,17 @@ export default function Settings() {
 
           {isPlus ? (
             <Btn
-              title="Manage subscription"
+              title={t('settings.manageSubscription')}
               variant="secondary"
               onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
             />
           ) : (
             <>
-              <Btn title="Get One Roof Plus" onPress={() => router.push('/paywall')} />
+              <Btn title={t('settings.getPlus')} onPress={() => router.push('/paywall')} />
               <Pressable onPress={doRestore} style={{ paddingVertical: sp.sm, alignItems: 'center' }}>
-                <Txt style={{ color: c.accent, fontWeight: '600' }}>Restore purchases</Txt>
+                <Txt style={{ color: c.accent, fontWeight: '600' }}>
+                  {t('settings.restorePurchases')}
+                </Txt>
               </Pressable>
             </>
           )}
@@ -254,7 +256,7 @@ export default function Settings() {
 
         {/* Language */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">Language</Txt>
+          <Txt variant="label">{t('settings.language')}</Txt>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
             {LANGUAGES.map((l) => {
               const active = l.id === lang
@@ -286,7 +288,7 @@ export default function Settings() {
 
         {/* Appearance */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">Appearance</Txt>
+          <Txt variant="label">{t('settings.appearance')}</Txt>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
             {APPEARANCE.map((a) => {
               const active = a.id === mode
@@ -303,7 +305,7 @@ export default function Settings() {
                     borderColor: active ? c.accent : c.border,
                   }}
                 >
-                  <Txt variant={active ? 'body' : 'muted'}>{a.label}</Txt>
+                  <Txt variant={active ? 'body' : 'muted'}>{t(a.key)}</Txt>
                 </Pressable>
               )
             })}
@@ -314,7 +316,7 @@ export default function Settings() {
 
         {/* App cards (home screen tile density) */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">App cards</Txt>
+          <Txt variant="label">{t('settings.appCards')}</Txt>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
             {TILES.map((tl) => {
               const active = tl.id === tile
@@ -331,21 +333,19 @@ export default function Settings() {
                     borderColor: active ? c.accent : c.border,
                   }}
                 >
-                  <Txt variant={active ? 'body' : 'muted'}>{tl.label}</Txt>
+                  <Txt variant={active ? 'body' : 'muted'}>{t(tl.key)}</Txt>
                 </Pressable>
               )
             })}
           </View>
-          <Txt variant="faint">
-            Compact fits more apps per row on the home screen (icon + name only).
-          </Txt>
+          <Txt variant="faint">{t('settings.compactHint')}</Txt>
         </View>
 
         <Divider />
 
         {/* Notifications */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">Notifications</Txt>
+          <Txt variant="label">{t('settings.notifications')}</Txt>
           <Card style={{ gap: sp.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
               <View
@@ -365,24 +365,26 @@ export default function Settings() {
                 )}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt style={{ fontFamily: fonts.semibold }}>Push reminders</Txt>
-                <Txt variant="faint">Pet care, calendar dates and family nudges</Txt>
+                <Txt style={{ fontFamily: fonts.semibold }}>{t('settings.pushReminders')}</Txt>
+                <Txt variant="faint">{t('settings.pushRemindersHint')}</Txt>
               </View>
-              <StatusPill on={!!pushOn} />
+              <StatusPill on={!!pushOn} label={pushOn ? t('common.on') : t('common.off')} />
             </View>
 
             {pushOn ? (
               <Pressable onPress={() => Linking.openSettings()}>
                 <Txt style={{ color: c.accent, fontFamily: fonts.semibold }}>
-                  Manage in iOS Settings
+                  {t('settings.manageInIos')}
                 </Txt>
               </Pressable>
             ) : (
-              <Btn title="Enable notifications" variant="secondary" onPress={enablePush} />
+              <Btn
+                title={t('settings.enableNotifications')}
+                variant="secondary"
+                onPress={enablePush}
+              />
             )}
-            {pushMsg ? (
-              <Txt variant="faint">{pushMsg}</Txt>
-            ) : null}
+            {pushMsg ? <Txt variant="faint">{t(pushMsg)}</Txt> : null}
           </Card>
         </View>
 
@@ -393,7 +395,7 @@ export default function Settings() {
           style={{ gap: sp.sm }}
           onLayout={(e) => setWeatherY(e.nativeEvent.layout.y)}
         >
-          <Txt variant="label">Weather</Txt>
+          <Txt variant="label">{t('settings.weather')}</Txt>
           <Card
             style={{
               gap: sp.md,
@@ -414,15 +416,15 @@ export default function Settings() {
                 <MapPin size={20} color={homeLoc ? c.accent : c.textMuted} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt style={{ fontFamily: fonts.semibold }}>Home city</Txt>
+                <Txt style={{ fontFamily: fonts.semibold }}>{t('settings.homeCity')}</Txt>
                 <Txt variant="faint" numberOfLines={1}>
-                  {homeLoc ? homeLoc.city : "Set your city for today's weather at home"}
+                  {homeLoc ? homeLoc.city : t('settings.homeCityHint')}
                 </Txt>
               </View>
               {homeLoc ? (
                 <Pressable onPress={clearCity} hitSlop={8}>
                   <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 13 }}>
-                    Remove
+                    {t('common.remove')}
                   </Txt>
                 </Pressable>
               ) : null}
@@ -432,20 +434,20 @@ export default function Settings() {
                 <Field
                   value={cityInput}
                   onChangeText={setCityInput}
-                  placeholder="e.g. Austin"
+                  placeholder={t('settings.cityPlaceholder')}
                   autoCapitalize="words"
                   returnKeyType="search"
                   onSubmitEditing={saveCity}
                 />
               </View>
               <Btn
-                title="Set"
+                title={t('settings.set')}
                 onPress={saveCity}
                 loading={savingCity}
                 disabled={!cityInput.trim()}
               />
             </View>
-            {cityMsg ? <Txt variant="faint">{cityMsg}</Txt> : null}
+            {cityMsg ? <Txt variant="faint">{t(cityMsg)}</Txt> : null}
           </Card>
         </View>
 
@@ -453,13 +455,13 @@ export default function Settings() {
 
         {/* Account */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">Account</Txt>
+          <Txt variant="label">{t('settings.account')}</Txt>
           <Card>
             <Txt variant="muted">{profile?.email ?? ''}</Txt>
           </Card>
-          <Btn title="Sign out" variant="secondary" onPress={doSignOut} />
+          <Btn title={t('settings.signOut')} variant="secondary" onPress={doSignOut} />
           <Pressable onPress={confirmDelete} style={{ paddingVertical: sp.md, alignItems: 'center' }}>
-            <Txt style={{ color: c.expense, fontWeight: '600' }}>Delete account</Txt>
+            <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('settings.deleteAccount')}</Txt>
           </Pressable>
         </View>
       </View>

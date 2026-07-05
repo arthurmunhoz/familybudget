@@ -70,3 +70,25 @@ not** yet:
   insert.
 - Confirm the PWA receipt-scan flow surfaces the `monthly_cap` reason as a
   paywall prompt (parity with iOS MonthDetail).
+
+## 4. Nudges: sent banner CTAs + Need-Help buttons (2026-07-04)
+
+`mobile/src/apps/pings/NudgesBanner.tsx` — the home banner now (a) lists SENT
+nudges with ack status + a dismiss ✕, and (b) shows BOTH Call and Got it on a
+"Need Help" nudge (so a recipient can acknowledge without calling). PWA
+`src/components/PingsBanner.tsx` shows received-only with Call-OR-Got-it. Port
+both.
+
+## 5. Family: single-screen expandable member cards (2026-07-04)
+
+`mobile/src/apps/family/Family.tsx` + `MemberDetail.tsx` — the separate member
+detail page is gone; the list is an accordion that expands a member's full card
+in place (fields, phone call button, "Edit my info"). PWA `src/apps/family/`
+still has a list → detail page; make it expand inline.
+
+## 6. Pet Care: per-pet view redesign (2026-07-04)
+
+`mobile/src/apps/pets/` — Pet Care reworked to a per-pet view: pet carousel
+(with All) → selected pet's info card (edit + a per-pet calendar color) → a
+month calendar of all pets' events with per-pet colored dots + the upcoming
+list. Adds `pets.tag_color` (migration). Port to PWA `src/apps/pets/`.

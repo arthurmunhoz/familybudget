@@ -9,6 +9,7 @@ import { Award, Trash2, X } from 'lucide-react-native'
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
+import { useI18n } from '@/hooks/useI18n'
 import { formatDay, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
@@ -31,6 +32,7 @@ type DetailData = {
 
 export default function AdminHousehold() {
   const { c } = useTheme()
+  const { t } = useI18n()
   const { profile } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
 
@@ -76,7 +78,7 @@ export default function AdminHousehold() {
     })
     setPlanBusy(false)
     if (error) {
-      Alert.alert('Could not change the plan — please try again.')
+      Alert.alert(t('admin.planError'))
       return
     }
     load()
@@ -89,7 +91,7 @@ export default function AdminHousehold() {
     const name = mName.trim()
     if (!email || !name || busy || !id) return
     if (!/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert('That doesn’t look like a valid email.')
+      Alert.alert(t('admin.invalidEmail'))
       return
     }
     setBusy(true)
@@ -100,10 +102,10 @@ export default function AdminHousehold() {
     if (error) {
       Alert.alert(
         error.code === '23505'
-          ? 'That email is already a member of a household.'
+          ? t('admin.emailExists')
           : error.message.includes('household_member_limit')
-            ? `This household is full (max ${MAX_MEMBERS} members).`
-            : 'Could not add the member — please try again.',
+            ? t('admin.householdFull', { max: MAX_MEMBERS })
+            : t('admin.addMemberError'),
       )
       return
     }
@@ -114,21 +116,21 @@ export default function AdminHousehold() {
 
   function removeMember(user: Profile) {
     if (user.email === profile?.email) {
-      Alert.alert('You can’t remove yourself.')
+      Alert.alert(t('admin.cantRemoveSelf'))
       return
     }
     Alert.alert(
-      'Remove member',
-      `Remove ${user.display_name} (${user.email})? They will lose access.`,
+      t('admin.removeMember'),
+      t('admin.removeConfirm', { name: user.display_name, email: user.email }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('admin.remove'),
           style: 'destructive',
           onPress: async () => {
             const { error } = await supabase.from('allowed_users').delete().eq('email', user.email)
             if (error) {
-              Alert.alert('Could not remove this member — they still have data attached.')
+              Alert.alert(t('admin.removeError'))
               return
             }
             load()
@@ -141,18 +143,18 @@ export default function AdminHousehold() {
   function removeHousehold() {
     if (!household) return
     if (members.length > 0) {
-      Alert.alert('Remove all members first.')
+      Alert.alert(t('admin.removeAllMembers'))
       return
     }
-    Alert.alert('Delete household', `Delete household "${household.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('admin.deleteHousehold'), t('admin.deleteConfirm', { name: household.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('admin.delete'),
         style: 'destructive',
         onPress: async () => {
           const { error } = await supabase.from('households').delete().eq('id', household.id)
           if (error) {
-            Alert.alert('Could not delete — the household still has data attached.')
+            Alert.alert(t('admin.deleteError'))
             return
           }
           router.back()
@@ -270,14 +272,14 @@ export default function AdminHousehold() {
               <TextInput
                 value={mName}
                 onChangeText={setMName}
-                placeholder="Name"
+                placeholder={t('admin.memberName')}
                 placeholderTextColor={c.textFaint}
                 style={[inputStyle, { width: 90 }]}
               />
               <TextInput
                 value={mEmail}
                 onChangeText={setMEmail}
-                placeholder="Google email"
+                placeholder={t('admin.memberEmail')}
                 placeholderTextColor={c.textFaint}
                 autoCapitalize="none"
                 keyboardType="email-address"

@@ -56,7 +56,15 @@ Both must pass before committing. Real on-device behavior (auth, camera, Face ID
 push, layout) must be checked by a human on a simulator/device — say so, don't
 claim it's verified.
 
+## i18n Rule
+All user-facing strings (labels, titles, placeholders, button text, alerts, error messages) **must** be
+translated via `t()` keys. **Exception:** the app name "One Roof" only. No hardcoded English.
+When adding new UI, add the keys to all 3 language files (en/es/pt) in `@/lib/i18n` first,
+then import `useI18n` in the component and wrap strings: `{t('namespace.key')}` or 
+`title={t('namespace.key', {param})}`.
+
 ## Don't
 - Don't add ad/tracking SDKs (keeps ATT off + COPPA exposure low).
 - Don't break the RLS tenancy model. Don't hardcode secrets (use EXPO_PUBLIC_* /
   EAS env). Don't claim device verification you didn't do.
+- Don't hardcode user-facing strings — add them to i18n files and use `t()` in the component.

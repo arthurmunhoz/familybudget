@@ -29,6 +29,7 @@ import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
+import { useI18n } from '@/hooks/useI18n'
 import { formatDuration, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
@@ -77,6 +78,7 @@ type AnalyticsData = { stats: AppStat[]; errors: ErrorRow[] }
 
 export default function Admin() {
   const { c } = useTheme()
+  const { t } = useI18n()
   const { profile } = useAuth()
   const { isPlus, refresh: refreshPlus } = usePlus()
   const [planBusy, setPlanBusy] = useState(false)
@@ -90,7 +92,7 @@ export default function Admin() {
     try {
       const { error } = await supabase.rpc('admin_set_plan', { p_plan: next ? 'plus' : 'free' })
       if (error) {
-        Alert.alert('Could not change the plan — please try again.')
+        Alert.alert(t('admin.planError'))
         return
       }
       await refreshPlus()
@@ -187,7 +189,7 @@ export default function Admin() {
     const { error } = await supabase.from('households').insert({ name })
     setBusy(false)
     if (error) {
-      Alert.alert('Could not create the household — please try again.')
+      Alert.alert(t('admin.createHouseholdError'))
       return
     }
     setNewHousehold('')
@@ -207,7 +209,7 @@ export default function Admin() {
   } as const
 
   return (
-    <Screen scroll header={<AppHeader title="Admin" />}>
+    <Screen scroll header={<AppHeader title={t('app.admin')} />}>
       {/* Testing: toggle Plus for this household to preview the Free experience */}
       <Card style={{ marginBottom: sp.md, gap: sp.sm, borderColor: c.accentSoft }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
@@ -317,7 +319,7 @@ export default function Admin() {
                 value={newHousehold}
                 onChangeText={setNewHousehold}
                 onSubmitEditing={createHousehold}
-                placeholder="Family name…"
+                placeholder={t('admin.familyNameHint')}
                 placeholderTextColor={c.textFaint}
                 style={[inputStyle, { flex: 1, backgroundColor: c.surface }]}
               />
@@ -343,7 +345,7 @@ export default function Admin() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search households or members…"
+              placeholder={t('admin.searchHouseholds')}
               placeholderTextColor={c.textFaint}
               autoCapitalize="none"
               style={inputStyle}

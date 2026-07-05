@@ -157,7 +157,7 @@ export default function NudgesScreen() {
     <Screen
       header={
         <>
-          <AppHeader title="Nudges" />
+          <AppHeader title={t('app.nudges')} />
           <View style={{ flexDirection: 'row', gap: sp.sm, marginBottom: sp.md }}>
             <TabBtn active={tab === 'send'} onPress={() => setTab('send')} label={t('pings.tabSend')} />
             <TabBtn
