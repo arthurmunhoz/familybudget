@@ -268,34 +268,42 @@ export default function DocumentVault() {
       {/* person filter — only for households with more than one member (nothing
           to narrow otherwise). Everyone · each member · Shared. */}
       {profiles.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0, flexShrink: 0 }}
-          contentContainerStyle={{
-            paddingHorizontal: sp.lg,
-            gap: sp.sm,
-            paddingBottom: sp.sm,
-            alignItems: 'center',
-          }}
-        >
-          <FilterChip active={person === 'all'} onPress={() => setPerson('all')}>
-            {t('common.everyone')}
-          </FilterChip>
-          {profiles.map((p) => (
-            <FilterChip key={p.email} active={person === p.email} onPress={() => setPerson(p.email)}>
-              {nameOf(p.email)}
+        <>
+          <Txt variant="label" style={{ paddingHorizontal: sp.lg, paddingBottom: 4 }}>
+            {t('docs.owner')}
+          </Txt>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, flexShrink: 0 }}
+            contentContainerStyle={{
+              paddingHorizontal: sp.lg,
+              gap: sp.sm,
+              paddingBottom: sp.sm,
+              alignItems: 'center',
+            }}
+          >
+            <FilterChip active={person === 'all'} onPress={() => setPerson('all')}>
+              {t('common.everyone')}
             </FilterChip>
-          ))}
-          <FilterChip active={person === 'shared'} onPress={() => setPerson('shared')}>
-            🏠 {t('docs.shared')}
-          </FilterChip>
-        </ScrollView>
+            {profiles.map((p) => (
+              <FilterChip key={p.email} active={person === p.email} onPress={() => setPerson(p.email)}>
+                {nameOf(p.email)}
+              </FilterChip>
+            ))}
+            <FilterChip active={person === 'shared'} onPress={() => setPerson('shared')}>
+              {t('docs.shared')}
+            </FilterChip>
+          </ScrollView>
+        </>
       ) : null}
 
       {/* category filter — flexGrow:0 stops the horizontal ScrollView from
           filling the parent's height (which would stretch the chips tall);
           alignItems:center keeps each chip at its natural height. */}
+      <Txt variant="label" style={{ paddingHorizontal: sp.lg, paddingBottom: 4 }}>
+        {t('docs.type')}
+      </Txt>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
