@@ -2,9 +2,9 @@
 // AdminHousehold page. Reuses admin_user_activity (30d) and the admin RLS
 // exception on allowed_users/households.
 import { useState } from 'react'
-import { Alert, Pressable, TextInput, View } from 'react-native'
+import { Alert, Pressable, Switch, TextInput, View } from 'react-native'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
-import { Trash2, X } from 'lucide-react-native'
+import { Award, Trash2, X } from 'lucide-react-native'
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -26,6 +26,7 @@ type DetailData = {
   household: Household | null
   members: Profile[]
   activity: Record<string, UserActivity>
+  isPlus: boolean
 }
 
 export default function AdminHousehold() {
@@ -36,13 +37,14 @@ export default function AdminHousehold() {
   const [mName, setMName] = useState('')
   const [mEmail, setMEmail] = useState('')
   const [busy, setBusy] = useState(false)
+  const [planBusy, setPlanBusy] = useState(false)
 
   const {
-    data = { household: null, members: [], activity: {} },
+    data = { household: null, members: [], activity: {}, isPlus: false },
     loading,
     revalidate: load,
   } = useCachedQuery<DetailData>(`admin:household:${id}`, async () => {
-    const [h, u, act] = await Promise.all([
+    const [h, u, act, plus] = await Promise.all([
       supabase.from('households').select('*').eq('id', id).single(),
       supabase
         .from('allowed_users')
@@ -50,6 +52,7 @@ export default function AdminHousehold() {
         .eq('household_id', id)
         .order('display_name'),
       supabase.rpc('admin_user_activity', { days: 30 }),
+      supabase.rpc('admin_household_is_plus', { p_household: id }),
     ])
     return {
       household: (h.data as Household) ?? null,
@@ -57,10 +60,27 @@ export default function AdminHousehold() {
       activity: Object.fromEntries(
         ((act.data ?? []) as UserActivity[]).map((a) => [a.user_email, a]),
       ),
+      isPlus: plus.data === true,
     }
   })
-  const { household, members, activity } = data
+  const { household, members, activity, isPlus } = data
   const atLimit = members.length >= MAX_MEMBERS
+
+  // Comp this household to Plus for free (or revoke). Admin-only RPC.
+  async function setPlan(next: boolean) {
+    if (planBusy || !id) return
+    setPlanBusy(true)
+    const { error } = await supabase.rpc('admin_set_household_plan', {
+      p_household: id,
+      p_plan: next ? 'plus' : 'free',
+    })
+    setPlanBusy(false)
+    if (error) {
+      Alert.alert('Could not change the plan — please try again.')
+      return
+    }
+    load()
+  }
 
   if (profile && !profile.is_admin) return <Redirect href="/" />
 
@@ -163,6 +183,39 @@ export default function AdminHousehold() {
           <Txt variant="muted">
             {members.length}/{MAX_MEMBERS} members · created {formatDay(household.created_at.slice(0, 10))}
           </Txt>
+
+          {/* Comp this household to One Roof Plus for free (admin-only). */}
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <View
+                style={{
+                  height: 40,
+                  width: 40,
+                  borderRadius: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isPlus ? c.accentSoft : c.surface,
+                }}
+              >
+                <Award size={20} color={isPlus ? c.accent : c.textMuted} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt style={{ fontWeight: '700' }}>One Roof Plus</Txt>
+                <Txt variant="faint" style={{ fontSize: 11 }}>
+                  {isPlus
+                    ? 'Comped to Plus (free) · unlimited scans, unlimited budgets'
+                    : 'Free plan · turn on to comp this household to Plus'}
+                  {planBusy ? ' · updating…' : ''}
+                </Txt>
+              </View>
+              <Switch
+                value={isPlus}
+                onValueChange={setPlan}
+                disabled={planBusy}
+                trackColor={{ true: c.accent }}
+              />
+            </View>
+          </Card>
 
           <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
             Members
