@@ -321,6 +321,9 @@ export const es: Record<keyof typeof en, string> = {
   'pets.photoFailed': 'No se pudo subir la foto — inténtalo de nuevo.',
   'pets.deletePet': 'Eliminar mascota',
   'pets.edit': 'Editar',
+  'pets.calendar': 'Calendario',
+  'pets.tagColor': 'Color en el calendario',
+  'pets.noDayEvents': 'Nada este día.',
 
   'calendar.title': 'Calendario',
   'calendar.today': 'Hoy',

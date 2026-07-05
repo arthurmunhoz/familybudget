@@ -323,6 +323,9 @@ export const en = {
   'pets.photoFailed': 'Could not upload the photo — please try again.',
   'pets.deletePet': 'Delete pet',
   'pets.edit': 'Edit',
+  'pets.calendar': 'Calendar',
+  'pets.tagColor': 'Calendar color',
+  'pets.noDayEvents': 'Nothing on this day.',
 
   'calendar.title': 'Calendar',
   'calendar.today': 'Today',

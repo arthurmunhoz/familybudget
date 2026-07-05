@@ -213,3 +213,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-046-apple-calendar.sql (calendar_events source='apple' + apple_event_id; on-device EventKit sync)
 --   migration-047-free-plan-limits.sql (free plan: 1 budget max trigger + free_monthly_cap=3)
 --   migration-048-admin-comp-plan.sql (admin_set_household_plan + admin_household_is_plus: comp any household to Plus)
+--   migration-049-pet-tag-color.sql (pets.tag_color: per-pet calendar dot color)

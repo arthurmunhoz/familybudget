@@ -98,6 +98,8 @@ export interface Pet {
   microchip: string | null
   notes: string | null
   photo_path: string | null
+  /** Per-pet calendar dot color (hex); null = a palette color by pet order. */
+  tag_color: string | null
   created_at: string
 }
 
