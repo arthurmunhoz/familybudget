@@ -210,3 +210,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-043-store-color.sql (shopping_stores.color for custom store tiles)
 --   migration-044-admin-set-plan.sql (admin_set_plan RPC: toggle household Plus for testing)
 --   migration-045-widget-tokens.sql (Home-Screen Nudges widget send token + RPC)
+--   migration-046-apple-calendar.sql (calendar_events source='apple' + apple_event_id; on-device EventKit sync)
+--   migration-047-free-plan-limits.sql (free plan: 1 budget max trigger + free_monthly_cap=3)

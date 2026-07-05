@@ -23,6 +23,7 @@ import { Camera, Check, ChevronDown, ChevronRight, Wallet, X } from 'lucide-reac
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { usePlus } from '@/lib/plus'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import { syncBudgetWidget, type BudgetWidgetItem } from '@/lib/widget'
@@ -47,6 +48,7 @@ interface MonthStat {
 export default function Budgets() {
   const { c } = useTheme()
   const { t } = useI18n()
+  const { isPlus } = usePlus()
 
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
@@ -138,13 +140,32 @@ export default function Budgets() {
     syncBudgetWidget(items)
   }, [loading, budgets, byBudget, statsById])
 
+  // Free households may keep only one budget; Plus is unlimited. The button
+  // gates before opening the sheet; the DB trigger is the real backstop.
+  const canCreateBudget = isPlus || budgets.length < 1
+
+  function startCreate() {
+    if (!canCreateBudget) {
+      router.push('/paywall')
+      return
+    }
+    setName('')
+    setPeriod('monthly')
+    setCreateOpen(true)
+  }
+
   async function create() {
     const trimmed = name.trim()
     if (!trimmed) return
     setSaving(true)
-    await supabase.from('budgets').insert({ name: trimmed, period })
+    const { error } = await supabase.from('budgets').insert({ name: trimmed, period })
     setSaving(false)
     setCreateOpen(false)
+    if (error) {
+      // Backstop for the server-side free-plan limit (client already gates it).
+      if (error.message.includes('free_plan_budget_limit')) router.push('/paywall')
+      return
+    }
     setName('')
     setPeriod('monthly')
     load()
@@ -190,11 +211,7 @@ export default function Budgets() {
         <Pressable
           accessibilityRole="button"
           disabled={loading}
-          onPress={() => {
-            setName('')
-            setPeriod('monthly')
-            setCreateOpen(true)
-          }}
+          onPress={startCreate}
           style={({ pressed }) => ({
             alignItems: 'center',
             justifyContent: 'center',

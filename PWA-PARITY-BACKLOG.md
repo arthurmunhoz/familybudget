@@ -57,3 +57,16 @@ The iOS Hub gained a home dashboard the PWA doesn't have yet:
   due/overdue items. A "Weather / home city" control was added to iOS Settings.
   Port needs a web weather fetch + a home-city setting (localStorage or
   user_settings) and reuse of the PWA's calendar/petCare helpers.
+
+## 3. Free-plan limits UX (2026-07-04)
+
+Migration 047 enforces free-plan limits server-side for BOTH apps (1 budget for
+non-Plus via a `budgets` trigger; `ai_config.free_monthly_cap = 3`). The iOS app
+gates these gracefully (New-budget → paywall; scan cap → paywall). The **PWA does
+not** yet:
+- `src/apps/budget/Budgets.tsx` — gate "New budget" when `!isPlus` and the
+  household already has a budget (route to the paywall) and catch the
+  `free_plan_budget_limit` insert error; otherwise a free user just gets a failed
+  insert.
+- Confirm the PWA receipt-scan flow surfaces the `monthly_cap` reason as a
+  paywall prompt (parity with iOS MonthDetail).
