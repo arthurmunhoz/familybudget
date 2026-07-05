@@ -84,6 +84,8 @@ export default function TodaySection() {
   }, [today, locale])
 
   const WIcon = weather ? weatherIcon(weather.code) : null
+  // "Westchase, Florida, US" → "Westchase" for the compact city line.
+  const cityShort = location?.city.split(',')[0].trim() ?? ''
   const totalItems = todaysOcc.length + petDue.length
   // Fill the agenda from calendar first, then pet-care, up to MAX_ROWS.
   const shownOcc = todaysOcc.slice(0, MAX_ROWS)
@@ -101,18 +103,29 @@ export default function TodaySection() {
           </Txt>
         </View>
         <Pressable
-          onPress={() => router.push('/settings')}
+          onPress={() =>
+            router.push(
+              location ? '/settings' : { pathname: '/settings', params: { highlight: 'weather' } },
+            )
+          }
           hitSlop={6}
           accessibilityRole="button"
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          style={{ alignItems: 'flex-end', gap: 1 }}
         >
           {weather && WIcon ? (
             <>
-              <WIcon size={22} color={c.accent} />
-              <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }}>
-                {weather.temperature}
-                {weather.unit}
-              </Txt>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <WIcon size={22} color={c.accent} />
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }}>
+                  {weather.temperature}
+                  {weather.unit}
+                </Txt>
+              </View>
+              {cityShort ? (
+                <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={1}>
+                  {t('home.inCity', { city: cityShort })}
+                </Txt>
+              ) : null}
             </>
           ) : (
             <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>

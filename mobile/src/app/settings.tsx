@@ -2,9 +2,9 @@
 // in-app account deletion (required by Apple Guideline 5.1.1(v)). Sections are
 // separated by dividers; Plus shows a certificate badge + the included feature
 // list when active, and notifications shows a live on/off status.
-import { useEffect, useState } from 'react'
-import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native'
-import { router } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { router, useLocalSearchParams } from 'expo-router'
 import {
   Award,
   Bell,
@@ -59,6 +59,25 @@ export default function Settings() {
   const [cityInput, setCityInput] = useState('')
   const [savingCity, setSavingCity] = useState(false)
   const [cityMsg, setCityMsg] = useState<string | null>(null)
+
+  // Deep-link from the Hub's "Set city" button (?highlight=weather): scroll to
+  // the Weather section and briefly outline it.
+  const params = useLocalSearchParams<{ highlight?: string }>()
+  const scrollRef = useRef<ScrollView>(null)
+  const [weatherY, setWeatherY] = useState<number | null>(null)
+  const [highlightWeather, setHighlightWeather] = useState(false)
+  const handledHighlight = useRef(false)
+
+  useEffect(() => {
+    if (params.highlight !== 'weather' || weatherY == null || handledHighlight.current) return
+    handledHighlight.current = true
+    const id = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, weatherY - 12), animated: true })
+      setHighlightWeather(true)
+      setTimeout(() => setHighlightWeather(false), 2400)
+    }, 350)
+    return () => clearTimeout(id)
+  }, [params.highlight, weatherY])
 
   // Reflect the current OS permission from the start (no prompt).
   useEffect(() => {
@@ -124,6 +143,15 @@ export default function Settings() {
     )
   }
 
+  async function doSignOut() {
+    await signOut()
+    // The session is gone, but Settings is still on top of the stack. Unwind any
+    // pushed screens back to the root route ("/"), which gates on session and now
+    // renders the Login screen.
+    if (router.canDismiss()) router.dismissAll()
+    router.replace('/')
+  }
+
   function confirmDelete() {
     Alert.alert(
       'Delete account',
@@ -154,7 +182,7 @@ export default function Settings() {
               Alert.alert('Could not delete account', error.message)
               return
             }
-            await signOut()
+            await doSignOut()
           },
         },
       ],
@@ -162,8 +190,68 @@ export default function Settings() {
   }
 
   return (
-    <Screen scroll header={<AppHeader title="Settings" />}>
+    <Screen scroll scrollRef={scrollRef} header={<AppHeader title="Settings" />}>
       <View style={{ gap: sp.xl }}>
+        {/* One Roof Plus */}
+        <View style={{ gap: sp.sm }}>
+          <Txt variant="label">One Roof Plus</Txt>
+          {isPlus ? (
+            <Card style={{ gap: sp.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                <View
+                  style={{
+                    height: 48,
+                    width: 48,
+                    borderRadius: 24,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: c.accentSoft,
+                  }}
+                >
+                  <Award size={26} color={c.accent} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>One Roof Plus</Txt>
+                  <Txt variant="faint">Active · your whole household</Txt>
+                </View>
+                <StatusPill on label="ACTIVE" />
+              </View>
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+              <View style={{ gap: sp.sm }}>
+                {PLUS_FEATURES.map((f) => (
+                  <FeatureRow key={f.label} icon={f.icon} label={f.label} included />
+                ))}
+              </View>
+            </Card>
+          ) : (
+            <Card style={{ gap: sp.md }}>
+              <Txt variant="muted">Unlock the whole household with One Roof Plus:</Txt>
+              <View style={{ gap: sp.sm }}>
+                {PLUS_FEATURES.map((f) => (
+                  <FeatureRow key={f.label} icon={f.icon} label={f.label} />
+                ))}
+              </View>
+            </Card>
+          )}
+
+          {isPlus ? (
+            <Btn
+              title="Manage subscription"
+              variant="secondary"
+              onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
+            />
+          ) : (
+            <>
+              <Btn title="Get One Roof Plus" onPress={() => router.push('/paywall')} />
+              <Pressable onPress={doRestore} style={{ paddingVertical: sp.sm, alignItems: 'center' }}>
+                <Txt style={{ color: c.accent, fontWeight: '600' }}>Restore purchases</Txt>
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        <Divider />
+
         {/* Language */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">Language</Txt>
@@ -301,9 +389,17 @@ export default function Settings() {
         <Divider />
 
         {/* Weather / home city (drives the Today section on the home screen) */}
-        <View style={{ gap: sp.sm }}>
+        <View
+          style={{ gap: sp.sm }}
+          onLayout={(e) => setWeatherY(e.nativeEvent.layout.y)}
+        >
           <Txt variant="label">Weather</Txt>
-          <Card style={{ gap: sp.md }}>
+          <Card
+            style={{
+              gap: sp.md,
+              ...(highlightWeather ? { borderWidth: 2, borderColor: c.accent } : {}),
+            }}
+          >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
               <View
                 style={{
@@ -355,73 +451,13 @@ export default function Settings() {
 
         <Divider />
 
-        {/* One Roof Plus */}
-        <View style={{ gap: sp.sm }}>
-          <Txt variant="label">One Roof Plus</Txt>
-          {isPlus ? (
-            <Card style={{ gap: sp.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                <View
-                  style={{
-                    height: 48,
-                    width: 48,
-                    borderRadius: 24,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: c.accentSoft,
-                  }}
-                >
-                  <Award size={26} color={c.accent} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>One Roof Plus</Txt>
-                  <Txt variant="faint">Active · your whole household</Txt>
-                </View>
-                <StatusPill on label="ACTIVE" />
-              </View>
-              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
-              <View style={{ gap: sp.sm }}>
-                {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.label} icon={f.icon} label={f.label} included />
-                ))}
-              </View>
-            </Card>
-          ) : (
-            <Card style={{ gap: sp.md }}>
-              <Txt variant="muted">Unlock the whole household with One Roof Plus:</Txt>
-              <View style={{ gap: sp.sm }}>
-                {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.label} icon={f.icon} label={f.label} />
-                ))}
-              </View>
-            </Card>
-          )}
-
-          {isPlus ? (
-            <Btn
-              title="Manage subscription"
-              variant="secondary"
-              onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
-            />
-          ) : (
-            <>
-              <Btn title="Get One Roof Plus" onPress={() => router.push('/paywall')} />
-              <Pressable onPress={doRestore} style={{ paddingVertical: sp.sm, alignItems: 'center' }}>
-                <Txt style={{ color: c.accent, fontWeight: '600' }}>Restore purchases</Txt>
-              </Pressable>
-            </>
-          )}
-        </View>
-
-        <Divider />
-
         {/* Account */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">Account</Txt>
           <Card>
             <Txt variant="muted">{profile?.email ?? ''}</Txt>
           </Card>
-          <Btn title="Sign out" variant="secondary" onPress={signOut} />
+          <Btn title="Sign out" variant="secondary" onPress={doSignOut} />
           <Pressable onPress={confirmDelete} style={{ paddingVertical: sp.md, alignItems: 'center' }}>
             <Txt style={{ color: c.expense, fontWeight: '600' }}>Delete account</Txt>
           </Pressable>

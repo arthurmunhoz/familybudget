@@ -1,7 +1,7 @@
 // Shared UI primitives for the One Roof RN app — themed Screen, header, card,
 // button, text, and text field. Every module screen builds from these so the
 // "Warm Hearth" look stays consistent.
-import { type ReactNode } from 'react'
+import { type ReactNode, type Ref } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -46,6 +46,7 @@ export function Screen({
   pad = true,
   edges = ['top', 'left', 'right'],
   header,
+  scrollRef,
 }: {
   children: ReactNode
   scroll?: boolean
@@ -55,6 +56,9 @@ export function Screen({
    *  Pass an <AppHeader/> here instead of as the first child so it doesn't
    *  scroll away. */
   header?: ReactNode
+  /** Optional ref to the inner ScrollView (only when `scroll`) — for
+   *  programmatic scroll-to, e.g. deep-linking to a section. */
+  scrollRef?: Ref<ScrollView>
 }) {
   const { c } = useTheme()
   const inner = pad ? { paddingHorizontal: sp.lg } : undefined
@@ -63,6 +67,7 @@ export function Screen({
       {header ? <View style={inner}>{header}</View> : null}
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={[{ paddingBottom: sp.xxl }, inner]}
           keyboardShouldPersistTaps="handled"

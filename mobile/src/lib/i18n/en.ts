@@ -430,6 +430,7 @@ export const en = {
   'home.noneYet': 'Nothing tracked yet — tap to set up.',
   'home.today': 'Today',
   'home.setCity': 'Set city',
+  'home.inCity': 'in {city}',
   'home.nothingToday': 'Nothing on today — enjoy your day.',
   'home.turns': 'turns {n}',
   'home.years': '{n} years',

@@ -428,6 +428,7 @@ export const pt: Record<keyof typeof en, string> = {
   'home.noneYet': 'Nada por aqui ainda — toque para começar.',
   'home.today': 'Hoje',
   'home.setCity': 'Definir cidade',
+  'home.inCity': 'em {city}',
   'home.nothingToday': 'Nada para hoje — aproveite o dia.',
   'home.turns': 'faz {n}',
   'home.years': '{n} anos',
