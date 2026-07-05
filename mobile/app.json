@@ -13,7 +13,9 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.oneroof.app"]
+        "com.apple.security.application-groups": [
+          "group.com.oneroof.app"
+        ]
       },
       "infoPlist": {
         "NSFaceIDUsageDescription": "Face ID unlocks your private Document Vault.",
@@ -76,6 +78,12 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#c2603f"
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "One Roof syncs your family calendar with your device calendar."
         }
       ],
       "@bacons/apple-targets"

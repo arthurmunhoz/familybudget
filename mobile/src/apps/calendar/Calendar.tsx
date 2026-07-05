@@ -33,8 +33,10 @@ import { supabase } from '@/lib/supabase'
 import type { CalendarEvent } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { getGoogleConnection } from '@/lib/googleCalendar'
+import { getAppleConnection, isAppleCalendarAvailable, syncAppleCalendar } from '@/lib/appleCalendar'
 import EventForm, { type EventDraft } from './EventForm'
 import { GoogleIcon } from './GoogleIcon'
+import { AppleIcon } from './AppleIcon'
 
 // App language → BCP-47 locale for Intl date/time formatting.
 const LOCALES: Record<string, string> = { en: 'en', es: 'es', pt: 'pt-BR' }
@@ -103,6 +105,29 @@ export default function Calendar() {
     }, []),
   )
 
+  // Apple Calendar is on-device (EventKit). Color the header button, and when
+  // linked, sync on open so pulled device events stay fresh, then refresh.
+  const [appleConnected, setAppleConnected] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      getAppleConnection().then((v) => {
+        if (!active) return
+        setAppleConnected(!!v)
+        if (v) {
+          syncAppleCalendar()
+            .then(() => {
+              if (active) load()
+            })
+            .catch(() => {})
+        }
+      })
+      return () => {
+        active = false
+      }
+    }, [load]),
+  )
+
   const [selected, setSelected] = useState(today)
   const [mode, setMode] = useState<'month' | 'upcoming'>('month')
   const [view, setView] = useState(() => {
@@ -140,8 +165,9 @@ export default function Calendar() {
   }
 
   function openEdit(ev: CalendarEvent) {
-    // Google-pulled rows are read-only — surface but don't open the editor.
-    if (ev.source === 'google') return
+    // Externally-sourced rows (Google / Apple device calendar) are read-only —
+    // surface them but don't open the editor.
+    if (ev.source !== 'oneroof') return
     setEditing(ev)
     setDraft({
       title: ev.title,
@@ -276,6 +302,24 @@ export default function Calendar() {
               >
                 <GoogleIcon size={18} color={googleConnected ? undefined : c.textFaint} />
               </Pressable>
+              {isAppleCalendarAvailable ? (
+                <Pressable
+                  onPress={() => router.push('/apple-calendar')}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('calendar.apple')}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: c.surface,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <AppleIcon size={17} color={appleConnected ? c.text : c.textFaint} />
+                </Pressable>
+              ) : null}
             </View>
           }
         />

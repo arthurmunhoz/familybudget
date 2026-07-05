@@ -201,10 +201,13 @@ export interface CalendarEvent {
   kind: EventKind
   /** Minutes-before to remind; null = no reminder. */
   reminder_minutes: number | null
-  /** Where the event came from: created in-app or pulled from Google. */
-  source: 'oneroof' | 'google'
+  /** Where the event came from: created in-app, pulled from Google, or pulled
+   *  from the device's Apple/iCloud calendar (on-device EventKit sync). */
+  source: 'oneroof' | 'google' | 'apple'
   google_event_id: string | null
   google_calendar_id: string | null
+  /** The device (EventKit) event id for source='apple' rows — dedups re-imports. */
+  apple_event_id: string | null
   synced_at: string | null
   created_by: string | null
   created_at: string
