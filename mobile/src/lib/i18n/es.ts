@@ -38,6 +38,8 @@ export const es: Record<keyof typeof en, string> = {
   'pings.filterAll': 'Todos',
   'pings.filterSent': 'Enviados',
   'pings.filterReceived': 'Recibidos',
+  'pings.today': 'Hoy',
+  'pings.yesterday': 'Ayer',
   'pings.empty': 'Aún no hay avisos.',
   'pings.noAcks': 'Nadie lo ha confirmado todavía.',
   'pings.preset.help': 'Necesito ayuda',

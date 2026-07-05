@@ -6,22 +6,39 @@
 // Deep-link: when the Hub banner is tapped, the screen passes focusId here — we
 // switch to "All", scroll that nudge into view, and pulse-highlight it so the
 // user can spot it. Data + realtime live in the screen (src/app/pings.tsx).
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { Phone, ThumbsUp } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
-import { formatDay, timeAgo } from '@/lib/format'
+import { addDaysISO, formatDay, timeAgo, todayISO } from '@/lib/format'
+import type { Lang } from '@/lib/i18n'
 import type { Ping, PingAck } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 
 export type PingWithAcks = Ping & { acks: PingAck[] }
 type Seg = 'all' | 'sent' | 'received'
 
+const LOCALE: Record<Lang, string> = { en: 'en-US', es: 'es', pt: 'pt-BR' }
+
 /** timeAgo for the first day, then the calendar day for older nudges. */
 function when(iso: string): string {
   return Date.now() - new Date(iso).getTime() > 86_400_000 ? formatDay(iso.slice(0, 10)) : timeAgo(iso)
+}
+
+/** Local ISO day (YYYY-MM-DD) of a timestamp — for grouping by calendar day. */
+function localDay(iso: string): string {
+  const d = new Date(iso)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+const ordinal = (n: number): string => {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`
 }
 
 export default function PingsHistory({
@@ -45,7 +62,7 @@ export default function PingsHistory({
   focusId?: string | null
 }) {
   const { c } = useTheme()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [seg, setSeg] = useState<Seg>('all')
   const [highlightId, setHighlightId] = useState<string | null>(null)
 
@@ -72,6 +89,38 @@ export default function PingsHistory({
   const filtered = pings.filter((p) =>
     seg === 'all' ? true : seg === 'sent' ? p.sender_email === myEmail : p.sender_email !== myEmail,
   )
+
+  // Group by local calendar day (Today / Yesterday / "Jul 3rd"), newest first.
+  const groups = useMemo(() => {
+    const today = todayISO()
+    const yesterday = addDaysISO(today, -1)
+    const curYear = Number(today.slice(0, 4))
+    const locale = LOCALE[lang]
+    const dayLabel = (dayISO: string): string => {
+      if (dayISO === today) return t('pings.today')
+      if (dayISO === yesterday) return t('pings.yesterday')
+      const [y, m, d] = dayISO.split('-').map(Number)
+      const date = new Date(y, m - 1, d)
+      if (lang === 'en') {
+        const mon = date.toLocaleDateString('en-US', { month: 'short' })
+        return y === curYear ? `${mon} ${ordinal(d)}` : `${mon} ${ordinal(d)}, ${y}`
+      }
+      return date.toLocaleDateString(locale, {
+        month: 'short',
+        day: 'numeric',
+        ...(y === curYear ? {} : { year: 'numeric' }),
+      })
+    }
+    const sorted = [...filtered].sort((a, b) => b.created_at.localeCompare(a.created_at))
+    const out: { key: string; label: string; items: PingWithAcks[] }[] = []
+    for (const p of sorted) {
+      const day = localDay(p.created_at)
+      const last = out[out.length - 1]
+      if (last && last.key === day) last.items.push(p)
+      else out.push({ key: day, label: dayLabel(day), items: [p] })
+    }
+    return out
+  }, [filtered, lang, t])
 
   const segs: { id: Seg; label: string }[] = [
     { id: 'all', label: t('pings.filterAll') },
@@ -110,22 +159,36 @@ export default function PingsHistory({
           style={{ flex: 1 }}
           contentContainerStyle={{ gap: sp.sm, paddingTop: sp.md, paddingBottom: sp.xxl }}
         >
-          {filtered.map((p) => (
-            <HistoryRow
-              key={p.id}
-              p={p}
-              highlighted={highlightId === p.id}
-              myEmail={myEmail}
-              phones={phones}
-              ackedLocal={ackedLocal}
-              senderName={senderName}
-              onAck={onAck}
-              onCall={onCall}
-              onLayout={(y) => {
-                rowY.current[p.id] = y
+          {groups.flatMap((g, gi) => [
+            <Txt
+              key={`h-${g.key}`}
+              variant="label"
+              style={{
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                color: c.textFaint,
+                marginTop: gi > 0 ? sp.md : 0,
               }}
-            />
-          ))}
+            >
+              {g.label}
+            </Txt>,
+            ...g.items.map((p) => (
+              <HistoryRow
+                key={p.id}
+                p={p}
+                highlighted={highlightId === p.id}
+                myEmail={myEmail}
+                phones={phones}
+                ackedLocal={ackedLocal}
+                senderName={senderName}
+                onAck={onAck}
+                onCall={onCall}
+                onLayout={(y) => {
+                  rowY.current[p.id] = y
+                }}
+              />
+            )),
+          ])}
         </ScrollView>
       )}
     </View>

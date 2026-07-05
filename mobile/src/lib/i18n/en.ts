@@ -40,6 +40,8 @@ export const en = {
   'pings.filterAll': 'All',
   'pings.filterSent': 'Sent',
   'pings.filterReceived': 'Received',
+  'pings.today': 'Today',
+  'pings.yesterday': 'Yesterday',
   'pings.empty': 'No nudges yet.',
   'pings.noAcks': 'No one has acknowledged yet.',
   'pings.preset.help': 'Need help',
