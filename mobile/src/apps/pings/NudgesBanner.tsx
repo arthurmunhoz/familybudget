@@ -171,18 +171,22 @@ export default function NudgesBanner() {
                 </Txt>
               </View>
             </Pressable>
-            {/* Respond CTA (separate target so it doesn't trigger the deep-link). */}
-            {isHelp && phone ? (
-              <Pressable
-                onPress={() => void Linking.openURL(`tel:${phone}`)}
-                style={[styles.actionBtn, { backgroundColor: c.expense }]}
-                accessibilityRole="button"
-                accessibilityLabel={t('pings.call')}
-              >
-                <Phone size={14} strokeWidth={2.5} color="#ffffff" />
-                <Txt style={styles.actionTxt}>{t('pings.call')}</Txt>
-              </Pressable>
-            ) : (
+            {/* Respond CTAs (separate targets so they don't trigger the deep-link).
+                Help nudges get Call AND Got it, so a recipient can acknowledge —
+                and dismiss the banner — without having to call. Other nudges just
+                get Got it. */}
+            <View style={styles.actions}>
+              {isHelp && phone ? (
+                <Pressable
+                  onPress={() => void Linking.openURL(`tel:${phone}`)}
+                  style={[styles.actionBtn, { backgroundColor: c.expense }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('pings.call')}
+                >
+                  <Phone size={14} strokeWidth={2.5} color="#ffffff" />
+                  <Txt style={styles.actionTxt}>{t('pings.call')}</Txt>
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={() => ack(p.id)}
                 style={[styles.actionBtn, { backgroundColor: c.accent }]}
@@ -192,7 +196,7 @@ export default function NudgesBanner() {
                 <ThumbsUp size={14} strokeWidth={2.5} color="#ffffff" />
                 <Txt style={styles.actionTxt}>{t('pings.gotIt')}</Txt>
               </Pressable>
-            )}
+            </View>
           </View>
         )
       })}
@@ -251,9 +255,11 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: sp.md },
   emoji: { fontSize: 26 },
+  actions: { gap: 6, alignItems: 'stretch' },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 5,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
