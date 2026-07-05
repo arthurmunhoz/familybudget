@@ -1,9 +1,11 @@
-// Family module: list every household member (avatar + name + a hint line), tap
-// one to view their full profile. The signed-in user can edit their own profile
-// and avatar; everyone can read all profiles (RLS scopes both reads and writes).
+// Family module: one screen listing every household member (avatar + name + a
+// hint line). Tapping a member expands their row in place to reveal the full
+// profile card — there is no separate detail screen. The signed-in user can edit
+// their own profile and avatar; everyone can read all profiles (RLS scopes both
+// reads and writes).
 import { useState } from 'react'
-import { View } from 'react-native'
-import { ChevronRight } from 'lucide-react-native'
+import { Pressable, View } from 'react-native'
+import { ChevronDown, ChevronRight } from 'lucide-react-native'
 
 import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
@@ -15,7 +17,7 @@ import { useTheme, sp } from '@/theme/theme'
 import { Screen, AppHeader, Card, Txt, Loader, EmptyState } from '@/components/ui'
 import type { MemberProfile } from '@/lib/types'
 import { Avatar } from './Avatar'
-import { MemberDetail } from './MemberDetail'
+import { MemberDetails } from './MemberDetail'
 import { EditProfile } from './EditProfile'
 import { ageOf, type Member } from './familyShared'
 
@@ -25,7 +27,8 @@ export default function Family() {
   const { c } = useTheme()
   const today = todayISO()
 
-  const [selected, setSelected] = useState<string | null>(null)
+  // Which member's card is expanded (accordion — one open at a time).
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [initialPhoto, setInitialPhoto] = useState<string | null>(null)
 
@@ -56,37 +59,6 @@ export default function Family() {
     setEditing(true)
   }
 
-  // Detail view for the tapped member.
-  if (selected) {
-    const member = members.find((m) => m.email === selected)
-    if (member) {
-      const isMe = member.email === profile?.email
-      return (
-        <>
-          <MemberDetail
-            member={member}
-            profile={byEmail[member.email]}
-            isMe={isMe}
-            onBack={() => setSelected(null)}
-            onEdit={openEditMine}
-          />
-          {editing && profile ? (
-            <EditProfile
-              profile={profile}
-              mine={byEmail[profile.email]}
-              initialPhoto={initialPhoto}
-              onClose={() => setEditing(false)}
-              onSaved={() => {
-                setEditing(false)
-                load()
-              }}
-            />
-          ) : null}
-        </>
-      )
-    }
-  }
-
   return (
     <Screen scroll header={<AppHeader title={t('family.title')} />}>
       {loading || profiles.length === 0 ? (
@@ -98,8 +70,9 @@ export default function Family() {
           {members.map((m) => {
             const p = byEmail[m.email]
             const isMe = m.email === profile?.email
+            const isOpen = expanded === m.email
             const age = ageOf(p?.birthday ?? null, today)
-            // A short hint line under the name: age, else phone, else nothing.
+            // A short hint line under the name (collapsed only): age, else phone.
             const hint =
               age != null
                 ? t('family.yrs', { years: age })
@@ -107,8 +80,12 @@ export default function Family() {
                   ? formatPhone(p.phone)
                   : null
             return (
-              <Card key={m.email} onPress={() => setSelected(m.email)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <Card key={m.email}>
+                <Pressable
+                  onPress={() => setExpanded(isOpen ? null : m.email)}
+                  accessibilityRole="button"
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}
+                >
                   <Avatar name={m.display_name} avatarPath={p?.avatar_path} size={48} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
@@ -130,15 +107,45 @@ export default function Family() {
                         </View>
                       ) : null}
                     </View>
-                    {hint ? <Txt variant="muted">{hint}</Txt> : null}
+                    {!isOpen && hint ? <Txt variant="muted">{hint}</Txt> : null}
                   </View>
-                  <ChevronRight size={20} color={c.textFaint} />
-                </View>
+                  {isOpen ? (
+                    <ChevronDown size={20} color={c.textFaint} />
+                  ) : (
+                    <ChevronRight size={20} color={c.textFaint} />
+                  )}
+                </Pressable>
+
+                {isOpen ? (
+                  <View
+                    style={{
+                      marginTop: sp.md,
+                      paddingTop: sp.md,
+                      borderTopWidth: 1,
+                      borderTopColor: c.border,
+                    }}
+                  >
+                    <MemberDetails member={m} profile={p} isMe={isMe} onEdit={openEditMine} />
+                  </View>
+                ) : null}
               </Card>
             )
           })}
         </View>
       )}
+
+      {editing && profile ? (
+        <EditProfile
+          profile={profile}
+          mine={byEmail[profile.email]}
+          initialPhoto={initialPhoto}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false)
+            load()
+          }}
+        />
+      ) : null}
     </Screen>
   )
 }
