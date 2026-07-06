@@ -93,6 +93,25 @@ still has a list → detail page; make it expand inline.
 month calendar of all pets' events with per-pet colored dots + the upcoming
 list. Adds `pets.tag_color` (migration). Port to PWA `src/apps/pets/`.
 
+## 7a. Gotcha: don't inline a sub-component in Better Deal (or similar forms) (2026-07-06)
+
+Not a parity gap — a bug fixed on iOS that's worth guarding against here too.
+`mobile/src/apps/calc/BetterDeal.tsx` defined its `OptionCard` (the per-option
+price/amount card) as a function *inside* `BetterDeal`'s render body. Every
+keystroke changed state → re-rendered `BetterDeal` → gave React a brand-new
+`OptionCard` component type → remounted the `TextInput`s → dropped keyboard
+focus mid-type (most noticeable right as the "Better deal" winner badge first
+appeared, since that's when both `TextInput`s' surrounding JSX changed). Fixed
+by hoisting `OptionCard` to a stable top-level component.
+
+The PWA's `BetterDeal` (`src/apps/calc/Calculator.tsx`) does **not** have this
+bug — its `card(...)` is a plain function returning JSX inline (called
+directly, not rendered as `<Card/>`), so React never sees a new component
+type. No fix needed here, but if `Calculator.tsx` is ever refactored to
+extract `card` into a real `function OptionCard(...)` / `<OptionCard/>`
+component, hoist it to module scope (outside `BetterDeal`) rather than
+defining it inside — same trap.
+
 ## 7. Nudges: editable presets + general high-priority type (2026-07-04)
 
 `mobile/src/apps/pings/PingComposer.tsx` + `NudgesBanner.tsx` + `PingsHistory.tsx`
@@ -104,3 +123,12 @@ the red UI + Call CTA + always-to-everyone send + urgent push (`api/send-ping.ts
 now keys `urgent` off `high_priority`) + an in-app `Vibration` buzz on arrival.
 Port to the PWA: `src/apps/pings/` composer + PingsBanner + `lib/pings.ts`, and
 the PWA web-push already flows through the same `send-ping`.
+
+## 8. Discount calculator redesign (2026-07-06)
+
+`mobile/src/apps/calc/Discount.tsx` — the plain price/percent/result-rows layout
+became a deal-forward design: the sale price is the hero (big Fraunces "You pay"
+number) with the original price struck through beside it and a green
+"Save $X · N%" badge; the discount is a large "N% OFF" readout with quick chips,
+a Custom field, and − / + fine-tune. Port to the PWA's `calc/Calculator.tsx`
+Discount section. (New i18n: calc.youPay / off / savePill.)
