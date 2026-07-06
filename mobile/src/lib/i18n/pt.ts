@@ -210,6 +210,7 @@ export const pt: Record<keyof typeof en, string> = {
   'common.removeName': 'Remover {name}',
   'common.deleteName': 'Excluir {name}',
   'common.close': 'Fechar',
+  'common.done': 'Pronto',
   'common.everyone': 'Todos',
   'common.on': 'Ativado',
   'common.off': 'Desativado',
@@ -338,6 +339,7 @@ export const pt: Record<keyof typeof en, string> = {
   'pets.edit': 'Editar',
   'pets.calendar': 'Calendário',
   'pets.tagColor': 'Cor no calendário',
+  'pets.dueMarker': 'Próximo',
   'pets.noDayEvents': 'Nada neste dia.',
 
   'calendar.title': 'Calendário',

@@ -2,7 +2,7 @@
 // inside PetCare: pet picker, type picker (vet/vaccine/medication/grooming/other),
 // title, date, optional next-due, optional notes. Used for new events, edits, and
 // the "log again" re-log flow (the parent pre-fills the draft).
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
@@ -69,7 +69,10 @@ export default function EventForm({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+      >
         <View
           style={{
             maxHeight: '90%',
@@ -190,7 +193,7 @@ export default function EventForm({
             ) : null}
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

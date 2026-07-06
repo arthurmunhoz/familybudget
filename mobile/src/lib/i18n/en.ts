@@ -212,6 +212,7 @@ export const en = {
   'common.removeName': 'Remove {name}',
   'common.deleteName': 'Delete {name}',
   'common.close': 'Close',
+  'common.done': 'Done',
   'common.everyone': 'Everyone',
   'common.on': 'On',
   'common.off': 'Off',
@@ -340,6 +341,7 @@ export const en = {
   'pets.edit': 'Edit',
   'pets.calendar': 'Calendar',
   'pets.tagColor': 'Calendar color',
+  'pets.dueMarker': 'Next due',
   'pets.noDayEvents': 'Nothing on this day.',
 
   'calendar.title': 'Calendar',

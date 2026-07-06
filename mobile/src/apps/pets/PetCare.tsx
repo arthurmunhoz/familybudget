@@ -5,11 +5,11 @@
 // upcoming reminders sorted by soonest, with a "done again" re-log on overdue.
 // The bottom bar adds an event (or the first pet). Pet + event add/edit are
 // bottom-sheet modals.
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Dimensions, Modal, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
-import { Check, ChevronLeft, ChevronRight, PawPrint, Pencil, Plus } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, PawPrint, Pencil, Plus } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -122,6 +122,21 @@ export default function PetCare() {
     [events, selectedDay],
   )
   const upcoming = useMemo(() => reminderEvents(events), [events])
+
+  // Upcoming "next due" dates grouped by day (within the visible month), so the
+  // calendar also marks when things are due — not just when they were logged.
+  const dueByDay = useMemo(() => {
+    const map = new Map<string, PetEvent[]>()
+    for (const e of upcoming) {
+      const d = e.next_due
+      if (!d || d < monthStart || d > monthEnd) continue
+      const arr = map.get(d)
+      if (arr) arr.push(e)
+      else map.set(d, [e])
+    }
+    return map
+  }, [upcoming, monthStart, monthEnd])
+  const dayDue = useMemo(() => dueByDay.get(selectedDay) ?? [], [dueByDay, selectedDay])
 
   function dueLabel(due: string): { text: string; overdue: boolean } {
     const days = daysBetweenISO(today, due)
@@ -415,34 +430,19 @@ export default function PetCare() {
                   </View>
                 ) : null}
 
-                {/* calendar color picker */}
-                <View style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md, gap: sp.sm }}>
+                {/* calendar color — a dropdown that shows only the selected swatch */}
+                <View
+                  style={{
+                    borderTopWidth: 1,
+                    borderTopColor: c.border,
+                    paddingTop: sp.md,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
                   <Txt variant="label">{t('pets.tagColor')}</Txt>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                    {PET_PALETTE.map((hex) => {
-                      const active = selPetColor.toLowerCase() === hex.toLowerCase()
-                      return (
-                        <Pressable
-                          key={hex}
-                          onPress={() => setPetColor(hex)}
-                          disabled={savingColor}
-                          accessibilityLabel={hex}
-                          style={{
-                            height: 30,
-                            width: 30,
-                            borderRadius: 15,
-                            backgroundColor: hex,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderWidth: active ? 2 : 0,
-                            borderColor: c.text,
-                          }}
-                        >
-                          {active ? <Check size={16} color="#fff" strokeWidth={3} /> : null}
-                        </Pressable>
-                      )
-                    })}
-                  </View>
+                  <ColorDropdown value={selPetColor} onSelect={setPetColor} disabled={savingColor} />
                 </View>
               </Card>
             ) : null}
@@ -483,9 +483,12 @@ export default function PetCare() {
                     return <View key={`b${i}`} style={{ width: `${100 / 7}%`, height: 46 }} />
                   }
                   const dateStr = `${view.y}-${pad(view.m)}-${pad(day)}`
-                  const dayEvs = eventsByDay.get(dateStr)
-                  // Unique per-pet colors for that day's events (up to 3 dots).
-                  const dots = [...new Set((dayEvs ?? []).map((e) => colorMap[e.pet_id]))].slice(0, 3)
+                  // Per-pet colors for events on that day (logged) + next-due
+                  // dates (upcoming), up to 3 dots.
+                  const colorsSet = new Set<string>()
+                  for (const e of eventsByDay.get(dateStr) ?? []) colorsSet.add(colorMap[e.pet_id])
+                  for (const e of dueByDay.get(dateStr) ?? []) colorsSet.add(colorMap[e.pet_id])
+                  const dots = [...colorsSet].slice(0, 3)
                   const isToday = dateStr === today
                   const isSelected = dateStr === selectedDay
                   return (
@@ -533,33 +536,78 @@ export default function PetCare() {
               {/* selected day's events */}
               <View style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.sm, gap: sp.sm }}>
                 <Txt variant="label">{formatDay(selectedDay)}</Txt>
-                {dayEvents.length === 0 ? (
+                {dayEvents.length === 0 && dayDue.length === 0 ? (
                   <Txt variant="faint">{t('pets.noDayEvents')}</Txt>
                 ) : (
-                  dayEvents.map((e) => {
-                    const Icon = TYPE_ICON[e.type]
-                    const pet = petById[e.pet_id]
-                    return (
-                      <Pressable
-                        key={e.id}
-                        onPress={() => openEditEvent(e)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
-                      >
-                        <View
-                          style={{ height: 8, width: 8, borderRadius: 4, backgroundColor: colorMap[e.pet_id] }}
-                        />
-                        <Icon size={16} color={c.textMuted} />
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
-                            {e.title}
-                          </Txt>
-                          <Txt variant="faint" numberOfLines={1}>
-                            {pet?.emoji} {pet?.name}
-                          </Txt>
-                        </View>
-                      </Pressable>
-                    )
-                  })
+                  <>
+                    {dayEvents.map((e) => {
+                      const Icon = TYPE_ICON[e.type]
+                      const pet = petById[e.pet_id]
+                      return (
+                        <Pressable
+                          key={e.id}
+                          onPress={() => openEditEvent(e)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
+                        >
+                          <View
+                            style={{ height: 8, width: 8, borderRadius: 4, backgroundColor: colorMap[e.pet_id] }}
+                          />
+                          <Icon size={16} color={c.textMuted} />
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
+                              {e.title}
+                            </Txt>
+                            <Txt variant="faint" numberOfLines={1}>
+                              {pet?.emoji} {pet?.name}
+                            </Txt>
+                          </View>
+                        </Pressable>
+                      )
+                    })}
+                    {dayDue.map((e) => {
+                      const Icon = TYPE_ICON[e.type]
+                      const pet = petById[e.pet_id]
+                      return (
+                        <Pressable
+                          key={`due-${e.id}`}
+                          onPress={() => openEditEvent(e)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
+                        >
+                          {/* hollow dot = upcoming due (vs a filled dot = logged) */}
+                          <View
+                            style={{
+                              height: 8,
+                              width: 8,
+                              borderRadius: 4,
+                              borderWidth: 1.5,
+                              borderColor: colorMap[e.pet_id],
+                            }}
+                          />
+                          <Icon size={16} color={c.textMuted} />
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
+                              {e.title}
+                            </Txt>
+                            <Txt variant="faint" numberOfLines={1}>
+                              {pet?.emoji} {pet?.name}
+                            </Txt>
+                          </View>
+                          <View
+                            style={{
+                              borderRadius: radius.pill,
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                              backgroundColor: c.accentSoft,
+                            }}
+                          >
+                            <Txt style={{ fontSize: 11, fontWeight: '700', color: c.accent }}>
+                              {t('pets.dueMarker')}
+                            </Txt>
+                          </View>
+                        </Pressable>
+                      )
+                    })}
+                  </>
                 )}
               </View>
             </Card>
@@ -707,5 +755,107 @@ export default function PetCare() {
         />
       ) : null}
     </SafeAreaView>
+  )
+}
+
+/** Compact color picker: a pill showing only the selected swatch; the full
+ *  palette lives in a dropdown anchored under it (measured in-window so it
+ *  overlays without clipping the card). */
+function ColorDropdown({
+  value,
+  onSelect,
+  disabled,
+}: {
+  value: string
+  onSelect: (hex: string) => void
+  disabled?: boolean
+}) {
+  const { c } = useTheme()
+  const ref = useRef<View>(null)
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const winW = Dimensions.get('window').width
+
+  const openMenu = () => {
+    ref.current?.measureInWindow((x, y, w, h) => {
+      setPos({ top: y + h + 6, right: Math.max(8, winW - (x + w)) })
+      setOpen(true)
+    })
+  }
+
+  return (
+    <>
+      <Pressable
+        ref={ref}
+        onPress={openMenu}
+        disabled={disabled}
+        accessibilityLabel={value}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          backgroundColor: c.surface,
+          borderRadius: radius.pill,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        <View style={{ height: 22, width: 22, borderRadius: 11, backgroundColor: value }} />
+        <ChevronDown size={14} color={c.textMuted} />
+      </Pressable>
+
+      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)}>
+          <View
+            style={{
+              position: 'absolute',
+              top: pos.top,
+              right: pos.right,
+              width: 168,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 10,
+              padding: 12,
+              backgroundColor: c.card,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: c.border,
+              shadowColor: '#000',
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 8,
+            }}
+          >
+            {PET_PALETTE.map((hex) => {
+              const active = value.toLowerCase() === hex.toLowerCase()
+              return (
+                <Pressable
+                  key={hex}
+                  onPress={() => {
+                    onSelect(hex)
+                    setOpen(false)
+                  }}
+                  accessibilityLabel={hex}
+                  style={{
+                    height: 30,
+                    width: 30,
+                    borderRadius: 15,
+                    backgroundColor: hex,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: active ? 2 : 0,
+                    borderColor: c.text,
+                  }}
+                >
+                  {active ? <Check size={16} color="#fff" strokeWidth={3} /> : null}
+                </Pressable>
+              )
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   )
 }
