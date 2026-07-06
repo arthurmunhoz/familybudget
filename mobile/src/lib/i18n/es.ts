@@ -481,7 +481,7 @@ export const es: Record<keyof typeof en, string> = {
   'settings.active': 'ACTIVO',
   'settings.plusFeatureScans': 'Escaneos de recibos y facturas con IA ilimitados',
   'settings.plusFeatureVault': 'Bóveda de documentos con bloqueo Face ID',
-  'settings.plusFeatureCalendar': 'Sincronización bidireccional con Google Calendar',
+  'settings.plusFeatureCalendar': 'Sincronización bidireccional con Google y Apple Calendar',
   'settings.plusUnlock': 'Desbloquea todo el hogar con One Roof Plus:',
   'settings.manageSubscription': 'Gestionar suscripción',
   'settings.getPlus': 'Obtener One Roof Plus',

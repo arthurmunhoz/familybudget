@@ -482,7 +482,7 @@ export const en = {
   'settings.active': 'ACTIVE',
   'settings.plusFeatureScans': 'Unlimited AI receipt & bill scans',
   'settings.plusFeatureVault': 'Document Vault with Face ID lock',
-  'settings.plusFeatureCalendar': 'Google Calendar two-way sync',
+  'settings.plusFeatureCalendar': 'Google & Apple Calendar two-way sync',
   'settings.plusUnlock': 'Unlock the whole household with One Roof Plus:',
   'settings.manageSubscription': 'Manage subscription',
   'settings.getPlus': 'Get One Roof Plus',
