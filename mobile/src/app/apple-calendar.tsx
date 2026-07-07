@@ -60,8 +60,11 @@ export default function AppleCalendarScreen() {
       const ok = await connectAppleCalendar()
       if (ok) await refresh()
       else Alert.alert(t('calendar.appleDenied'))
-    } catch {
-      Alert.alert(t('calendar.connectError'))
+    } catch (e) {
+      // No crash reporting is wired up yet — surface the real message so a
+      // failure is diagnosable from the alert itself instead of a dead end.
+      console.warn('[apple-calendar] connect failed', e)
+      Alert.alert(t('calendar.connectError'), e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
@@ -73,8 +76,9 @@ export default function AppleCalendarScreen() {
     try {
       await syncAppleCalendar()
       await refresh()
-    } catch {
-      Alert.alert(t('calendar.connectError'))
+    } catch (e) {
+      console.warn('[apple-calendar] sync failed', e)
+      Alert.alert(t('calendar.connectError'), e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
