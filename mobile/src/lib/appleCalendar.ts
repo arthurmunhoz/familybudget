@@ -14,7 +14,11 @@
 // occurrence is stored as its own non-recurring row (apple_event_id = id#start).
 import { Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import * as Calendar from 'expo-calendar'
+// expo-calendar 56.0.9 deprecated the classic promise-based API at the
+// package root (calling it now rejects with a deprecation notice instead of
+// running) — the exact same functions still work unchanged from the /legacy
+// subpath, which is what this whole file is built against.
+import * as Calendar from 'expo-calendar/legacy'
 
 import { supabase } from './supabase'
 import type { CalendarEvent, EventRecurrence } from './types'
