@@ -1,12 +1,13 @@
-// Pet Care — a per-pet view. Top: a horizontal carousel to pick a pet (each in
-// its calendar color). Below: the selected pet's info card, with a calendar-color
-// swatch picker and an Edit button. Below that: a month calendar showing EVERY
-// pet's events as small per-pet colored dots (tap a day to see it), then the
-// upcoming reminders sorted by soonest, with a "done again" re-log on overdue.
-// The bottom bar adds an event (or the first pet). Pet + event add/edit are
-// bottom-sheet modals.
+// Pet Care — a per-pet view. Top: a horizontally-paging carousel where each
+// page IS a pet's full info card (photo, details, calendar-color picker, Edit
+// button) — scrolling moves to the next pet; the last page adds a new one.
+// Below: a month calendar showing EVERY pet's events as small per-pet colored
+// dots (tap a day to see it), then the upcoming reminders sorted by soonest,
+// with a "done again" re-log on overdue. The bottom bar adds an event (or the
+// first pet). Pet + event add/edit are bottom-sheet modals.
 import {
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -20,7 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
@@ -67,7 +68,8 @@ export default function PetCare() {
     return { y, m } // m is 1-indexed
   })
   const [savingColor, setSavingColor] = useState(false)
-  const [colorMenuOpen, setColorMenuOpen] = useState(false)
+  const carouselRef = useRef<HTMLDivElement>(null)
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const [showForm, setShowForm] = useState(false)
   const [fPet, setFPet] = useState('')
@@ -126,8 +128,6 @@ export default function PetCare() {
       setSelectedPet(petsSorted[0].id)
     }
   }, [petsSorted, selectedPet])
-
-  const selPet = pets.find((p) => p.id === selectedPet) ?? null
 
   // Month grid: events grouped by their date within the visible month.
   const monthStart = `${view.y}-${pad(view.m)}-01`
@@ -245,12 +245,11 @@ export default function PetCare() {
     await supabase.from('pet_events').delete().eq('id', event.id)
   }
 
-  async function setPetColor(hex: string) {
-    if (!selPet || savingColor) return
+  async function setPetColor(petId: string, hex: string) {
+    if (savingColor) return
     setSavingColor(true)
-    await supabase.from('pets').update({ tag_color: hex }).eq('id', selPet.id)
+    await supabase.from('pets').update({ tag_color: hex }).eq('id', petId)
     setSavingColor(false)
-    setColorMenuOpen(false)
     load()
   }
 
@@ -285,29 +284,57 @@ export default function PetCare() {
     })
   }
 
-  // Info-card detail rows (only the filled ones).
-  const info: { label: string; value: string }[] = []
-  if (selPet) {
-    if (selPet.species)
-      info.push({ label: t('pets.species'), value: t(`pets.species.${selPet.species}` as TKey) })
-    if (selPet.breed) info.push({ label: t('pets.breed'), value: selPet.breed })
-    if (selPet.birthday) {
-      const mo = ageInMonths(selPet.birthday, today)
+  // Info-card detail rows for any pet (only the filled ones) — used for every
+  // page of the carousel, not just the currently-selected one.
+  function infoRowsFor(p: Pet): { label: string; value: string }[] {
+    const rows: { label: string; value: string }[] = []
+    if (p.species) rows.push({ label: t('pets.species'), value: t(`pets.species.${p.species}` as TKey) })
+    if (p.breed) rows.push({ label: t('pets.breed'), value: p.breed })
+    if (p.birthday) {
+      const mo = ageInMonths(p.birthday, today)
       const age =
         mo < 0 ? '' : mo < 12 ? t('pets.ageMo', { months: mo }) : t('pets.ageY', { years: Math.floor(mo / 12) })
-      info.push({ label: t('pets.birthday'), value: formatDay(selPet.birthday) + (age ? ` · ${age}` : '') })
+      rows.push({ label: t('pets.birthday'), value: formatDay(p.birthday) + (age ? ` · ${age}` : '') })
     }
-    if (selPet.color)
-      info.push({
+    if (p.color)
+      rows.push({
         label: t('pets.color'),
-        value: selPet.color + (selPet.color_secondary ? ` & ${selPet.color_secondary}` : ''),
+        value: p.color + (p.color_secondary ? ` & ${p.color_secondary}` : ''),
       })
-    if (selPet.weight) info.push({ label: t('pets.weight'), value: selPet.weight })
-    if (selPet.length) info.push({ label: t('pets.length'), value: selPet.length })
-    if (selPet.microchip) info.push({ label: t('pets.microchip'), value: selPet.microchip })
-    if (selPet.notes) info.push({ label: t('pets.petNotes'), value: selPet.notes })
+    if (p.weight) rows.push({ label: t('pets.weight'), value: p.weight })
+    if (p.length) rows.push({ label: t('pets.length'), value: p.length })
+    if (p.microchip) rows.push({ label: t('pets.microchip'), value: p.microchip })
+    if (p.notes) rows.push({ label: t('pets.petNotes'), value: p.notes })
+    return rows
   }
-  const selPetColor = selPet ? colorMap[selPet.id] : undefined
+  const subtitleFor = (p: Pet) =>
+    [p.species ? t(`pets.species.${p.species}` as TKey) : null, p.breed].filter(Boolean).join(' · ')
+
+  // Scroll-snap carousel: on scroll, find whichever card's center is closest
+  // to the container's center and select it (throttled to one check per frame).
+  const scrollRaf = useRef<number | null>(null)
+  function onCarouselScroll() {
+    if (scrollRaf.current != null) return
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = null
+      const container = carouselRef.current
+      if (!container) return
+      const containerCenter = container.scrollLeft + container.clientWidth / 2
+      let closestIdx = 0
+      let closestDist = Infinity
+      cardRefs.current.forEach((el, i) => {
+        if (!el) return
+        const center = el.offsetLeft + el.offsetWidth / 2
+        const dist = Math.abs(center - containerCenter)
+        if (dist < closestDist) {
+          closestDist = dist
+          closestIdx = i
+        }
+      })
+      const pet = petsSorted[closestIdx]
+      if (pet && pet.id !== selectedPet) setSelectedPet(pet.id)
+    })
+  }
 
   return (
     <div className="mx-auto min-h-dvh max-w-md px-4 pb-32">
@@ -336,148 +363,44 @@ export default function PetCare() {
         </div>
       ) : (
         <>
-          {/* pet selector carousel */}
-          <div className="-mx-4 mb-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-2">
-            {petsSorted.map((p) => {
-              const selected = selectedPet === p.id
-              const dot = colorMap[p.id]
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedPet(p.id)}
-                  className="w-24 shrink-0 overflow-hidden rounded-2xl bg-(--card) text-left"
-                  style={{ border: `2px solid ${selected ? dot : 'transparent'}` }}
-                >
-                  <div className="flex h-18 w-full items-center justify-center overflow-hidden bg-(--surface) text-3xl">
-                    {petPhotoUrls[p.id] ? (
-                      <img
-                        src={petPhotoUrls[p.id]}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span>{p.emoji || speciesEmoji(p.species)}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 p-2">
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ background: dot }}
-                      aria-hidden="true"
-                    />
-                    <p className="truncate text-xs font-semibold text-(--text)">{p.name}</p>
-                  </div>
-                </button>
-              )
-            })}
-            {/* add-pet card */}
+          {/* pet carousel — each page IS the full info card; scroll to the
+              next pet, last page adds a new one. Scroll position drives
+              selection via onCarouselScroll (nearest-center detection). */}
+          <div
+            ref={carouselRef}
+            onScroll={onCarouselScroll}
+            className="-mx-4 mb-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pt-2 pb-2"
+          >
+            {petsSorted.map((p, i) => (
+              <div
+                key={p.id}
+                ref={(el) => {
+                  cardRefs.current[i] = el
+                }}
+                className="w-[calc(100%-2rem)] max-w-md shrink-0 snap-center rounded-2xl bg-(--card) p-4"
+              >
+                <PetInfoCard
+                  pet={p}
+                  photoUrl={petPhotoUrls[p.id]}
+                  color={colorMap[p.id]}
+                  info={infoRowsFor(p)}
+                  subtitle={subtitleFor(p)}
+                  savingColor={savingColor}
+                  t={t}
+                  onEdit={() => navigate(`/pets/${p.id}`)}
+                  onSetColor={(hex) => setPetColor(p.id, hex)}
+                />
+              </div>
+            ))}
+            {/* add-pet page */}
             <button
               onClick={() => setShowPetForm(true)}
-              className="flex w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-(--surface-2) py-3 text-(--text-faint) active:bg-(--surface)"
+              className="flex w-[calc(100%-2rem)] max-w-md shrink-0 snap-center flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-(--surface-2) py-16 text-(--text-faint) active:bg-(--surface)"
             >
-              <Plus size={22} strokeWidth={2} aria-hidden="true" />
-              <span className="text-[11px] font-semibold">{t('pets.addPet')}</span>
+              <Plus size={28} strokeWidth={2} aria-hidden="true" />
+              <span className="text-sm font-semibold">{t('pets.addPet')}</span>
             </button>
           </div>
-
-          {/* selected pet info card */}
-          {selPet && (
-            <section className="mb-4 rounded-2xl bg-(--card) p-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-2xl"
-                  style={{ border: `2px solid ${selPetColor}` }}
-                >
-                  {petPhotoUrls[selPet.id] ? (
-                    <img src={petPhotoUrls[selPet.id]} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span>{selPet.emoji || speciesEmoji(selPet.species)}</span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-display text-lg font-bold text-(--text)">{selPet.name}</p>
-                  {info[0] && (
-                    <p className="truncate text-sm text-(--text-faint)">
-                      {[
-                        selPet.species ? t(`pets.species.${selPet.species}` as TKey) : null,
-                        selPet.breed,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => navigate(`/pets/${selPet.id}`)}
-                  aria-label={t('pets.edit')}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text) active:bg-(--surface-2)"
-                >
-                  <Pencil size={14} strokeWidth={2} aria-hidden="true" />
-                  {t('pets.edit')}
-                </button>
-              </div>
-
-              {info.length > 0 && (
-                <dl className="mt-3 space-y-1.5 border-t border-(--border) pt-3">
-                  {info.map((it) => (
-                    <div key={it.label} className="flex items-baseline gap-3 text-sm">
-                      <dt className="w-24 shrink-0 text-(--text-faint)">{it.label}</dt>
-                      <dd className="min-w-0 flex-1 break-words text-(--text)">{it.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-
-              {/* calendar color — a dropdown that shows only the selected swatch */}
-              <div className="relative mt-3 flex items-center justify-between border-t border-(--border) pt-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
-                  {t('pets.tagColor')}
-                </span>
-                <button
-                  onClick={() => setColorMenuOpen((v) => !v)}
-                  disabled={savingColor}
-                  aria-label={selPetColor}
-                  className="flex items-center gap-2 rounded-full bg-(--surface) px-3 py-2 disabled:opacity-50"
-                >
-                  <span
-                    className="h-5 w-5 rounded-full"
-                    style={{ background: selPetColor }}
-                    aria-hidden="true"
-                  />
-                  <ChevronRight
-                    size={14}
-                    strokeWidth={2}
-                    aria-hidden="true"
-                    className={`text-(--text-muted) transition-transform ${colorMenuOpen ? 'rotate-90' : ''}`}
-                  />
-                </button>
-                {colorMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setColorMenuOpen(false)} />
-                    <div className="absolute right-0 top-full z-20 mt-2 flex w-42 flex-wrap gap-2.5 rounded-xl border border-(--border) bg-(--card) p-3 shadow-lg">
-                      {PET_PALETTE.map((hex) => {
-                        const active = selPetColor?.toLowerCase() === hex.toLowerCase()
-                        return (
-                          <button
-                            key={hex}
-                            onClick={() => setPetColor(hex)}
-                            aria-label={hex}
-                            className="flex h-7 w-7 items-center justify-center rounded-full"
-                            style={{
-                              background: hex,
-                              border: active ? '2px solid var(--text)' : 'none',
-                            }}
-                          >
-                            {active && <Check size={15} strokeWidth={3} className="text-white" aria-hidden="true" />}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-          )}
 
           {/* calendar of ALL pets' events */}
           <section className="mb-4 rounded-2xl bg-(--card) p-3">
@@ -821,6 +744,121 @@ export default function PetCare() {
         />
       )}
     </div>
+  )
+}
+
+/** One page of the pet carousel — the full info card (photo, details, Edit,
+ *  calendar-color picker) for a single pet. Manages its own color-dropdown
+ *  open state, since every pet's card is mounted concurrently (only one is
+ *  in view at a time, but all must be independently interactive). */
+function PetInfoCard({
+  pet,
+  photoUrl,
+  color,
+  info,
+  subtitle,
+  savingColor,
+  t,
+  onEdit,
+  onSetColor,
+}: {
+  pet: Pet
+  photoUrl: string | undefined
+  color: string
+  info: { label: string; value: string }[]
+  subtitle: string
+  savingColor: boolean
+  t: ReturnType<typeof useI18n>['t']
+  onEdit: () => void
+  onSetColor: (hex: string) => void
+}) {
+  const [colorMenuOpen, setColorMenuOpen] = useState(false)
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-(--surface) text-2xl"
+          style={{ border: `2px solid ${color}` }}
+        >
+          {photoUrl ? (
+            <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span>{pet.emoji || speciesEmoji(pet.species)}</span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-lg font-bold text-(--text)">{pet.name}</p>
+          {subtitle && <p className="truncate text-sm text-(--text-faint)">{subtitle}</p>}
+        </div>
+        <button
+          onClick={onEdit}
+          aria-label={t('pets.edit')}
+          className="flex shrink-0 items-center gap-1.5 rounded-full bg-(--surface) px-3 py-1.5 text-xs font-semibold text-(--text) active:bg-(--surface-2)"
+        >
+          <Pencil size={14} strokeWidth={2} aria-hidden="true" />
+          {t('pets.edit')}
+        </button>
+      </div>
+
+      {info.length > 0 && (
+        <dl className="mt-3 space-y-1.5 border-t border-(--surface-2) pt-3">
+          {info.map((it) => (
+            <div key={it.label} className="flex items-baseline gap-3 text-sm">
+              <dt className="w-24 shrink-0 text-(--text-faint)">{it.label}</dt>
+              <dd className="min-w-0 flex-1 break-words text-(--text)">{it.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {/* calendar color — a dropdown that shows only the selected swatch */}
+      <div className="relative mt-3 flex items-center justify-between border-t border-(--surface-2) pt-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
+          {t('pets.tagColor')}
+        </span>
+        <button
+          onClick={() => setColorMenuOpen((v) => !v)}
+          disabled={savingColor}
+          aria-label={color}
+          className="flex items-center gap-2 rounded-full bg-(--surface) px-3 py-2 disabled:opacity-50"
+        >
+          <span className="h-5 w-5 rounded-full" style={{ background: color }} aria-hidden="true" />
+          <ChevronDown
+            size={14}
+            strokeWidth={2}
+            aria-hidden="true"
+            className={`text-(--text-muted) transition-transform ${colorMenuOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {colorMenuOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setColorMenuOpen(false)} />
+            <div className="absolute right-0 top-full z-20 mt-2 flex w-42 flex-wrap gap-2.5 rounded-xl border border-(--surface-2) bg-(--card) p-3 shadow-lg">
+              {PET_PALETTE.map((hex) => {
+                const active = color.toLowerCase() === hex.toLowerCase()
+                return (
+                  <button
+                    key={hex}
+                    onClick={() => {
+                      onSetColor(hex)
+                      setColorMenuOpen(false)
+                    }}
+                    aria-label={hex}
+                    className="flex h-7 w-7 items-center justify-center rounded-full"
+                    style={{
+                      background: hex,
+                      border: active ? '2px solid var(--text)' : 'none',
+                    }}
+                  >
+                    {active && <Check size={15} strokeWidth={3} className="text-white" aria-hidden="true" />}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </>
   )
 }
 

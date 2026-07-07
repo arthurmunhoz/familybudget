@@ -1,10 +1,10 @@
-// Pet Care — a per-pet view. Top: a horizontal carousel to pick a pet (each in
-// its calendar color). Below: the selected pet's info card, with a calendar-color
-// swatch picker and an Edit button. Below that: a month calendar showing EVERY
-// pet's events as small per-pet colored dots (tap a day to see it), then the
-// upcoming reminders sorted by soonest, with a "done again" re-log on overdue.
-// The bottom bar adds an event (or the first pet). Pet + event add/edit are
-// bottom-sheet modals.
+// Pet Care — a per-pet view. Top: a horizontally-paging carousel where each
+// page IS a pet's full info card (photo, details, calendar-color picker, Edit
+// button) — swiping moves to the next pet; the last page adds a new one.
+// Below: a month calendar showing EVERY pet's events as small per-pet colored
+// dots (tap a day to see it), then the upcoming reminders sorted by soonest,
+// with a "done again" re-log on overdue. The bottom bar adds an event (or the
+// first pet). Pet + event add/edit are bottom-sheet modals.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Dimensions, Modal, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -101,8 +101,6 @@ export default function PetCare() {
     }
   }, [petsSorted, selectedPet])
 
-  const selPet = pets.find((p) => p.id === selectedPet) ?? null
-
   // Month grid: events grouped by their date within the visible month.
   const monthStart = `${view.y}-${pad(view.m)}-01`
   const monthEnd = `${view.y}-${pad(view.m)}-${pad(new Date(view.y, view.m, 0).getDate())}`
@@ -196,10 +194,10 @@ export default function PetCare() {
     ])
   }
 
-  async function setPetColor(hex: string) {
-    if (!selPet || savingColor) return
+  async function setPetColor(petId: string, hex: string) {
+    if (savingColor) return
     setSavingColor(true)
-    await supabase.from('pets').update({ tag_color: hex }).eq('id', selPet.id)
+    await supabase.from('pets').update({ tag_color: hex }).eq('id', petId)
     setSavingColor(false)
     load()
   }
@@ -234,29 +232,34 @@ export default function PetCare() {
     })
   }
 
-  // Info-card detail rows (only the filled ones).
-  const info: { label: string; value: string }[] = []
-  if (selPet) {
-    if (selPet.species)
-      info.push({ label: t('pets.species'), value: t(`pets.species.${selPet.species}` as TKey) })
-    if (selPet.breed) info.push({ label: t('pets.breed'), value: selPet.breed })
-    if (selPet.birthday) {
-      const mo = ageInMonths(selPet.birthday, today)
+  // Info-card detail rows for any pet (only the filled ones) — used for every
+  // page of the carousel, not just the currently-selected one.
+  function infoRowsFor(p: Pet): { label: string; value: string }[] {
+    const rows: { label: string; value: string }[] = []
+    if (p.species) rows.push({ label: t('pets.species'), value: t(`pets.species.${p.species}` as TKey) })
+    if (p.breed) rows.push({ label: t('pets.breed'), value: p.breed })
+    if (p.birthday) {
+      const mo = ageInMonths(p.birthday, today)
       const age =
         mo < 0 ? '' : mo < 12 ? t('pets.ageMo', { months: mo }) : t('pets.ageY', { years: Math.floor(mo / 12) })
-      info.push({ label: t('pets.birthday'), value: formatDay(selPet.birthday) + (age ? ` · ${age}` : '') })
+      rows.push({ label: t('pets.birthday'), value: formatDay(p.birthday) + (age ? ` · ${age}` : '') })
     }
-    if (selPet.color)
-      info.push({
+    if (p.color)
+      rows.push({
         label: t('pets.color'),
-        value: selPet.color + (selPet.color_secondary ? ` & ${selPet.color_secondary}` : ''),
+        value: p.color + (p.color_secondary ? ` & ${p.color_secondary}` : ''),
       })
-    if (selPet.weight) info.push({ label: t('pets.weight'), value: selPet.weight })
-    if (selPet.length) info.push({ label: t('pets.length'), value: selPet.length })
-    if (selPet.microchip) info.push({ label: t('pets.microchip'), value: selPet.microchip })
-    if (selPet.notes) info.push({ label: t('pets.petNotes'), value: selPet.notes })
+    if (p.weight) rows.push({ label: t('pets.weight'), value: p.weight })
+    if (p.length) rows.push({ label: t('pets.length'), value: p.length })
+    if (p.microchip) rows.push({ label: t('pets.microchip'), value: p.microchip })
+    if (p.notes) rows.push({ label: t('pets.petNotes'), value: p.notes })
+    return rows
   }
-  const selPetColor = selPet ? colorMap[selPet.id] : c.accent
+  const subtitleFor = (p: Pet) =>
+    [p.species ? t(`pets.species.${p.species}` as TKey) : null, p.breed].filter(Boolean).join(' · ')
+
+  // Carousel paging: one full-width page per pet + a trailing "add pet" page.
+  const CARD_WIDTH = Dimensions.get('window').width - sp.lg * 2
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
@@ -276,177 +279,145 @@ export default function PetCare() {
           contentContainerStyle={{ paddingBottom: 120 }}
           keyboardShouldPersistTaps="handled"
         >
-          {/* pet selector carousel */}
+          {/* pet carousel — each page IS the full info card; swipe to the next
+              pet, last page adds a new one. Snaps by momentum end, computing
+              the nearest page from the scroll offset. */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={CARD_WIDTH + sp.md}
+            snapToAlignment="start"
             contentContainerStyle={{ paddingHorizontal: sp.lg, paddingVertical: sp.sm, gap: sp.md }}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + sp.md))
+              const pet = petsSorted[Math.max(0, Math.min(idx, petsSorted.length - 1))]
+              if (pet) setSelectedPet(pet.id)
+            }}
           >
             {petsSorted.map((p) => {
-              const selected = selectedPet === p.id
-              const dot = colorMap[p.id]
+              const color = colorMap[p.id]
+              const pInfo = infoRowsFor(p)
+              const subtitle = subtitleFor(p)
               return (
-                <Pressable
-                  key={p.id}
-                  onPress={() => setSelectedPet(p.id)}
-                  style={{
-                    width: 96,
-                    borderRadius: radius.lg,
-                    backgroundColor: c.card,
-                    overflow: 'hidden',
-                    borderWidth: 2,
-                    borderColor: selected ? dot : 'transparent',
-                  }}
-                >
+                <Card key={p.id} style={{ width: CARD_WIDTH, gap: sp.md }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                    <View
+                      style={{
+                        height: 56,
+                        width: 56,
+                        borderRadius: 28,
+                        overflow: 'hidden',
+                        backgroundColor: c.surface,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 2,
+                        borderColor: color,
+                      }}
+                    >
+                      {petPhotoUrls[p.id] ? (
+                        <Image
+                          source={{ uri: petPhotoUrls[p.id] }}
+                          style={{ height: 56, width: 56 }}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <Txt style={{ fontSize: 28 }}>{p.emoji || speciesEmoji(p.species)}</Txt>
+                      )}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Txt variant="h2" numberOfLines={1}>
+                        {p.name}
+                      </Txt>
+                      {subtitle ? (
+                        <Txt variant="faint" numberOfLines={1}>
+                          {subtitle}
+                        </Txt>
+                      ) : null}
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        setEditingPet(p)
+                        setShowPetForm(true)
+                      }}
+                      hitSlop={8}
+                      accessibilityLabel={t('pets.edit')}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: c.surface,
+                        borderRadius: radius.pill,
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                      }}
+                    >
+                      <Pencil size={14} color={c.text} />
+                      <Txt style={{ fontWeight: '600', fontSize: 13 }}>{t('pets.edit')}</Txt>
+                    </Pressable>
+                  </View>
+
+                  {/* detail rows */}
+                  {pInfo.length > 0 ? (
+                    <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>
+                      {pInfo.map((it) => (
+                        <View key={it.label} style={{ flexDirection: 'row', gap: sp.md }}>
+                          <Txt variant="faint" style={{ width: 96 }}>
+                            {it.label}
+                          </Txt>
+                          <Txt style={{ flex: 1 }}>{it.value}</Txt>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {/* calendar color — a dropdown that shows only the selected swatch */}
                   <View
                     style={{
-                      height: 72,
-                      width: '100%',
-                      backgroundColor: c.surface,
+                      borderTopWidth: 1,
+                      borderTopColor: c.border,
+                      paddingTop: sp.md,
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      justifyContent: 'space-between',
                     }}
                   >
-                    {petPhotoUrls[p.id] ? (
-                      <Image
-                        source={{ uri: petPhotoUrls[p.id] }}
-                        style={{ height: 72, width: 96 }}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <Txt style={{ fontSize: 34 }}>{p.emoji || speciesEmoji(p.species)}</Txt>
-                    )}
+                    <Txt variant="label">{t('pets.tagColor')}</Txt>
+                    <ColorDropdown
+                      value={color}
+                      onSelect={(hex) => setPetColor(p.id, hex)}
+                      disabled={savingColor}
+                    />
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, padding: sp.sm }}>
-                    <View style={{ height: 8, width: 8, borderRadius: 4, backgroundColor: dot }} />
-                    <Txt style={{ fontWeight: '600', fontSize: 12, flex: 1 }} numberOfLines={1}>
-                      {p.name}
-                    </Txt>
-                  </View>
-                </Pressable>
+                </Card>
               )
             })}
-            {/* add-pet card */}
+            {/* add-pet page */}
             <Pressable
               onPress={() => {
                 setEditingPet(null)
                 setShowPetForm(true)
               }}
               style={{
-                width: 72,
+                width: CARD_WIDTH,
                 borderRadius: radius.lg,
                 borderWidth: 2,
                 borderStyle: 'dashed',
                 borderColor: c.surface2,
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 4,
-                paddingVertical: 12,
+                gap: 6,
+                paddingVertical: 40,
               }}
             >
-              <Plus size={22} color={c.textFaint} />
-              <Txt variant="label" style={{ color: c.textFaint, fontSize: 11 }}>
+              <Plus size={28} color={c.textFaint} />
+              <Txt variant="label" style={{ color: c.textFaint }}>
                 {t('pets.addPet')}
               </Txt>
             </Pressable>
           </ScrollView>
 
-          <View style={{ paddingHorizontal: sp.lg, gap: sp.lg, marginTop: sp.sm }}>
-            {/* selected pet info card */}
-            {selPet ? (
-              <Card style={{ gap: sp.md }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                  <View
-                    style={{
-                      height: 56,
-                      width: 56,
-                      borderRadius: 28,
-                      overflow: 'hidden',
-                      backgroundColor: c.surface,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 2,
-                      borderColor: selPetColor,
-                    }}
-                  >
-                    {petPhotoUrls[selPet.id] ? (
-                      <Image
-                        source={{ uri: petPhotoUrls[selPet.id] }}
-                        style={{ height: 56, width: 56 }}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <Txt style={{ fontSize: 28 }}>{selPet.emoji || speciesEmoji(selPet.species)}</Txt>
-                    )}
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Txt variant="h2" numberOfLines={1}>
-                      {selPet.name}
-                    </Txt>
-                    {info[0] ? (
-                      <Txt variant="faint" numberOfLines={1}>
-                        {[
-                          selPet.species ? t(`pets.species.${selPet.species}` as TKey) : null,
-                          selPet.breed,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </Txt>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    onPress={() => {
-                      setEditingPet(selPet)
-                      setShowPetForm(true)
-                    }}
-                    hitSlop={8}
-                    accessibilityLabel={t('pets.edit')}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 5,
-                      backgroundColor: c.surface,
-                      borderRadius: radius.pill,
-                      paddingHorizontal: 12,
-                      paddingVertical: 7,
-                    }}
-                  >
-                    <Pencil size={14} color={c.text} />
-                    <Txt style={{ fontWeight: '600', fontSize: 13 }}>{t('pets.edit')}</Txt>
-                  </Pressable>
-                </View>
-
-                {/* detail rows */}
-                {info.length > 0 ? (
-                  <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>
-                    {info.map((it) => (
-                      <View key={it.label} style={{ flexDirection: 'row', gap: sp.md }}>
-                        <Txt variant="faint" style={{ width: 96 }}>
-                          {it.label}
-                        </Txt>
-                        <Txt style={{ flex: 1 }}>{it.value}</Txt>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-
-                {/* calendar color — a dropdown that shows only the selected swatch */}
-                <View
-                  style={{
-                    borderTopWidth: 1,
-                    borderTopColor: c.border,
-                    paddingTop: sp.md,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Txt variant="label">{t('pets.tagColor')}</Txt>
-                  <ColorDropdown value={selPetColor} onSelect={setPetColor} disabled={savingColor} />
-                </View>
-              </Card>
-            ) : null}
-
+          <View style={{ paddingHorizontal: sp.lg, gap: sp.lg, marginTop: sp.md }}>
             {/* calendar of ALL pets' events */}
             <Card style={{ padding: sp.md, gap: sp.sm }}>
               <View
