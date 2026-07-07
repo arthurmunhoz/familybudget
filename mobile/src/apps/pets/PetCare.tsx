@@ -547,7 +547,7 @@ export default function PetCare() {
               </View>
 
               {/* selected day's events */}
-              <View style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.sm, gap: sp.sm }}>
+              <View style={{ marginTop: sp.md, borderTopWidth: 1, borderTopColor: c.surface2, paddingTop: sp.md, gap: sp.sm }}>
                 <Txt variant="label">{formatDay(selectedDay)}</Txt>
                 {dayEvents.length === 0 && dayDue.length === 0 ? (
                   <Txt variant="faint">{t('pets.noDayEvents')}</Txt>
@@ -786,12 +786,15 @@ function ColorDropdown({
   const { c } = useTheme()
   const ref = useRef<View>(null)
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState({ top: 0, right: 0 })
-  const winW = Dimensions.get('window').width
+  // Anchor the menu ABOVE the pill: it sits low on the pet card, so opening
+  // downward would collide with the calendar below. `bottom` = distance from the
+  // window bottom to the pill's top.
+  const [pos, setPos] = useState({ bottom: 0, right: 0 })
+  const { width: winW, height: winH } = Dimensions.get('window')
 
   const openMenu = () => {
-    ref.current?.measureInWindow((x, y, w, h) => {
-      setPos({ top: y + h + 6, right: Math.max(8, winW - (x + w)) })
+    ref.current?.measureInWindow((x, y, w) => {
+      setPos({ bottom: winH - y + 6, right: Math.max(8, winW - (x + w)) })
       setOpen(true)
     })
   }
@@ -823,7 +826,7 @@ function ColorDropdown({
           <View
             style={{
               position: 'absolute',
-              top: pos.top,
+              bottom: pos.bottom,
               right: pos.right,
               width: 168,
               flexDirection: 'row',
