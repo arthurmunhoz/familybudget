@@ -134,7 +134,20 @@ async function getAccessToken(db: any, conn: Conn, id: string, secret: string): 
       grant_type: 'refresh_token',
     }),
   })
-  if (!r.ok) throw new Error(`token refresh ${r.status}: ${await r.text()}`)
+  if (!r.ok) {
+    const body = await r.text()
+    // Google returns JSON like {"error":"invalid_grant","error_description":"..."} —
+    // surface a short, human-readable reason instead of the raw body (this
+    // string ends up stored in last_error and shown directly in the app).
+    let reason = body
+    try {
+      const j = JSON.parse(body)
+      reason = j.error === 'invalid_grant' ? 'TOKEN_EXPIRED' : j.error_description || j.error || body
+    } catch {
+      /* not JSON — keep the raw text */
+    }
+    throw new Error(reason)
+  }
   const j = await r.json()
   await db
     .from('google_calendar_connections')

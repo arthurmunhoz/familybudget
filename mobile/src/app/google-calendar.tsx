@@ -117,7 +117,11 @@ export default function GoogleCalendarScreen() {
             </Txt>
             <Txt variant="faint">{t('calendar.syncDir')}</Txt>
             {conn.last_error ? (
-              <Txt style={{ color: c.expense, fontSize: 13 }}>{conn.last_error}</Txt>
+              <Txt style={{ color: c.expense, fontSize: 13 }}>
+                {conn.last_error === 'TOKEN_EXPIRED'
+                  ? t('calendar.googleTokenExpired')
+                  : t('calendar.googleSyncError')}
+              </Txt>
             ) : null}
           </Card>
 
