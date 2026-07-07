@@ -129,6 +129,18 @@ export default function ShoppingList() {
   const [storeInput, setStoreInput] = useState('')
   const [customColor, setCustomColor] = useState<string | null>(null)
 
+  // While the keyboard is up, drop the add bar's safe-area bottom padding (the
+  // keyboard replaces the home-indicator gap) so the bar sits flush on it.
+  const [keyboardUp, setKeyboardUp] = useState(false)
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardUp(true))
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardUp(false))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [])
+
   // Editing an existing store (rename / recolor / delete) inside the sheet.
   const [editingStore, setEditingStore] = useState<ShoppingStore | null>(null)
   const [editName, setEditName] = useState('')
@@ -493,10 +505,14 @@ export default function ShoppingList() {
       {/* Add bar: store chips + text field, pinned above the keyboard. */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={insets.top}
         style={styles.addBarWrap}
       >
-        <View style={[styles.addBar, { backgroundColor: c.bg, paddingBottom: insets.bottom + sp.md }]}>
+        <View
+          style={[
+            styles.addBar,
+            { backgroundColor: c.bg, paddingBottom: (keyboardUp ? 0 : insets.bottom) + sp.md },
+          ]}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
