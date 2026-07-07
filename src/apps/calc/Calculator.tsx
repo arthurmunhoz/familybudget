@@ -414,11 +414,18 @@ function BetterDeal() {
 }
 
 // ── Discount ─────────────────────────────────────────────────────────────────
+// Deal-forward layout: the sale price ("You pay") is the hero, the original is
+// struck through beside it, a green "Save $X · N%" pill sits below, and the
+// discount itself is a big "N% OFF" readout with quick chips, a Custom field,
+// and − / + fine-tuning.
+
+const DISCOUNT_CHIPS = [10, 15, 20, 50]
 
 function Discount() {
   const { t } = useI18n()
   const [price, setPrice] = useState('')
   const [pct, setPct] = useState(20)
+  const [custom, setCustom] = useState('')
   // Focus without scrolling — see SplitBill / the Calculator scroll-padding note.
   const priceRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -427,7 +434,21 @@ function Discount() {
 
   const p = num(price)
   const save = (p * pct) / 100
-  const final = p - save
+  const final = Math.max(0, p - save)
+  const hasDeal = p > 0 && save > 0
+
+  function pickChip(v: number) {
+    setPct(v)
+    setCustom('')
+  }
+  function onCustom(val: string) {
+    setCustom(val)
+    setPct(num(val))
+  }
+  function adjust(delta: number) {
+    setCustom('')
+    setPct((cur) => Math.min(100, Math.max(0, Math.round(cur) + delta)))
+  }
 
   return (
     <div className="space-y-4">
@@ -441,16 +462,80 @@ function Discount() {
           className={inputCls}
         />
       </Field>
-      <div>
-        <span className="text-xs font-semibold text-(--text-faint)">
-          {t('calc.discountPct')} · {pct}%
-        </span>
-        <PercentPicker value={pct} onChange={setPct} presets={[10, 15, 20, 50]} />
+
+      {/* Discount % — big readout + fine-tune, quick chips, custom */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="font-display text-2xl text-(--accent)">
+            {pct}%{' '}
+            <span className="text-sm tracking-wide text-(--accent)">{t('calc.off')}</span>
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => adjust(-1)}
+              aria-label="−1%"
+              className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-(--surface) text-lg font-bold text-(--text-muted) active:scale-95 transition-transform"
+            >
+              −
+            </button>
+            <button
+              onClick={() => adjust(1)}
+              aria-label="+1%"
+              className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-(--surface) text-lg font-bold text-(--text-muted) active:scale-95 transition-transform"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {DISCOUNT_CHIPS.map((v) => {
+            const active = pct === v && custom === ''
+            return (
+              <button
+                key={v}
+                onClick={() => pickChip(v)}
+                className={`min-w-14 flex-1 rounded-lg py-2 text-sm font-bold transition-colors ${
+                  active ? 'bg-(--accent) text-white' : 'bg-(--surface) text-(--text-muted)'
+                }`}
+              >
+                {v}%
+              </button>
+            )
+          })}
+          <input
+            inputMode="decimal"
+            value={custom}
+            onChange={(e) => onCustom(e.target.value)}
+            placeholder={t('calc.custom')}
+            className={`w-20 rounded-lg py-2 text-center text-sm font-bold outline-none transition-colors ${
+              custom !== ''
+                ? 'bg-(--accent) text-white placeholder:text-white/70'
+                : 'bg-(--surface) text-(--text) placeholder:text-(--text-faint)'
+            }`}
+          />
+        </div>
       </div>
-      <div className="rounded-2xl bg-(--card) px-4 py-3">
-        <ResultRow label={t('calc.youSave')} value={`− ${formatMoney(save)}`} />
-        <div className="my-1 h-px bg-(--surface-2)" />
-        <ResultRow label={t('calc.finalPrice')} value={formatMoney(Math.max(0, final))} strong />
+
+      {/* Result — the sale price is the hero */}
+      <div className="space-y-2 rounded-2xl bg-(--card) p-4">
+        <span className="block text-xs font-semibold tracking-wide text-(--text-faint) uppercase">
+          {t('calc.youPay')}
+        </span>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <span className="font-display text-4xl tabular-nums text-(--text)">
+            {formatMoney(final)}
+          </span>
+          {hasDeal && (
+            <span className="text-base text-(--text-faint) line-through">{formatMoney(p)}</span>
+          )}
+        </div>
+        {hasDeal && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-(--income)/12 px-2.5 py-1 text-[13px] font-semibold text-(--income)">
+            <Tag size={14} strokeWidth={2} aria-hidden="true" />
+            {t('calc.savePill', { amount: formatMoney(save), pct })}
+          </span>
+        )}
       </div>
     </div>
   )

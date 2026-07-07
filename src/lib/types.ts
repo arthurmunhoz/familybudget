@@ -96,6 +96,8 @@ export interface Pet {
   microchip: string | null
   notes: string | null
   photo_path: string | null
+  /** Per-pet calendar dot color (hex); null = a palette color by pet order. */
+  tag_color: string | null
   created_at: string
 }
 
@@ -160,8 +162,22 @@ export interface Ping {
   message: string
   /** Targeted recipient emails; null = the whole household. */
   recipients: string[] | null
+  /** Urgent nudge (Need-Help-style): red UI, sound/vibration, Call CTA. */
+  high_priority: boolean
   created_at: string
   expires_at: string
+}
+
+/** An editable per-household nudge preset (from ping_presets). */
+export interface PingPreset {
+  id: string
+  emoji: string
+  /** Custom text; overrides preset_key localization when set. */
+  label: string | null
+  /** i18n suffix (pings.preset.<key>) for a seeded default; null for custom. */
+  preset_key: string | null
+  high_priority: boolean
+  sort_order: number
 }
 
 export interface PingAck {

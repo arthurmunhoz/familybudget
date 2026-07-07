@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Pencil, User, Users, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Pencil, Phone, User, Users, X } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useBack } from '../../hooks/useBack'
 import { useCachedQuery } from '../../hooks/useCachedQuery'
@@ -10,7 +10,7 @@ import { fileToResizedBase64 } from '../../lib/image'
 import type { TKey } from '../../lib/i18n'
 import { getSignedUrls } from '../../lib/signedUrls'
 import { supabase } from '../../lib/supabase'
-import type { MemberProfile } from '../../lib/types'
+import type { MemberProfile, Profile } from '../../lib/types'
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
@@ -36,12 +36,164 @@ function ageOf(birthday: string | null, today: string): number | null {
   return age >= 0 && age <= 130 ? age : null
 }
 
+// Keep digits and a leading + so formatted numbers dial cleanly.
+function callHref(raw: string): string {
+  return `tel:${raw.trim().replace(/[^\d+]/g, '')}`
+}
+
+/** One member row: avatar + name, expands in place to the full profile card
+ *  (fields, call button, "Edit my info" for the signed-in user's own row) —
+ *  hoisted to module scope so it isn't recreated (and remounted) every render. */
+function MemberCard({
+  member,
+  memberProfile,
+  avatarUrl,
+  isMe,
+  isOpen,
+  today,
+  t,
+  onToggle,
+  onAvatarClick,
+  onEdit,
+}: {
+  member: Profile
+  memberProfile: MemberProfile | undefined
+  avatarUrl: string | undefined
+  isMe: boolean
+  isOpen: boolean
+  today: string
+  t: (key: TKey, vars?: Record<string, string | number>) => string
+  onToggle: () => void
+  onAvatarClick: (url: string) => void
+  onEdit: () => void
+}) {
+  const age = ageOf(memberProfile?.birthday ?? null, today)
+  // A short hint line under the name (collapsed only): age, else phone.
+  const hint =
+    age != null
+      ? t('family.yrs', { years: age })
+      : memberProfile?.phone
+        ? formatPhone(memberProfile.phone)
+        : null
+
+  const items: { label: string; value: string; phone?: string }[] = []
+  if (memberProfile?.birthday) {
+    items.push({
+      label: t('family.birthday'),
+      value:
+        formatDay(memberProfile.birthday) +
+        (age != null ? ` · ${t('family.yrs', { years: age })}` : ''),
+    })
+  }
+  for (const [key, labelKey] of FIELDS) {
+    const v = memberProfile?.[key]
+    if (v) {
+      items.push({
+        label: t(labelKey),
+        value: key === 'phone' ? formatPhone(String(v)) : String(v),
+        ...(key === 'phone' ? { phone: String(v) } : {}),
+      })
+    }
+  }
+
+  return (
+    <section className="rounded-2xl bg-(--card) p-4">
+      <button
+        onClick={onToggle}
+        className="flex w-full min-w-0 items-center gap-3 text-left"
+        aria-expanded={isOpen}
+      >
+        {avatarUrl ? (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation()
+              onAvatarClick(avatarUrl)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation()
+                onAvatarClick(avatarUrl)
+              }
+            }}
+            aria-label={member.display_name}
+            className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-(--surface) active:opacity-80"
+          >
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+          </span>
+        ) : (
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-(--surface) text-(--text-faint)">
+            <span className="text-lg font-semibold">
+              {member.display_name.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <h2 className="flex items-center gap-2 truncate font-bold text-(--text)">
+            <span className="truncate">{member.display_name}</span>
+            {isMe && (
+              <span className="shrink-0 rounded-full bg-(--accent-soft) px-2 py-0.5 text-[10px] font-bold text-(--accent)">
+                {t('family.you')}
+              </span>
+            )}
+          </h2>
+          {!isOpen && hint && <p className="text-sm text-(--text-faint)">{hint}</p>}
+        </div>
+        {isOpen ? (
+          <ChevronDown size={20} strokeWidth={2} className="shrink-0 text-(--text-faint)" aria-hidden="true" />
+        ) : (
+          <ChevronRight size={20} strokeWidth={2} className="shrink-0 text-(--text-faint)" aria-hidden="true" />
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="mt-4 border-t border-(--surface-2) pt-4">
+          {items.length > 0 ? (
+            <dl className="space-y-3">
+              {items.map((it) => (
+                <div key={it.label} className="flex items-center gap-3 text-sm">
+                  <dt className="w-24 shrink-0 text-(--text-faint)">{it.label}</dt>
+                  <dd className="min-w-0 flex-1 break-words text-(--text)">{it.value}</dd>
+                  {it.phone && (
+                    <a
+                      href={callHref(it.phone)}
+                      aria-label={`${t('family.call')} ${member.display_name}`}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-(--accent-soft) text-(--accent) active:opacity-80"
+                    >
+                      <Phone size={16} strokeWidth={2} aria-hidden="true" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="text-sm text-(--text-faint)">{t('family.empty')}</p>
+          )}
+
+          {isMe && (
+            <button
+              onClick={onEdit}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-(--surface) py-2.5 text-sm font-semibold text-(--text) active:bg-(--surface-2)"
+            >
+              <Pencil size={16} strokeWidth={2} aria-hidden="true" />
+              {t('family.editMine')}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function Family() {
   const back = useBack()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
   const today = todayISO()
 
+  // Which member's card is expanded (accordion — one open at a time).
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -50,6 +202,9 @@ export default function Family() {
   const [preview, setPreview] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   useScrollLock(editing || Boolean(preview))
+
+  // Members sorted alphabetically, same as the list order.
+  const members = [...profiles].sort((a, b) => a.display_name.localeCompare(b.display_name))
 
   // Cached: member profiles + signed avatar URLs render instantly on return.
   const {
@@ -186,85 +341,21 @@ export default function Family() {
         </p>
       ) : (
         <div className="space-y-3">
-          {profiles.map((m) => {
-            const p = byEmail[m.email]
-            const isMe = m.email === profile?.email
-            const age = ageOf(p?.birthday ?? null, today)
-            const items: { label: string; value: string }[] = []
-            if (p?.birthday) {
-              items.push({
-                label: t('family.birthday'),
-                value:
-                  formatDay(p.birthday) +
-                  (age != null ? ` · ${t('family.yrs', { years: age })}` : ''),
-              })
-            }
-            for (const [key, labelKey] of FIELDS) {
-              const v = p?.[key]
-              if (v) {
-                items.push({
-                  label: t(labelKey),
-                  value: key === 'phone' ? formatPhone(String(v)) : String(v),
-                })
-              }
-            }
-            return (
-              <section key={m.email} className="rounded-2xl bg-(--card) p-4">
-                <div className="flex min-w-0 items-center gap-3">
-                  {avatarUrls[m.email] ? (
-                    <button
-                      onClick={() => setPreview(avatarUrls[m.email])}
-                      aria-label={m.display_name}
-                      className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-(--surface) active:opacity-80"
-                    >
-                      <img
-                        src={avatarUrls[m.email]}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
-                  ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-(--surface) text-(--text-faint)">
-                      <span className="text-lg font-semibold">
-                        {m.display_name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  <h2 className="truncate font-bold text-(--text)">
-                    {m.display_name}
-                    {isMe && (
-                      <span className="ml-2 rounded-full bg-(--accent-soft) px-2 py-0.5 text-[10px] font-bold text-(--accent)">
-                        {t('family.you')}
-                      </span>
-                    )}
-                  </h2>
-                </div>
-
-                {items.length > 0 ? (
-                  <dl className="mt-3 space-y-1.5">
-                    {items.map((it) => (
-                      <div key={it.label} className="flex items-baseline gap-3 text-sm">
-                        <dt className="w-28 shrink-0 text-(--text-faint)">{it.label}</dt>
-                        <dd className="min-w-0 flex-1 break-words text-(--text)">{it.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : (
-                  <p className="mt-2 text-sm text-(--text-faint)">{t('family.empty')}</p>
-                )}
-
-                {isMe && (
-                  <button
-                    onClick={openEdit}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-(--surface) py-2.5 text-sm font-semibold text-(--text) active:bg-(--surface-2)"
-                  >
-                    <Pencil size={16} strokeWidth={2} aria-hidden="true" />
-                    {t('family.editMine')}
-                  </button>
-                )}
-              </section>
-            )
-          })}
+          {members.map((m) => (
+            <MemberCard
+              key={m.email}
+              member={m}
+              memberProfile={byEmail[m.email]}
+              avatarUrl={avatarUrls[m.email]}
+              isMe={m.email === profile?.email}
+              isOpen={expanded === m.email}
+              today={today}
+              t={t}
+              onToggle={() => setExpanded((cur) => (cur === m.email ? null : m.email))}
+              onAvatarClick={setPreview}
+              onEdit={openEdit}
+            />
+          ))}
         </div>
       )}
 

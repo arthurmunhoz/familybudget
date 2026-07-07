@@ -2,10 +2,12 @@
 // to their phones. Insert goes through RLS (household + sender stamped by column
 // defaults); the push is a best-effort call to api/send-ping.
 import { supabase } from './supabase'
-import type { Ping, PingAck } from './types'
+import type { TKey } from './i18n'
+import type { Ping, PingAck, PingPreset } from './types'
 
-// Preset pings. `emoji` is stored on the row; the human text is localized at
-// send time (i18n key `pings.preset.<kind>`) so the banner/push read nicely.
+// Built-in default presets (kind + emoji). Now seeded into the editable
+// per-household `ping_presets` table via seed_ping_presets(); kept here as
+// the reference set. Text is localized (pings.preset.<kind>).
 export const PING_PRESETS = [
   { kind: 'help', emoji: '🆘' },
   { kind: 'omw', emoji: '🚗' },
@@ -15,8 +17,65 @@ export const PING_PRESETS = [
   { kind: 'love', emoji: '👋' },
 ] as const
 
-export type PingPreset = (typeof PING_PRESETS)[number]
 export type ActivePing = Ping & { acks: PingAck[] }
+
+/** Seed the household's default presets if empty, then fetch them (ordered). */
+export async function fetchPingPresets(): Promise<PingPreset[]> {
+  await supabase.rpc('seed_ping_presets')
+  const { data } = await supabase
+    .from('ping_presets')
+    .select('id, emoji, label, preset_key, high_priority, sort_order')
+    .order('sort_order')
+  return (data ?? []) as PingPreset[]
+}
+
+/** Display text for a preset: the custom label, else the localized default. */
+export function presetText(p: PingPreset, t: (key: TKey) => string): string {
+  if (p.label && p.label.trim()) return p.label.trim()
+  return p.preset_key ? t(`pings.preset.${p.preset_key}` as TKey) : ''
+}
+
+export async function createPingPreset(fields: {
+  emoji: string
+  label: string
+  high_priority: boolean
+}): Promise<void> {
+  const { data } = await supabase
+    .from('ping_presets')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  const nextOrder = ((data?.[0]?.sort_order as number | undefined) ?? -1) + 1
+  const { error } = await supabase.from('ping_presets').insert({
+    emoji: fields.emoji.trim() || '📣',
+    label: fields.label.trim(),
+    high_priority: fields.high_priority,
+    sort_order: nextOrder,
+  })
+  if (error) throw error
+}
+
+export async function updatePingPreset(
+  id: string,
+  fields: { emoji: string; label: string; high_priority: boolean },
+): Promise<void> {
+  const { error } = await supabase
+    .from('ping_presets')
+    .update({
+      emoji: fields.emoji.trim() || '📣',
+      // Editing sets a custom label, replacing any localized default.
+      label: fields.label.trim(),
+      preset_key: null,
+      high_priority: fields.high_priority,
+    })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deletePingPreset(id: string): Promise<void> {
+  const { error } = await supabase.from('ping_presets').delete().eq('id', id)
+  if (error) throw error
+}
 
 async function authToken(): Promise<string> {
   const { data } = await supabase.auth.getSession()
@@ -25,17 +84,26 @@ async function authToken(): Promise<string> {
 
 /** Insert a ping (RLS stamps household + sender) then fire the household push.
  *  `recipients` null = whole household; otherwise only those member emails.
- *  Push failures are swallowed — the ping is already saved and shows up live
- *  via Realtime regardless. */
+ *  `highPriority` forces red UI / Call CTA / urgent push and, at the call
+ *  site, forces recipients to null (send to everyone) regardless of any
+ *  recipient-picker selection. Push failures are swallowed — the ping is
+ *  already saved and shows up live via Realtime regardless. */
 export async function sendPing(
   kind: string,
   emoji: string,
   message: string,
   recipients: string[] | null = null,
+  highPriority: boolean = false,
 ): Promise<void> {
   const { data, error } = await supabase
     .from('pings')
-    .insert({ kind, emoji, message, recipients })
+    .insert({
+      kind,
+      emoji,
+      message,
+      recipients: highPriority ? null : recipients,
+      high_priority: highPriority,
+    })
     .select()
     .single()
   if (error || !data) throw error ?? new Error('Could not send ping')
@@ -52,8 +120,9 @@ export async function sendPing(
 }
 
 /** AI: map free text → {kind, emoji, message} in the user's language, then send
- *  to `recipients` (null = whole household). Returns what was sent so the UI can
- *  show a brief confirmation. */
+ *  to `recipients` (null = whole household). The AI-suggested ping is never
+ *  high-priority — that flag is only ever set explicitly via a preset.
+ *  Returns what was sent so the UI can show a brief confirmation. */
 export async function sendCustomPing(
   text: string,
   recipients: string[] | null = null,
@@ -69,7 +138,7 @@ export async function sendCustomPing(
   const emoji = (result.emoji || '📣').trim()
   const message = (result.message || text).trim()
   const kind = result.kind || 'custom'
-  await sendPing(kind, emoji, message, recipients)
+  await sendPing(kind, emoji, message, recipients, false)
   return { emoji, message }
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { MapPin, X } from 'lucide-react'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { notifyHouseholdChanged, useHousehold } from '../hooks/useHousehold'
@@ -11,6 +11,7 @@ import { APPS } from '../lib/apps'
 import { LANGUAGES, type TKey } from '../lib/i18n'
 import { fileToResizedBase64 } from '../lib/image'
 import { supabase } from '../lib/supabase'
+import { geocodeCity, loadHomeLocation, saveHomeLocation, type HomeLocation } from '../lib/weather'
 
 export default function Drawer({
   open,
@@ -28,6 +29,39 @@ export default function Drawer({
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   useScrollLock(open)
+
+  // Home city for the Hub's "Today" weather — per-device, stored in localStorage
+  // (no browser geolocation permission requested). Loaded fresh each time the
+  // drawer opens so it reflects a change made elsewhere (e.g. cleared).
+  const [homeLoc, setHomeLoc] = useState<HomeLocation | null>(null)
+  const [cityInput, setCityInput] = useState('')
+  const [savingCity, setSavingCity] = useState(false)
+  const [cityMsg, setCityMsg] = useState<string | null>(null)
+  useEffect(() => {
+    if (open) setHomeLoc(loadHomeLocation())
+  }, [open])
+
+  async function saveCity() {
+    const q = cityInput.trim()
+    if (!q) return
+    setSavingCity(true)
+    setCityMsg(null)
+    const loc = await geocodeCity(q)
+    setSavingCity(false)
+    if (!loc) {
+      setCityMsg(t('drawer.cityNotFound'))
+      return
+    }
+    saveHomeLocation(loc)
+    setHomeLoc(loc)
+    setCityInput('')
+  }
+
+  function clearCity() {
+    saveHomeLocation(null)
+    setHomeLoc(null)
+    setCityMsg(null)
+  }
 
   // Drag-to-reorder the app list (grip handle), persisted via reorderApps.
   const appById = useMemo(() => new Map(APPS.map((a) => [a.id, a])), [])
@@ -194,6 +228,52 @@ export default function Drawer({
         </div>
 
         <NotificationsToggle />
+
+        <div className="mt-6">
+          <span className="text-sm text-(--text-muted)">{t('drawer.weather')}</span>
+          <div className="mt-2 rounded-xl bg-(--surface) p-3">
+            <div className="flex items-center gap-3">
+              <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                  homeLoc ? 'bg-(--accent-soft) text-(--accent)' : 'bg-(--surface-2) text-(--text-muted)'
+                }`}
+              >
+                <MapPin size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-(--text)">{t('drawer.homeCity')}</div>
+                <div className="truncate text-xs text-(--text-faint)">
+                  {homeLoc ? homeLoc.city : t('drawer.homeCityHint')}
+                </div>
+              </div>
+              {homeLoc && (
+                <button
+                  onClick={clearCity}
+                  className="shrink-0 text-xs font-semibold text-(--expense)"
+                >
+                  {t('common.remove')}
+                </button>
+              )}
+            </div>
+            <div className="mt-2.5 flex items-end gap-2">
+              <input
+                value={cityInput}
+                onChange={(e) => setCityInput(e.target.value)}
+                placeholder={t('drawer.cityPlaceholder')}
+                onKeyDown={(e) => e.key === 'Enter' && saveCity()}
+                className="min-w-0 flex-1 rounded-lg bg-(--card) px-3 py-2 text-sm text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+              />
+              <button
+                onClick={saveCity}
+                disabled={savingCity || !cityInput.trim()}
+                className="shrink-0 rounded-lg bg-(--accent) px-3.5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {t('drawer.setCity')}
+              </button>
+            </div>
+            {cityMsg && <p className="mt-1.5 text-xs text-(--text-faint)">{cityMsg}</p>}
+          </div>
+        </div>
 
         <div className="mt-6">
           <span className="text-sm text-(--text-muted)">{t('drawer.myApps')}</span>

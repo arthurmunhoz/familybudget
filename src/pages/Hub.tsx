@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
 import PingsBanner from '../components/PingsBanner'
+import TodaySection from '../components/TodaySection'
 import WhatsNewModal from '../components/WhatsNewModal'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
@@ -136,6 +137,8 @@ export default function Hub() {
           <Menu size={24} strokeWidth={2} aria-hidden="true" />
         </button>
       </header>
+
+      <TodaySection onSetCity={() => setDrawerOpen(true)} />
 
       <PingsBanner />
 

@@ -123,8 +123,11 @@ export default function MonthDetail() {
     }
   })
 
-  // ?add=1 (the home card's "＋ New entry") opens the form on arrival, then
-  // clears the param so back/refresh doesn't reopen it.
+  // ?add=1 / ?scan=1 (the home card's "＋ New entry" / camera shortcut) open
+  // the form or the scan tip on arrival, then clear the param so back/refresh
+  // doesn't reopen it. Scan opens the TIP modal, not the file picker directly —
+  // the picker's fileInputRef.click() must stay inside a real tap (see below)
+  // for iOS Safari to allow the native camera.
   const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
     if (loading || !data.month) return
@@ -132,6 +135,9 @@ export default function MonthDetail() {
       setEditing(null)
       setPrefill(undefined)
       setFormOpen(true)
+      setSearchParams({}, { replace: true })
+    } else if (searchParams.get('scan') === '1') {
+      setShowScanTip(true)
       setSearchParams({}, { replace: true })
     }
   }, [loading, data.month, searchParams, setSearchParams])
