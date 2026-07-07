@@ -5,7 +5,6 @@ import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
 import PingsBanner from '../components/PingsBanner'
 import TodaySection from '../components/TodaySection'
-import WhatsNewModal from '../components/WhatsNewModal'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useAuth } from '../hooks/useAuth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -206,7 +205,6 @@ export default function Hub() {
       )}
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-      <WhatsNewModal />
     </div>
   )
 }
