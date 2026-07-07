@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.oneroof.app",
+      "appleTeamId": "R87YC3Q5W2",
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "entitlements": {
