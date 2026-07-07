@@ -63,8 +63,53 @@ When adding new UI, add the keys to all 3 language files (en/es/pt) in `@/lib/i1
 then import `useI18n` in the component and wrap strings: `{t('namespace.key')}` or 
 `title={t('namespace.key', {param})}`.
 
+## Coding standards
+
+**Match the established pattern — don't invent a new one.** Before writing a new
+`lib/` file or a data-fetching/auth flow, grep for how the existing files in the
+same area already do it (`lib/auth.tsx`, `lib/googleCalendar.ts` are the
+reference implementations for anything session/auth-related) and follow that,
+even if a different approach would also technically work. Divergent one-off
+patterns are exactly what caused the two bugs below — both were an agent
+solving an already-solved problem a new way instead of matching what was
+already there.
+
+- **Reading the current user/session: always `supabase.auth.getSession()`,
+  never `supabase.auth.getUser()`.** `getSession()` reads the cached local
+  session (instant, no network). `getUser()` round-trips to the Auth server to
+  revalidate the JWT — on any network hiccup it resolves with `user: null`
+  instead of throwing, which silently masquerades as "not signed in" deep
+  inside unrelated flows. (Real bug: `lib/appleCalendar.ts`'s `currentUser()`
+  used `getUser()`, so a flaky connection made Apple Calendar connect fail
+  with a generic "Couldn't connect" error — fixed by switching to
+  `getSession()`, matching `auth.tsx` and `googleCalendar.ts`.) If a screen
+  already has `useAuth()` in scope, prefer its `profile`/`session` over a
+  fresh lookup at all.
+- **Never define a component inside another component's render body.**
+  `function Inner() {...}` (or a `const Inner = () =>`) written inside
+  `function Outer() { ... return <Inner/> }` gets a *new function identity on
+  every render of `Outer`* — React then unmounts + remounts `Inner` on every
+  state change, which drops focus from any `TextInput` inside it and resets
+  any local state. Hoist sub-components to module scope (outside and above the
+  parent), passing data in as props. (Real bug: `BetterDeal.tsx`'s
+  `OptionCard` was defined inside `BetterDeal`, so every keystroke into either
+  price/amount field remounted both cards' inputs, dropping keyboard focus
+  mid-type the moment the "better deal" winner calculation changed. Fixed by
+  hoisting `OptionCard` above `BetterDeal`.) A plain function that *returns*
+  JSX and is called directly (`{card('A', ...)}`, not `<Card/>`) is fine — it
+  doesn't create a new component type, just inlines the tree.
+- **Before shipping a fix for a reported bug, verify the actual root cause**
+  against the DB (migrations, RLS, constraints via the Supabase MCP tools) and
+  the client code path, not just the symptom. A generic error message (e.g.
+  "Couldn't connect") can come from several unrelated causes — confirm which
+  one before touching code.
+
 ## Don't
 - Don't add ad/tracking SDKs (keeps ATT off + COPPA exposure low).
 - Don't break the RLS tenancy model. Don't hardcode secrets (use EXPO_PUBLIC_* /
   EAS env). Don't claim device verification you didn't do.
 - Don't hardcode user-facing strings — add them to i18n files and use `t()` in the component.
+- Don't use `supabase.auth.getUser()` for session/current-user checks — use
+  `supabase.auth.getSession()` (see Coding standards above).
+- Don't define a component function inside another component's render body —
+  hoist it to module scope (see Coding standards above).

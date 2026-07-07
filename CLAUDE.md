@@ -163,42 +163,58 @@ morning notification per household. Pieces:
   joining `user_settings.language`); single fixed send time; Hobby-plan crons
   fire once/day within ~the hour, not minute-precise.
 
-**Pings (household one-tap pings)**: a hub app (`/pings`, registered in
-`apps.ts`). The Pings page (`src/apps/pings/Pings.tsx`) has the composer:
-six one-tap presets, a recipient picker, and an AI "just type it" box.
-`PingsBanner` shows active (non-expired) pings live with a 👍 ack + "seen
-by" names + a 📞 Call button — and is rendered on BOTH the Hub and the Pings
-page. Dismissal: the SENDER gets an ✕ to hide their own banner (persisted per
-device in `localStorage` `pings-dismissed:<email>`); RECIPIENTS auto-hide a
-ping 30s after their own ack (derived from the ack's `created_at`, re-checked
-by a 5s tick). Pieces:
+**Pings (household one-tap pings, aka "Nudges")**: a hub app (`/pings`,
+registered in `apps.ts`). The Pings page (`src/apps/pings/Pings.tsx`) has the
+composer: an editable per-household list of one-tap presets, a recipient
+picker, and an AI "just type it" box. `PingsBanner` shows BOTH active
+(non-expired) pings sent TO me (with a 👍 Got it + 📞 Call CTA) AND pings I
+SENT (with "seen by" ack status + an ✕ dismiss) — rendered on BOTH the Hub and
+the Pings page. Dismissal: the SENDER's ✕ hides their own sent-row (persisted
+per device in `localStorage` `pings-dismissed:<email>`); RECIPIENTS' rows drop
+off the moment they ack (optimistic + Realtime).
 - `pings` + `ping_acks` tables (migration 027), RLS by household, Realtime.
   Pings auto-expire 6h after creation (`expires_at`); banner filters on it.
+  `pings.high_priority boolean` (shared schema with iOS) replaces the old
+  hardcoded `kind === 'help'` special-casing — ANY preset can be flagged
+  high-priority now, which drives red UI, a Call CTA, forced send-to-everyone,
+  and an urgent push.
 - `pings.recipients text[]` (migration 028): null = whole household, else a
   list of member emails. The `pings_select` RLS makes targeted pings visible
-  only to recipients + sender. `🆘 help` ALWAYS sends to everyone (forced in the
-  page's `recipientsFor`).
-- The Pings page lists presets one-per-line (full-width, no truncation); each
-  row has a grip handle to drag-reorder (Pointer Events + pointer-capture +
-  `touch-none`, so it works on the iOS PWA). The order is saved per device in
-  `localStorage` (`pings-order:<email>`). The `help` row has a red border
-  (`border-(--expense)`) to stand out; others use `border-transparent` to keep
-  heights aligned.
-- `src/lib/pings.ts` — `PING_PRESETS` (kind+emoji; human text is the i18n
-  key `pings.preset.<kind>`), `sendPing(kind,emoji,msg,recipients)`,
-  `sendCustomPing(text,recipients)` (AI), `ackPing`, `fetchActivePings`,
-  `fetchMemberPhones` (for the Call button).
+  only to recipients + sender. A `high_priority` ping ALWAYS sends to everyone
+  (forced in `sendPing`, ignoring any recipient-picker selection).
+- `ping_presets` table: per-household editable presets (`emoji`, `label`,
+  `preset_key`, `high_priority`, `sort_order`). Seeded on first read via the
+  Postgres function `seed_ping_presets()` (called defensively — no-ops once a
+  household has rows). `label` null + `preset_key` set = a seeded default,
+  localized via `pings.preset.<preset_key>`; editing a preset clears
+  `preset_key` and sets a custom `label` (`presetText()` in `pings.ts` picks
+  whichever is set). The Pings page has an "Edit presets" toggle that flips
+  the list into a manage mode: tap a preset to edit emoji/label/high-priority,
+  a delete ✕ per row, and an "Add nudge" row to create new ones — all direct
+  Supabase read/writes (RLS-scoped to the household).
+- `src/lib/pings.ts` — `fetchPingPresets` (seeds + fetches, ordered by
+  `sort_order`), `createPingPreset`/`updatePingPreset`/`deletePingPreset`,
+  `presetText(preset, t)`, `sendPing(kind,emoji,msg,recipients,highPriority)`,
+  `sendCustomPing(text,recipients)` (AI — always `high_priority: false`),
+  `ackPing`, `fetchActivePings`, `fetchMemberPhones` (for the Call button).
+  Kept in sync with `mobile/src/lib/pings.ts` (the iOS Nudges feature this was
+  ported from) — same table/RPC contract, same preset semantics.
 - Send flow: client INSERTs under RLS (household + sender stamped by defaults),
   then calls `api/send-ping` with the id; that function (service role) verifies
   the caller shares the household and pushes to the recipients (or all but the
   sender). It also attaches the sender's `tel` from `member_profiles` so the push
-  carries a Call action. Push failures are swallowed — Realtime shows it anyway.
+  carries a Call action, and marks the push `urgent` when `high_priority` is
+  true. Push failures are swallowed — Realtime shows it anyway.
 - `api/suggest-ping` — Claude Haiku maps free text → `{kind, emoji, message}`
-  in the user's language; reuses `ANTHROPIC_API_KEY`. No new env vars.
+  in the user's language; reuses `ANTHROPIC_API_KEY`. No new env vars. The AI
+  path never sets `high_priority` — that flag is only ever set explicitly via
+  a preset's toggle.
 - Call button: `public/sw.js` adds a `call` notification action + `tel:` handler.
   iOS web-push IGNORES notification action buttons, so the in-app 📞 Call button
   in `PingsBanner` (shown when the sender has a Family phone) is the reliable
   path on iPhone; the notification action only works on Android/desktop.
+  High-priority pings show Call AND Got it together (not either/or) so a
+  recipient can acknowledge without having to call.
 
 **Data fetching — cache to avoid the "blink"**: screens re-mount on every
 navigation, so fetching from empty state flashes (0 → real value). Use
@@ -307,6 +323,38 @@ complete. To get in:
   a real-device check — say so rather than implying you verified it.
 - Production (one-roof-app.vercel.app) only reflects committed + DEPLOYED code;
   if someone "doesn't see" a committed change there, it just isn't deployed yet.
+
+## Coding standards
+
+**Match the established pattern — don't invent a new one.** Before writing a
+new session/data-fetching flow, grep for how the existing code in the same
+area already does it (`src/hooks/useAuth.tsx`, `src/lib/googleCalendar.ts` are
+the reference implementations for anything session/auth-related) and follow
+that, even if a different approach would also technically work. A one-off
+pattern that diverges from the rest of the codebase is how subtle,
+hard-to-reproduce bugs get introduced — see the `mobile/CLAUDE.md` "Coding
+standards" section for two real examples (a `getUser()` vs `getSession()` auth
+bug, and a component-defined-inside-a-component focus bug) whose lessons apply
+here too:
+- **Reading the current user/session: always `supabase.auth.getSession()`,
+  never `supabase.auth.getUser()`.** `getSession()` reads the cached local
+  session (instant, no network). `getUser()` round-trips to the Auth server to
+  revalidate the JWT — on any network hiccup it resolves with `user: null`
+  instead of throwing, silently masquerading as "not signed in" deep inside an
+  unrelated flow.
+- **Never define a component inside another component's render body.** It
+  gets a new function identity on every render of the parent, so React
+  unmounts + remounts it on every state change — dropping focus from any
+  `<input>` inside it. Hoist sub-components above the parent, passing data in
+  as props. A plain function that *returns* JSX and is called directly
+  (`{card('A', ...)}`, not `<Card/>`) is fine — it doesn't create a new
+  component type, just inlines the tree. (This is exactly why `BetterDeal`'s
+  `card()` helper in `Calculator.tsx` is written as a closure call, not a
+  `<Card/>` component — keep it that way if you touch it.)
+- **Before shipping a fix for a reported bug, verify the actual root cause**
+  against the DB (migrations, RLS, constraints — via the Supabase MCP tools)
+  and the client code path, not just the symptom. A generic error message can
+  come from several unrelated causes — confirm which one before touching code.
 
 ## How NOT to do things (learned the hard way)
 
