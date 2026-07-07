@@ -75,6 +75,11 @@ export default function DocumentVault() {
       setLockOn(false)
       return
     }
+    // The Face ID lock is a One Roof Plus feature.
+    if (!isPlus) {
+      router.push('/paywall')
+      return
+    }
     // Prove it's the owner before turning the lock on (mirrors the PWA).
     try {
       const r = await LocalAuthentication.authenticateAsync({
@@ -147,12 +152,7 @@ export default function DocumentVault() {
 
   async function pickFile() {
     if (picking || !profile) return
-    // Document Vault uploads are a One Roof Plus feature. Existing docs stay
-    // viewable for everyone; adding new ones needs Plus.
-    if (!isPlus) {
-      router.push('/paywall')
-      return
-    }
+    // The Document Vault is free to use — only the Face ID lock is Plus.
     setPicking(true)
     try {
       const result = await DocumentPicker.getDocumentAsync({

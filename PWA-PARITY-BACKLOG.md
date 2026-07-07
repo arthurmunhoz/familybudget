@@ -33,3 +33,13 @@ type. No fix needed here, but if `Calculator.tsx` is ever refactored to
 extract `card` into a real `function OptionCard(...)` / `<OptionCard/>`
 component, hoist it to module scope (outside `BetterDeal`) rather than
 defining it inside — same trap.
+
+## 9. Document Vault: Face ID lock is now the Plus gate (2026-07-07)
+
+Product change (both apps): the Document Vault is FREE to use; only the opt-in
+**Face ID lock** is One Roof Plus. iOS `mobile/src/apps/docs/DocumentVault.tsx`
+now: uploads are ungated, and `toggleLock` routes to the paywall when a non-Plus
+user tries to enable the lock. The PWA vault is already free to use, but its
+Face ID lock (`src/components/VaultGate.tsx` / `lib/biometric.ts` opt-in) is NOT
+Plus-gated yet — gate enabling the lock on `current_household_is_plus`. Also
+reword any "Document Vault" Plus copy to "Face ID lock for the Document Vault".

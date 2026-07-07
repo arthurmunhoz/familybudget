@@ -18,7 +18,7 @@ const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stde
 
 const BENEFITS = [
   'Unlimited AI receipt & bill scans',
-  'Document Vault with Face ID',
+  'Face ID lock for the Document Vault',
   'Google Calendar two-way sync',
   'Support a family-run app ✨',
 ]
