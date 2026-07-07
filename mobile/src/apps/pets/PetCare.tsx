@@ -258,8 +258,20 @@ export default function PetCare() {
   const subtitleFor = (p: Pet) =>
     [p.species ? t(`pets.species.${p.species}` as TKey) : null, p.breed].filter(Boolean).join(' · ')
 
-  // Carousel paging: one full-width page per pet + a trailing "add pet" page.
-  const CARD_WIDTH = Dimensions.get('window').width - sp.lg * 2
+  // Peek carousel: the card is narrower than the screen so the neighbor pets
+  // peek on both sides, and each pet snaps dead-center. PEEK = the padding on
+  // each side (= half the off-card space), which is what centers a snapped card.
+  const winW = Dimensions.get('window').width
+  const PEEK = 28
+  const CARD_WIDTH = winW - PEEK * 2
+  const carouselRef = useRef<ScrollView>(null)
+
+  function scrollToPet(index: number) {
+    const pet = petsSorted[index]
+    if (!pet) return
+    carouselRef.current?.scrollTo({ x: index * (CARD_WIDTH + sp.md), animated: true })
+    setSelectedPet(pet.id)
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
@@ -283,12 +295,13 @@ export default function PetCare() {
               pet, last page adds a new one. Snaps by momentum end, computing
               the nearest page from the scroll offset. */}
           <ScrollView
+            ref={carouselRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             decelerationRate="fast"
             snapToInterval={CARD_WIDTH + sp.md}
             snapToAlignment="start"
-            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingVertical: sp.sm, gap: sp.md }}
+            contentContainerStyle={{ paddingHorizontal: PEEK, paddingVertical: sp.sm, gap: sp.md }}
             onMomentumScrollEnd={(e) => {
               const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + sp.md))
               const pet = petsSorted[Math.max(0, Math.min(idx, petsSorted.length - 1))]
@@ -416,6 +429,35 @@ export default function PetCare() {
               </Txt>
             </Pressable>
           </ScrollView>
+
+          {/* page dots — tap to jump a pet to center */}
+          {petsSorted.length > 1 ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: sp.xs,
+              }}
+            >
+              {petsSorted.map((p, i) => {
+                const active = p.id === selectedPet
+                return (
+                  <Pressable key={p.id} onPress={() => scrollToPet(i)} hitSlop={8}>
+                    <View
+                      style={{
+                        height: 7,
+                        width: active ? 18 : 7,
+                        borderRadius: 4,
+                        backgroundColor: active ? colorMap[p.id] : c.surface2,
+                      }}
+                    />
+                  </Pressable>
+                )
+              })}
+            </View>
+          ) : null}
 
           <View style={{ paddingHorizontal: sp.lg, gap: sp.lg, marginTop: sp.md }}>
             {/* calendar of ALL pets' events */}
