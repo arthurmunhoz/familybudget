@@ -48,8 +48,11 @@ type PushMap = Record<string, { deviceId: string; syncedAt: string }>
 
 // ── Local (per-device, per-user) state ───────────────────────────────────────
 async function currentUser(): Promise<{ email: string; household_id: string } | null> {
-  const { data: u } = await supabase.auth.getUser()
-  const email = u.user?.email
+  // getSession() reads the cached local session (no network round-trip); unlike
+  // getUser() (which re-validates against the Auth server), it can't fail on a
+  // flaky connection and turn into a false "not signed in" mid-sync.
+  const { data: s } = await supabase.auth.getSession()
+  const email = s.session?.user.email
   if (!email) return null
   const { data } = await supabase
     .from('allowed_users')
