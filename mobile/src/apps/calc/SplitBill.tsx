@@ -23,7 +23,7 @@ export function SplitBill() {
     if (m === 'item' && !isPlus) {
       Alert.alert(t('calc.plusByItem'), undefined, [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: 'Get One Roof Plus', onPress: () => router.push('/paywall') },
+        { text: t('settings.getPlus'), onPress: () => router.push('/paywall') },
       ])
       return
     }

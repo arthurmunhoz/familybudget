@@ -219,9 +219,9 @@ export default function MonthDetail({
       if (!res.ok) {
         // Free households hit a monthly scan cap — offer Plus instead of erroring.
         if (json.reason === 'monthly_cap') {
-          Alert.alert('Scan limit reached', json.error ?? '', [
+          Alert.alert(t('bill.scanLimitReached'), json.error ?? '', [
             { text: t('common.cancel'), style: 'cancel' },
-            { text: 'Get One Roof Plus', onPress: () => router.push('/paywall') },
+            { text: t('settings.getPlus'), onPress: () => router.push('/paywall') },
           ])
           return
         }

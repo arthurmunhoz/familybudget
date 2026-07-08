@@ -129,6 +129,7 @@ export const en = {
   'bill.takePhoto': 'Take a photo of the bill',
   'bill.scanning': 'Reading the bill…',
   'bill.scanFailed': 'Couldn’t read that bill — try a clearer photo.',
+  'bill.scanLimitReached': 'Scan limit reached',
   'bill.scanTip': 'Snap the itemized bill and I’ll pull out each item and price.',
   'bill.scanCamera': 'Take photo',
   'bill.scanLibrary': 'Choose photo',

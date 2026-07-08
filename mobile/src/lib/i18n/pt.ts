@@ -127,6 +127,7 @@ export const pt: Record<keyof typeof en, string> = {
   'bill.takePhoto': 'Tirar foto da conta',
   'bill.scanning': 'Lendo a conta…',
   'bill.scanFailed': 'Não consegui ler essa conta — tente uma foto mais nítida.',
+  'bill.scanLimitReached': 'Limite de leituras atingido',
   'bill.scanTip': 'Fotografe a conta detalhada e vou extrair cada item e preço.',
   'bill.scanCamera': 'Tirar foto',
   'bill.scanLibrary': 'Escolher foto',
