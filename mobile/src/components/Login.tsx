@@ -37,7 +37,7 @@ export default function Login() {
           <Txt variant="display" style={{ fontSize: 40 }}>
             One Roof
           </Txt>
-          <Txt variant="muted">Your whole home, in one app</Txt>
+          <Txt variant="muted">{t('login.tagline')}</Txt>
         </View>
 
         {appleAuthSupported ? (
