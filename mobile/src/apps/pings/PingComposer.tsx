@@ -10,7 +10,17 @@
 // delete it, or add a new one (emoji + label + high-priority). Sending is a
 // direct insert into `pings` (household_id + sender_email stamped by defaults).
 import { useMemo, useState } from 'react'
-import { Alert, Modal, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native'
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View,
+} from 'react-native'
 import { Check, ChevronDown, ChevronUp, Pencil, Plus, Send, Sparkles, Trash2, X } from 'lucide-react-native'
 
 import { Btn, Txt } from '@/components/ui'
@@ -351,7 +361,10 @@ function PresetEditor({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}
+      >
         <View
           style={{
             backgroundColor: c.card,
@@ -438,7 +451,7 @@ function PresetEditor({
             disabled={!label.trim()}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
