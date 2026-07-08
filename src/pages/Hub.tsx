@@ -33,6 +33,9 @@ export default function Hub() {
   const { hidden, tileStyle, orderedApps } = useAppPrefs()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  // Set by the Today card's temperature/"Set city" tap — tells the Drawer to
+  // scroll to and briefly highlight its Weather section once it opens.
+  const [highlightWeather, setHighlightWeather] = useState(false)
 
   // Badges are cached in memory (useCachedQuery): on return to the hub they
   // render their last value instantly and only update if the data changed —
@@ -137,7 +140,12 @@ export default function Hub() {
         </button>
       </header>
 
-      <TodaySection onSetCity={() => setDrawerOpen(true)} />
+      <TodaySection
+        onSetCity={() => {
+          setHighlightWeather(true)
+          setDrawerOpen(true)
+        }}
+      />
 
       <PingsBanner />
 
@@ -204,7 +212,12 @@ export default function Hub() {
         </div>
       )}
 
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        highlightWeather={highlightWeather}
+        onHighlightWeatherHandled={() => setHighlightWeather(false)}
+      />
     </div>
   )
 }

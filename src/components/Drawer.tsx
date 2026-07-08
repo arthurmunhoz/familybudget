@@ -16,9 +16,15 @@ import { geocodeCity, loadHomeLocation, saveHomeLocation, type HomeLocation } fr
 export default function Drawer({
   open,
   onClose,
+  highlightWeather = false,
+  onHighlightWeatherHandled,
 }: {
   open: boolean
   onClose: () => void
+  /** Scroll to and briefly outline the Weather section once the drawer opens
+   *  (set by the Today card's temperature/"Set city" tap). */
+  highlightWeather?: boolean
+  onHighlightWeatherHandled?: () => void
 }) {
   const { profile, session, signOut } = useAuth()
   const { household } = useHousehold()
@@ -29,6 +35,29 @@ export default function Drawer({
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   useScrollLock(open)
+
+  // Scroll-to-Weather + a brief highlight ring, triggered from the Hub's Today
+  // card. Waits for the drawer's slide-in to settle before scrolling.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const weatherRef = useRef<HTMLDivElement>(null)
+  const [flashWeather, setFlashWeather] = useState(false)
+  useEffect(() => {
+    if (!open || !highlightWeather) return
+    const t1 = setTimeout(() => {
+      const container = scrollRef.current
+      const section = weatherRef.current
+      if (container && section) {
+        container.scrollTo({ top: section.offsetTop - 12, behavior: 'smooth' })
+      }
+      setFlashWeather(true)
+      onHighlightWeatherHandled?.()
+    }, 350)
+    const t2 = setTimeout(() => setFlashWeather(false), 350 + 2400)
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [open, highlightWeather, onHighlightWeatherHandled])
 
   // Home city for the Hub's "Today" weather — per-device, stored in localStorage
   // (no browser geolocation permission requested). Loaded fresh each time the
@@ -180,6 +209,7 @@ export default function Drawer({
         </div>
 
         <div
+          ref={scrollRef}
           className="flex-1 overflow-y-auto overscroll-contain px-5"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
         >
@@ -229,9 +259,13 @@ export default function Drawer({
 
         <NotificationsToggle />
 
-        <div className="mt-6">
+        <div ref={weatherRef} className="mt-6">
           <span className="text-sm text-(--text-muted)">{t('drawer.weather')}</span>
-          <div className="mt-2 rounded-xl bg-(--surface) p-3">
+          <div
+            className={`mt-2 rounded-xl bg-(--surface) p-3 transition-shadow ${
+              flashWeather ? 'ring-2 ring-(--accent)' : ''
+            }`}
+          >
             <div className="flex items-center gap-3">
               <span
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
