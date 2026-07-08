@@ -253,6 +253,14 @@ and default to all-day + yearly + household-owned. `src/lib/calendar.ts` holds
   calls `handleConnectRedirect(session)`, which POSTs the one-time
   `provider_refresh_token` to `api/google-calendar-connect.ts` (the client can't
   persist it — RLS denies), then triggers a sync.
+- Calendar sync is a **One Roof Plus** feature and is enforced **server-side**:
+  `api/google-calendar-sync.ts` skips any connection whose household isn't Plus
+  (via the `household_is_plus(p_household)` RPC, which guards on the
+  subscription's `expires_at`), so a lapsed/cancelled plan stops syncing
+  automatically — no disconnect needed, and a stale client can't bypass it. The
+  Apple equivalent (`mobile/src/lib/appleCalendar.ts` `syncAppleCalendar`) runs
+  on-device, so it self-gates with the session-scoped `current_household_is_plus`
+  RPC (fail-open only on a network error, never on an explicit `false`).
 - `api/google-calendar-sync.ts` — refreshes the access token (needs
   `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` env), pulls events in a -30d..+180d
   window (`singleEvents=true`), upserts into `calendar_events` (source='google',

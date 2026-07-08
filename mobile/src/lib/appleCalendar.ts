@@ -189,6 +189,14 @@ export async function syncAppleCalendar(): Promise<void> {
   const state = await readConn(who.email)
   if (!state.connected) return
 
+  // Apple Calendar sync is a One Roof Plus feature. Enforce it here (not just at
+  // the connect UI) so a household whose subscription lapsed stops syncing even
+  // if it stays "connected" locally. The RPC guards on the subscription's
+  // `expires_at`, so a cancelled/expired plan auto-downgrades without a
+  // disconnect. Fail-open only on a network error (data is undefined, not false).
+  const { data: isPlus } = await supabase.rpc('current_household_is_plus')
+  if (isPlus === false) return
+
   const now = new Date()
   const start = new Date(now.getTime() - WINDOW_BACK * 86400000)
   const end = new Date(now.getTime() + WINDOW_FWD * 86400000)

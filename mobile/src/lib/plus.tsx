@@ -8,9 +8,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
+import { AppState, type AppStateStatus } from 'react-native'
 import Purchases, {
   type CustomerInfo,
   type PurchasesOffering,
@@ -111,6 +113,21 @@ export function PlusProvider({ children }: { children: ReactNode }) {
       /* ignore */
     }
   }, [householdId])
+
+  // Re-check entitlement whenever the app returns to the foreground. Without this
+  // an app left open across the subscription's expiry keeps showing Plus until it
+  // re-mounts — `serverPlus` is otherwise only fetched on mount/household change.
+  // This is what actually revokes Plus features promptly after a lapse/cancel,
+  // since the server RPC (`current_household_is_plus`) guards on `expires_at`.
+  const appState = useRef(AppState.currentState)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      const wasBackground = appState.current.match(/inactive|background/)
+      appState.current = next
+      if (wasBackground && next === 'active') void refresh()
+    })
+    return () => sub.remove()
+  }, [refresh])
 
   const purchase = useCallback(async (pkg: PurchasesPackage) => {
     try {

@@ -62,8 +62,16 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
   **per household** — RevenueCat's `app_user_id` is the `household_id`, so any
   member's purchase covers the family. `usePlus().isPlus` OR's the RevenueCat
   entitlement with the server plan (`household_subscriptions`, stamped by
-  `api/revenuecat-webhook`). Generous-free gates route to `/paywall`: Document
-  Vault uploads, Google Calendar connect, and the AI-scan cap.
+  `api/revenuecat-webhook`). Generous-free gates route to `/paywall`: the Document
+  Vault Face ID lock (uploads/viewing are free), Google + Apple Calendar connect,
+  the by-item bill split, a 2nd+ budget, and the AI-scan cap.
+  **Revocation on lapse:** the server plan guards on `expires_at`, so a
+  cancelled/expired subscription auto-downgrades. `PlusProvider` re-checks the
+  entitlement on every app foreground (`AppState` → `refresh()`) so features lock
+  promptly, and the stateful features that keep running once enabled — calendar
+  sync — re-check Plus at sync time (Google server-side in
+  `api/google-calendar-sync`, Apple on-device in `syncAppleCalendar`). Existing
+  budgets stay usable after a lapse (only creating new ones is blocked).
 - **AI scans** (`api/scan-receipt`, `api/scan-bill`): **Claude Haiku only** — an
   unreadable photo fails with "try a clearer photo"; never escalate to Opus or
   any pricier model (owner rule, applies to every AI call in the app).

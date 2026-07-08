@@ -394,9 +394,26 @@ export default async function handler(req: any, res: any) {
     connections = (data ?? []) as Conn[]
   }
 
+  // Google Calendar sync is a One Roof Plus feature. Enforce it server-side so a
+  // household whose subscription has lapsed stops syncing regardless of a stale
+  // client — `household_is_plus` guards on the subscription's `expires_at`, so a
+  // cancelled/expired plan auto-downgrades here without needing to disconnect.
+  const plusByHousehold = new Map<string, boolean>()
+  async function householdIsPlus(hid: string): Promise<boolean> {
+    if (plusByHousehold.has(hid)) return plusByHousehold.get(hid)!
+    const { data } = await db.rpc('household_is_plus', { p_household: hid })
+    const plus = data === true
+    plusByHousehold.set(hid, plus)
+    return plus
+  }
+
   const results: any[] = []
   for (const conn of connections) {
     try {
+      if (!(await householdIsPlus(conn.household_id))) {
+        results.push({ user: conn.user_email, skipped: 'not_plus' })
+        continue
+      }
       results.push({ user: conn.user_email, ...(await syncConnection(db, conn, clientId, clientSecret)) })
     } catch (e: any) {
       await db
