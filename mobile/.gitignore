@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# @bacons/apple-targets output (generated from targets/*/expo-target.config.js
+# at prebuild — the hand-written .swift/config files are committed, these aren't)
+targets/**/Assets.xcassets/
+targets/**/Info.plist
+targets/**/generated.entitlements
