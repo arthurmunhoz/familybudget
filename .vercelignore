@@ -1,0 +1,6 @@
+# The mobile/ app is a separate Expo/React Native project (built via EAS or
+# Xcode, never Vercel) — its own node_modules and generated native ios/android
+# directories can balloon into tens of thousands of files (CocoaPods, vendored
+# frameworks) that blow past Vercel's upload file-count limit. Vercel's CLI
+# doesn't pick up mobile/.gitignore (nested), so this needs to be explicit here.
+mobile/
