@@ -70,8 +70,13 @@ export default function Settings() {
 
   useEffect(() => {
     if (params.highlight !== 'weather' || weatherY == null || handledHighlight.current) return
-    handledHighlight.current = true
+    // Don't lock in `handledHighlight` until the scroll actually fires — the
+    // Plus and Notifications cards above this section resolve async state
+    // (isPlus, pushOn) shortly after mount and can change height, re-firing
+    // this section's onLayout with a corrected y. Locking too early meant the
+    // scroll used a stale pre-settle offset and landed short of the card.
     const id = setTimeout(() => {
+      handledHighlight.current = true
       scrollRef.current?.scrollTo({ y: Math.max(0, weatherY - 12), animated: true })
       setHighlightWeather(true)
       setTimeout(() => setHighlightWeather(false), 2400)

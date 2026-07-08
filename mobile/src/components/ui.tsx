@@ -4,6 +4,8 @@
 import { type ReactNode, type Ref } from 'react'
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -66,14 +68,19 @@ export function Screen({
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={edges}>
       {header ? <View style={inner}>{header}</View> : null}
       {scroll ? (
-        <ScrollView
-          ref={scrollRef}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
-          contentContainerStyle={[{ paddingBottom: sp.xxl }, inner]}
-          keyboardShouldPersistTaps="handled"
         >
-          {children}
-        </ScrollView>
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={[{ paddingBottom: sp.xxl }, inner]}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
       ) : (
         <View style={[{ flex: 1 }, inner]}>{children}</View>
       )}

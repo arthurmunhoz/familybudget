@@ -103,11 +103,7 @@ export default function TodaySection() {
           </Txt>
         </View>
         <Pressable
-          onPress={() =>
-            router.push(
-              location ? '/settings' : { pathname: '/settings', params: { highlight: 'weather' } },
-            )
-          }
+          onPress={() => router.push({ pathname: '/settings', params: { highlight: 'weather' } })}
           hitSlop={6}
           accessibilityRole="button"
           style={{ alignItems: 'flex-end', gap: 1 }}
