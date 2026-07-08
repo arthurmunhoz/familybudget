@@ -50,7 +50,7 @@ export const pt: Record<keyof typeof en, string> = {
   'pings.preset.love': 'Pensando em você',
   'pings.editPresets': 'Editar avisos',
   'pings.donePresets': 'Pronto',
-  'pings.addPreset': '＋ Adicionar aviso',
+  'pings.addPreset': 'Adicionar aviso',
   'pings.newPreset': 'Novo aviso',
   'pings.editPreset': 'Editar aviso',
   'pings.presetEmoji': 'Emoji',

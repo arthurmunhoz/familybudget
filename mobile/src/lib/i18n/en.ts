@@ -52,7 +52,7 @@ export const en = {
   'pings.preset.love': 'Thinking of you',
   'pings.editPresets': 'Edit presets',
   'pings.donePresets': 'Done',
-  'pings.addPreset': '＋ Add nudge',
+  'pings.addPreset': 'Add nudge',
   'pings.newPreset': 'New nudge',
   'pings.editPreset': 'Edit nudge',
   'pings.presetEmoji': 'Emoji',
