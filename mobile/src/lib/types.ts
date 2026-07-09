@@ -5,6 +5,9 @@ export interface Profile {
   display_name: string
   household_id: string
   is_admin: boolean
+  /** Household-scoped role (migration 051). Distinct from the global is_admin.
+   *  Optional because some queries don't select it. */
+  role?: 'owner' | 'member'
 }
 
 export interface Household {

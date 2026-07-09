@@ -216,3 +216,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-049-pet-tag-color.sql (pets.tag_color: per-pet calendar dot color)
 --   migration-050-nudge-presets.sql (ping_presets table + pings.high_priority + seed_ping_presets)
 --   migration-051-self-serve-onboarding.sql (allowed_users.role owner/member + household_join_codes + create_household/join_household/get_join_code/rotate_join_code/remove_member RPCs)
+--   migration-052-admin-set-owner.sql (admin_set_owner: global admin assigns a household's owner)
+--   migration-053-admin-delete-household.sql (admin_delete_household: cascade-delete a household + all its data)

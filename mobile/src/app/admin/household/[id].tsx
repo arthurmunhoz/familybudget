@@ -50,7 +50,7 @@ export default function AdminHousehold() {
       supabase.from('households').select('*').eq('id', id).single(),
       supabase
         .from('allowed_users')
-        .select('email, display_name, household_id, is_admin')
+        .select('email, display_name, household_id, is_admin, role')
         .eq('household_id', id)
         .order('display_name'),
       supabase.rpc('admin_user_activity', { days: 30 }),
@@ -67,6 +67,7 @@ export default function AdminHousehold() {
   })
   const { household, members, activity, isPlus } = data
   const atLimit = members.length >= MAX_MEMBERS
+  const hasOwner = members.some((u) => u.role === 'owner')
 
   // Comp this household to Plus for free (or revoke). Admin-only RPC.
   async function setPlan(next: boolean) {
@@ -140,27 +141,49 @@ export default function AdminHousehold() {
     )
   }
 
-  function removeHousehold() {
-    if (!household) return
-    if (members.length > 0) {
-      Alert.alert(t('admin.removeAllMembers'))
-      return
-    }
-    Alert.alert(t('admin.deleteHousehold'), t('admin.deleteConfirm', { name: household.name }), [
+  // Global-admin assigns a household owner (atomic single-owner swap via RPC).
+  function setOwner(user: Profile) {
+    if (!id) return
+    Alert.alert(t('admin.makeOwner'), t('admin.makeOwnerConfirm', { name: user.display_name }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('admin.delete'),
-        style: 'destructive',
+        text: t('admin.makeOwner'),
         onPress: async () => {
-          const { error } = await supabase.from('households').delete().eq('id', household.id)
+          const { error } = await supabase.rpc('admin_set_owner', { p_household: id, p_email: user.email })
           if (error) {
-            Alert.alert(t('admin.deleteError'))
+            Alert.alert(t('admin.setOwnerError'))
             return
           }
-          router.back()
+          load()
         },
       },
     ])
+  }
+
+  // Cascade-delete the whole household + all its data (admin RPC, migration 053).
+  // Works even when the household still has members/data — the plain delete
+  // couldn't (FK-blocked), which is why this exists.
+  function removeHousehold() {
+    if (!household) return
+    Alert.alert(
+      t('admin.deleteHousehold'),
+      t('admin.deleteConfirmAll', { name: household.name, count: String(members.length) }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('admin.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.rpc('admin_delete_household', { p_household: household.id })
+            if (error) {
+              Alert.alert(t('admin.deleteError'))
+              return
+            }
+            router.back()
+          },
+        },
+      ],
+    )
   }
 
   const inputStyle = {
@@ -219,6 +242,20 @@ export default function AdminHousehold() {
             </View>
           </Card>
 
+          {members.length > 0 && !hasOwner ? (
+            <View
+              style={{
+                backgroundColor: c.expense + '18',
+                borderRadius: radius.md,
+                padding: sp.md,
+              }}
+            >
+              <Txt style={{ color: c.expense, fontWeight: '600', fontSize: 13 }}>
+                {t('admin.noOwnerWarning')}
+              </Txt>
+            </View>
+          ) : null}
+
           <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
             Members
           </Txt>
@@ -229,30 +266,59 @@ export default function AdminHousehold() {
           ) : (
             members.map((u) => (
               <Card key={u.email}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                      <Txt style={{ fontWeight: '600' }} numberOfLines={1}>
-                        {u.display_name}
+                <View style={{ gap: sp.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                        <Txt style={{ fontWeight: '600' }} numberOfLines={1}>
+                          {u.display_name}
+                        </Txt>
+                        {u.role === 'owner' ? (
+                          <View style={{ backgroundColor: c.income + '22', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                            <Txt style={{ color: c.income, fontWeight: '700', fontSize: 10 }}>
+                              {t('admin.owner').toUpperCase()}
+                            </Txt>
+                          </View>
+                        ) : null}
+                        {u.is_admin ? (
+                          <View style={{ backgroundColor: c.accentSoft, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                            <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 10 }}>ADMIN</Txt>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
+                        {u.email}
                       </Txt>
-                      {u.is_admin ? (
-                        <View style={{ backgroundColor: c.accentSoft, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                          <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 10 }}>ADMIN</Txt>
-                        </View>
-                      ) : null}
+                      <Txt variant="faint" style={{ fontSize: 11 }}>
+                        {activity[u.email]
+                          ? `Active ${timeAgo(activity[u.email].last_seen)} · ${activity[u.email].events} events / 30d`
+                          : 'Never accessed'}
+                      </Txt>
                     </View>
-                    <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
-                      {u.email}
-                    </Txt>
-                    <Txt variant="faint" style={{ fontSize: 11 }}>
-                      {activity[u.email]
-                        ? `Active ${timeAgo(activity[u.email].last_seen)} · ${activity[u.email].events} events / 30d`
-                        : 'Never accessed'}
-                    </Txt>
+                    {!u.is_admin ? (
+                      <Pressable onPress={() => removeMember(u)} hitSlop={8} accessibilityLabel={`Remove ${u.display_name}`}>
+                        <X size={18} color={c.textFaint} />
+                      </Pressable>
+                    ) : null}
                   </View>
-                  {!u.is_admin ? (
-                    <Pressable onPress={() => removeMember(u)} hitSlop={8} accessibilityLabel={`Remove ${u.display_name}`}>
-                      <X size={18} color={c.textFaint} />
+                  {u.role !== 'owner' ? (
+                    <Pressable
+                      onPress={() => setOwner(u)}
+                      style={{
+                        alignSelf: 'flex-start',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingVertical: 6,
+                        paddingHorizontal: 10,
+                        borderRadius: radius.md,
+                        backgroundColor: c.surface,
+                      }}
+                    >
+                      <Award size={14} color={c.accent} />
+                      <Txt style={{ color: c.accent, fontWeight: '600', fontSize: 12 }}>
+                        {t('admin.makeOwner')}
+                      </Txt>
                     </Pressable>
                   ) : null}
                 </View>
@@ -302,24 +368,22 @@ export default function AdminHousehold() {
             </View>
           )}
 
-          {members.length === 0 ? (
-            <Pressable
-              onPress={removeHousehold}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: sp.sm,
-                backgroundColor: c.card,
-                borderRadius: radius.md,
-                paddingVertical: 14,
-                marginTop: sp.lg,
-              }}
-            >
-              <Trash2 size={18} color={c.expense} />
-              <Txt style={{ color: c.expense, fontWeight: '600' }}>Delete household</Txt>
-            </Pressable>
-          ) : null}
+          <Pressable
+            onPress={removeHousehold}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: sp.sm,
+              backgroundColor: c.card,
+              borderRadius: radius.md,
+              paddingVertical: 14,
+              marginTop: sp.lg,
+            }}
+          >
+            <Trash2 size={18} color={c.expense} />
+            <Txt style={{ color: c.expense, fontWeight: '600' }}>Delete household</Txt>
+          </Pressable>
         </View>
       )}
     </Screen>

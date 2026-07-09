@@ -113,7 +113,7 @@ export default function Admin() {
   } = useCachedQuery<BaseData>('admin:base', async () => {
     const [h, u, hh] = await Promise.all([
       supabase.from('households').select('*').eq('is_internal', false).order('created_at'),
-      supabase.from('allowed_users').select('email, display_name, household_id, is_admin'),
+      supabase.from('allowed_users').select('email, display_name, household_id, is_admin, role'),
       supabase.rpc('admin_household_activity'),
     ])
     return {
@@ -371,6 +371,8 @@ export default function Admin() {
           ) : (
             visibleHouseholds.map((h) => {
               const memberCount = users.filter((u) => u.household_id === h.id).length
+              const needsOwner =
+                memberCount > 0 && !users.some((u) => u.household_id === h.id && u.role === 'owner')
               return (
                 <Card key={h.id} onPress={() => router.push(`/admin/household/${h.id}`)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
@@ -380,6 +382,20 @@ export default function Admin() {
                         <Txt style={{ fontWeight: '700' }} numberOfLines={1}>
                           {h.name}
                         </Txt>
+                        {needsOwner ? (
+                          <View
+                            style={{
+                              backgroundColor: c.expense + '22',
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                              borderRadius: 999,
+                            }}
+                          >
+                            <Txt style={{ color: c.expense, fontWeight: '700', fontSize: 10 }}>
+                              {t('admin.noOwner')}
+                            </Txt>
+                          </View>
+                        ) : null}
                       </View>
                       <Txt variant="faint" style={{ fontSize: 11 }}>
                         {memberCount} {memberCount === 1 ? 'member' : 'members'} ·{' '}
