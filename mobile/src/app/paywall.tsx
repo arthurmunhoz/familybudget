@@ -30,22 +30,22 @@ const BENEFIT_KEYS: TKey[] = [
   'settings.plusFeatureSupport',
 ]
 
-function periodLabel(pkg: PurchasesPackage): string {
+function periodLabel(pkg: PurchasesPackage, t: (key: TKey) => string): string {
   switch (pkg.packageType) {
     case PACKAGE_TYPE.ANNUAL:
-      return 'Yearly'
+      return t('paywall.periodYearly')
     case PACKAGE_TYPE.MONTHLY:
-      return 'Monthly'
+      return t('paywall.periodMonthly')
     case PACKAGE_TYPE.LIFETIME:
-      return 'Lifetime'
+      return t('paywall.periodLifetime')
     case PACKAGE_TYPE.WEEKLY:
-      return 'Weekly'
+      return t('paywall.periodWeekly')
     case PACKAGE_TYPE.SIX_MONTH:
-      return '6 months'
+      return t('paywall.period6mo')
     case PACKAGE_TYPE.THREE_MONTH:
-      return '3 months'
+      return t('paywall.period3mo')
     case PACKAGE_TYPE.TWO_MONTH:
-      return '2 months'
+      return t('paywall.period2mo')
     default:
       return pkg.product.title
   }
@@ -72,11 +72,11 @@ export default function Paywall() {
     try {
       const ok = await purchase(chosen)
       if (ok) {
-        Alert.alert('Welcome to One Roof Plus 🎉', 'Everything is unlocked. Thank you!')
+        Alert.alert(t('paywall.welcomeTitle'), t('paywall.welcomeBody'))
         router.back()
       }
     } catch {
-      Alert.alert('Purchase failed', 'Something went wrong. Please try again.')
+      Alert.alert(t('paywall.purchaseFailedTitle'), t('paywall.purchaseFailedBody'))
     } finally {
       setBusy(false)
     }
@@ -88,12 +88,12 @@ export default function Paywall() {
     try {
       const ok = await restore()
       Alert.alert(
-        ok ? 'Purchases restored' : 'Nothing to restore',
-        ok ? "You're on One Roof Plus." : 'No previous purchase was found for this Apple ID.',
+        ok ? t('paywall.restoredTitle') : t('paywall.nothingRestoreTitle'),
+        ok ? t('paywall.restoredBody') : t('paywall.nothingRestoreBody'),
       )
       if (ok) router.back()
     } catch {
-      Alert.alert('Restore failed', 'Please try again.')
+      Alert.alert(t('paywall.restoreFailedTitle'), t('paywall.restoreFailedBody'))
     } finally {
       setBusy(false)
     }
@@ -103,7 +103,7 @@ export default function Paywall() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <ScrollView contentContainerStyle={{ padding: sp.lg, paddingBottom: sp.xxl, gap: sp.lg }}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Close">
+          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={t('common.close')}>
             <X size={24} color={c.textMuted} />
           </Pressable>
         </View>
@@ -122,10 +122,10 @@ export default function Paywall() {
             <Sparkles size={30} color={c.accent} />
           </View>
           <Txt variant="title" style={{ textAlign: 'center' }}>
-            One Roof Plus
+            {t('settings.plus')}
           </Txt>
           <Txt variant="muted" style={{ textAlign: 'center' }}>
-            One subscription for your whole household.
+            {t('paywall.subtitle')}
           </Txt>
         </View>
 
@@ -141,25 +141,25 @@ export default function Paywall() {
         {isPlus ? (
           <Card>
             <Txt style={{ fontWeight: '700', color: c.income, textAlign: 'center' }}>
-              You're on One Roof Plus ✓
+              {t('paywall.alreadyPlus')}
             </Txt>
           </Card>
         ) : !available ? (
           <Card>
             <Txt variant="muted" style={{ textAlign: 'center' }}>
-              In-app purchases aren't available in this build.
+              {t('paywall.unavailable')}
             </Txt>
           </Card>
         ) : loading ? (
           <Card>
             <Txt variant="muted" style={{ textAlign: 'center' }}>
-              Loading plans…
+              {t('paywall.loadingPlans')}
             </Txt>
           </Card>
         ) : packages.length === 0 ? (
           <Card>
             <Txt variant="muted" style={{ textAlign: 'center' }}>
-              Plans aren't set up yet. Please check back soon.
+              {t('paywall.noPlans')}
             </Txt>
           </Card>
         ) : (
@@ -184,11 +184,13 @@ export default function Paywall() {
                     }}
                   >
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Txt style={{ fontWeight: '700' }}>{periodLabel(pkg)}</Txt>
+                      <Txt style={{ fontWeight: '700' }}>{periodLabel(pkg, t)}</Txt>
                       {intro ? (
-                        <Txt variant="faint">{intro.priceString} intro, then renews</Txt>
+                        <Txt variant="faint">
+                          {t('paywall.introThenRenews', { price: intro.priceString })}
+                        </Txt>
                       ) : (
-                        <Txt variant="faint">{pkg.product.description || 'Auto-renews'}</Txt>
+                        <Txt variant="faint">{pkg.product.description || t('paywall.autoRenews')}</Txt>
                       )}
                     </View>
                     <Txt style={{ fontWeight: '700' }}>{pkg.product.priceString}</Txt>
@@ -198,7 +200,13 @@ export default function Paywall() {
             </View>
 
             <Btn
-              title={busy ? 'Please wait…' : chosen ? `Subscribe — ${chosen.product.priceString}` : 'Subscribe'}
+              title={
+                busy
+                  ? t('paywall.pleaseWait')
+                  : chosen
+                    ? t('paywall.subscribePrice', { price: chosen.product.priceString })
+                    : t('paywall.subscribe')
+              }
               onPress={buy}
               disabled={busy || !chosen}
               loading={busy}
@@ -208,23 +216,22 @@ export default function Paywall() {
 
         {!isPlus && available ? (
           <Pressable onPress={doRestore} disabled={busy} style={{ alignItems: 'center', paddingVertical: sp.sm }}>
-            <Txt style={{ color: c.accent, fontWeight: '600' }}>Restore purchases</Txt>
+            <Txt style={{ color: c.accent, fontWeight: '600' }}>{t('settings.restorePurchases')}</Txt>
           </Pressable>
         ) : null}
 
         <Txt variant="faint" style={{ textAlign: 'center' }}>
-          Subscriptions renew automatically unless cancelled at least 24 hours before the period
-          ends. Manage or cancel anytime in your Apple ID settings.
+          {t('paywall.legal')}
         </Txt>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: sp.lg }}>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
             <Txt variant="faint" style={{ textDecorationLine: 'underline' }}>
-              Terms of Use
+              {t('paywall.terms')}
             </Txt>
           </Pressable>
           <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
             <Txt variant="faint" style={{ textDecorationLine: 'underline' }}>
-              Privacy Policy
+              {t('paywall.privacy')}
             </Txt>
           </Pressable>
         </View>
