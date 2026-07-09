@@ -34,6 +34,9 @@ export interface CurrentWeather {
 
 export type TempUnit = 'fahrenheit' | 'celsius'
 
+/** A noteworthy condition in today's forecast (drives the home alert banner). */
+export type WeatherAlertKind = 'thunder' | 'snow' | 'heat' | 'cold' | 'wind' | 'rain'
+
 const KEY = 'weather-home'
 
 export async function loadHomeLocation(): Promise<HomeLocation | null> {
@@ -71,6 +74,75 @@ export async function geocodeCity(name: string): Promise<HomeLocation | null> {
     if (!r) return null
     const label = [r.name, r.admin1, r.country_code].filter(Boolean).join(', ')
     return { city: label, lat: r.latitude, lon: r.longitude }
+  } catch {
+    return null
+  }
+}
+
+/** Up to `limit` city matches for a typed query (Open-Meteo geocoding) — powers
+ *  the Settings autocomplete. Returns [] for short/empty queries or on failure. */
+export async function searchCities(name: string, limit = 5): Promise<HomeLocation[]> {
+  const q = name.trim()
+  if (q.length < 2) return []
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+      q,
+    )}&count=${limit}&language=en&format=json`
+    const res = await fetch(url)
+    if (!res.ok) return []
+    const json = (await res.json()) as {
+      results?: { name: string; admin1?: string; country_code?: string; latitude: number; longitude: number }[]
+    }
+    return (json.results ?? []).map((r) => ({
+      city: [r.name, r.admin1, r.country_code].filter(Boolean).join(', '),
+      lat: r.latitude,
+      lon: r.longitude,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/** Inspect TODAY's forecast and return the single most-notable alert, or null.
+ *  Priority: thunderstorm > heavy snow > extreme heat > extreme cold > wind >
+ *  rain. Thresholds are evaluated in the requested unit; wind uses km/h gusts. */
+export async function fetchDayAlert(
+  lat: number,
+  lon: number,
+  unit: TempUnit = 'fahrenheit',
+): Promise<WeatherAlertKind | null> {
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&daily=weather_code,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max,wind_gusts_10m_max` +
+      `&temperature_unit=${unit}&wind_speed_unit=kmh&timezone=auto&forecast_days=1`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const json = (await res.json()) as {
+      daily?: {
+        weather_code?: number[]
+        apparent_temperature_max?: number[]
+        apparent_temperature_min?: number[]
+        precipitation_probability_max?: number[]
+        wind_gusts_10m_max?: number[]
+      }
+    }
+    const d = json.daily
+    if (!d) return null
+    const code = d.weather_code?.[0] ?? 0
+    const tHi = d.apparent_temperature_max?.[0]
+    const tLo = d.apparent_temperature_min?.[0]
+    const pop = d.precipitation_probability_max?.[0] ?? 0
+    const gust = d.wind_gusts_10m_max?.[0] ?? 0 // km/h
+    const hot = unit === 'celsius' ? 37 : 99
+    const cold = unit === 'celsius' ? 0 : 32
+    if (code >= 95) return 'thunder'
+    if (code === 75 || code === 77 || code === 86) return 'snow' // heavy snow / grains / heavy showers
+    if (tHi != null && tHi >= hot) return 'heat'
+    if (tLo != null && tLo <= cold) return 'cold'
+    if (gust >= 55) return 'wind' // ~34 mph gusts
+    if (pop >= 60) return 'rain'
+    return null
   } catch {
     return null
   }
@@ -115,22 +187,34 @@ export function weatherIcon(code: number): LucideIcon {
   return Cloud
 }
 
-/** Home location + its current weather, reloadable (e.g. on screen focus). */
+/** Home location + its current weather + today's alert, reloadable (e.g. on
+ *  screen focus). */
 export function useHomeWeather(unit: TempUnit) {
   const [location, setLocation] = useState<HomeLocation | null>(null)
   const [weather, setWeather] = useState<CurrentWeather | null>(null)
+  const [alert, setAlert] = useState<WeatherAlertKind | null>(null)
   const [ready, setReady] = useState(false)
 
   const reload = useCallback(async () => {
     const loc = await loadHomeLocation()
     setLocation(loc)
     setReady(true)
-    setWeather(loc ? await fetchCurrentWeather(loc.lat, loc.lon, unit) : null)
+    if (!loc) {
+      setWeather(null)
+      setAlert(null)
+      return
+    }
+    const [w, a] = await Promise.all([
+      fetchCurrentWeather(loc.lat, loc.lon, unit),
+      fetchDayAlert(loc.lat, loc.lon, unit),
+    ])
+    setWeather(w)
+    setAlert(a)
   }, [unit])
 
   useEffect(() => {
     void reload()
   }, [reload])
 
-  return { location, weather, ready, reload }
+  return { location, weather, alert, ready, reload }
 }

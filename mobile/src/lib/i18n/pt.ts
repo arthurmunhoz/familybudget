@@ -455,6 +455,12 @@ export const pt: Record<keyof typeof en, string> = {
   'home.today': 'Hoje',
   'home.setCity': 'Definir cidade',
   'home.inCity': 'em {city}',
+  'home.weatherRain': 'Chuva provável hoje — leve guarda-chuva.',
+  'home.weatherThunder': 'Tempestades previstas para hoje.',
+  'home.weatherSnow': 'Neve forte prevista para hoje.',
+  'home.weatherHeat': 'Calor extremo hoje — hidrate-se.',
+  'home.weatherCold': 'Frio congelante hoje — agasalhe-se.',
+  'home.weatherWind': 'Dia de vento pela frente.',
   'home.greeting': 'Oi, {name}',
 
   // Settings
@@ -500,6 +506,7 @@ export const pt: Record<keyof typeof en, string> = {
   'settings.cityPlaceholder': 'ex.: Austin',
   'settings.set': 'Salvar',
   'settings.cityNotFound': 'Não encontramos essa cidade. Tente outra grafia.',
+  'settings.searchingCity': 'Buscando…',
   'settings.plus': 'One Roof Plus',
   'settings.plusActive': 'Ativo · toda a sua casa',
   'settings.active': 'ATIVO',

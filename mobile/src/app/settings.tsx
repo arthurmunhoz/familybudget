@@ -37,7 +37,15 @@ import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import { LANGUAGES, type TKey } from '@/lib/i18n'
 import { getPushEnabled, registerForPush } from '@/lib/notifications'
-import { geocodeCity, loadHomeLocation, saveHomeLocation, type HomeLocation } from '@/lib/weather'
+import {
+  fetchCurrentWeather,
+  loadHomeLocation,
+  saveHomeLocation,
+  searchCities,
+  weatherIcon,
+  type CurrentWeather,
+  type HomeLocation,
+} from '@/lib/weather'
 import { supabase } from '@/lib/supabase'
 import { dark, fonts, light, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
@@ -414,8 +422,11 @@ export default function Settings() {
 
   const [homeLoc, setHomeLoc] = useState<HomeLocation | null>(null)
   const [cityInput, setCityInput] = useState('')
-  const [savingCity, setSavingCity] = useState(false)
+  const [suggestions, setSuggestions] = useState<HomeLocation[]>([])
+  const [searching, setSearching] = useState(false)
+  const [preview, setPreview] = useState<CurrentWeather | null>(null)
   const [cityMsg, setCityMsg] = useState<TKey | null>(null)
+  const unit = lang === 'en' ? 'fahrenheit' : 'celsius'
 
   // Deep-link from the Hub's "Set city" button (?highlight=weather): scroll to
   // the Weather section and briefly outline it.
@@ -455,25 +466,57 @@ export default function Settings() {
     }
   }, [])
 
-  async function saveCity() {
+  // Live city autocomplete (debounced) — replaces the old geocode-on-submit.
+  useEffect(() => {
     const q = cityInput.trim()
-    if (!q) return
-    setSavingCity(true)
-    setCityMsg(null)
-    const loc = await geocodeCity(q)
-    setSavingCity(false)
-    if (!loc) {
-      setCityMsg('settings.cityNotFound')
+    if (q.length < 2) {
+      setSuggestions([])
+      setSearching(false)
       return
     }
+    setSearching(true)
+    let active = true
+    const id = setTimeout(async () => {
+      const results = await searchCities(q)
+      if (active) {
+        setSuggestions(results)
+        setSearching(false)
+        setCityMsg(results.length === 0 ? 'settings.cityNotFound' : null)
+      }
+    }, 300)
+    return () => {
+      active = false
+      clearTimeout(id)
+    }
+  }, [cityInput])
+
+  // Current conditions for the saved city → shown in the card.
+  useEffect(() => {
+    if (!homeLoc) {
+      setPreview(null)
+      return
+    }
+    let active = true
+    fetchCurrentWeather(homeLoc.lat, homeLoc.lon, unit).then((w) => {
+      if (active) setPreview(w)
+    })
+    return () => {
+      active = false
+    }
+  }, [homeLoc, unit])
+
+  async function pickCity(loc: HomeLocation) {
     await saveHomeLocation(loc)
     setHomeLoc(loc)
     setCityInput('')
+    setSuggestions([])
+    setCityMsg(null)
   }
 
   async function clearCity() {
     await saveHomeLocation(null)
     setHomeLoc(null)
+    setPreview(null)
     setCityMsg(null)
   }
 
@@ -746,20 +789,33 @@ export default function Settings() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
               <View
                 style={{
-                  height: 40,
-                  width: 40,
-                  borderRadius: 20,
+                  height: 44,
+                  width: 44,
+                  borderRadius: 22,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: homeLoc ? c.accentSoft : c.surface,
                 }}
               >
-                <MapPin size={20} color={homeLoc ? c.accent : c.textMuted} />
+                {homeLoc && preview ? (
+                  (() => {
+                    const WI = weatherIcon(preview.code)
+                    return <WI size={22} color={c.accent} />
+                  })()
+                ) : (
+                  <MapPin size={20} color={homeLoc ? c.accent : c.textMuted} />
+                )}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt style={{ fontFamily: fonts.semibold }}>{t('settings.homeCity')}</Txt>
+                <Txt style={{ fontFamily: fonts.semibold }} numberOfLines={1}>
+                  {homeLoc ? homeLoc.city.split(',')[0] : t('settings.homeCity')}
+                </Txt>
                 <Txt variant="faint" numberOfLines={1}>
-                  {homeLoc ? homeLoc.city : t('settings.homeCityHint')}
+                  {homeLoc
+                    ? preview
+                      ? `${preview.temperature}${preview.unit}`
+                      : homeLoc.city
+                    : t('settings.homeCityHint')}
                 </Txt>
               </View>
               {homeLoc ? (
@@ -770,25 +826,48 @@ export default function Settings() {
                 </Pressable>
               ) : null}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: sp.sm }}>
-              <View style={{ flex: 1 }}>
-                <Field
-                  value={cityInput}
-                  onChangeText={setCityInput}
-                  placeholder={t('settings.cityPlaceholder')}
-                  autoCapitalize="words"
-                  returnKeyType="search"
-                  onSubmitEditing={saveCity}
-                />
+
+            <Field
+              value={cityInput}
+              onChangeText={setCityInput}
+              placeholder={t('settings.cityPlaceholder')}
+              autoCapitalize="words"
+              autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                if (suggestions[0]) void pickCity(suggestions[0])
+              }}
+            />
+
+            {suggestions.length > 0 ? (
+              <View style={{ borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, overflow: 'hidden' }}>
+                {suggestions.map((s, i) => (
+                  <Pressable
+                    key={`${s.lat},${s.lon}`}
+                    onPress={() => void pickCity(s)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: sp.sm,
+                      paddingHorizontal: sp.md,
+                      paddingVertical: 10,
+                      backgroundColor: pressed ? c.cardActive : c.card,
+                      borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                      borderTopColor: c.border,
+                    })}
+                  >
+                    <MapPin size={14} color={c.textMuted} />
+                    <Txt numberOfLines={1} style={{ flex: 1 }}>
+                      {s.city}
+                    </Txt>
+                  </Pressable>
+                ))}
               </View>
-              <Btn
-                title={t('settings.set')}
-                onPress={saveCity}
-                loading={savingCity}
-                disabled={!cityInput.trim()}
-              />
-            </View>
-            {cityMsg ? <Txt variant="faint">{t(cityMsg)}</Txt> : null}
+            ) : searching ? (
+              <Txt variant="faint">{t('settings.searchingCity')}</Txt>
+            ) : cityMsg ? (
+              <Txt variant="faint">{t(cityMsg)}</Txt>
+            ) : null}
           </Card>
         </View>
 

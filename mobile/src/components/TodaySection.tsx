@@ -7,6 +7,15 @@
 import { useCallback, useMemo } from 'react'
 import { Pressable, View } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
+import {
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  ThermometerSnowflake,
+  ThermometerSun,
+  Wind,
+  type LucideIcon,
+} from 'lucide-react-native'
 
 import { Card, Txt } from './ui'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -23,11 +32,22 @@ import {
 import { overdueEvents } from '../lib/petCare'
 import { TYPE_ICON } from '../apps/pets/petUi'
 import type { CalendarEvent, PetEvent } from '../lib/types'
-import { useHomeWeather, weatherIcon } from '../lib/weather'
+import { useHomeWeather, weatherIcon, type WeatherAlertKind } from '../lib/weather'
+import type { TKey } from '../lib/i18n'
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 
 const LOCALE: Record<string, string> = { en: 'en-US', es: 'es', pt: 'pt-BR' }
 const MAX_ROWS = 5
+
+// Home-screen weather alert: an on-brand Lucide icon + localized message per kind.
+const WEATHER_ALERT: Record<WeatherAlertKind, { icon: LucideIcon; key: TKey }> = {
+  thunder: { icon: CloudLightning, key: 'home.weatherThunder' },
+  snow: { icon: CloudSnow, key: 'home.weatherSnow' },
+  heat: { icon: ThermometerSun, key: 'home.weatherHeat' },
+  cold: { icon: ThermometerSnowflake, key: 'home.weatherCold' },
+  wind: { icon: Wind, key: 'home.weatherWind' },
+  rain: { icon: CloudRain, key: 'home.weatherRain' },
+}
 
 type PetLite = { id: string; name: string; emoji: string }
 
@@ -38,7 +58,7 @@ export default function TodaySection() {
   const today = todayISO()
 
   const unit = lang === 'en' ? 'fahrenheit' : 'celsius'
-  const { location, weather, reload: reloadWeather } = useHomeWeather(unit)
+  const { location, weather, alert: weatherAlert, reload: reloadWeather } = useHomeWeather(unit)
 
   type TodayData = { events: CalendarEvent[]; petEvents: PetEvent[]; pets: PetLite[] }
   const { data = { events: [], petEvents: [], pets: [] }, revalidate } =
@@ -84,6 +104,8 @@ export default function TodaySection() {
   }, [today, locale])
 
   const WIcon = weather ? weatherIcon(weather.code) : null
+  const alertMeta = weatherAlert ? WEATHER_ALERT[weatherAlert] : null
+  const AlertIcon = alertMeta?.icon
   // "Westchase, Florida, US" → "Westchase" for the compact city line.
   const cityShort = location?.city.split(',')[0].trim() ?? ''
   const totalItems = todaysOcc.length + petDue.length
@@ -130,6 +152,24 @@ export default function TodaySection() {
           )}
         </Pressable>
       </View>
+
+      {/* today's weather alert (rain / storm / extreme temp / wind) */}
+      {alertMeta && AlertIcon ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: sp.sm,
+            backgroundColor: c.accentSoft,
+            borderRadius: radius.md,
+            paddingHorizontal: sp.md,
+            paddingVertical: sp.sm,
+          }}
+        >
+          <AlertIcon size={18} color={c.accent} />
+          <Txt style={{ flex: 1, fontSize: 13, color: c.text }}>{t(alertMeta.key)}</Txt>
+        </View>
+      ) : null}
 
       {/* agenda */}
       {totalItems === 0 ? (

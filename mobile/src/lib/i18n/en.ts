@@ -457,6 +457,12 @@ export const en = {
   'home.today': 'Today',
   'home.setCity': 'Set city',
   'home.inCity': 'in {city}',
+  'home.weatherRain': 'Rain likely today — grab an umbrella.',
+  'home.weatherThunder': 'Thunderstorms expected today.',
+  'home.weatherSnow': 'Heavy snow expected today.',
+  'home.weatherHeat': 'Extreme heat today — stay hydrated.',
+  'home.weatherCold': 'Freezing today — bundle up.',
+  'home.weatherWind': 'Windy day ahead.',
   'home.greeting': 'Hi, {name}',
 
   // Settings
@@ -501,6 +507,7 @@ export const en = {
   'settings.cityPlaceholder': 'e.g. Austin',
   'settings.set': 'Set',
   'settings.cityNotFound': "Couldn't find that city. Try a different spelling.",
+  'settings.searchingCity': 'Searching…',
   'settings.plus': 'One Roof Plus',
   'settings.plusActive': 'Active · your whole household',
   'settings.active': 'ACTIVE',
