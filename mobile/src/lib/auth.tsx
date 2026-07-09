@@ -31,6 +31,11 @@ interface AuthState {
   /** All members of the signed-in user's household (RLS-scoped). */
   profiles: Profile[]
   loading: boolean
+  /** True once the profile lookup has resolved for the current session. A signed-in
+   *  user with `profileLoaded && !profile` has no household yet → show onboarding. */
+  profileLoaded: boolean
+  /** Re-fetch the caller's profile (call after create/join household onboarding). */
+  refreshProfile: () => Promise<void>
   signInWithApple: () => Promise<void>
   signInWithGoogle: () => Promise<void>
   devSignIn: () => Promise<{ error: string | null }>
@@ -44,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
+  const [profileLoaded, setProfileLoaded] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -61,21 +67,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Load the profile (household, admin) whenever the signed-in email changes.
+  // Load the profile (household, admin, role) whenever the signed-in email changes.
   const email = session?.user.email ?? null
-  useEffect(() => {
+
+  // Manual re-fetch — called after create/join onboarding so the app re-renders
+  // from the Onboarding gate into the Hub without a full reload.
+  const refreshProfile = useCallback(async () => {
     if (!email) {
       setProfile(null)
+      setProfileLoaded(true)
+      return
+    }
+    const { data } = await supabase
+      .from('allowed_users')
+      .select('email, display_name, household_id, is_admin, role')
+      .eq('email', email)
+      .maybeSingle()
+    setProfile((data as Profile) ?? null)
+    setProfileLoaded(true)
+  }, [email])
+
+  useEffect(() => {
+    setProfileLoaded(false)
+    if (!email) {
+      setProfile(null)
+      setProfileLoaded(true)
       return
     }
     let active = true
     supabase
       .from('allowed_users')
-      .select('email, display_name, household_id, is_admin')
+      .select('email, display_name, household_id, is_admin, role')
       .eq('email', email)
       .maybeSingle()
       .then(({ data }) => {
-        if (active) setProfile((data as Profile) ?? null)
+        if (active) {
+          setProfile((data as Profile) ?? null)
+          setProfileLoaded(true)
+        }
       })
     return () => {
       active = false
@@ -92,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true
     supabase
       .from('allowed_users')
-      .select('email, display_name, household_id, is_admin')
+      .select('email, display_name, household_id, is_admin, role')
       .eq('household_id', householdId)
       .then(({ data }) => {
         if (active) setProfiles((data as Profile[]) ?? [])
@@ -172,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, profiles, loading, signInWithApple, signInWithGoogle, devSignIn, signOut }}
+      value={{ session, profile, profiles, loading, profileLoaded, refreshProfile, signInWithApple, signInWithGoogle, devSignIn, signOut }}
     >
       {children}
     </AuthContext.Provider>

@@ -551,6 +551,23 @@ export const pt: Record<keyof typeof en, string> = {
   'login.continueGoogle': 'Continuar com Google',
   'login.devSignIn': 'Login de desenvolvimento',
 
+  // Onboarding (primeiro login, ainda sem casa)
+  'onboarding.subtitle': 'Vamos configurar você. Crie uma casa ou entre em uma para a qual você foi convidado.',
+  'onboarding.createTitle': 'Criar uma casa',
+  'onboarding.createDesc': 'Comece do zero e depois convide sua família com um código.',
+  'onboarding.namePlaceholder': 'Nome da casa',
+  'onboarding.createBtn': 'Criar casa',
+  'onboarding.joinTitle': 'Entrar em uma casa',
+  'onboarding.joinDesc': 'Digite o código de alguém que já está na casa.',
+  'onboarding.codePlaceholder': 'Código da casa',
+  'onboarding.joinBtn': 'Entrar na casa',
+  'onboarding.errNameRequired': 'Digite um nome para a casa.',
+  'onboarding.errCodeRequired': 'Digite um código de casa.',
+  'onboarding.errInvalidCode': 'Esse código não é válido. Confira e tente novamente.',
+  'onboarding.errAlready': 'Você já pertence a uma casa.',
+  'onboarding.errTooMany': 'Muitas tentativas. Tente novamente em alguns minutos.',
+  'onboarding.errGeneric': 'Algo deu errado. Tente novamente.',
+
   // Admin household
   'admin.household': 'Casa',
   'admin.planError': 'Não foi possível alterar o plano — tente novamente.',

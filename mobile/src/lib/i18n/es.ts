@@ -551,6 +551,23 @@ export const es: Record<keyof typeof en, string> = {
   'login.continueGoogle': 'Continuar con Google',
   'login.devSignIn': 'Iniciar sesión de desarrollo',
 
+  // Onboarding (primer inicio de sesión, aún sin hogar)
+  'onboarding.subtitle': 'Vamos a configurarte. Crea un hogar o únete a uno al que te invitaron.',
+  'onboarding.createTitle': 'Crear un hogar',
+  'onboarding.createDesc': 'Empieza de cero y luego invita a tu familia con un código.',
+  'onboarding.namePlaceholder': 'Nombre del hogar',
+  'onboarding.createBtn': 'Crear hogar',
+  'onboarding.joinTitle': 'Unirse a un hogar',
+  'onboarding.joinDesc': 'Introduce el código de alguien que ya esté en el hogar.',
+  'onboarding.codePlaceholder': 'Código del hogar',
+  'onboarding.joinBtn': 'Unirse al hogar',
+  'onboarding.errNameRequired': 'Introduce un nombre para el hogar.',
+  'onboarding.errCodeRequired': 'Introduce un código de hogar.',
+  'onboarding.errInvalidCode': 'Ese código no es válido. Compruébalo e inténtalo de nuevo.',
+  'onboarding.errAlready': 'Ya perteneces a un hogar.',
+  'onboarding.errTooMany': 'Demasiados intentos. Inténtalo de nuevo en unos minutos.',
+  'onboarding.errGeneric': 'Algo salió mal. Inténtalo de nuevo.',
+
   // Admin household
   'admin.household': 'Hogar',
   'admin.planError': 'No se pudo cambiar el plan — inténtalo de nuevo.',

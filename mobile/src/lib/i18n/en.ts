@@ -552,6 +552,23 @@ export const en = {
   'login.continueGoogle': 'Continue with Google',
   'login.devSignIn': 'Dev sign in',
 
+  // Onboarding (first login, no household yet)
+  'onboarding.subtitle': "Let's get you set up. Create a household or join one you were invited to.",
+  'onboarding.createTitle': 'Create a household',
+  'onboarding.createDesc': 'Start fresh, then invite your family with a code.',
+  'onboarding.namePlaceholder': 'Household name',
+  'onboarding.createBtn': 'Create household',
+  'onboarding.joinTitle': 'Join a household',
+  'onboarding.joinDesc': 'Enter the code from someone already in the household.',
+  'onboarding.codePlaceholder': 'Household code',
+  'onboarding.joinBtn': 'Join household',
+  'onboarding.errNameRequired': 'Please enter a household name.',
+  'onboarding.errCodeRequired': 'Please enter a household code.',
+  'onboarding.errInvalidCode': "That code isn't valid. Double-check it and try again.",
+  'onboarding.errAlready': "You're already in a household.",
+  'onboarding.errTooMany': 'Too many attempts. Please try again in a few minutes.',
+  'onboarding.errGeneric': 'Something went wrong. Please try again.',
+
   // Admin household
   'admin.household': 'Household',
   'admin.planError': 'Could not change the plan — please try again.',
