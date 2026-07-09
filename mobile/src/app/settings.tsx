@@ -3,7 +3,17 @@
 // separated by dividers; Plus shows a certificate badge + the included feature
 // list when active, and notifications shows a live on/off status.
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import {
+  AccessibilityInfo,
+  Alert,
+  Animated,
+  Easing,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import {
   Award,
@@ -48,6 +58,106 @@ const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Wallet, key: 'settings.plusFeatureBudgets' },
   { icon: FolderLock, key: 'settings.plusFeatureVault' },
 ]
+
+// Warm golden tones for the Plus card confetti.
+const CONFETTI_GOLDS = ['#F4C95D', '#E7B24A', '#D99E3B', '#F8DE93']
+
+type ConfettiPiece = {
+  left: number // % across the card
+  size: number
+  color: string
+  delay: number // ms stagger
+  duration: number // ms fall
+  drift: number // px horizontal
+  spin: 1 | 2 | -1 | -2
+}
+
+function makeConfetti(count: number): ConfettiPiece[] {
+  return Array.from({ length: count }, (_, i) => ({
+    left: Math.random() * 100,
+    size: 5 + Math.random() * 5,
+    color: CONFETTI_GOLDS[i % CONFETTI_GOLDS.length],
+    delay: Math.random() * 450,
+    duration: 1500 + Math.random() * 1000,
+    drift: (Math.random() - 0.5) * 44,
+    spin: ((Math.random() < 0.5 ? -1 : 1) * (1 + Math.round(Math.random()))) as 1 | 2 | -1 | -2,
+  }))
+}
+
+// One-shot golden confetti that rains once inside the Plus card when it mounts
+// (i.e. when a Plus member opens Settings), then unmounts itself — no persistent
+// animation. Sizes itself to the card via the absolute-fill container's onLayout,
+// and is skipped entirely when the OS "Reduce Motion" setting is on.
+function PlusConfetti() {
+  const pieces = useRef(makeConfetti(18)).current
+  const progress = useRef(pieces.map(() => new Animated.Value(0))).current
+  const [height, setHeight] = useState(0)
+  const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (reduce && !cancelled) setDone(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (height <= 0 || done) return
+    const anims = pieces.map((p, i) =>
+      Animated.timing(progress[i], {
+        toValue: 1,
+        duration: p.duration,
+        delay: p.delay,
+        easing: Easing.in(Easing.quad), // accelerate downward, like gravity
+        useNativeDriver: true,
+      }),
+    )
+    Animated.parallel(anims).start(({ finished }) => {
+      if (finished) setDone(true)
+    })
+  }, [height, done, pieces, progress])
+
+  if (done) return null
+
+  return (
+    <View
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+      onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
+    >
+      {height > 0 &&
+        pieces.map((p, i) => {
+          const t = progress[i]
+          return (
+            <Animated.View
+              key={i}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: `${p.left}%`,
+                width: p.size,
+                height: p.size * 0.62,
+                borderRadius: 1.5,
+                backgroundColor: p.color,
+                opacity: t.interpolate({
+                  inputRange: [0, 0.08, 0.72, 1],
+                  outputRange: [0, 0.85, 0.85, 0],
+                }),
+                transform: [
+                  { translateY: t.interpolate({ inputRange: [0, 1], outputRange: [-14, height + 14] }) },
+                  { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [0, p.drift] }) },
+                  { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${p.spin * 180}deg`] }) },
+                ],
+              }}
+            />
+          )
+        })}
+    </View>
+  )
+}
 
 export default function Settings() {
   const { c } = useTheme()
@@ -205,7 +315,8 @@ export default function Settings() {
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">{t('settings.plus')}</Txt>
           {isPlus ? (
-            <Card style={{ gap: sp.md }}>
+            <Card style={{ gap: sp.md, overflow: 'hidden' }}>
+              <PlusConfetti />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
                 <View
                   style={{
