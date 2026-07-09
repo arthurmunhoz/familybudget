@@ -2,7 +2,7 @@
 // in-app account deletion (required by Apple Guideline 5.1.1(v)). Sections are
 // separated by dividers; Plus shows a certificate badge + the included feature
 // list when active, and notifications shows a live on/off status.
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   AccessibilityInfo,
   Alert,
@@ -11,6 +11,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   View,
 } from 'react-native'
@@ -26,6 +27,7 @@ import {
   ReceiptText,
   Sparkles,
   Wallet,
+  X,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -37,19 +39,9 @@ import { LANGUAGES, type TKey } from '@/lib/i18n'
 import { getPushEnabled, registerForPush } from '@/lib/notifications'
 import { geocodeCity, loadHomeLocation, saveHomeLocation, type HomeLocation } from '@/lib/weather'
 import { supabase } from '@/lib/supabase'
-import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { dark, fonts, light, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
 import { useTilePref, type TileStyle } from '@/hooks/useTilePref'
-
-const APPEARANCE: { id: ThemeMode; key: TKey }[] = [
-  { id: 'light', key: 'settings.light' },
-  { id: 'dark', key: 'settings.dark' },
-]
-
-const TILES: { id: TileStyle; key: TKey }[] = [
-  { id: 'large', key: 'settings.large' },
-  { id: 'compact', key: 'settings.compact' },
-]
 
 const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Sparkles, key: 'settings.plusFeatureScans' },
@@ -156,6 +148,257 @@ function PlusConfetti() {
           )
         })}
     </View>
+  )
+}
+
+// Household members + (owner-only) invite code. Fetches its own data so it can
+// refresh after a member is removed. Uses the migration-051 owner RPCs.
+function HouseholdSection() {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const { profile } = useAuth()
+  const isOwner = profile?.role === 'owner'
+  const hid = profile?.household_id ?? null
+  const [name, setName] = useState<string | null>(null)
+  const [members, setMembers] = useState<{ email: string; display_name: string; role: string }[]>([])
+  const [code, setCode] = useState<string | null>(null)
+  const [rotating, setRotating] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!hid) return
+    const [h, m] = await Promise.all([
+      supabase.from('households').select('name').eq('id', hid).maybeSingle(),
+      supabase
+        .from('allowed_users')
+        .select('email, display_name, role')
+        .eq('household_id', hid)
+        .order('display_name'),
+    ])
+    setName((h.data as { name?: string } | null)?.name ?? null)
+    setMembers((m.data as { email: string; display_name: string; role: string }[]) ?? [])
+  }, [hid])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    if (!isOwner) {
+      setCode(null)
+      return
+    }
+    supabase.rpc('get_join_code').then(({ data }) => setCode(typeof data === 'string' ? data : null))
+  }, [isOwner])
+
+  async function shareCode() {
+    if (!code) return
+    try {
+      await Share.share({ message: t('household.shareMessage', { code }) })
+    } catch {
+      /* user dismissed the share sheet */
+    }
+  }
+
+  function rotate() {
+    Alert.alert(t('household.rotateTitle'), t('household.rotateConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('household.rotate'),
+        style: 'destructive',
+        onPress: async () => {
+          setRotating(true)
+          const { data, error } = await supabase.rpc('rotate_join_code')
+          setRotating(false)
+          if (error || typeof data !== 'string') {
+            Alert.alert(t('household.rotateError'))
+            return
+          }
+          setCode(data)
+        },
+      },
+    ])
+  }
+
+  function removeMember(m: { email: string; display_name: string }) {
+    Alert.alert(t('household.removeMember'), t('household.removeConfirm', { name: m.display_name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.remove'),
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase.rpc('remove_member', { p_email: m.email })
+          if (error) {
+            Alert.alert(t('household.removeError'))
+            return
+          }
+          void load()
+        },
+      },
+    ])
+  }
+
+  return (
+    <View style={{ gap: sp.sm }}>
+      <Txt variant="label">{t('household.title')}</Txt>
+      <Card style={{ gap: sp.md }}>
+        {name ? <Txt style={{ fontFamily: fonts.display, fontSize: 18 }}>{name}</Txt> : null}
+        <View style={{ gap: sp.md }}>
+          {members.map((m) => (
+            <View key={m.email} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Txt numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+                    {m.display_name}
+                  </Txt>
+                  {m.role === 'owner' ? (
+                    <View style={{ backgroundColor: c.accentSoft, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                      <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 10 }}>
+                        {t('household.owner').toUpperCase()}
+                      </Txt>
+                    </View>
+                  ) : null}
+                </View>
+                <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
+                  {m.email}
+                </Txt>
+              </View>
+              {isOwner && m.role !== 'owner' ? (
+                <Pressable onPress={() => removeMember(m)} hitSlop={8} accessibilityLabel={t('household.removeMember')}>
+                  <X size={18} color={c.textFaint} />
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      </Card>
+
+      {isOwner ? (
+        <Card style={{ gap: sp.md }}>
+          <View style={{ gap: 2 }}>
+            <Txt style={{ fontFamily: fonts.semibold }}>{t('household.inviteCode')}</Txt>
+            <Txt variant="faint">{t('household.inviteHint')}</Txt>
+          </View>
+          <View style={{ alignItems: 'center', paddingVertical: sp.md, backgroundColor: c.surface, borderRadius: radius.md }}>
+            <Txt style={{ fontSize: 26, letterSpacing: 4, fontFamily: fonts.semibold, color: c.text }}>
+              {code ?? '········'}
+            </Txt>
+          </View>
+          <View style={{ flexDirection: 'row', gap: sp.sm }}>
+            <Btn title={t('household.share')} onPress={shareCode} disabled={!code} style={{ flex: 1 }} />
+            <Btn title={t('household.rotate')} onPress={rotate} variant="secondary" loading={rotating} style={{ flex: 1 }} />
+          </View>
+        </Card>
+      ) : (
+        <Txt variant="faint">{t('household.notOwnerHint')}</Txt>
+      )}
+    </View>
+  )
+}
+
+// Palette-accurate mini preview of the app (used by the Appearance picker). Takes
+// the light OR dark token set so each option always shows its own theme,
+// regardless of the theme currently active.
+function ThemePreview({ p }: { p: typeof light }) {
+  return (
+    <View style={{ height: 74, borderRadius: 10, backgroundColor: p.bg, padding: 8, gap: 6, overflow: 'hidden' }}>
+      <View style={{ gap: 3 }}>
+        <View style={{ width: 40, height: 6, borderRadius: 3, backgroundColor: p.text }} />
+        <View style={{ width: 26, height: 4, borderRadius: 2, backgroundColor: p.textMuted }} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 5 }}>
+        {[0, 1].map((i) => (
+          <View
+            key={i}
+            style={{
+              flex: 1,
+              height: 26,
+              borderRadius: 7,
+              backgroundColor: p.card,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: p.border,
+              padding: 5,
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: p.accent }} />
+            <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: p.textMuted }} />
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+// Mini preview of the home tile density (uses the active theme).
+function TilePreview({ compact }: { compact: boolean }) {
+  const { c } = useTheme()
+  const cols = compact ? 3 : 2
+  const tiles = cols * 2
+  const tileW = compact ? 18 : 30
+  const tileH = compact ? 18 : 24
+  return (
+    <View style={{ height: 74, borderRadius: 10, backgroundColor: c.bg, padding: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, width: cols * tileW + (cols - 1) * 5, justifyContent: 'center' }}>
+        {Array.from({ length: tiles }).map((_, i) => (
+          <View
+            key={i}
+            style={{
+              width: tileW,
+              height: tileH,
+              borderRadius: 6,
+              backgroundColor: c.card,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: c.border,
+              padding: 3,
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ width: 6, height: 6, borderRadius: 2, backgroundColor: c.accent }} />
+            {!compact ? <View style={{ width: 14, height: 2.5, borderRadius: 2, backgroundColor: c.textMuted }} /> : null}
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+// A selectable option: a preview thumbnail + label, with a selected ring + check.
+function OptionCard({
+  selected,
+  onPress,
+  label,
+  children,
+}: {
+  selected: boolean
+  onPress: () => void
+  label: string
+  children: ReactNode
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flex: 1,
+        gap: 6,
+        padding: 6,
+        borderRadius: radius.md + 2,
+        borderWidth: 2,
+        borderColor: selected ? c.accent : c.border,
+        backgroundColor: c.card,
+      }}
+    >
+      {children}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+        {selected ? <Check size={14} color={c.accent} strokeWidth={3} /> : null}
+        <Txt
+          variant={selected ? 'body' : 'muted'}
+          style={{ fontSize: 13, fontFamily: selected ? fonts.semibold : fonts.body }}
+        >
+          {label}
+        </Txt>
+      </View>
+    </Pressable>
   )
 }
 
@@ -374,6 +617,10 @@ export default function Settings() {
 
         <Divider />
 
+        <HouseholdSection />
+
+        <Divider />
+
         {/* Language */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">{t('settings.language')}</Txt>
@@ -410,25 +657,12 @@ export default function Settings() {
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">{t('settings.appearance')}</Txt>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
-            {APPEARANCE.map((a) => {
-              const active = a.id === mode
-              return (
-                <Pressable
-                  key={a.id}
-                  onPress={() => setMode(a.id)}
-                  style={{
-                    paddingHorizontal: sp.md,
-                    paddingVertical: sp.sm,
-                    borderRadius: radius.md,
-                    backgroundColor: active ? c.accentSoft : c.card,
-                    borderWidth: 1,
-                    borderColor: active ? c.accent : c.border,
-                  }}
-                >
-                  <Txt variant={active ? 'body' : 'muted'}>{t(a.key)}</Txt>
-                </Pressable>
-              )
-            })}
+            <OptionCard selected={mode === 'light'} onPress={() => setMode('light')} label={t('settings.light')}>
+              <ThemePreview p={light} />
+            </OptionCard>
+            <OptionCard selected={mode === 'dark'} onPress={() => setMode('dark')} label={t('settings.dark')}>
+              <ThemePreview p={dark} />
+            </OptionCard>
           </View>
         </View>
 
@@ -438,25 +672,12 @@ export default function Settings() {
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">{t('settings.appCards')}</Txt>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
-            {TILES.map((tl) => {
-              const active = tl.id === tile
-              return (
-                <Pressable
-                  key={tl.id}
-                  onPress={() => setTile(tl.id)}
-                  style={{
-                    paddingHorizontal: sp.md,
-                    paddingVertical: sp.sm,
-                    borderRadius: radius.md,
-                    backgroundColor: active ? c.accentSoft : c.card,
-                    borderWidth: 1,
-                    borderColor: active ? c.accent : c.border,
-                  }}
-                >
-                  <Txt variant={active ? 'body' : 'muted'}>{t(tl.key)}</Txt>
-                </Pressable>
-              )
-            })}
+            <OptionCard selected={tile === 'large'} onPress={() => setTile('large')} label={t('settings.large')}>
+              <TilePreview compact={false} />
+            </OptionCard>
+            <OptionCard selected={tile === 'compact'} onPress={() => setTile('compact')} label={t('settings.compact')}>
+              <TilePreview compact />
+            </OptionCard>
           </View>
           <Txt variant="faint">{t('settings.compactHint')}</Txt>
         </View>

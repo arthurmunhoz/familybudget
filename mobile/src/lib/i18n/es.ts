@@ -468,6 +468,22 @@ export const es: Record<keyof typeof en, string> = {
   'settings.compact': 'Compactas',
   'settings.compactHint':
     'El modo compacto muestra más apps por fila en la pantalla de inicio (solo icono y nombre).',
+
+  // Household (miembros + código de invitación)
+  'household.title': 'Hogar',
+  'household.owner': 'Propietario',
+  'household.inviteCode': 'Código de invitación',
+  'household.inviteHint': 'Comparte este código para que tu familia se una a tu hogar.',
+  'household.share': 'Compartir código',
+  'household.rotate': 'Restablecer código',
+  'household.rotateTitle': '¿Restablecer el código de invitación?',
+  'household.rotateConfirm': 'El código actual deja de funcionar de inmediato. Quien quieras invitar necesitará el nuevo.',
+  'household.rotateError': 'No se pudo restablecer el código. Inténtalo de nuevo.',
+  'household.shareMessage': '¡Únete a nuestro hogar en One Roof! Descarga la app, toca “Unirse a un hogar” e introduce este código: {code}',
+  'household.removeMember': 'Eliminar miembro',
+  'household.removeConfirm': '¿Eliminar a {name} del hogar? Perderá el acceso a todo lo compartido aquí.',
+  'household.removeError': 'No se pudo eliminar a este miembro. Inténtalo de nuevo.',
+  'household.notOwnerHint': 'Solo el propietario del hogar puede invitar o eliminar miembros.',
   'settings.notifications': 'Notificaciones',
   'settings.pushReminders': 'Recordatorios push',
   'settings.pushRemindersHint': 'Cuidado de mascotas, fechas del calendario y avisos familiares',
