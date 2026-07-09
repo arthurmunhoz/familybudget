@@ -215,3 +215,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-048-admin-comp-plan.sql (admin_set_household_plan + admin_household_is_plus: comp any household to Plus)
 --   migration-049-pet-tag-color.sql (pets.tag_color: per-pet calendar dot color)
 --   migration-050-nudge-presets.sql (ping_presets table + pings.high_priority + seed_ping_presets)
+--   migration-051-self-serve-onboarding.sql (allowed_users.role owner/member + household_join_codes + create_household/join_household/get_join_code/rotate_join_code/remove_member RPCs)

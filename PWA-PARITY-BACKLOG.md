@@ -43,3 +43,21 @@ user tries to enable the lock. The PWA vault is already free to use, but its
 Face ID lock (`src/components/VaultGate.tsx` / `lib/biometric.ts` opt-in) is NOT
 Plus-gated yet — gate enabling the lock on `current_household_is_plus`. Also
 reword any "Document Vault" Plus copy to "Face ID lock for the Document Vault".
+
+## 10. Self-serve household onboarding (create / join by code) (2026-07-08)
+
+New feature, iOS-first. The DB layer is already live & shared by both apps
+(`supabase/migration-051-self-serve-onboarding.sql`): `allowed_users.role`
+(`owner`/`member`, **distinct from the global `is_admin`** — never conflate),
+`household_join_codes` (RLS-locked, definer-only), and SECURITY DEFINER RPCs
+`create_household(name)`, `join_household(code)`, `get_join_code()`,
+`rotate_join_code()`, `remove_member(email)`. Open signup: a first-login user
+with no `allowed_users` row lands on onboarding (create → becomes owner, or join
+by an 8-char code). Owner-only surfaces show/rotate the code and remove members.
+
+The PWA needs the CLIENT work once the iOS version exists (source of truth):
+`useAuth` must expose a "signed in but no household" state (currently a session
+with `profile === null` just falls into a broken Hub) + a `refreshProfile()`;
+an Onboarding gate/screen (create or join); and an owner-only Invite/manage
+section (share code, rotate, remove member). Reuse the RPCs above — no new DB
+work. See the iOS onboarding screen + gate for exact behavior.

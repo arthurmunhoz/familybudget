@@ -124,6 +124,21 @@ one.
   `${profile.household_id}/<category>/<uuid>.<ext>`.
 - Admin-only aggregates are `security definer` functions guarded by
   `where public.is_admin()` (see `admin_user_activity`).
+- **`is_admin` is a GLOBAL super-admin, NOT a per-household role** — the admin
+  RLS policies aren't household-scoped, so `is_admin=true` can read/write EVERY
+  household. Household "ownership" is a separate, household-scoped
+  `allowed_users.role` (`owner`/`member`, migration 051). NEVER give a normal
+  user `is_admin`; onboarding/owner flows use `role='owner'`.
+- **Self-serve onboarding (migration 051)**: open signup — a first-login user
+  with no `allowed_users` row can `create_household(name)` (becomes `owner`,
+  `is_admin=false`) or `join_household(code)` (becomes `member`). Codes live in
+  `household_join_codes` (RLS-locked, definer-only; every household gets one via
+  an AFTER INSERT trigger). Owner-only RPCs: `get_join_code()`,
+  `rotate_join_code()`, `remove_member(email)`. All are `security definer`,
+  guarded on `jwt_email()` + a "not already in a household" check — clients call
+  the RPCs, never write `allowed_users`/`households`/`household_join_codes`
+  directly (admin-only RLS is unchanged). Client onboarding UI is iOS-first
+  (PWA parity in the backlog).
 
 **Auth/profile**: `useAuth()` gives `profile` (self) and `profiles` (members
 of OWN household only — already filtered; admins can query `allowed_users`
