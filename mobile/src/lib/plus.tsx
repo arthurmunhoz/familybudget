@@ -79,8 +79,12 @@ export function PlusProvider({ children }: { children: ReactNode }) {
           const { customerInfo } = await Purchases.logIn(householdId)
           if (active) setInfo(customerInfo)
         } else {
-          // Signed out — drop back to an anonymous RevenueCat user.
-          await Purchases.logOut().catch(() => {})
+          // Signed out — drop back to an anonymous RevenueCat user. Only if
+          // we aren't already anonymous (e.g. before `profile` loads on first
+          // mount) — RevenueCat logs a console.error for a no-op logOut().
+          if (!(await Purchases.isAnonymous())) {
+            await Purchases.logOut().catch(() => {})
+          }
           const ci = await Purchases.getCustomerInfo()
           if (active) setInfo(ci)
         }
