@@ -10,17 +10,24 @@ import { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases'
 
 import { Btn, Card, Txt } from '@/components/ui'
 import { usePlus } from '@/lib/plus'
+import { useI18n } from '@/hooks/useI18n'
+import type { TKey } from '@/lib/i18n'
 import { radius, sp, useTheme } from '@/theme/theme'
 
 const PRIVACY_URL = 'https://one-roof-app.vercel.app/privacy.html'
 // Apple's standard EULA is an accepted Terms of Use for IAP.
 const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
 
-const BENEFITS = [
-  'Unlimited AI receipt & bill scans',
-  'Face ID lock for the Document Vault',
-  'Google Calendar two-way sync',
-  'Support a family-run app ✨',
+// Localized benefit keys, highest-value first. Shares the settings.plusFeature*
+// keys with the Settings Plus card so both surfaces stay in sync; the support
+// line is paywall-only. Every real Plus gate in the app must appear here.
+const BENEFIT_KEYS: TKey[] = [
+  'settings.plusFeatureScans',
+  'settings.plusFeatureCalendar',
+  'settings.plusFeatureSplit',
+  'settings.plusFeatureBudgets',
+  'settings.plusFeatureVault',
+  'settings.plusFeatureSupport',
 ]
 
 function periodLabel(pkg: PurchasesPackage): string {
@@ -46,6 +53,7 @@ function periodLabel(pkg: PurchasesPackage): string {
 
 export default function Paywall() {
   const { c } = useTheme()
+  const { t } = useI18n()
   const { offering, isPlus, available, loading, purchase, restore } = usePlus()
   const packages = offering?.availablePackages ?? []
   // Default-select the annual plan (best value) if present, else the first.
@@ -122,10 +130,10 @@ export default function Paywall() {
         </View>
 
         <Card style={{ gap: sp.md }}>
-          {BENEFITS.map((b) => (
-            <View key={b} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+          {BENEFIT_KEYS.map((k) => (
+            <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
               <Check size={18} color={c.income} />
-              <Txt style={{ flex: 1 }}>{b}</Txt>
+              <Txt style={{ flex: 1 }}>{t(k)}</Txt>
             </View>
           ))}
         </Card>

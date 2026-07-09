@@ -13,7 +13,9 @@ import {
   Check,
   FolderLock,
   MapPin,
+  ReceiptText,
   Sparkles,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -41,8 +43,10 @@ const TILES: { id: TileStyle; key: TKey }[] = [
 
 const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Sparkles, key: 'settings.plusFeatureScans' },
-  { icon: FolderLock, key: 'settings.plusFeatureVault' },
   { icon: CalendarDays, key: 'settings.plusFeatureCalendar' },
+  { icon: ReceiptText, key: 'settings.plusFeatureSplit' },
+  { icon: Wallet, key: 'settings.plusFeatureBudgets' },
+  { icon: FolderLock, key: 'settings.plusFeatureVault' },
 ]
 
 export default function Settings() {
