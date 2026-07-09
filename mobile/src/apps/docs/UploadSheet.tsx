@@ -3,7 +3,7 @@
 // household-prefixed path and inserts a `documents` row. Mirrors the PWA's
 // upload form.
 import { useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
@@ -88,6 +88,10 @@ export default function UploadSheet({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
         <View
           style={{
@@ -160,6 +164,7 @@ export default function UploadSheet({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

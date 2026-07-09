@@ -1,7 +1,7 @@
 // Edit sheet — rename a document and change its category / owner. The file
 // bytes are immutable (content-addressed path); this only updates the row.
 import { useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
@@ -53,6 +53,10 @@ export default function EditSheet({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
         <View
           style={{
@@ -115,6 +119,7 @@ export default function EditSheet({
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
