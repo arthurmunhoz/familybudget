@@ -64,6 +64,13 @@ export default function ShoppingList() {
     [],
   )
 
+  // Ids the user just deleted locally. A refetch already in flight when they tap
+  // carries a pre-delete snapshot; without this guard its setItems would
+  // resurrect the row for a few hundred ms (the "lag" that makes people tap
+  // again and delete two). Hide these ids from every server snapshot until the
+  // server confirms they're gone, then drop them from the set.
+  const pendingRemovals = useRef<Set<string>>(new Set())
+
   const load = useCallback(async () => {
     // Offline: keep the persisted list on screen, don't touch the network.
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -78,7 +85,21 @@ export default function ShoppingList() {
     ])
     // Only overwrite local state when the fetch actually succeeded — a failed
     // request (offline / captive wifi) must not wipe the list.
-    if (!itemsRes.error) setItems(itemsRes.data ?? [])
+    if (!itemsRes.error) {
+      const data = itemsRes.data ?? []
+      if (pendingRemovals.current.size) {
+        // Any pending id the server no longer returns is confirmed deleted —
+        // clear it. Ids the snapshot still contains stay hidden (delete not yet
+        // propagated), so a stale in-flight fetch can't bring the row back.
+        const serverIds = new Set(data.map((i) => i.id))
+        for (const id of pendingRemovals.current) {
+          if (!serverIds.has(id)) pendingRemovals.current.delete(id)
+        }
+        setItems(data.filter((i) => !pendingRemovals.current.has(i.id)))
+      } else {
+        setItems(data)
+      }
+    }
     if (!storesRes.error) setStores(storesRes.data ?? [])
     setLoading(false)
   }, [setItems, setStores])
@@ -150,12 +171,14 @@ export default function ShoppingList() {
   }
 
   function remove(item: ShoppingItem) {
+    pendingRemovals.current.add(item.id)
     setItems((list) => list.filter((i) => i.id !== item.id))
     enqueueOp({ k: 'item.remove', id: item.id })
     scheduleLoad()
   }
 
   function clearChecked() {
+    items.filter((i) => i.checked).forEach((i) => pendingRemovals.current.add(i.id))
     setItems((list) => list.filter((i) => !i.checked))
     enqueueOp({ k: 'item.clearChecked' })
     scheduleLoad()
