@@ -19,7 +19,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Plus, X } from 'lucide-react-native'
+import { Plus, SlidersHorizontal, X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -37,6 +37,7 @@ import { supabase } from '@/lib/supabase'
 import type { CategoryRule, CustomCategory, Entry, EntryType, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Chip, DateField } from './shared'
+import ManageCategoriesSheet from './ManageCategoriesSheet'
 
 export interface EntryPrefill {
   label?: string
@@ -107,7 +108,6 @@ export default function EntryForm({
     Boolean(entry) || Boolean(initial?.category),
   )
   const [subcategory, setSubcategory] = useState(entry?.subcategory ?? initial?.subcategory ?? '')
-  const [subOpen, setSubOpen] = useState(Boolean(entry?.subcategory || initial?.subcategory))
   const [date, setDate] = useState(entry?.entry_date ?? initialDate ?? defaultDate)
   const [pickOpen, setPickOpen] = useState(false)
   const [recurring, setRecurring] = useState(entry?.recurring ?? false)
@@ -122,6 +122,7 @@ export default function EntryForm({
   const [newCatName, setNewCatName] = useState('')
   const [newCatIcon, setNewCatIcon] = useState('')
   const [creatingCat, setCreatingCat] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
 
   // Auto-categorize as the label is typed, until the user picks manually.
   useEffect(() => {
@@ -176,6 +177,14 @@ export default function EntryForm({
     setNewCatName('')
     setNewCatIcon('')
     pickCategory((data as CustomCategory).id)
+    onCategoryCreated()
+  }
+
+  // Re-sync the custom categories after the Manage sheet edits/deletes/adds, and
+  // let the parent reload (a delete reassigns entries to "Other").
+  async function refreshCats() {
+    const { data } = await supabase.from('custom_categories').select('*').order('created_at')
+    setLocalCats((data as CustomCategory[]) ?? [])
     onCategoryCreated()
   }
 
@@ -545,53 +554,57 @@ export default function EntryForm({
                   </View>
                 )}
 
-                {/* subcategory — folded until asked for (or already set) */}
-                {!subOpen ? (
-                  <Pressable onPress={() => setSubOpen(true)} style={{ alignSelf: 'flex-start' }}>
-                    <Txt
-                      style={{
-                        fontSize: 12,
-                        fontFamily: fonts.medium,
-                        color: c.textMuted,
-                        textDecorationLine: 'underline',
-                      }}
-                    >
-                      {t('entry.addSubcategory')}
+                {/* manage (edit / delete) the household's custom categories */}
+                {gridOpen ? (
+                  <Pressable
+                    onPress={() => setManageOpen(true)}
+                    style={({ pressed }) => ({
+                      alignSelf: 'flex-start',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingHorizontal: sp.md,
+                      paddingVertical: sp.sm,
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: c.border,
+                      backgroundColor: c.surface,
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <SlidersHorizontal size={15} color={c.accent} />
+                    <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
+                      {t('manageCats.title')}
                     </Txt>
                   </Pressable>
-                ) : (
-                  <>
-                    <Field
-                      label={`${t('entry.subcategory')} ${t('entry.optional')}`}
-                      value={subcategory}
-                      onChangeText={setSubcategory}
-                      placeholder={
-                        isBuiltinCategory(category)
-                          ? t(`entry.sub.${category}` as TKey)
-                          : t('entry.subcategoryPlaceholder')
-                      }
-                    />
-                    {subSuggestions.length > 0 && (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                        {subSuggestions.map((s) => {
-                          const active = subcategory.trim().toLowerCase() === s.toLowerCase()
-                          return (
-                            <Chip key={s} active={active} onPress={() => setSubcategory(active ? '' : s)}>
-                              <Txt
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: '600',
-                                  color: active ? '#fff' : c.textMuted,
-                                }}
-                              >
-                                {s}
-                              </Txt>
-                            </Chip>
-                          )
-                        })}
-                      </View>
-                    )}
-                  </>
+                ) : null}
+
+                {/* subcategory — its own labeled field section (optional) */}
+                <Field
+                  label={`${t('entry.subcategory')} ${t('entry.optional')}`}
+                  value={subcategory}
+                  onChangeText={setSubcategory}
+                  placeholder={
+                    isBuiltinCategory(category)
+                      ? t(`entry.sub.${category}` as TKey)
+                      : t('entry.subcategoryPlaceholder')
+                  }
+                />
+                {subSuggestions.length > 0 && (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+                    {subSuggestions.map((s) => {
+                      const active = subcategory.trim().toLowerCase() === s.toLowerCase()
+                      return (
+                        <Chip key={s} active={active} onPress={() => setSubcategory(active ? '' : s)}>
+                          <Txt
+                            style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : c.textMuted }}
+                          >
+                            {s}
+                          </Txt>
+                        </Chip>
+                      )
+                    })}
+                  </View>
                 )}
               </View>
             )}
@@ -694,6 +707,13 @@ export default function EntryForm({
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
+      {manageOpen ? (
+        <ManageCategoriesSheet
+          categories={localCats}
+          onChanged={refreshCats}
+          onClose={() => setManageOpen(false)}
+        />
+      ) : null}
     </Modal>
   )
 }

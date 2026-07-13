@@ -61,3 +61,16 @@ with `profile === null` just falls into a broken Hub) + a `refreshProfile()`;
 an Onboarding gate/screen (create or join); and an owner-only Invite/manage
 section (share code, rotate, remove member). Reuse the RPCs above — no new DB
 work. See the iOS onboarding screen + gate for exact behavior.
+
+## 11. Manage categories — edit/delete custom budget categories (2026-07-09)
+
+New feature, iOS-first. DB is live & shared: `delete_custom_category(p_id)`
+(migration 054) removes a household custom category and reassigns its entries +
+keyword rules to the built-in `other` (atomic, household-guarded). iOS added a
+`ManageCategoriesSheet` (`mobile/src/apps/budget/`) — a scrollable list of the
+household's custom categories, tap-to-edit emoji+name inline (plain
+`custom_categories` UPDATE), 🗑 delete (the RPC), and an "Add category" row —
+opened from a "Manage categories" button under the entry form's "All" category
+grid. Built-ins (the 14 in `categories.ts`) stay read-only. The PWA needs the
+CLIENT equivalent (its budget entry form / category picker); reuse the RPC, no
+new DB work.
