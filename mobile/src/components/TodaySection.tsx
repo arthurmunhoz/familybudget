@@ -4,8 +4,8 @@
 // anniversaries highlighted with their marker + "turns N"/"N years") and any
 // pet-care items due today or overdue. Tapping a row opens the relevant app.
 // Reloads on focus so it reflects new events / a changed home city.
-import { useCallback, useMemo } from 'react'
-import { Pressable, View } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { Animated, Pressable, View, type StyleProp, type ViewStyle } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import {
   CloudLightning,
@@ -51,6 +51,60 @@ const WEATHER_ALERT: Record<WeatherAlertKind, { icon: LucideIcon; key: TKey }> =
 
 type PetLite = { id: string; name: string; emoji: string }
 
+// A subtly-pulsing placeholder that holds the weather/alert area while the
+// forecast loads, so the card doesn't jump when the value lands.
+function Shimmer({ style }: { style?: StyleProp<ViewStyle> }) {
+  const { c } = useTheme()
+  const o = useRef(new Animated.Value(0.5)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(o, { toValue: 1, duration: 650, useNativeDriver: true }),
+        Animated.timing(o, { toValue: 0.5, duration: 650, useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [o])
+  return <Animated.View style={[{ backgroundColor: c.surface2, borderRadius: 6, opacity: o }, style]} />
+}
+
+// Matches the top-right weather block (icon + temp, then the city line).
+function WeatherSkeleton() {
+  return (
+    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Shimmer style={{ width: 20, height: 20, borderRadius: 10 }} />
+        <Shimmer style={{ width: 34, height: 15 }} />
+      </View>
+      <Shimmer style={{ width: 52, height: 10 }} />
+    </View>
+  )
+}
+
+// Matches the alert banner (same height + accentSoft chip) so it doesn't reflow.
+function AlertSkeleton() {
+  const { c } = useTheme()
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp.sm,
+        backgroundColor: c.accentSoft,
+        borderRadius: radius.md,
+        paddingHorizontal: sp.md,
+        paddingVertical: sp.sm,
+      }}
+    >
+      <Shimmer style={{ width: 18, height: 18, borderRadius: 9 }} />
+      <View style={{ flex: 1 }}>
+        <Shimmer style={{ width: '70%', height: 11 }} />
+      </View>
+    </View>
+  )
+}
+
 export default function TodaySection() {
   const { c } = useTheme()
   const { t, lang } = useI18n()
@@ -58,7 +112,13 @@ export default function TodaySection() {
   const today = todayISO()
 
   const unit = lang === 'en' ? 'fahrenheit' : 'celsius'
-  const { location, weather, alert: weatherAlert, reload: reloadWeather } = useHomeWeather(unit)
+  const {
+    location,
+    weather,
+    alert: weatherAlert,
+    loading: weatherLoading,
+    reload: reloadWeather,
+  } = useHomeWeather(unit)
 
   type TodayData = { events: CalendarEvent[]; petEvents: PetEvent[]; pets: PetLite[] }
   const { data = { events: [], petEvents: [], pets: [] }, revalidate } =
@@ -145,6 +205,8 @@ export default function TodaySection() {
                 </Txt>
               ) : null}
             </>
+          ) : weatherLoading ? (
+            <WeatherSkeleton />
           ) : (
             <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
               {location ? '—' : t('home.setCity')}
@@ -169,6 +231,8 @@ export default function TodaySection() {
           <AlertIcon size={18} color={c.accent} />
           <Txt style={{ flex: 1, fontSize: 13, color: c.text }}>{t(alertMeta.key)}</Txt>
         </View>
+      ) : weatherLoading ? (
+        <AlertSkeleton />
       ) : null}
 
       {/* agenda */}

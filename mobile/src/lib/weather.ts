@@ -5,6 +5,8 @@
 // coordinates once; the current temperature + condition are fetched on demand.
 import { useCallback, useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+
+import { readCache, writeCache } from '../hooks/useCachedQuery'
 import {
   Cloud,
   CloudDrizzle,
@@ -194,6 +196,9 @@ export function useHomeWeather(unit: TempUnit) {
   const [weather, setWeather] = useState<CurrentWeather | null>(null)
   const [alert, setAlert] = useState<WeatherAlertKind | null>(null)
   const [ready, setReady] = useState(false)
+  // True while the (~1s) forecast fetch is in flight AND nothing is cached yet —
+  // the UI holds the space with a skeleton instead of popping content in.
+  const [loading, setLoading] = useState(true)
 
   const reload = useCallback(async () => {
     const loc = await loadHomeLocation()
@@ -202,19 +207,37 @@ export function useHomeWeather(unit: TempUnit) {
     if (!loc) {
       setWeather(null)
       setAlert(null)
+      setLoading(false)
       return
+    }
+    // Seed from the in-memory cache so a revisit renders instantly (no skeleton);
+    // otherwise keep the skeleton until the first fetch lands.
+    const cacheKey = `weather:${loc.lat.toFixed(3)},${loc.lon.toFixed(3)},${unit}`
+    const cached = readCache<{ weather: CurrentWeather | null; alert: WeatherAlertKind | null }>(cacheKey)
+    if (cached) {
+      setWeather(cached.weather)
+      setAlert(cached.alert)
+      setLoading(false)
+    } else {
+      setLoading(true)
     }
     const [w, a] = await Promise.all([
       fetchCurrentWeather(loc.lat, loc.lon, unit),
       fetchDayAlert(loc.lat, loc.lon, unit),
     ])
-    setWeather(w)
-    setAlert(a)
+    // A failed current-weather fetch returns null — don't overwrite a good
+    // cached/displayed value with it; just stop loading.
+    if (w) {
+      setWeather(w)
+      setAlert(a)
+      writeCache(cacheKey, { weather: w, alert: a })
+    }
+    setLoading(false)
   }, [unit])
 
   useEffect(() => {
     void reload()
   }, [reload])
 
-  return { location, weather, alert, ready, reload }
+  return { location, weather, alert, ready, loading, reload }
 }
