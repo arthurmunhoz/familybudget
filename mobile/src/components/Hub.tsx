@@ -52,6 +52,18 @@ export default function Hub() {
     }
   }, [reloadShopping])
 
+  // Household name for the header (mirrors the PWA hub). Cached so it renders the
+  // last value instantly on return and doesn't flash the "One Roof" fallback.
+  const { data: householdName } = useCachedQuery<string | null>('hub:householdName', async () => {
+    if (!profile?.household_id) return null
+    const { data } = await supabase
+      .from('households')
+      .select('name')
+      .eq('id', profile.household_id)
+      .maybeSingle()
+    return (data as { name?: string } | null)?.name ?? null
+  })
+
   const badges: Record<string, number> = { shopping: shoppingCount }
 
   return (
@@ -68,7 +80,7 @@ export default function Hub() {
         }}
       >
         <View>
-          <Txt variant="display">One Roof</Txt>
+          <Txt variant="display">{householdName ?? 'One Roof'}</Txt>
           {profile?.display_name ? (
             <Txt variant="muted">{t('home.greeting', { name: profile.display_name })}</Txt>
           ) : null}
