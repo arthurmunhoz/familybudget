@@ -288,7 +288,7 @@ export default function PetCare() {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: sp.xxl }}
           keyboardShouldPersistTaps="handled"
         >
           {/* pet carousel — each page IS the full info card; swipe to the next
@@ -625,6 +625,10 @@ export default function PetCare() {
               </View>
             </Card>
 
+            {/* Add an event — sits right under the calendar (events land there)
+                and scrolls with the content instead of a fixed bottom bar. */}
+            <Btn title={t('pets.newEventBtn')} onPress={openNewEvent} />
+
             {/* upcoming reminders (all pets) */}
             {upcoming.length > 0 ? (
               <View style={{ gap: sp.sm }}>
@@ -716,22 +720,21 @@ export default function PetCare() {
         </ScrollView>
       )}
 
-      {/* bottom action bar */}
-      <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-        <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
-          <Btn
-            title={pets.length === 0 ? t('pets.addPetBtn') : t('pets.newEventBtn')}
-            onPress={() => {
-              if (pets.length === 0) {
+      {/* bottom action bar — only the "add first pet" CTA in the empty state.
+          Adding an event moved under the calendar (it scrolls with content). */}
+      {pets.length === 0 ? (
+        <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
+            <Btn
+              title={t('pets.addPetBtn')}
+              onPress={() => {
                 setEditingPet(null)
                 setShowPetForm(true)
-              } else {
-                openNewEvent()
-              }
-            }}
-          />
-        </View>
-      </SafeAreaView>
+              }}
+            />
+          </View>
+        </SafeAreaView>
+      ) : null}
 
       {showPetForm ? (
         <PetForm
