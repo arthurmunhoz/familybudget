@@ -79,6 +79,23 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
   **unlimited for Plus**.
 - **Push** (`api/send-ping`, `api/send-digest`): Expo push tokens + web-push,
   per-recipient language.
+- **Home-Screen Widgets** (`targets/widgets/`, `src/lib/widget.ts`): a WidgetKit
+  extension (Budget + Nudges) fed through an App Group
+  (`group.com.oneroof.app`, `@bacons/apple-targets`'s `ExtensionStorage`) since
+  the widget process can't reach the app's JS/Supabase session.
+  `useSyncNudgeWidget` (mounted in `_layout.tsx`) pushes the send token,
+  household members, real editable presets, and the app's own Light/Dark
+  choice on every login — not gated on visiting the Nudges screen. Tapping a
+  preset sends via `api/widget-nudge.ts` (a per-device token, not a Supabase
+  session) and flashes a "sent!" confirmation using WidgetKit's own timeline
+  mechanism (two dated entries; iOS itself flips between them, no process
+  needed at the transition). Acking a nudge (`api/ack-ping.ts`) sends a
+  **silent** push back to the sender so their widget can show "seen by" —
+  caught by `src/lib/backgroundNotifications.ts`
+  (`UIBackgroundModes: remote-notification` + `expo-task-manager`),
+  best-effort like every other push here (no background delivery if the app
+  was force-quit). Widget text is English-only for now — SwiftUI widgets don't
+  share the app's `t()` dictionaries.
 - **Offline** (`src/lib/offline.ts`): AsyncStorage outbox for the shopping list.
 - **Caching** (`src/hooks/useCachedQuery.ts`): stale-while-revalidate so screens
   render instantly on return (cleared on sign-out).
@@ -159,6 +176,21 @@ Sign in with Apple, camera scans (receipt + bill), Face ID vault, push delivery,
 offline shopping (airplane-mode add/check → reconnect), Google Calendar connect,
 and the Plus purchase/restore flow.
 
+### E. Home-Screen Widgets — ship the native + server changes
+Verified in Simulator only so far (real APNs delivery/latency can't be tested
+there — `xcrun simctl push` fakes the payload arriving but not real-world
+timing or reliability). Before this reaches a real device:
+1. **Deploy the server side** — `api/widget-nudge.ts` (updated) and
+   `api/ack-ping.ts` (new) aren't live yet: `npx vercel deploy --prod`.
+2. **New EAS build required** — the widget's theme/preset/confirmation logic,
+   the new `UIBackgroundModes: remote-notification` entitlement, and the
+   `expo-task-manager` dependency are all native changes; no build on the App
+   Store or a device has them until the next `eas build -p ios`.
+3. **Real-device QA** — confirm the "seen by" ack push actually arrives
+   (latency, and that it's silent/no visible banner), and reconfirm it
+   legitimately doesn't fire when the app's been force-quit (expected, not a
+   bug — iOS gives zero background execution to force-quit apps).
+
 ---
 
 ## 6. Next improvements (backlog)
@@ -176,6 +208,9 @@ Non-blocking polish, roughly by value:
   add a Vercel cron for background Google sync (currently on-open + after-edit).
 - **Push** — prune stale Expo push tokens from send receipts.
 - **App icon** — replace the upscaled icon with a crisp 1024×1024 PNG.
+- **Widgets** — localize widget text (ES/PT — currently English-only, see §3);
+  extend the Warm Hearth theme sync + real-data treatment from the Nudges
+  widget to the Budget widget (still system-appearance-only, POC-level).
 
 ---
 

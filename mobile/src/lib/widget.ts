@@ -6,6 +6,8 @@ import { Platform } from 'react-native'
 import { ExtensionStorage } from '@bacons/apple-targets'
 
 const APP_GROUP = 'group.com.oneroof.app'
+// Must match the `kind:` string in NudgesWidget.swift's StaticConfiguration.
+const NUDGES_WIDGET_KIND = 'NudgesWidget'
 
 export interface BudgetWidgetItem {
   id: string
@@ -41,14 +43,30 @@ export function syncBudgetWidget(budgets: BudgetWidgetItem[]): void {
   }
 }
 
+/** Mirror the app's manually-chosen Light/Dark (Settings → Appearance) into
+ *  the App Group so the Nudges widget matches it instead of following the
+ *  device's system appearance. */
+export function syncWidgetTheme(mode: 'light' | 'dark'): void {
+  const s = store()
+  if (!s) return
+  try {
+    s.set('widget_theme', mode)
+    ExtensionStorage.reloadWidget(NUDGES_WIDGET_KIND)
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
 export interface NudgeMember {
   email: string
   name: string
 }
 export interface NudgePreset {
+  id: string
   kind: string
   emoji: string
   label: string
+  highPriority: boolean
 }
 
 /** Feed the Nudges widget: the send token, the members it can target (the
@@ -65,7 +83,32 @@ export function syncNudgeWidget(data: {
     if (data.token) s.set('widget_token', data.token)
     s.set('nudge_members', JSON.stringify(data.members))
     s.set('nudge_presets', JSON.stringify(data.presets))
-    ExtensionStorage.reloadWidget()
+    ExtensionStorage.reloadWidget(NUDGES_WIDGET_KIND)
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
+/** Flash a transient "{emoji} {label} · seen by {name}" on the Nudges widget
+ *  for 3s, then it reverts to the list on its own (see NudgesWidget.swift's
+ *  timeline — `until` is read there, nothing needs to fire again at expiry).
+ *  Called from the background-push handler when someone acks a nudge this
+ *  device sent (mobile/src/lib/backgroundNotifications.ts). */
+export function writeAckStatus(data: { emoji: string; label: string; ackerName: string }): void {
+  const s = store()
+  if (!s) return
+  try {
+    s.set(
+      'widget_status',
+      JSON.stringify({
+        type: 'ack',
+        emoji: data.emoji,
+        label: data.label,
+        name: data.ackerName,
+        until: Date.now() + 3000,
+      }),
+    )
+    ExtensionStorage.reloadWidget(NUDGES_WIDGET_KIND)
   } catch {
     /* native module unavailable — ignore */
   }
