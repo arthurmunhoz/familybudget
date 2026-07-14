@@ -18,6 +18,7 @@ import { categoryById } from '@/lib/categories'
 import { formatDay, formatDayHeading, formatMoney, periodEndISO, periodTitle, todayISO } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type {
+  CategoryOverride,
   CategoryRule,
   CustomCategory,
   Entry,
@@ -62,12 +63,13 @@ export default function MonthDetail({
 
   // Cached (stale-while-revalidate) so the period renders instantly on return.
   const {
-    data: { month, entries, rules, subcatSuggestions, customCats, topCategories } = {
+    data: { month, entries, rules, subcatSuggestions, customCats, overrides, topCategories } = {
       month: null,
       entries: [],
       rules: [],
       subcatSuggestions: {},
       customCats: [],
+      overrides: [],
       topCategories: [],
     },
     loading,
@@ -78,9 +80,10 @@ export default function MonthDetail({
     rules: CategoryRule[]
     subcatSuggestions: Record<string, string[]>
     customCats: CustomCategory[]
+    overrides: CategoryOverride[]
     topCategories: string[]
   }>(`month:${monthId}`, async () => {
-    const [m, e, r, subs, custom] = await Promise.all([
+    const [m, e, r, subs, custom, ovr] = await Promise.all([
       supabase.from('months').select('*, budgets(name, period)').eq('id', monthId).single(),
       supabase.from('entries').select('*').eq('month_id', monthId),
       supabase.from('category_rules').select('keyword, category'),
@@ -88,6 +91,7 @@ export default function MonthDetail({
       // entry form's most-used category chips.
       supabase.from('entries').select('type, category, subcategory'),
       supabase.from('custom_categories').select('*').order('created_at'),
+      supabase.from('category_overrides').select('base_id, name, icon'),
     ])
 
     const counts = new Map<string, Map<string, number>>()
@@ -119,6 +123,7 @@ export default function MonthDetail({
       rules: (r.data as CategoryRule[]) ?? [],
       subcatSuggestions: map,
       customCats: (custom.data as CustomCategory[]) ?? [],
+      overrides: (ovr.data as CategoryOverride[]) ?? [],
       topCategories: [...catCounts.entries()].sort((a, b) => b[1] - a[1]).map(([x]) => x),
     }
   })
@@ -326,7 +331,7 @@ export default function MonthDetail({
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 140, gap: sp.md }}
       >
-        <SummaryChart entries={filtered} customCats={customCats} />
+        <SummaryChart entries={filtered} customCats={customCats} overrides={overrides} />
 
         {/* sort controls */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: sp.sm }}>
@@ -369,6 +374,7 @@ export default function MonthDetail({
                   key={e.id}
                   entry={e}
                   customCats={customCats}
+                  overrides={overrides}
                   showDate={false}
                   showPerson={person === 'all'}
                   nameOf={nameOf}
@@ -389,6 +395,7 @@ export default function MonthDetail({
                 key={e.id}
                 entry={e}
                 customCats={customCats}
+                overrides={overrides}
                 showDate
                 showPerson={person === 'all'}
                 nameOf={nameOf}
@@ -436,6 +443,7 @@ export default function MonthDetail({
           rules={rules}
           subcategorySuggestions={subcatSuggestions}
           customCategories={customCats}
+          categoryOverrides={overrides}
           topCategories={topCategories}
           onCategoryCreated={load}
           entry={editing}
@@ -475,6 +483,7 @@ function SortBtn({ active, label, onPress }: { active: boolean; label: string; o
 function EntryRow({
   entry: e,
   customCats,
+  overrides,
   showDate,
   showPerson,
   nameOf,
@@ -483,6 +492,7 @@ function EntryRow({
 }: {
   entry: Entry
   customCats: CustomCategory[]
+  overrides: CategoryOverride[]
   showDate: boolean
   showPerson: boolean
   nameOf: (email: string) => string
@@ -490,7 +500,7 @@ function EntryRow({
   onLongPress: () => void
 }) {
   const { c } = useTheme()
-  const cat = categoryById(e.category, customCats)
+  const cat = categoryById(e.category, customCats, overrides)
   const isIncome = e.type === 'income'
   const secondary = [
     e.subcategory,

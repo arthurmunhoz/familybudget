@@ -1,8 +1,12 @@
-// Manage the household's CUSTOM budget categories (the 14 built-ins are app
-// defaults and stay read-only). A scrollable list — tap a row to edit its emoji
-// + name inline, 🗑 to delete (its entries move to "Other" via the
-// delete_custom_category RPC, migration 054), and an "Add category" row for new
-// ones. Mirrors the Nudges "Edit presets" pattern. Opened from the entry form.
+// Manage budget categories. Two sections:
+//  • Defaults — the built-in presets. Editing one stores a per-household
+//    override (migration 056: name/icon, either nullable) instead of touching
+//    the shared defaults; "reset" (↺) removes the override. Entries keep
+//    referencing the preset id, so nothing migrates.
+//  • Yours — the household's custom categories: edit inline, 🗑 delete (its
+//    entries move to "Other" via delete_custom_category, migration 054), and an
+//    "Add category" row.
+// Opened from the entry form. Mirrors the Nudges "Edit presets" list pattern.
 import { useState } from 'react'
 import {
   Alert,
@@ -15,34 +19,51 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Plus, Trash2, X } from 'lucide-react-native'
+import { Plus, RotateCcw, Trash2, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
+import type { TKey } from '@/lib/i18n'
+import { CATEGORIES } from '@/lib/categories'
 import { supabase } from '@/lib/supabase'
-import type { CustomCategory } from '@/lib/types'
+import type { CategoryOverride, CustomCategory } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
+
+// Editable presets — salary is income-only, so it stays out of expense mgmt.
+const PRESETS = CATEGORIES.filter((c) => c.id !== 'salary')
 
 export default function ManageCategoriesSheet({
   categories,
+  overrides,
   onChanged,
   onClose,
 }: {
   categories: CustomCategory[]
-  /** Called after any create/edit/delete so the parent can re-sync. */
+  overrides: CategoryOverride[]
+  /** Called after any create/edit/delete/override so the parent can re-sync. */
   onChanged: () => void
   onClose: () => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const [list, setList] = useState<CustomCategory[]>(categories)
-  // The row currently being edited: a category id, 'new', or null (none).
+  const [customList, setCustomList] = useState<CustomCategory[]>(categories)
+  const [ovr, setOvr] = useState<CategoryOverride[]>(overrides)
+  // Row being edited: a preset id, a custom id, 'new', or null.
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [draftIcon, setDraftIcon] = useState('')
   const [busy, setBusy] = useState(false)
 
-  function startEdit(cat: CustomCategory) {
+  const overrideOf = (id: string) => ovr.find((o) => o.base_id === id)
+  const presetName = (id: string) => overrideOf(id)?.name ?? t(`cat.${id}` as TKey)
+  const presetIcon = (id: string, def: string) => overrideOf(id)?.icon ?? def
+
+  function startEditPreset(p: { id: string; icon: string }) {
+    setEditingId(p.id)
+    setDraftName(presetName(p.id))
+    setDraftIcon(presetIcon(p.id, p.icon))
+  }
+  function startEditCustom(cat: CustomCategory) {
     setEditingId(cat.id)
     setDraftName(cat.name)
     setDraftIcon(cat.icon)
@@ -58,12 +79,65 @@ export default function ManageCategoriesSheet({
     setDraftIcon('')
   }
 
-  async function saveEdit() {
+  // Save a preset override: store only the fields that differ from the default
+  // (so changing just the icon keeps the localized name). If nothing differs,
+  // remove any existing override.
+  async function savePreset(p: { id: string; icon: string }) {
+    if (busy) return
+    const name = draftName.trim()
+    const icon = draftIcon.trim()
+    const defName = t(`cat.${p.id}` as TKey)
+    const nameToStore = name && name !== defName ? name : null
+    const iconToStore = icon && icon !== p.icon ? icon : null
+    const exists = !!overrideOf(p.id)
+    const clear = nameToStore === null && iconToStore === null
+    setBusy(true)
+    const res = clear
+      ? exists
+        ? await supabase.from('category_overrides').delete().eq('base_id', p.id)
+        : null
+      : exists
+        ? await supabase
+            .from('category_overrides')
+            .update({ name: nameToStore, icon: iconToStore })
+            .eq('base_id', p.id)
+        : await supabase
+            .from('category_overrides')
+            .insert({ base_id: p.id, name: nameToStore, icon: iconToStore })
+    setBusy(false)
+    if (res?.error) {
+      Alert.alert(t('manageCats.saveError'))
+      return
+    }
+    setOvr((prev) => {
+      const rest = prev.filter((o) => o.base_id !== p.id)
+      return nameToStore === null && iconToStore === null
+        ? rest
+        : [...rest, { base_id: p.id, name: nameToStore, icon: iconToStore }]
+    })
+    cancelEdit()
+    onChanged()
+  }
+
+  async function resetPreset(id: string) {
+    setBusy(true)
+    const { error } = await supabase.from('category_overrides').delete().eq('base_id', id)
+    setBusy(false)
+    if (error) {
+      Alert.alert(t('manageCats.saveError'))
+      return
+    }
+    setOvr((prev) => prev.filter((o) => o.base_id !== id))
+    if (editingId === id) cancelEdit()
+    onChanged()
+  }
+
+  async function saveCustom(id: string) {
     const name = draftName.trim()
     if (!name || busy) return
     const icon = draftIcon.trim() || '🏷️'
     setBusy(true)
-    if (editingId === 'new') {
+    if (id === 'new') {
       const { data, error } = await supabase
         .from('custom_categories')
         .insert({ name, icon })
@@ -74,21 +148,21 @@ export default function ManageCategoriesSheet({
         Alert.alert(t('manageCats.saveError'))
         return
       }
-      setList((prev) => [...prev, data as CustomCategory])
+      setCustomList((prev) => [...prev, data as CustomCategory])
     } else {
-      const { error } = await supabase.from('custom_categories').update({ name, icon }).eq('id', editingId)
+      const { error } = await supabase.from('custom_categories').update({ name, icon }).eq('id', id)
       setBusy(false)
       if (error) {
         Alert.alert(t('manageCats.saveError'))
         return
       }
-      setList((prev) => prev.map((x) => (x.id === editingId ? { ...x, name, icon } : x)))
+      setCustomList((prev) => prev.map((x) => (x.id === id ? { ...x, name, icon } : x)))
     }
     cancelEdit()
     onChanged()
   }
 
-  function confirmDelete(cat: CustomCategory) {
+  function confirmDeleteCustom(cat: CustomCategory) {
     Alert.alert(t('manageCats.deleteTitle', { name: cat.name }), t('manageCats.deleteBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
@@ -100,7 +174,7 @@ export default function ManageCategoriesSheet({
             Alert.alert(t('manageCats.deleteError'))
             return
           }
-          setList((prev) => prev.filter((x) => x.id !== cat.id))
+          setCustomList((prev) => prev.filter((x) => x.id !== cat.id))
           if (editingId === cat.id) cancelEdit()
           onChanged()
         },
@@ -128,48 +202,53 @@ export default function ManageCategoriesSheet({
     color: c.text,
   }
 
-  // A plain function that returns the inline editor row (NOT a component — see
-  // the coding standard: a component defined in the render body would remount
-  // each keystroke and drop the TextInput focus). Called directly below.
-  const renderEditor = (isNew: boolean, key?: string) => (
-      <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingVertical: sp.sm }}>
-        <TextInput
-          value={draftIcon}
-          onChangeText={setDraftIcon}
-          placeholder="🏷️"
-          placeholderTextColor={c.textFaint}
-          maxLength={4}
-          style={iconInput}
-        />
-        <TextInput
-          value={draftName}
-          onChangeText={setDraftName}
-          placeholder={t('manageCats.namePlaceholder')}
-          placeholderTextColor={c.textFaint}
-          maxLength={40}
-          autoFocus
-          style={nameInput}
-        />
-        <Pressable
-          onPress={saveEdit}
-          disabled={busy || !draftName.trim()}
-          style={({ pressed }) => ({
-            backgroundColor: c.accent,
-            borderRadius: radius.md,
-            paddingHorizontal: sp.md,
-            paddingVertical: 12,
-            opacity: busy || !draftName.trim() ? 0.5 : pressed ? 0.85 : 1,
-          })}
-        >
-          <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>
-            {isNew ? t('common.add') : t('common.save')}
-          </Txt>
-        </Pressable>
-        <Pressable onPress={cancelEdit} hitSlop={8} accessibilityLabel={t('common.cancel')}>
-          <X size={20} color={c.textMuted} />
-        </Pressable>
-      </View>
+  // Plain function (NOT a component — a component defined in the render body
+  // would remount each keystroke and drop the input focus). Called directly.
+  const editorRow = (onSave: () => void, saveLabel: string, key?: string) => (
+    <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingVertical: sp.sm }}>
+      <TextInput
+        value={draftIcon}
+        onChangeText={setDraftIcon}
+        placeholder="🏷️"
+        placeholderTextColor={c.textFaint}
+        maxLength={4}
+        style={iconInput}
+      />
+      <TextInput
+        value={draftName}
+        onChangeText={setDraftName}
+        placeholder={t('manageCats.namePlaceholder')}
+        placeholderTextColor={c.textFaint}
+        maxLength={40}
+        autoFocus
+        style={nameInput}
+      />
+      <Pressable
+        onPress={onSave}
+        disabled={busy || !draftName.trim()}
+        style={({ pressed }) => ({
+          backgroundColor: c.accent,
+          borderRadius: radius.md,
+          paddingHorizontal: sp.md,
+          paddingVertical: 12,
+          opacity: busy || !draftName.trim() ? 0.5 : pressed ? 0.85 : 1,
+        })}
+      >
+        <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>{saveLabel}</Txt>
+      </Pressable>
+      <Pressable onPress={cancelEdit} hitSlop={8} accessibilityLabel={t('common.cancel')}>
+        <X size={20} color={c.textMuted} />
+      </Pressable>
+    </View>
   )
+
+  const rowStyle = {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: sp.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.border,
+  }
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -177,7 +256,7 @@ export default function ManageCategoriesSheet({
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View
             style={{
-              maxHeight: '85%',
+              maxHeight: '88%',
               backgroundColor: c.card,
               borderTopLeftRadius: radius.lg,
               borderTopRightRadius: radius.lg,
@@ -203,28 +282,52 @@ export default function ManageCategoriesSheet({
               contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl }}
               keyboardShouldPersistTaps="handled"
             >
-              {list.length === 0 && editingId !== 'new' ? (
-                <Txt variant="faint" style={{ paddingVertical: sp.md }}>
+              {/* Defaults (built-in presets) */}
+              <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+                {t('manageCats.defaults')}
+              </Txt>
+              {PRESETS.map((p) =>
+                editingId === p.id ? (
+                  editorRow(() => savePreset(p), t('common.save'), p.id)
+                ) : (
+                  <View key={p.id} style={rowStyle}>
+                    <Pressable
+                      onPress={() => startEditPreset(p)}
+                      style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 12 }}
+                    >
+                      <Txt style={{ fontSize: 20 }}>{presetIcon(p.id, p.icon)}</Txt>
+                      <Txt style={{ flex: 1, minWidth: 0 }} numberOfLines={1}>
+                        {presetName(p.id)}
+                      </Txt>
+                    </Pressable>
+                    {overrideOf(p.id) ? (
+                      <Pressable onPress={() => resetPreset(p.id)} hitSlop={8} accessibilityLabel={t('manageCats.reset')}>
+                        <RotateCcw size={16} color={c.textMuted} />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ),
+              )}
+
+              {/* Yours (custom categories) */}
+              <Txt
+                variant="label"
+                style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginTop: sp.lg, marginBottom: 2 }}
+              >
+                {t('manageCats.yours')}
+              </Txt>
+              {customList.length === 0 && editingId !== 'new' ? (
+                <Txt variant="faint" style={{ paddingVertical: sp.sm }}>
                   {t('manageCats.empty')}
                 </Txt>
               ) : null}
-
-              {list.map((cat) =>
+              {customList.map((cat) =>
                 editingId === cat.id ? (
-                  renderEditor(false, cat.id)
+                  editorRow(() => saveCustom(cat.id), t('common.save'), cat.id)
                 ) : (
-                  <View
-                    key={cat.id}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: sp.md,
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: c.border,
-                    }}
-                  >
+                  <View key={cat.id} style={rowStyle}>
                     <Pressable
-                      onPress={() => startEdit(cat)}
+                      onPress={() => startEditCustom(cat)}
                       style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 12 }}
                     >
                       <Txt style={{ fontSize: 20 }}>{cat.icon}</Txt>
@@ -232,7 +335,7 @@ export default function ManageCategoriesSheet({
                         {cat.name}
                       </Txt>
                     </Pressable>
-                    <Pressable onPress={() => confirmDelete(cat)} hitSlop={8} accessibilityLabel={t('common.delete')}>
+                    <Pressable onPress={() => confirmDeleteCustom(cat)} hitSlop={8} accessibilityLabel={t('common.delete')}>
                       <Trash2 size={18} color={c.textFaint} />
                     </Pressable>
                   </View>
@@ -240,7 +343,7 @@ export default function ManageCategoriesSheet({
               )}
 
               {editingId === 'new' ? (
-                renderEditor(true)
+                editorRow(() => saveCustom('new'), t('common.add'))
               ) : (
                 <Pressable
                   onPress={startNew}

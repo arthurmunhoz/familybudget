@@ -1,4 +1,4 @@
-import type { CategoryRule, CustomCategory } from './types'
+import type { CategoryOverride, CategoryRule, CustomCategory } from './types'
 
 export interface Category {
   id: string
@@ -23,14 +23,32 @@ export const CATEGORIES: Category[] = [
   { id: 'other', name: 'Other', icon: '📦' },
 ]
 
-/** Resolve built-in first, then the household's custom categories, then 'other'
- *  (so entries keep rendering if a custom category is deleted). */
-export function categoryById(id: string, custom?: CustomCategory[]): Category {
+/** Apply a household's override (if any) to a built-in preset. */
+function withOverride(builtin: Category, overrides?: CategoryOverride[]): Category {
+  const o = overrides?.find((x) => x.base_id === builtin.id)
+  if (!o) return builtin
+  return { ...builtin, name: o.name ?? builtin.name, icon: o.icon ?? builtin.icon }
+}
+
+/** Resolve built-in first (with the household's override layered on), then the
+ *  household's custom categories, then 'other' (so entries keep rendering if a
+ *  custom category is deleted). `overrides` is optional and backward-compatible:
+ *  callers that don't pass it get the default presets. */
+export function categoryById(
+  id: string,
+  custom?: CustomCategory[],
+  overrides?: CategoryOverride[],
+): Category {
   const builtin = CATEGORIES.find((c) => c.id === id)
-  if (builtin) return builtin
+  if (builtin) return withOverride(builtin, overrides)
   const c = custom?.find((cc) => cc.id === id)
   if (c) return { id: c.id, name: c.name, icon: c.icon }
-  return CATEGORIES[CATEGORIES.length - 1]
+  return withOverride(CATEGORIES[CATEGORIES.length - 1], overrides)
+}
+
+/** The 14 built-in presets with the household's overrides applied. */
+export function builtinCategories(overrides?: CategoryOverride[]): Category[] {
+  return CATEGORIES.map((c) => withOverride(c, overrides))
 }
 
 export function isBuiltinCategory(id: string): boolean {

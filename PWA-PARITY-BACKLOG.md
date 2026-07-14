@@ -71,6 +71,14 @@ keyword rules to the built-in `other` (atomic, household-guarded). iOS added a
 household's custom categories, tap-to-edit emoji+name inline (plain
 `custom_categories` UPDATE), 🗑 delete (the RPC), and an "Add category" row —
 opened from a "Manage categories" button under the entry form's "All" category
-grid. Built-ins (the 14 in `categories.ts`) stay read-only. The PWA needs the
-CLIENT equivalent (its budget entry form / category picker); reuse the RPC, no
-new DB work.
+grid. The PWA needs the CLIENT equivalent (its budget entry form / category
+picker); reuse the RPCs/tables, no new DB work.
+
+Built-ins are ALSO editable now (migration 056 `category_overrides`): a
+per-household override of a preset's name and/or icon (both nullable — override
+just the icon and keep the localized name). `categoryById(id, custom, overrides)`
+gained an optional 3rd arg (backward-compatible; old app builds pass nothing and
+see the defaults). The Manage sheet shows a "Defaults" section (edit → upsert
+override, ↺ reset → delete override) + a "Yours" section (custom). On the PWA,
+thread `overrides` through its `categoryById` call sites + load
+`category_overrides` alongside `custom_categories`.

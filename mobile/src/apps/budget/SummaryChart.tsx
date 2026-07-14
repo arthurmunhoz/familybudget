@@ -12,15 +12,17 @@ import { Card, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { categoryById } from '@/lib/categories'
 import { formatMoney, todayISO } from '@/lib/format'
-import type { CustomCategory, Entry } from '@/lib/types'
+import type { CategoryOverride, CustomCategory, Entry } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 
 export default function SummaryChart({
   entries,
   customCats = [],
+  overrides = [],
 }: {
   entries: Entry[]
   customCats?: CustomCategory[]
+  overrides?: CategoryOverride[]
 }) {
   const { t } = useI18n()
   const { c } = useTheme()
@@ -172,7 +174,7 @@ export default function SummaryChart({
       {categories.length > 0 && (
         <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.surface, paddingTop: sp.md }}>
           {categories.map(([catId, amount]) => {
-            const cat = categoryById(catId, customCats)
+            const cat = categoryById(catId, customCats, overrides)
             const subs = [...(bySub.get(catId)?.entries() ?? [])].sort((a, b) => b[1] - a[1])
             const hasSubs = subs.some(([k]) => k !== '')
             const expanded = expandedCat === catId

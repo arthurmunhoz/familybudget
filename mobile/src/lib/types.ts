@@ -65,6 +65,14 @@ export interface CustomCategory {
   created_at: string
 }
 
+/** Per-household override of a built-in preset category (migration 056).
+ *  name/icon are null when that field keeps the default. */
+export interface CategoryOverride {
+  base_id: string
+  name: string | null
+  icon: string | null
+}
+
 export interface ShoppingItem {
   id: string
   label: string

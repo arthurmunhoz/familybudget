@@ -25,7 +25,7 @@ import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import {
-  CATEGORIES,
+  builtinCategories,
   categoryById,
   isBuiltinCategory,
   normalizeLabel,
@@ -34,7 +34,7 @@ import {
 } from '@/lib/categories'
 import { addDaysISO, formatDay, formatMoney, shortName, todayISO } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
-import type { CategoryRule, CustomCategory, Entry, EntryType, Profile } from '@/lib/types'
+import type { CategoryOverride, CategoryRule, CustomCategory, Entry, EntryType, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Chip, DateField } from './shared'
 import ManageCategoriesSheet from './ManageCategoriesSheet'
@@ -59,6 +59,7 @@ export default function EntryForm({
   rules,
   subcategorySuggestions,
   customCategories,
+  categoryOverrides,
   topCategories,
   onCategoryCreated,
   entry,
@@ -77,6 +78,8 @@ export default function EntryForm({
   subcategorySuggestions: Record<string, string[]>
   /** Household-defined categories (shown alongside the built-ins). */
   customCategories: CustomCategory[]
+  /** Household overrides of the built-in presets (name/icon). */
+  categoryOverrides: CategoryOverride[]
   /** Household's most-used expense category ids, most-used first. */
   topCategories: string[]
   /** Called after a new custom category is saved, so the parent can refetch. */
@@ -118,6 +121,7 @@ export default function EntryForm({
   // Category picker: chips by default, the full grid behind "All".
   const [gridOpen, setGridOpen] = useState(false)
   const [localCats, setLocalCats] = useState<CustomCategory[]>(customCategories)
+  const [localOverrides, setLocalOverrides] = useState<CategoryOverride[]>(categoryOverrides)
   const [newCatOpen, setNewCatOpen] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [newCatIcon, setNewCatIcon] = useState('')
@@ -133,15 +137,19 @@ export default function EntryForm({
   const parsedAmount = parseFloat(amount.replace(',', '.'))
   const amountValid = !Number.isNaN(parsedAmount) && parsedAmount > 0
 
-  const selectedCat = categoryById(category, localCats)
-  const catName = (cat: Category) =>
-    isBuiltinCategory(cat.id) ? t(`cat.${cat.id}` as TKey) : cat.name
+  const selectedCat = categoryById(category, localCats, localOverrides)
+  // Built-in names are localized UNLESS the household overrode the name.
+  const catName = (cat: Category) => {
+    if (!isBuiltinCategory(cat.id)) return cat.name
+    const o = localOverrides.find((x) => x.base_id === cat.id)
+    return o?.name ?? t(`cat.${cat.id}` as TKey)
+  }
   const allExpenseCats: Category[] = useMemo(
     () => [
-      ...CATEGORIES.filter((x) => x.id !== 'salary'),
+      ...builtinCategories(localOverrides).filter((x) => x.id !== 'salary'),
       ...localCats.map((x) => ({ id: x.id, name: x.name, icon: x.icon })),
     ],
-    [localCats],
+    [localCats, localOverrides],
   )
   const knownIds = useMemo(() => new Set(allExpenseCats.map((x) => x.id)), [allExpenseCats])
   const quickIds = (topCategories.length > 0 ? topCategories : FALLBACK_TOP)
@@ -183,8 +191,12 @@ export default function EntryForm({
   // Re-sync the custom categories after the Manage sheet edits/deletes/adds, and
   // let the parent reload (a delete reassigns entries to "Other").
   async function refreshCats() {
-    const { data } = await supabase.from('custom_categories').select('*').order('created_at')
-    setLocalCats((data as CustomCategory[]) ?? [])
+    const [custom, ovr] = await Promise.all([
+      supabase.from('custom_categories').select('*').order('created_at'),
+      supabase.from('category_overrides').select('base_id, name, icon'),
+    ])
+    setLocalCats((custom.data as CustomCategory[]) ?? [])
+    setLocalOverrides((ovr.data as CategoryOverride[]) ?? [])
     onCategoryCreated()
   }
 
@@ -413,7 +425,7 @@ export default function EntryForm({
                     </Txt>
                   </View>
                   {quickIds.map((id) => {
-                    const qc = categoryById(id, localCats)
+                    const qc = categoryById(id, localCats, localOverrides)
                     return (
                       <Pressable
                         key={id}
@@ -710,6 +722,7 @@ export default function EntryForm({
       {manageOpen ? (
         <ManageCategoriesSheet
           categories={localCats}
+          overrides={localOverrides}
           onChanged={refreshCats}
           onClose={() => setManageOpen(false)}
         />
