@@ -9,6 +9,9 @@ const APP_GROUP = 'group.com.oneroof.app'
 
 export interface BudgetWidgetItem {
   id: string
+  /** Current period's month id — lets the widget deep-link to add/scan an
+   *  entry (oneroof:///budget/<id>/<monthId>?add=1). null = no period yet. */
+  monthId: string | null
   name: string
   period: string
   balance: number

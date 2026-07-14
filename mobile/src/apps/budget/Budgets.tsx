@@ -129,6 +129,7 @@ export default function Budgets() {
       const stat = defaultId ? statsById.get(defaultId) : undefined
       return {
         id: b.id,
+        monthId: defaultId,
         name: b.name,
         period: b.period,
         balance: stat?.balance ?? 0,

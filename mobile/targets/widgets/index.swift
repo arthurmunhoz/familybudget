@@ -15,10 +15,17 @@ func money(_ v: Double, _ symbol: String) -> String {
   return symbol + num
 }
 
+// Deep link into the app's entry flow for a budget's current period. Mirrors the
+// in-app route /budget/<id>/<monthId>?add=1 (or ?scan=1).
+func addEntryURL(budgetId: String, monthId: String, scan: Bool) -> URL? {
+  URL(string: "oneroof:///budget/\(budgetId)/\(monthId)?\(scan ? "scan" : "add")=1")
+}
+
 // The app writes this JSON array into the App Group under "budgets"
 // (see mobile/src/lib/widget.ts).
 struct BudgetInfo: Codable, Identifiable {
   let id: String
+  let monthId: String?   // current period → deep-link target for add/scan
   let name: String
   let period: String
   let balance: Double
@@ -37,8 +44,38 @@ func loadBudgets() -> [BudgetInfo] {
 }
 
 private let sampleBudget = BudgetInfo(
-  id: "", name: "Our Home Budget", period: "monthly",
+  id: "", monthId: "sample", name: "Our Home Budget", period: "monthly",
   balance: 1240, income: 3200, spent: 1960, currency: "$")
+
+// Two small deep-link action buttons (Scan / Add) — shared by the Budget widget
+// (medium/large) and the Quick Add widget.
+struct AddEntryButtons: View {
+  let budgetId: String
+  let monthId: String
+  var addLabel: String = "Add"
+  var body: some View {
+    HStack(spacing: 8) {
+      Link(destination: addEntryURL(budgetId: budgetId, monthId: monthId, scan: true) ?? URL(string: "oneroof:///")!) {
+        Label("Scan", systemImage: "camera.fill")
+          .font(.caption).fontWeight(.semibold)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 8)
+          .background(Color.secondary.opacity(0.16))
+          .clipShape(RoundedRectangle(cornerRadius: 10))
+      }
+      Link(destination: addEntryURL(budgetId: budgetId, monthId: monthId, scan: false) ?? URL(string: "oneroof:///")!) {
+        Label(addLabel, systemImage: "plus")
+          .font(.caption).fontWeight(.semibold)
+          .lineLimit(1)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, 8)
+          .foregroundStyle(.white)
+          .background(Color.accentColor)
+          .clipShape(RoundedRectangle(cornerRadius: 10))
+      }
+    }
+  }
+}
 
 // ── Budget selection (configurable widget) ──────────────────────────────────
 struct BudgetEntity: AppEntity {
@@ -120,14 +157,24 @@ struct BudgetWidgetView: View {
           HStack(spacing: 18) {
             VStack(alignment: .leading, spacing: 1) {
               Text("received").font(.caption2).foregroundStyle(.secondary)
-              Text(money(b.income, b.currency)).font(.subheadline)
+              HStack(spacing: 2) {
+                Image(systemName: "arrow.down").font(.system(size: 10, weight: .bold)).foregroundStyle(.green)
+                Text(money(b.income, b.currency)).font(.subheadline)
+              }
             }
             VStack(alignment: .leading, spacing: 1) {
               Text("spent").font(.caption2).foregroundStyle(.secondary)
-              Text(money(b.spent, b.currency)).font(.subheadline)
+              HStack(spacing: 2) {
+                Image(systemName: "arrow.up").font(.system(size: 10, weight: .bold)).foregroundStyle(.red)
+                Text(money(b.spent, b.currency)).font(.subheadline)
+              }
             }
           }
           .padding(.top, 2)
+        }
+        if family != .systemSmall, let mid = b.monthId {
+          AddEntryButtons(budgetId: b.id, monthId: mid, addLabel: "Add Entry")
+            .padding(.top, 6)
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -148,8 +195,8 @@ struct BudgetWidget: Widget {
         .containerBackground(.fill.tertiary, for: .widget)
     }
     .configurationDisplayName("Budget")
-    .description("Pick a budget to show its balance.")
-    .supportedFamilies([.systemSmall, .systemMedium])
+    .description("Pick a budget to show its balance and quick-add entries.")
+    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }
 }
 
@@ -160,5 +207,6 @@ struct OneRoofWidgets: WidgetBundle {
     BudgetWidget()
     NudgesWidget()
     TodayWidget()
+    QuickAddWidget()
   }
 }
