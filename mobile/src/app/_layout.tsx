@@ -12,9 +12,11 @@ import {
 } from '@expo-google-fonts/hanken-grotesk';
 
 import { AuthProvider } from '@/lib/auth';
+import { registerBackgroundNotifications } from '@/lib/backgroundNotifications';
 import { PlusProvider } from '@/lib/plus';
 import { I18nProvider } from '@/hooks/useI18n';
 import { TilePrefProvider } from '@/hooks/useTilePref';
+import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -31,6 +33,11 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
   }, [fontsLoaded]);
+
+  // Silent-push → Nudges widget "seen by" plumbing (backgroundNotifications.ts).
+  useEffect(() => {
+    registerBackgroundNotifications();
+  }, []);
 
   if (!fontsLoaded) return null;
 
@@ -52,9 +59,13 @@ export default function RootLayout() {
 }
 
 // Navigation chrome + status bar, resolved from the saved appearance override.
+// Also keeps the Nudges widget synced (useSyncNudgeWidget) — mounted here, not
+// on the Nudges screen, so it fires on every app launch/login regardless of
+// which screen the user actually opens.
 function Chrome() {
   const { mode } = useThemePref();
   const isDark = mode === 'dark';
+  useSyncNudgeWidget();
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>

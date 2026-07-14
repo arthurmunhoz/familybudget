@@ -7,6 +7,47 @@ let APP_GROUP = "group.com.oneroof.app"
 
 func groupDefaults() -> UserDefaults? { UserDefaults(suiteName: APP_GROUP) }
 
+// "Warm Hearth" tokens, ported 1:1 from mobile/src/theme/theme.ts. The app's
+// theme is a MANUAL, persisted choice (Settings → Appearance), independent of
+// the system light/dark setting — so widgets must read the app's own choice
+// (mirrored into "widget_theme" by mobile/src/lib/widget.ts) rather than use
+// SwiftUI's system-appearance-following semantic colors like .primary/.secondary.
+extension Color {
+  init(hex: String) {
+    var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+    if s.hasPrefix("#") { s.removeFirst() }
+    var v: UInt64 = 0
+    Scanner(string: s).scanHexInt64(&v)
+    self.init(
+      red: Double((v >> 16) & 0xFF) / 255,
+      green: Double((v >> 8) & 0xFF) / 255,
+      blue: Double(v & 0xFF) / 255)
+  }
+}
+
+struct WarmHearth {
+  let bg: Color
+  let card: Color
+  let text: Color
+  let textMuted: Color
+  let accent: Color
+  let expense: Color
+}
+
+let lightTheme = WarmHearth(
+  bg: Color(hex: "fbf6f0"), card: Color(hex: "ffffff"), text: Color(hex: "2b2521"),
+  textMuted: Color(hex: "8c8076"), accent: Color(hex: "c2603f"), expense: Color(hex: "cf5a4c"))
+
+let darkTheme = WarmHearth(
+  bg: Color(hex: "1b1714"), card: Color(hex: "262019"), text: Color(hex: "f3ebe0"),
+  textMuted: Color(hex: "a89c8e"), accent: Color(hex: "da7a5b"), expense: Color(hex: "e07a6a"))
+
+/** The app's manually-chosen Light/Dark, mirrored into the App Group — NOT the
+ *  device's system appearance. Defaults light (matches the app's own default). */
+func appTheme() -> WarmHearth {
+  groupDefaults()?.string(forKey: "widget_theme") == "dark" ? darkTheme : lightTheme
+}
+
 func money(_ v: Double, _ symbol: String) -> String {
   let n = NumberFormatter()
   n.numberStyle = .decimal

@@ -77,6 +77,8 @@ export async function deletePingPreset(id: string): Promise<void> {
   if (error) throw error
 }
 
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
+
 async function authToken(): Promise<string> {
   const { data } = await supabase.auth.getSession()
   return data.session?.access_token ?? ''
@@ -143,9 +145,21 @@ export async function fetchMemberPhones(): Promise<Record<string, string>> {
   return out
 }
 
-/** Record that the current user saw/acknowledged a ping. */
+/** Record that the current user saw/acknowledged a ping, then best-effort
+ *  notify the sender (silent push → their Nudges widget shows "seen by you").
+ *  Notify failures are swallowed — the ack itself already landed. */
 export async function ackPing(pingId: string): Promise<void> {
   await supabase.from('ping_acks').insert({ ping_id: pingId })
+  try {
+    const token = await authToken()
+    await fetch(`${API_BASE}/api/ack-ping`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ping_id: pingId }),
+    })
+  } catch {
+    // best-effort only
+  }
 }
 
 /** Active (non-expired) pings for the household, newest first, each with its

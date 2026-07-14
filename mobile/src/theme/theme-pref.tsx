@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { syncWidgetTheme } from '@/lib/widget'
 
 export type ThemeMode = 'light' | 'dark'
 
@@ -27,7 +28,10 @@ export function ThemePrefProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true
     AsyncStorage.getItem(CACHE).then((v) => {
-      if (active && (v === 'light' || v === 'dark')) setModeState(v)
+      if (active && (v === 'light' || v === 'dark')) {
+        setModeState(v)
+        syncWidgetTheme(v)
+      }
     })
     return () => {
       active = false
@@ -37,6 +41,7 @@ export function ThemePrefProvider({ children }: { children: ReactNode }) {
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m)
     AsyncStorage.setItem(CACHE, m).catch(() => {})
+    syncWidgetTheme(m)
   }, [])
 
   return <ThemePrefContext.Provider value={{ mode, setMode }}>{children}</ThemePrefContext.Provider>

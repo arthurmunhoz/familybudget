@@ -30,6 +30,14 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 - **Pure logic copied from the PWA** lives in `@/lib/` (types, format, calendar,
   categories, petCare, stores, signedUrls, pings) — keep them in sync with the PWA
   or, post-cutover, treat these as the source of truth.
+- **Home-Screen widgets** `@/lib/widget.ts` + `targets/widgets/`: the widget
+  extension can't reach the app's JS/Supabase session, so all data crosses via
+  the shared App Group (`ExtensionStorage`) — mirror new data the same way
+  (JSON string via `.set(key, ...)`, scoped `ExtensionStorage.reloadWidget(kind)`,
+  matching key names in the Swift loader). `useSyncNudgeWidget` (mounted in
+  `_layout.tsx`) is the reference for "sync on login, not on screen visit."
+  See `DOCUMENTATION.md` §3 for the full picture (confirmation-timeline
+  mechanism, silent ack push).
 - Icons: `lucide-react-native`. Images: `expo-image` + `@/lib/signedUrls`. Dates:
   `@react-native-community/datetimepicker`. Camera/photos: `expo-image-picker` +
   `expo-image-manipulator`. Files: `expo-document-picker` + `expo-file-system`
@@ -43,8 +51,11 @@ implementation lives in `src/apps/<id>/`. Nested routes use folders
 ## AI / server endpoints
 Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`
 (`https://one-roof-app.vercel.app`) with `Authorization: Bearer <session token>`:
-`/api/scan-receipt` (Budget) and `/api/suggest-ping` (Nudges). Push fan-out and
-Google Calendar sync still need server work (see the TODO doc).
+`/api/scan-receipt` (Budget), `/api/suggest-ping` (Nudges), and `/api/ack-ping`
+(silent push to a nudge's sender when acked — see the widget note above). The
+Nudges *widget* itself talks to `/api/widget-nudge` directly from Swift, using
+a per-device widget token instead of a Supabase session (migration 045). Push
+fan-out and Google Calendar sync still need server work (see the TODO doc).
 
 ## Verifying changes (no simulator in this harness)
 There is no browser/simulator in the agent harness. The gate is:

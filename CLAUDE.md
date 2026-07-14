@@ -53,6 +53,8 @@ api/scan-bill.ts           Itemized bill photo → line items + tax/tip (Claude 
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
 api/send-ping.ts         Push a household ping to everyone but the sender
 api/suggest-ping.ts      Free text → {kind,emoji,message} ping (Claude)
+api/widget-nudge.ts      Send a nudge from the iOS Home-Screen widget (per-device token, not a session)
+api/ack-ping.ts          Silent push to a ping's sender when acked, for the iOS widget's "seen by"
 api/google-calendar-connect.ts  Store a user's Google OAuth tokens (service role)
 api/google-calendar-sync.ts     Pull Google Calendar events → calendar_events
 public/                    Icons, manifest, family.jpg backdrop photo
@@ -214,6 +216,11 @@ off the moment they ack (optimistic + Realtime).
   `ackPing`, `fetchActivePings`, `fetchMemberPhones` (for the Call button).
   Kept in sync with `mobile/src/lib/pings.ts` (the iOS Nudges feature this was
   ported from) — same table/RPC contract, same preset semantics.
+- `ackPing` also best-effort calls `api/ack-ping` after the insert — a silent
+  (no visible banner) push to the ping's SENDER, so if they're on iOS their
+  Nudges home-screen widget can flash "seen by {name}" without opening the
+  app. Purely additive to the existing insert-then-Realtime ack flow; failures
+  are swallowed the same way every other push here is.
 - Send flow: client INSERTs under RLS (household + sender stamped by defaults),
   then calls `api/send-ping` with the id; that function (service role) verifies
   the caller shares the household and pushes to the recipients (or all but the

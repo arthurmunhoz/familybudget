@@ -36,10 +36,11 @@ export default async function handler(req: any, res: any) {
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY
   if (!url || !serviceKey) return res.status(500).json({ error: 'Not configured' })
 
-  const { token, kind, emoji, message, recipients } = req.body ?? {}
+  const { token, kind, emoji, message, recipients, high_priority } = req.body ?? {}
   if (!token || typeof token !== 'string' || !kind || !message) {
     return res.status(400).json({ error: 'Missing fields' })
   }
+  const highPriority = high_priority === true
 
   const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
@@ -53,9 +54,9 @@ export default async function handler(req: any, res: any) {
   const senderEmail: string = wt.user_email
   const household: string = wt.household_id
 
-  // "Need help" always goes to everyone (parity with the app).
+  // High-priority nudges always go to everyone (parity with the app).
   const targetList: string[] | null =
-    kind === 'help' || !Array.isArray(recipients) || recipients.length === 0
+    highPriority || !Array.isArray(recipients) || recipients.length === 0
       ? null
       : recipients.filter((r: unknown) => typeof r === 'string')
 
@@ -68,6 +69,7 @@ export default async function handler(req: any, res: any) {
       emoji: typeof emoji === 'string' && emoji ? emoji : '📣',
       message,
       recipients: targetList,
+      high_priority: highPriority,
     })
     .select('id')
     .single()
@@ -106,7 +108,7 @@ export default async function handler(req: any, res: any) {
       url: '/pings',
       tag: `ping-${ping.id}`,
       tel,
-      urgent: kind === 'help',
+      urgent: highPriority,
     })
     const stale: string[] = []
     for (const s of subs ?? []) {
