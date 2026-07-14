@@ -41,6 +41,43 @@ export function syncBudgetWidget(budgets: BudgetWidgetItem[]): void {
   }
 }
 
+export interface TodayWidgetItem {
+  emoji: string
+  title: string
+  subtitle: string | null
+}
+
+export interface TodayWidgetData {
+  /** Localized "Today" caption. */
+  todayLabel: string
+  /** "Wed, Jul 9" (medium/large). */
+  dateLong: string
+  /** "Wed 9" (small). */
+  dateShort: string
+  temp: number | null
+  /** Unit incl. degree, e.g. "°F". */
+  unit: string | null
+  /** WMO weather code → SF Symbol in the widget. */
+  code: number | null
+  city: string | null
+  items: TodayWidgetItem[]
+  /** Localized "Nothing today" line. */
+  emptyLabel: string
+}
+
+/** Feed the Today widget: date, current weather, and today's agenda items
+ *  (calendar + pet-care due), mirroring the Hub's info card. */
+export function syncTodayWidget(data: TodayWidgetData): void {
+  const s = store()
+  if (!s) return
+  try {
+    s.set('today', JSON.stringify(data))
+    ExtensionStorage.reloadWidget()
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
 export interface NudgeMember {
   email: string
   name: string

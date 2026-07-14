@@ -33,6 +33,7 @@ import { overdueEvents } from '../lib/petCare'
 import { TYPE_ICON } from '../apps/pets/petUi'
 import type { CalendarEvent, PetEvent } from '../lib/types'
 import { useHomeWeather, weatherIcon, type WeatherAlertKind } from '../lib/weather'
+import { syncTodayWidget, type TodayWidgetItem } from '../lib/widget'
 import type { TKey } from '../lib/i18n'
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 
@@ -173,6 +174,44 @@ export default function TodaySection() {
   const shownOcc = todaysOcc.slice(0, MAX_ROWS)
   const shownPet = petDue.slice(0, Math.max(0, MAX_ROWS - shownOcc.length))
   const overflow = totalItems - (shownOcc.length + shownPet.length)
+
+  // Home-screen "Today" widget: same agenda + weather, written to the App Group.
+  const widgetItems: TodayWidgetItem[] = useMemo(() => {
+    const evItems = todaysOcc.map((o) => {
+      const ev = o.event
+      const years = ev.kind === 'birthday' || ev.kind === 'anniversary' ? yearsAt(ev, o.start) : 0
+      const time = ev.all_day ? null : ev.start_time ? formatTime(ev.start_time, locale) : null
+      const subtitle =
+        ev.kind === 'birthday' && years > 0
+          ? t('home.turns', { n: years })
+          : ev.kind === 'anniversary' && years > 0
+            ? t('home.years', { n: years })
+            : time
+      return { emoji: KIND_EMOJI[ev.kind] || '📅', title: ev.title, subtitle: subtitle ?? null }
+    })
+    const petItems = petDue.map((e) => ({
+      emoji: petById[e.pet_id]?.emoji || '🐾',
+      title: e.title,
+      subtitle: (e.next_due ?? '') < today ? t('home.overdue') : t('home.dueToday'),
+    }))
+    return [...evItems, ...petItems].slice(0, 6)
+  }, [todaysOcc, petDue, petById, locale, t, today])
+
+  useEffect(() => {
+    const [y, m, d] = today.split('-').map(Number)
+    const dt = new Date(y, m - 1, d)
+    syncTodayWidget({
+      todayLabel: t('home.today'),
+      dateLong: dt.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }),
+      dateShort: dt.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' }),
+      temp: weather?.temperature ?? null,
+      unit: weather?.unit ?? null,
+      code: weather?.code ?? null,
+      city: cityShort || null,
+      items: widgetItems,
+      emptyLabel: t('home.nothingToday'),
+    })
+  }, [widgetItems, weather, cityShort, locale, t, today])
 
   return (
     <Card style={{ gap: sp.md, marginBottom: sp.lg }}>
