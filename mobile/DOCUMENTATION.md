@@ -91,7 +91,13 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
   preset sends via `api/widget.ts` (a per-device token, not a Supabase session;
   posted to the legacy `/api/widget-nudge` URL, which is rewritten onto it) and flashes a "sent!" confirmation using WidgetKit's own timeline
   mechanism (two dated entries; iOS itself flips between them, no process
-  needed at the transition). Acking a nudge (`api/ack-ping.ts`) sends a
+  needed at the transition). The confirmation is instant because
+  `SendNudgeIntent` does NOT await the POST — iOS only re-renders a widget after
+  the intent's `perform()` returns, so an awaited (cold-start) network call
+  would freeze the old list on screen for seconds. The POST is handed to
+  `NudgeSender`, a **background `URLSession`** (`sharedContainerIdentifier` =
+  App Group, file-based upload) that the system daemon completes even after the
+  extension suspends, so `perform()` can return immediately. Acking a nudge (`api/ack-ping.ts`) sends a
   **silent** push back to the sender so their widget can show "seen by" —
   caught by `src/lib/backgroundNotifications.ts`
   (`UIBackgroundModes: remote-notification` + `expo-task-manager`),
