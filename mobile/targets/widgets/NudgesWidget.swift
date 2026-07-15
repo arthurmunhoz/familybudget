@@ -153,6 +153,59 @@ struct ToggleRecipientIntent: AppIntent {
   }
 }
 
+// Fire-and-forget POST to the nudge endpoint over a BACKGROUND URLSession. This
+// is what lets the "Sent!" confirmation feel instant: SendNudgeIntent.perform()
+// returns the moment it writes the status (iOS only re-renders a widget AFTER the
+// intent returns), and the system's background daemon still delivers the POST
+// even once the extension is suspended. A plain URLSession.shared task fired
+// without awaiting would be suspended along with the extension and might never
+// reach the server.
+final class NudgeSender: NSObject, URLSessionTaskDelegate {
+  static let shared = NudgeSender()
+
+  private lazy var session: URLSession = {
+    let cfg = URLSessionConfiguration.background(withIdentifier: "com.oneroof.widget.nudge")
+    // Required inside an app extension: lets the background daemon read the body
+    // file and finish the upload outside the extension's own lifetime.
+    cfg.sharedContainerIdentifier = APP_GROUP
+    cfg.sessionSendsLaunchEvents = false
+    cfg.isDiscretionary = false
+    return URLSession(configuration: cfg, delegate: self, delegateQueue: nil)
+  }()
+
+  func send(body: [String: Any]) {
+    guard
+      let url = URL(string: NUDGE_ENDPOINT),
+      let data = try? JSONSerialization.data(withJSONObject: body),
+      let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: APP_GROUP)
+    else { return }
+    // Background uploads must be file-based (in-memory bodies are dropped when the
+    // extension is suspended). Stage the JSON in the shared container, and first
+    // sweep any stragglers from earlier sends the daemon already finished (the
+    // completion delegate below only runs while the extension is still alive).
+    let sweepBefore = Date().addingTimeInterval(-60)
+    if let existing = try? FileManager.default.contentsOfDirectory(
+      at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) {
+      for f in existing where f.lastPathComponent.hasPrefix("nudge-") {
+        let mod = (try? f.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        if let mod, mod < sweepBefore { try? FileManager.default.removeItem(at: f) }
+      }
+    }
+    let file = dir.appendingPathComponent("nudge-\(UUID().uuidString).json")
+    do { try data.write(to: file) } catch { return }
+    var req = URLRequest(url: url)
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let task = session.uploadTask(with: req, fromFile: file)
+    task.taskDescription = file.path  // so the delegate can delete it
+    task.resume()
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    if let path = task.taskDescription { try? FileManager.default.removeItem(atPath: path) }
+  }
+}
+
 // Send a nudge to the currently selected recipients (or everyone). High-priority
 // presets always go to everyone — enforced here and again server-side.
 struct SendNudgeIntent: AppIntent {
@@ -171,24 +224,24 @@ struct SendNudgeIntent: AppIntent {
   }
 
   func perform() async throws -> some IntentResult {
-    // Show the "sent!" confirmation immediately — the network call is
-    // best-effort from here on, same as everywhere else pings are sent.
+    // Flash the "Sent!" confirmation the instant the button is tapped. iOS only
+    // re-renders the widget AFTER perform() returns, so the send must NOT be
+    // awaited here — awaiting a network round-trip (a cold Vercel function can
+    // take a few seconds) would keep the old preset list on screen until it
+    // finished, which is the "nothing happens for a while, then Sent!" lag.
+    // Instead: write the status, return immediately, and let NudgeSender's
+    // background URLSession deliver the POST even after the extension suspends.
     writeStatus(
       WidgetStatus(type: "sent", emoji: emoji, label: message, name: nil, until: Date().addingTimeInterval(3)))
     WidgetCenter.shared.reloadTimelines(ofKind: "NudgesWidget")
 
     let token = widgetToken()
-    if !token.isEmpty, let url = URL(string: NUDGE_ENDPOINT) {
+    if !token.isEmpty {
       let recipients = highPriority ? [] : loadRecipients()
-      var req = URLRequest(url: url)
-      req.httpMethod = "POST"
-      req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-      let body: [String: Any] = [
+      NudgeSender.shared.send(body: [
         "token": token, "kind": kind, "emoji": emoji, "message": message,
         "recipients": recipients, "high_priority": highPriority,
-      ]
-      req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-      _ = try? await URLSession.shared.data(for: req)
+      ])
     }
     return .result()
   }
@@ -266,6 +319,58 @@ struct NudgeChip: View {
   }
 }
 
+// One preset as a big, centred tappable tile. The medium/large widgets lay these
+// out 2-up in a grid (see nudgeGridRows) instead of thin full-width rows, so each
+// target is larger and clearly separated left/right — a near-miss can no longer
+// land on the neighbouring nudge and fire the wrong one.
+struct NudgeTile: View {
+  let preset: NudgePreset
+  let theme: WarmHearth
+  let prominent: Bool  // the small widget's single, oversized tile
+
+  var body: some View {
+    VStack(spacing: 4) {
+      Text(preset.emoji).font(.system(size: prominent ? 36 : 22))
+      Text(preset.label)
+        .font(prominent ? .subheadline : .caption)
+        .fontWeight(.medium)
+        .foregroundStyle(theme.text)
+        .lineLimit(2)
+        .multilineTextAlignment(.center)
+        .minimumScaleFactor(0.8)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(.horizontal, 6).padding(.vertical, 8)
+    .background(preset.highPriority ? theme.expense.opacity(0.14) : theme.card)
+    .overlay(
+      RoundedRectangle(cornerRadius: 12)
+        .stroke(preset.highPriority ? theme.expense.opacity(0.55) : Color.clear, lineWidth: 1))
+    .clipShape(RoundedRectangle(cornerRadius: 12))
+  }
+}
+
+// Chunk presets into rows of `columns`, padding the final row with nils so every
+// tile keeps an equal width (a lone last tile won't stretch full-bleed).
+struct NudgeGridRow: Identifiable {
+  let id: Int
+  let cells: [NudgePreset?]
+}
+
+func nudgeGridRows(_ presets: [NudgePreset], columns: Int) -> [NudgeGridRow] {
+  guard columns > 0 else { return [] }
+  var rows: [NudgeGridRow] = []
+  var idx = 0
+  while idx < presets.count {
+    let cells = (0..<columns).map { c -> NudgePreset? in
+      let j = idx + c
+      return j < presets.count ? presets[j] : nil
+    }
+    rows.append(NudgeGridRow(id: rows.count, cells: cells))
+    idx += columns
+  }
+  return rows
+}
+
 struct NudgeConfirmationView: View {
   let status: WidgetStatus
   let theme: WarmHearth
@@ -294,12 +399,19 @@ struct NudgesWidgetView: View {
   @Environment(\.widgetFamily) var family
   private var theme: WarmHearth { appTheme() }
 
+  // Small shows a single big tile; medium/large go 2-up.
+  private var columns: Int { family == .systemSmall ? 1 : 2 }
+
   private var presetCount: Int {
     switch family {
-    case .systemSmall: return 2
-    case .systemMedium: return 3
-    default: return 6
+    case .systemSmall: return 1
+    case .systemMedium: return 4   // 2×2
+    default: return 6              // 2×3
     }
+  }
+
+  private var gridRows: [NudgeGridRow] {
+    nudgeGridRows(Array(entry.presets.prefix(presetCount)), columns: columns)
   }
 
   var body: some View {
@@ -328,27 +440,26 @@ struct NudgesWidgetView: View {
           }
           .frame(maxWidth: .infinity)
         }
-        VStack(spacing: 5) {
-          ForEach(Array(entry.presets.prefix(presetCount))) { p in
-            Button(
-              intent: SendNudgeIntent(kind: p.kind, emoji: p.emoji, message: p.label, highPriority: p.highPriority)
-            ) {
-              HStack(spacing: 6) {
-                Text(p.emoji)
-                Text(p.label).font(.caption).fontWeight(.medium).foregroundStyle(theme.text).lineLimit(1)
-                Spacer(minLength: 0)
+        VStack(spacing: 6) {
+          ForEach(gridRows) { row in
+            HStack(spacing: 6) {
+              ForEach(Array(row.cells.enumerated()), id: \.offset) { _, cell in
+                if let p = cell {
+                  Button(
+                    intent: SendNudgeIntent(kind: p.kind, emoji: p.emoji, message: p.label, highPriority: p.highPriority)
+                  ) {
+                    NudgeTile(preset: p, theme: theme, prominent: family == .systemSmall)
+                  }
+                  .buttonStyle(.plain)
+                } else {
+                  Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
               }
-              .padding(.horizontal, 10).padding(.vertical, 8)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .background(p.highPriority ? theme.expense.opacity(0.14) : theme.card)
-              .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                  .stroke(p.highPriority ? theme.expense.opacity(0.55) : Color.clear, lineWidth: 1))
-              .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
           }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
