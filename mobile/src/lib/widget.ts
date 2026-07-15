@@ -65,6 +65,10 @@ export interface TodayWidgetData {
   /** WMO weather code → SF Symbol in the widget. */
   code: number | null
   city: string | null
+  /** Localized weather-alert line (rain/storm/extreme temp/wind), or null. */
+  alert: string | null
+  /** Alert kind → the widget maps it to an SF Symbol. */
+  alertKind: string | null
   items: TodayWidgetItem[]
   /** Localized "Nothing today" line. */
   emptyLabel: string

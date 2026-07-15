@@ -118,6 +118,23 @@ struct AddEntryButtons: View {
   }
 }
 
+// A right-aligned "received ↓ / spent ↑" stat block.
+struct BudgetStat: View {
+  let label: String
+  let value: String
+  let symbol: String
+  let color: Color
+  var body: some View {
+    VStack(alignment: .trailing, spacing: 1) {
+      Text(label).font(.caption2).foregroundStyle(.secondary)
+      HStack(spacing: 2) {
+        Image(systemName: symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(color)
+        Text(value).font(.subheadline)
+      }
+    }
+  }
+}
+
 // ── Budget selection (configurable widget) ──────────────────────────────────
 struct BudgetEntity: AppEntity {
   let id: String
@@ -182,36 +199,29 @@ struct BudgetWidgetView: View {
 
   var body: some View {
     if let b = entry.budget {
-      VStack(alignment: .leading, spacing: 6) {
+      VStack(alignment: .leading, spacing: 8) {
         HStack(spacing: 6) {
           Image(systemName: "creditcard").font(.caption)
           Text(b.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
         Spacer(minLength: 0)
-        Text("balance").font(.caption2).foregroundStyle(.secondary)
-        Text(money(b.balance, b.currency))
-          .font(.system(size: family == .systemSmall ? 28 : (family == .systemLarge ? 40 : 34), weight: .semibold))
-          .foregroundStyle(b.balance >= 0 ? Color.green : Color.red)
-          .minimumScaleFactor(0.6)
-          .lineLimit(1)
-        if family != .systemSmall {
-          HStack(spacing: 18) {
-            VStack(alignment: .leading, spacing: 1) {
-              Text("received").font(.caption2).foregroundStyle(.secondary)
-              HStack(spacing: 2) {
-                Image(systemName: "arrow.down").font(.system(size: 10, weight: .bold)).foregroundStyle(.green)
-                Text(money(b.income, b.currency)).font(.subheadline)
-              }
-            }
-            VStack(alignment: .leading, spacing: 1) {
-              Text("spent").font(.caption2).foregroundStyle(.secondary)
-              HStack(spacing: 2) {
-                Image(systemName: "arrow.up").font(.system(size: 10, weight: .bold)).foregroundStyle(.red)
-                Text(money(b.spent, b.currency)).font(.subheadline)
-              }
+        // Balance on the left; received/spent stacked on the right — same row.
+        HStack(alignment: .bottom, spacing: 8) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text("balance").font(.caption2).foregroundStyle(.secondary)
+            Text(money(b.balance, b.currency))
+              .font(.system(size: family == .systemSmall ? 28 : (family == .systemLarge ? 40 : 34), weight: .semibold))
+              .foregroundStyle(b.balance >= 0 ? Color.green : Color.red)
+              .minimumScaleFactor(0.6)
+              .lineLimit(1)
+          }
+          if family != .systemSmall {
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 6) {
+              BudgetStat(label: "received", value: money(b.income, b.currency), symbol: "arrow.down", color: .green)
+              BudgetStat(label: "spent", value: money(b.spent, b.currency), symbol: "arrow.up", color: .red)
             }
           }
-          .padding(.top, 2)
         }
         // On the tall Large size, push the buttons to the bottom so the balance
         // + stats sit in the middle instead of everything hugging the top.
@@ -221,6 +231,7 @@ struct BudgetWidgetView: View {
             .padding(.top, 6)
         }
       }
+      .padding(6)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     } else {
       VStack(spacing: 4) {

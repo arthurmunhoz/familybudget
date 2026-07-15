@@ -208,10 +208,12 @@ export default function TodaySection() {
       unit: weather?.unit ?? null,
       code: weather?.code ?? null,
       city: cityShort || null,
+      alert: weatherAlert ? t(WEATHER_ALERT[weatherAlert].key) : null,
+      alertKind: weatherAlert ?? null,
       items: widgetItems,
       emptyLabel: t('home.nothingToday'),
     })
-  }, [widgetItems, weather, cityShort, locale, t, today])
+  }, [widgetItems, weather, weatherAlert, cityShort, locale, t, today])
 
   return (
     <Card style={{ gap: sp.md, marginBottom: sp.lg }}>

@@ -21,6 +21,8 @@ struct TodayInfo: Codable {
   let unit: String?
   let code: Int?
   let city: String?
+  let alert: String?
+  let alertKind: String?
   let items: [TodayItem]
   let emptyLabel: String
 }
@@ -32,6 +34,18 @@ func loadToday() -> TodayInfo? {
     let info = try? JSONDecoder().decode(TodayInfo.self, from: data)
   else { return nil }
   return info
+}
+
+// Weather-alert kind → SF Symbol (matches lib/weather.ts WeatherAlertKind).
+func alertSymbol(_ kind: String) -> String {
+  switch kind {
+  case "thunder": return "cloud.bolt.rain.fill"
+  case "snow": return "cloud.snow.fill"
+  case "heat": return "thermometer.sun.fill"
+  case "cold": return "thermometer.snowflake"
+  case "wind": return "wind"
+  default: return "cloud.rain.fill" // rain
+  }
 }
 
 // WMO weather code → SF Symbol (matches lib/weather.ts weatherIcon).
@@ -57,6 +71,8 @@ private let sampleToday = TodayInfo(
   unit: "°F",
   code: 2,
   city: "Austin",
+  alert: "Rain likely today — grab an umbrella.",
+  alertKind: "rain",
   items: [
     TodayItem(emoji: "🎂", title: "Mom's birthday", subtitle: "turns 58"),
     TodayItem(emoji: "🐾", title: "Bella — vet checkup", subtitle: "due"),
@@ -128,6 +144,22 @@ struct TodayWidgetView: View {
               }
             }
           }
+        }
+
+        // Weather alert (rain / storm / extreme temp / wind) — mirrors the app's
+        // Today card banner. Medium/large only (small has no room).
+        if !isSmall, let alert = info.alert {
+          HStack(spacing: 6) {
+            Image(systemName: alertSymbol(info.alertKind ?? ""))
+              .symbolRenderingMode(.multicolor)
+              .font(.system(size: 13))
+            Text(alert).font(.caption2).lineLimit(2)
+            Spacer(minLength: 0)
+          }
+          .padding(.horizontal, 8)
+          .padding(.vertical, 6)
+          .background(Color.accentColor.opacity(0.15))
+          .clipShape(RoundedRectangle(cornerRadius: 8))
         }
 
         if info.items.isEmpty {

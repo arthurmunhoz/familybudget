@@ -44,6 +44,7 @@ struct QuickAddWidgetView: View {
         AddEntryButtons(budgetId: b.id, monthId: mid)
           .padding(.top, 4)
       }
+      .padding(6)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     } else {
       VStack(spacing: 4) {
