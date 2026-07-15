@@ -117,7 +117,9 @@ struct TodayWidgetView: View {
           if let temp = info.temp {
             VStack(alignment: .trailing, spacing: 0) {
               HStack(spacing: 3) {
-                Image(systemName: weatherSymbol(info.code ?? -1)).font(.system(size: 14))
+                Image(systemName: weatherSymbol(info.code ?? -1))
+                  .font(.system(size: 14))
+                  .symbolRenderingMode(.multicolor)
                 Text("\(Int(temp))\(info.unit ?? "°")")
                   .font(.system(size: isSmall ? 14 : 16, weight: .bold))
               }
@@ -129,7 +131,17 @@ struct TodayWidgetView: View {
         }
 
         if info.items.isEmpty {
-          Text(info.emptyLabel).font(.caption).foregroundStyle(.secondary)
+          // Center the empty message (with a small glyph) so the widget reads as
+          // intentionally "clear day" instead of a top-stuck label + blank space.
+          Spacer(minLength: 0)
+          VStack(spacing: 6) {
+            Image(systemName: "checkmark.circle").font(.title3).foregroundStyle(.secondary)
+            Text(info.emptyLabel)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .multilineTextAlignment(.center)
+          }
+          .frame(maxWidth: .infinity)
           Spacer(minLength: 0)
         } else {
           VStack(alignment: .leading, spacing: isSmall ? 5 : 6) {

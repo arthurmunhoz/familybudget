@@ -190,7 +190,7 @@ struct BudgetWidgetView: View {
         Spacer(minLength: 0)
         Text("balance").font(.caption2).foregroundStyle(.secondary)
         Text(money(b.balance, b.currency))
-          .font(.system(size: family == .systemSmall ? 28 : 34, weight: .semibold))
+          .font(.system(size: family == .systemSmall ? 28 : (family == .systemLarge ? 40 : 34), weight: .semibold))
           .foregroundStyle(b.balance >= 0 ? Color.green : Color.red)
           .minimumScaleFactor(0.6)
           .lineLimit(1)
@@ -213,6 +213,9 @@ struct BudgetWidgetView: View {
           }
           .padding(.top, 2)
         }
+        // On the tall Large size, push the buttons to the bottom so the balance
+        // + stats sit in the middle instead of everything hugging the top.
+        if family == .systemLarge { Spacer(minLength: 0) }
         if family != .systemSmall, let mid = b.monthId {
           AddEntryButtons(budgetId: b.id, monthId: mid, addLabel: "Add Entry")
             .padding(.top, 6)
