@@ -48,6 +48,25 @@ Character limits are Apple's; I've kept everything within them. Tweak to taste.
 ## What's New (v1.0)
 `Welcome to One Roof! Your family's calendar, shopping, budget, pets, documents, and nudges — all in one shared app. We'd love your feedback: arthurmunhoz@hotmail.com`
 
+## What's New (v1.1) — 4000 char max; paste into the new version's "What's New"
+
+```
+Home-Screen widgets are here.
+
+• Today — your day at a glance: agenda, weather, and heads-up alerts. It keeps itself up to date even when you never open the app.
+• Money — a budget's balance at a glance, plus add an entry or scan a receipt straight from the Home Screen.
+• Nudges — send a one-tap nudge without opening the app, and see when someone's seen it.
+
+Also in this release:
+
+• Family, redesigned — swipe through everyone's photos and see their details on one card. Hold any detail to convert units (cm/ft, kg/lb, shoe sizes), or to check blood-type compatibility.
+• Money — manage your categories at last: edit, rename, or delete them, including the built-in ones.
+• Join a household with a code — new members can create or join a home the first time they sign in.
+• Weather — find your home city with autocomplete, and get a heads-up when rain, storms, or extreme temperatures are on the way.
+• The One Roof Plus page is now fully translated.
+• Polish and fixes across Pet Care, Documents, and the Shopping List.
+```
+
 ---
 
 ## Screenshots plan (6.7" iPhone required; add 6.5" + iPad if you keep tablet support)
