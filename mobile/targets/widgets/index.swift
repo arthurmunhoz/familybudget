@@ -180,48 +180,74 @@ struct BudgetWidgetView: View {
   var entry: BudgetEntry
   @Environment(\.widgetFamily) var family
 
+  private func header(_ b: BudgetInfo) -> some View {
+    HStack(spacing: 6) {
+      Image(systemName: "creditcard").font(.caption)
+      Text(b.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+    }
+  }
+
+  private func balanceBlock(_ b: BudgetInfo) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("balance").font(.caption2).foregroundStyle(.secondary)
+      Text(money(b.balance, b.currency))
+        .font(.system(size: family == .systemSmall ? 28 : (family == .systemLarge ? 40 : 34), weight: .semibold))
+        .foregroundStyle(b.balance >= 0 ? Color.green : Color.red)
+        .minimumScaleFactor(0.6)
+        .lineLimit(1)
+    }
+  }
+
+  private func incomeSpent(_ b: BudgetInfo) -> some View {
+    HStack(spacing: 18) {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("received").font(.caption2).foregroundStyle(.secondary)
+        HStack(spacing: 2) {
+          Image(systemName: "arrow.down").font(.system(size: 10, weight: .bold)).foregroundStyle(.green)
+          Text(money(b.income, b.currency)).font(.subheadline)
+        }
+      }
+      VStack(alignment: .leading, spacing: 1) {
+        Text("spent").font(.caption2).foregroundStyle(.secondary)
+        HStack(spacing: 2) {
+          Image(systemName: "arrow.up").font(.system(size: 10, weight: .bold)).foregroundStyle(.red)
+          Text(money(b.spent, b.currency)).font(.subheadline)
+        }
+      }
+    }
+  }
+
   var body: some View {
     if let b = entry.budget {
-      VStack(alignment: .leading, spacing: 6) {
-        HStack(spacing: 6) {
-          Image(systemName: "creditcard").font(.caption)
-          Text(b.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-        }
-        Spacer(minLength: 0)
-        Text("balance").font(.caption2).foregroundStyle(.secondary)
-        Text(money(b.balance, b.currency))
-          .font(.system(size: family == .systemSmall ? 28 : (family == .systemLarge ? 40 : 34), weight: .semibold))
-          .foregroundStyle(b.balance >= 0 ? Color.green : Color.red)
-          .minimumScaleFactor(0.6)
-          .lineLimit(1)
-        if family != .systemSmall {
-          HStack(spacing: 18) {
-            VStack(alignment: .leading, spacing: 1) {
-              Text("received").font(.caption2).foregroundStyle(.secondary)
-              HStack(spacing: 2) {
-                Image(systemName: "arrow.down").font(.system(size: 10, weight: .bold)).foregroundStyle(.green)
-                Text(money(b.income, b.currency)).font(.subheadline)
-              }
-            }
-            VStack(alignment: .leading, spacing: 1) {
-              Text("spent").font(.caption2).foregroundStyle(.secondary)
-              HStack(spacing: 2) {
-                Image(systemName: "arrow.up").font(.system(size: 10, weight: .bold)).foregroundStyle(.red)
-                Text(money(b.spent, b.currency)).font(.subheadline)
-              }
+      Group {
+        if family == .systemSmall {
+          // Small: name up top, then received/spent, then the balance pinned to
+          // the very bottom (largest number, read last). Side padding is trimmed
+          // a touch below so the balance figure gets more room.
+          VStack(alignment: .leading, spacing: 6) {
+            header(b)
+            Spacer(minLength: 0)
+            incomeSpent(b)
+            balanceBlock(b)
+          }
+        } else {
+          VStack(alignment: .leading, spacing: 6) {
+            header(b)
+            Spacer(minLength: 0)
+            balanceBlock(b)
+            incomeSpent(b).padding(.top, 2)
+            // On the tall Large size, push the buttons to the bottom so the
+            // balance + stats sit in the middle instead of hugging the top.
+            if family == .systemLarge { Spacer(minLength: 0) }
+            if let mid = b.monthId {
+              AddEntryButtons(budgetId: b.id, monthId: mid, addLabel: "Add Entry")
+                .padding(.top, 6)
             }
           }
-          .padding(.top, 2)
-        }
-        // On the tall Large size, push the buttons to the bottom so the balance
-        // + stats sit in the middle instead of everything hugging the top.
-        if family == .systemLarge { Spacer(minLength: 0) }
-        if family != .systemSmall, let mid = b.monthId {
-          AddEntryButtons(budgetId: b.id, monthId: mid, addLabel: "Add Entry")
-            .padding(.top, 6)
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+      .padding(.horizontal, family == .systemSmall ? -6 : 0)
     } else {
       VStack(spacing: 4) {
         Image(systemName: "creditcard").foregroundStyle(.secondary)
