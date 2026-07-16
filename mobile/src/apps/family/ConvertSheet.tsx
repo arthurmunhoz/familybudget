@@ -1,4 +1,4 @@
-// Bottom sheet shown when a member card field is long-pressed. For height /
+// Bottom sheet shown when a member card field's "?" is tapped. For height /
 // weight / shoe it lists the value converted to other popular units (the stored
 // one flagged "current"); for blood type — which has no units — it shows
 // donor/recipient compatibility instead.
@@ -145,9 +145,11 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: sp.lg,
-    paddingTop: sp.md,
-    paddingBottom: sp.xl,
+    // Roomy insets: the blood-type chips wrap into several rows and read as
+    // cramped when they run close to the sheet's edges.
+    paddingHorizontal: sp.xl,
+    paddingTop: sp.lg,
+    paddingBottom: sp.xxl,
   },
   grab: {
     width: 40,

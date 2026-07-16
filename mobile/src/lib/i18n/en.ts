@@ -438,7 +438,7 @@ export const en = {
   'family.changePhoto': 'Change photo',
   'family.removePhoto': 'Remove',
   'family.photoFailed': 'Could not upload the photo — please try again.',
-  'family.convertHint': 'Hold a field to convert its units',
+  'family.fieldDetails': 'Details',
   'family.convertCurrent': 'current',
   'family.convertApprox': 'Approximate — varies by brand',
   'family.donateTo': 'Can donate to',

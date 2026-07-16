@@ -436,7 +436,7 @@ export const es: Record<keyof typeof en, string> = {
   'family.changePhoto': 'Cambiar foto',
   'family.removePhoto': 'Quitar',
   'family.photoFailed': 'No se pudo subir la foto — inténtalo de nuevo.',
-  'family.convertHint': 'Mantén pulsado un campo para convertir sus unidades',
+  'family.fieldDetails': 'Detalles',
   'family.convertCurrent': 'actual',
   'family.convertApprox': 'Aproximado — varía según la marca',
   'family.donateTo': 'Puede donar a',

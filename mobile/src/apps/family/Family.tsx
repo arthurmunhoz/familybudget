@@ -74,7 +74,7 @@ export default function Family() {
   const scrollX = useRef(new Animated.Value(myIndex * SLOT)).current
   const scrollRef = useRef<ScrollView>(null)
   const [selected, setSelected] = useState(myIndex)
-  // Long-press-a-field → conversion / blood-compatibility sheet.
+  // A field's "?" → conversion / blood-compatibility sheet.
   const [convert, setConvert] = useState<{
     kind: ConvertKind
     raw: string
@@ -121,10 +121,14 @@ export default function Family() {
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       {header}
 
-      {/* Info-card pager — slides in sync with the carousel below. Clipped so
-          neighbour cards don't bleed at the screen edges; each page's generous
-          paddingBottom leaves room for the card's drop-shadow to show above the
-          carousel (rather than being cut off flush against it). */}
+      {/* Info-card pager — slides in sync with the carousel below. `overflow:
+          hidden` keeps neighbour cards from bleeding at the screen edges, but RN
+          can't clip one axis only, so it would equally clip the card's shadow top
+          and bottom. The page padding below is therefore sized to CONTAIN the
+          shadow: it reaches ~(radius − offset) above the card and ~(radius +
+          offset) below, so paddingTop/paddingBottom must exceed those or the
+          shadow gets sliced off flush against the header / carousel. Keep them in
+          step with the shadow values if you ever deepen it again. */}
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <Animated.View
           style={{
@@ -140,7 +144,7 @@ export default function Family() {
             return (
               <View
                 key={m.email}
-                style={{ width, paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: 30 }}
+                style={{ width, paddingHorizontal: sp.lg, paddingTop: sp.lg, paddingBottom: 30 }}
               >
                 <View
                   style={{
@@ -150,12 +154,14 @@ export default function Family() {
                     padding: sp.lg,
                     borderWidth: StyleSheet.hairlineWidth,
                     borderColor: c.border,
-                    // Float it: a deeper, softer shadow lifts the card off the page.
+                    // Float it — but shallow enough that the shadow fits inside the
+                    // pager's clip: it spreads 6pt up and 22pt down, against the
+                    // 16pt / 30pt page padding above and below.
                     shadowColor: '#000',
-                    shadowOpacity: 0.16,
-                    shadowRadius: 20,
-                    shadowOffset: { width: 0, height: 12 },
-                    elevation: 12,
+                    shadowOpacity: 0.14,
+                    shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 8 },
+                    elevation: 8,
                   }}
                 >
                   {/* Header (fixed) — no avatar; the photo lives in the carousel. */}

@@ -1,11 +1,14 @@
 // The info rows for a member (rendered inside Family's card, in a scroll view so
 // only the rows scroll). Every filled member_profiles field gets a related icon;
-// the phone row has a call button — but NOT on your own card. Long-pressing a
-// measured field (height/weight/shoe) or blood type opens the conversion sheet.
+// the phone row has a call button — but NOT on your own card. A measured field
+// (height/weight/shoe) or blood type gets a "?" button next to its value that
+// opens the conversion / compatibility sheet — only when the stored value is
+// actually parseable (canConvert), so legacy unit-less free text just has no "?".
 import { Linking, Pressable, View } from 'react-native'
 import {
   AlertTriangle,
   Cake,
+  CircleHelp,
   Droplet,
   Footprints,
   Phone,
@@ -40,7 +43,7 @@ const FIELD_ICON: Partial<Record<keyof MemberProfile, LucideIcon>> = {
   notes: StickyNote,
 }
 
-// Which fields support the long-press conversion / compatibility sheet.
+// Which fields get the "?" → conversion / compatibility sheet.
 const CONVERT_KIND: Partial<Record<keyof MemberProfile, ConvertKind>> = {
   height: 'height',
   weight: 'weight',
@@ -109,24 +112,13 @@ export function MemberDetails({
     return <Txt variant="muted">{t('family.empty')}</Txt>
   }
 
-  const anyConvertible = items.some((it) => it.convert)
-
   return (
     <View>
-      {anyConvertible ? (
-        <Txt variant="faint" style={{ marginBottom: 4 }}>
-          {t('family.convertHint')}
-        </Txt>
-      ) : null}
       {items.map((it, i) => {
         const Icon = it.icon
         return (
-          <Pressable
+          <View
             key={it.label}
-            onLongPress={
-              it.convert ? () => onConvert(it.convert!.kind, it.convert!.raw, it.label) : undefined
-            }
-            delayLongPress={300}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -149,12 +141,42 @@ export function MemberDetails({
               <Icon size={16} color={c.accent} />
             </View>
             <Txt style={{ color: c.textMuted, fontSize: 13 }}>{it.label}</Txt>
-            <Txt
-              style={{ flex: 1, fontSize: 14, fontWeight: '500', textAlign: 'right' }}
-              numberOfLines={2}
+            {/* Value and its "?" ride together, right-aligned, so the button sits
+                against the value rather than drifting to the row's edge. */}
+            <View
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 6,
+              }}
             >
-              {it.value}
-            </Txt>
+              <Txt
+                style={{ flexShrink: 1, fontSize: 14, fontWeight: '500', textAlign: 'right' }}
+                numberOfLines={2}
+              >
+                {it.value}
+              </Txt>
+              {it.convert ? (
+                <Pressable
+                  onPress={() => onConvert(it.convert!.kind, it.convert!.raw, it.label)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('family.fieldDetails')}: ${it.label}`}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: c.accentSoft,
+                  }}
+                >
+                  <CircleHelp size={14} color={c.accent} />
+                </Pressable>
+              ) : null}
+            </View>
             {it.phone && !isMe ? (
               <Pressable
                 onPress={() => call(it.phone!)}
@@ -174,7 +196,7 @@ export function MemberDetails({
                 <Phone size={15} color={CALL_GREEN} />
               </Pressable>
             ) : null}
-          </Pressable>
+          </View>
         )
       })}
     </View>
