@@ -27,7 +27,9 @@ import type { MemberProfile } from '@/lib/types'
 import { Avatar } from './Avatar'
 import { MemberDetails } from './MemberDetail'
 import { EditProfile } from './EditProfile'
+import { ConvertSheet } from './ConvertSheet'
 import { type Member } from './familyShared'
+import { type ConvertKind } from './units'
 
 const AV_BASE = 84 // rendered avatar size (scaled per position by the carousel)
 const SLOT = 72 // horizontal slot width per avatar in the carousel
@@ -72,6 +74,12 @@ export default function Family() {
   const scrollX = useRef(new Animated.Value(myIndex * SLOT)).current
   const scrollRef = useRef<ScrollView>(null)
   const [selected, setSelected] = useState(myIndex)
+  // Long-press-a-field → conversion / blood-compatibility sheet.
+  const [convert, setConvert] = useState<{
+    kind: ConvertKind
+    raw: string
+    label: string
+  } | null>(null)
 
   async function openEditMine() {
     if (!profile) return
@@ -113,7 +121,10 @@ export default function Family() {
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       {header}
 
-      {/* Info-card pager — slides in sync with the carousel below. */}
+      {/* Info-card pager — slides in sync with the carousel below. Clipped so
+          neighbour cards don't bleed at the screen edges; each page's generous
+          paddingBottom leaves room for the card's drop-shadow to show above the
+          carousel (rather than being cut off flush against it). */}
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <Animated.View
           style={{
@@ -129,7 +140,7 @@ export default function Family() {
             return (
               <View
                 key={m.email}
-                style={{ width, paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.md }}
+                style={{ width, paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: 30 }}
               >
                 <View
                   style={{
@@ -147,28 +158,25 @@ export default function Family() {
                     elevation: 12,
                   }}
                 >
-                  {/* Header (fixed) */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                    <Avatar name={m.display_name} avatarPath={p?.avatar_path} size={52} zoomable />
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                      <Txt variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>
-                        {m.display_name}
-                      </Txt>
-                      {isMe ? (
-                        <View
-                          style={{
-                            backgroundColor: c.accentSoft,
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderRadius: 999,
-                          }}
-                        >
-                          <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 11 }}>
-                            {t('family.you')}
-                          </Txt>
-                        </View>
-                      ) : null}
-                    </View>
+                  {/* Header (fixed) — no avatar; the photo lives in the carousel. */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                    <Txt variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>
+                      {m.display_name}
+                    </Txt>
+                    {isMe ? (
+                      <View
+                        style={{
+                          backgroundColor: c.accentSoft,
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 999,
+                        }}
+                      >
+                        <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 11 }}>
+                          {t('family.you')}
+                        </Txt>
+                      </View>
+                    ) : null}
                   </View>
 
                   <View style={{ height: 1, backgroundColor: c.border, marginVertical: sp.md }} />
@@ -179,7 +187,12 @@ export default function Family() {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: sp.xs }}
                   >
-                    <MemberDetails member={m} profile={p} isMe={isMe} />
+                    <MemberDetails
+                      member={m}
+                      profile={p}
+                      isMe={isMe}
+                      onConvert={(kind, raw, label) => setConvert({ kind, raw, label })}
+                    />
                   </ScrollView>
 
                   {/* Edit (fixed) — only on my own card. */}
@@ -273,6 +286,15 @@ export default function Family() {
           {members[selected]?.display_name}
         </Txt>
       </View>
+
+      {convert ? (
+        <ConvertSheet
+          kind={convert.kind}
+          raw={convert.raw}
+          label={convert.label}
+          onClose={() => setConvert(null)}
+        />
+      ) : null}
 
       {editing && profile ? (
         <EditProfile

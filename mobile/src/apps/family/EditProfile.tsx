@@ -2,7 +2,7 @@
 // member_profiles row). Handles the avatar (pick → resize → upload to the
 // documents bucket), birthday (native date picker), blood type (chips), and the
 // remaining text fields, then upserts the row.
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import {
   Alert,
   Modal,
@@ -10,6 +10,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
@@ -23,10 +24,26 @@ import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
 import { formatPhone, formatDay } from '@/lib/format'
 import { useI18n } from '@/hooks/useI18n'
-import { useTheme, sp, radius } from '@/theme/theme'
+import { useTheme, sp, radius, fonts } from '@/theme/theme'
 import { Btn, Field, Txt } from '@/components/ui'
 import type { MemberProfile, Profile } from '@/lib/types'
 import { BLOOD_TYPES, EDIT_FIELDS } from './familyShared'
+import {
+  cmToFtIn,
+  composeHeight,
+  composeShoe,
+  composeWeight,
+  ftInToCm,
+  parseHeight,
+  parseShoe,
+  parseWeight,
+  shoeConvert,
+  weightConvert,
+  type HeightUnit,
+  type ShoeGender,
+  type ShoeSystem,
+  type WeightUnit,
+} from './units'
 
 type Form = {
   avatar_path: string
@@ -63,6 +80,283 @@ function emptyForm(p?: MemberProfile): Form {
   }
 }
 
+// ── Measured-field editors (hoisted to module scope so their TextInputs keep
+// focus across parent re-renders). Each seeds from the stored "value + unit"
+// string, and pushes a freshly-composed string up on every change. ────────────
+function UnitPills<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (v: T) => void
+}) {
+  const { c } = useTheme()
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: c.border,
+        borderRadius: radius.sm,
+        overflow: 'hidden',
+      }}
+    >
+      {options.map((o, i) => {
+        const on = o.value === value
+        return (
+          <Pressable
+            key={o.value}
+            onPress={() => onChange(o.value)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              backgroundColor: on ? c.accent : 'transparent',
+              borderLeftWidth: i ? StyleSheet.hairlineWidth : 0,
+              borderLeftColor: c.border,
+            }}
+          >
+            <Txt style={{ color: on ? '#fff' : c.textMuted, fontWeight: '600', fontSize: 13 }}>
+              {o.label}
+            </Txt>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+function NumInput({
+  value,
+  onChangeText,
+  width = 72,
+}: {
+  value: string
+  onChangeText: (v: string) => void
+  width?: number
+}) {
+  const { c } = useTheme()
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      keyboardType="decimal-pad"
+      style={{
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: c.border,
+        borderRadius: radius.md,
+        paddingHorizontal: sp.md,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: c.text,
+        width,
+        backgroundColor: c.card,
+        fontFamily: fonts.body,
+      }}
+    />
+  )
+}
+
+function MeasureRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View style={{ gap: 6 }}>
+      <Txt variant="label">{label}</Txt>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>{children}</View>
+    </View>
+  )
+}
+
+function HeightField({
+  label,
+  initial,
+  metric,
+  onChange,
+}: {
+  label: string
+  initial: string
+  metric: boolean
+  onChange: (v: string) => void
+}) {
+  const [unit, setUnit] = useState<HeightUnit>(
+    () => parseHeight(initial)?.unit ?? (metric ? 'cm' : 'ftin'),
+  )
+  const [a, setA] = useState(() => {
+    const p = parseHeight(initial)
+    if (!p) return ''
+    return p.unit === 'cm' ? String(Math.round(p.cm)) : String(cmToFtIn(p.cm).ft)
+  })
+  const [b, setB] = useState(() => {
+    const p = parseHeight(initial)
+    return !p || p.unit === 'cm' ? '' : String(cmToFtIn(p.cm).inch)
+  })
+
+  function changeA(v: string) {
+    setA(v)
+    onChange(composeHeight(unit, v, b))
+  }
+  function changeB(v: string) {
+    setB(v)
+    onChange(composeHeight(unit, a, v))
+  }
+  function toggle(u: HeightUnit) {
+    if (u === unit) return
+    let na = a
+    let nb = b
+    if (u === 'cm') {
+      na = a || b ? String(Math.round(ftInToCm(parseFloat(a) || 0, parseFloat(b) || 0))) : ''
+      nb = ''
+    } else {
+      const cm = parseFloat(a)
+      if (isFinite(cm)) {
+        const r = cmToFtIn(cm)
+        na = String(r.ft)
+        nb = String(r.inch)
+      } else {
+        na = ''
+        nb = ''
+      }
+    }
+    setUnit(u)
+    setA(na)
+    setB(nb)
+    onChange(composeHeight(u, na, nb))
+  }
+
+  return (
+    <MeasureRow label={label}>
+      {unit === 'cm' ? (
+        <NumInput value={a} onChangeText={changeA} width={84} />
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <NumInput value={a} onChangeText={changeA} width={52} />
+          <Txt variant="muted">ft</Txt>
+          <NumInput value={b} onChangeText={changeB} width={52} />
+          <Txt variant="muted">in</Txt>
+        </View>
+      )}
+      <View style={{ flex: 1 }} />
+      <UnitPills
+        value={unit}
+        onChange={toggle}
+        options={[
+          { value: 'ftin', label: 'ft·in' },
+          { value: 'cm', label: 'cm' },
+        ]}
+      />
+    </MeasureRow>
+  )
+}
+
+function WeightField({
+  label,
+  initial,
+  metric,
+  onChange,
+}: {
+  label: string
+  initial: string
+  metric: boolean
+  onChange: (v: string) => void
+}) {
+  const [unit, setUnit] = useState<WeightUnit>(
+    () => parseWeight(initial)?.unit ?? (metric ? 'kg' : 'lb'),
+  )
+  const [v, setV] = useState(() => (parseWeight(initial) ? String(parseFloat(initial)) : ''))
+
+  function changeV(next: string) {
+    setV(next)
+    onChange(composeWeight(unit, next))
+  }
+  function toggle(u: WeightUnit) {
+    if (u === unit) return
+    const n = parseFloat(v)
+    const nv = isFinite(n) ? String(weightConvert(n, unit, u)) : v
+    setUnit(u)
+    setV(nv)
+    onChange(composeWeight(u, nv))
+  }
+
+  return (
+    <MeasureRow label={label}>
+      <NumInput value={v} onChangeText={changeV} />
+      <View style={{ flex: 1 }} />
+      <UnitPills
+        value={unit}
+        onChange={toggle}
+        options={[
+          { value: 'lb', label: 'lb' },
+          { value: 'kg', label: 'kg' },
+        ]}
+      />
+    </MeasureRow>
+  )
+}
+
+function ShoeField({
+  label,
+  initial,
+  metric,
+  onChange,
+}: {
+  label: string
+  initial: string
+  metric: boolean
+  onChange: (v: string) => void
+}) {
+  const { t } = useI18n()
+  const p0 = parseShoe(initial)
+  const [system, setSystem] = useState<ShoeSystem>(p0?.system ?? (metric ? 'EU' : 'US'))
+  const [gender, setGender] = useState<ShoeGender>(p0?.gender ?? 'M')
+  const [v, setV] = useState(() => (p0 ? String(p0.value) : ''))
+
+  function changeV(next: string) {
+    setV(next)
+    onChange(composeShoe(system, gender, next))
+  }
+  function toggleSystem(s: ShoeSystem) {
+    if (s === system) return
+    const n = parseFloat(v)
+    const conv = isFinite(n) ? shoeConvert(n, gender, system, s) : null
+    const nv = conv != null ? String(conv) : v
+    setSystem(s)
+    setV(nv)
+    onChange(composeShoe(s, gender, nv))
+  }
+  function toggleGender(g: ShoeGender) {
+    if (g === gender) return
+    setGender(g)
+    onChange(composeShoe(system, g, v))
+  }
+
+  return (
+    <View style={{ gap: 6 }}>
+      <Txt variant="label">{label}</Txt>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+        <NumInput value={v} onChangeText={changeV} />
+        <View style={{ flex: 1 }} />
+        <UnitPills
+          value={system}
+          onChange={toggleSystem}
+          options={[
+            { value: 'US', label: 'US' },
+            { value: 'EU', label: 'EU' },
+            { value: 'UK', label: 'UK' },
+          ]}
+        />
+      </View>
+      <UnitPills
+        value={gender}
+        onChange={toggleGender}
+        options={[
+          { value: 'M', label: t('family.shoeMen') },
+          { value: 'W', label: t('family.shoeWomen') },
+        ]}
+      />
+    </View>
+  )
+}
+
 export function EditProfile({
   profile,
   mine,
@@ -76,8 +370,10 @@ export function EditProfile({
   onClose: () => void
   onSaved: () => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { c } = useTheme()
+  // Default unit for empty fields: imperial for English, metric otherwise.
+  const metric = lang !== 'en'
 
   const [form, setForm] = useState<Form>(() => emptyForm(mine))
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialPhoto)
@@ -327,22 +623,52 @@ export function EditProfile({
               </View>
             </View>
 
-            {/* remaining text fields */}
-            {EDIT_FIELDS.map(([key, labelKey]) => (
-              <Field
-                key={key}
-                label={t(labelKey)}
-                value={form[key as keyof Form]}
-                onChangeText={(v) => set(key as keyof Form, v)}
-                onBlur={
-                  key === 'phone'
-                    ? () => set('phone', formatPhone(form.phone))
-                    : undefined
-                }
-                keyboardType={key === 'phone' ? 'phone-pad' : 'default'}
-                multiline={key === 'notes' || key === 'allergies'}
-              />
-            ))}
+            {/* remaining fields — height/weight/shoe get a unit picker */}
+            {EDIT_FIELDS.map(([key, labelKey]) => {
+              if (key === 'height')
+                return (
+                  <HeightField
+                    key={key}
+                    label={t(labelKey)}
+                    initial={form.height}
+                    metric={metric}
+                    onChange={(v) => set('height', v)}
+                  />
+                )
+              if (key === 'weight')
+                return (
+                  <WeightField
+                    key={key}
+                    label={t(labelKey)}
+                    initial={form.weight}
+                    metric={metric}
+                    onChange={(v) => set('weight', v)}
+                  />
+                )
+              if (key === 'shoe_size')
+                return (
+                  <ShoeField
+                    key={key}
+                    label={t(labelKey)}
+                    initial={form.shoe_size}
+                    metric={metric}
+                    onChange={(v) => set('shoe_size', v)}
+                  />
+                )
+              return (
+                <Field
+                  key={key}
+                  label={t(labelKey)}
+                  value={form[key as keyof Form]}
+                  onChangeText={(v) => set(key as keyof Form, v)}
+                  onBlur={
+                    key === 'phone' ? () => set('phone', formatPhone(form.phone)) : undefined
+                  }
+                  keyboardType={key === 'phone' ? 'phone-pad' : 'default'}
+                  multiline={key === 'notes' || key === 'allergies'}
+                />
+              )
+            })}
           </ScrollView>
 
           {/* save */}
