@@ -41,8 +41,9 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   - **A widget CAN do its own networking** — no Supabase session needed. Two
     live examples: Nudges POSTs to `/api/widget-nudge`, and Today pulls weather
     straight from Open-Meteo (public, keyless) plus its agenda from
-    `/api/widget-today`, both authenticated with the per-device **widget token**
-    (`widget_tokens`, migration 045). Prefer this over App-Group-only data for
+    `/api/widget?action=today` — both authenticated with the per-device **widget
+    token** (`widget_tokens`, migration 045) and both served by the same
+    `api/widget.ts`. Prefer this over App-Group-only data for
     anything that GOES STALE: a mirrored snapshot only updates when someone opens
     the app, so a widget fed only by the App Group shows yesterday's data on a
     phone that wasn't opened. **Never bake a formatted date into a payload** —
@@ -67,9 +68,11 @@ Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`
 (silent push to a nudge's sender when acked — see the widget note above). The
 Nudges *widget* itself talks to `/api/widget-nudge` directly from Swift, using
 a per-device widget token instead of a Supabase session (migration 045); the
-Today widget uses the same token against `/api/widget-today` to pull today's
-agenda on its own timeline. Push fan-out and Google Calendar sync still need
-server work (see the TODO doc).
+Today widget uses the same token against `/api/widget?action=today` to pull
+today's agenda on its own timeline. Both are served by one `api/widget.ts` —
+`/api/widget-nudge` is a `vercel.json` rewrite onto it, kept forever because the
+shipped App Store build posts to that exact URL. Push fan-out and Google
+Calendar sync still need server work (see the TODO doc).
 
 **`api/` is NOT covered by any build gate** — `tsconfig.app.json` only includes
 `src`, and Vercel compiles the functions at deploy. Type-check a new/changed
@@ -79,6 +82,9 @@ npx tsc --noEmit --ignoreConfig --esModuleInterop --skipLibCheck \
   --module esnext --moduleResolution bundler --target es2022 --strict \
   --types node api/<file>.ts
 ```
+**And `api/` is capped at 12 files on Vercel Hobby — it is currently AT 12.** A
+new endpoint must fold into an existing function behind `?action=`; see the root
+`CLAUDE.md` "Build, deploy, git".
 
 ## Verifying changes (no simulator in this harness)
 There is no browser/simulator in the agent harness. The gate is:

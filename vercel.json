@@ -1,4 +1,19 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "_comment": [
+    "The /api/apple-* and /api/widget-nudge rewrites are LOAD-BEARING, not tidiness.",
+    "Those functions were merged into api/apple.ts + api/widget.ts to stay under",
+    "Vercel Hobby's 12-Serverless-Function cap, but the SHIPPED App Store build",
+    "calls the original paths and can never be changed. Removing a rewrite breaks",
+    "Apple sign-in / account deletion / the Nudges widget on every phone already",
+    "out there. The catch-all must stay LAST — rewrites match in order.",
+    "Vercel serves real files (api/*) before rewrites, so these only fire for the",
+    "now-fileless legacy paths."
+  ],
+  "rewrites": [
+    { "source": "/api/apple-connect", "destination": "/api/apple?action=connect" },
+    { "source": "/api/apple-revoke", "destination": "/api/apple?action=revoke" },
+    { "source": "/api/widget-nudge", "destination": "/api/widget?action=nudge" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "crons": [{ "path": "/api/send-digest", "schedule": "0 11 * * *" }]
 }

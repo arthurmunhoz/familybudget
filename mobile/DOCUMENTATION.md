@@ -57,7 +57,9 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
 - **Auth** (`src/lib/auth.tsx`): Sign in with Apple (`signInWithIdToken`), Google
   OAuth (in-app `WebBrowser`), and a DEV-only email/password login. In-app account
   deletion (`delete_my_account` RPC) also revokes the Apple token
-  (`api/apple-connect` / `api/apple-revoke`).
+  (`api/apple.ts`, `?action=connect` / `?action=revoke`; the old
+  `/api/apple-connect` + `/api/apple-revoke` URLs still resolve via `vercel.json`
+  rewrites, since shipped builds call them).
 - **One Roof Plus** (`src/lib/plus.tsx`, `src/app/paywall.tsx`): entitlement is
   **per household** — RevenueCat's `app_user_id` is the `household_id`, so any
   member's purchase covers the family. `usePlus().isPlus` OR's the RevenueCat
@@ -86,8 +88,8 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
   `useSyncNudgeWidget` (mounted in `_layout.tsx`) pushes the send token,
   household members, real editable presets, and the app's own Light/Dark
   choice on every login — not gated on visiting the Nudges screen. Tapping a
-  preset sends via `api/widget-nudge.ts` (a per-device token, not a Supabase
-  session) and flashes a "sent!" confirmation using WidgetKit's own timeline
+  preset sends via `api/widget.ts` (a per-device token, not a Supabase session;
+  posted to the legacy `/api/widget-nudge` URL, which is rewritten onto it) and flashes a "sent!" confirmation using WidgetKit's own timeline
   mechanism (two dated entries; iOS itself flips between them, no process
   needed at the transition). Acking a nudge (`api/ack-ping.ts`) sends a
   **silent** push back to the sender so their widget can show "seen by" —
@@ -180,8 +182,8 @@ and the Plus purchase/restore flow.
 Verified in Simulator only so far (real APNs delivery/latency can't be tested
 there — `xcrun simctl push` fakes the payload arriving but not real-world
 timing or reliability). Before this reaches a real device:
-1. **Deploy the server side** — `api/widget-nudge.ts` (updated) and
-   `api/ack-ping.ts` (new) aren't live yet: `npx vercel deploy --prod`.
+1. **Deploy the server side** — `api/widget.ts` (nudge + today) and
+   `api/ack-ping.ts` aren't live yet: `npx vercel deploy --prod`.
 2. **New EAS build required** — the widget's theme/preset/confirmation logic,
    the new `UIBackgroundModes: remote-notification` entitlement, and the
    `expo-task-manager` dependency are all native changes; no build on the App

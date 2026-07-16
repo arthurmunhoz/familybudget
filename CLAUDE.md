@@ -53,9 +53,10 @@ api/scan-bill.ts           Itemized bill photo → line items + tax/tip (Claude 
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
 api/send-ping.ts         Push a household ping to everyone but the sender
 api/suggest-ping.ts      Free text → {kind,emoji,message} ping (Claude)
-api/widget-nudge.ts      Send a nudge from the iOS Home-Screen widget (per-device token, not a session)
-api/widget-today.ts      Today's agenda for the iOS Today widget (per-device token) — lets it
-                         self-refresh with the app closed; reuses src/lib/calendar+petCare
+api/widget.ts            iOS Home-Screen widget backend, per-device token (not a session).
+                         ?action=nudge (send a nudge) | ?action=today (agenda, so the
+                         Today widget self-refreshes with the app closed)
+api/apple.ts             Sign in with Apple: ?action=connect | ?action=revoke
 api/ack-ping.ts          Silent push to a ping's sender when acked, for the iOS widget's "seen by"
 api/google-calendar-connect.ts  Store a user's Google OAuth tokens (service role)
 api/google-calendar-sync.ts     Pull Google Calendar events → calendar_events
@@ -422,6 +423,22 @@ here too:
 
 - `npm run build` runs `tsc -b && vite build` — this is the only gate (no
   test suite). Run it before every commit.
+- **`api/` is NOT type-checked by that gate** — `tsconfig.app.json` only
+  includes `src`, and Vercel compiles the functions at deploy. Check a new or
+  changed function by hand first:
+  ```
+  npx tsc --noEmit --ignoreConfig --esModuleInterop --skipLibCheck \
+    --module esnext --moduleResolution bundler --target es2022 --strict \
+    --types node api/<file>.ts
+  ```
+- **Vercel Hobby allows at most 12 Serverless Functions** and `api/` is AT 12 —
+  adding a 13th file fails the deploy outright. To add an endpoint, either fold
+  it into a related function behind an `?action=` switch (see `api/widget.ts`,
+  `api/apple.ts`) or upgrade the plan. When merging, the old public URL MUST be
+  kept alive with a `vercel.json` rewrite if any SHIPPED App Store build calls
+  it (`/api/widget-nudge`, `/api/apple-connect`, `/api/apple-revoke` are exactly
+  this) — those rewrites are load-bearing, not clutter. Rewrites match in order,
+  so the `/(.*)` → index.html catch-all stays last.
 - Deploys are MANUAL: `npx vercel deploy --prod --yes`. Pushing to GitHub
   does NOT deploy. Production domain: one-roof-app.vercel.app.
 - Commit messages: plain, descriptive, no Co-Authored-By/AI trailers.
