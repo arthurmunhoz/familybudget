@@ -600,6 +600,15 @@ export const en = {
   'onboarding.errAlready': "You're already in a household.",
   'onboarding.errTooMany': 'Too many attempts. Please try again in a few minutes.',
   'onboarding.errGeneric': 'Something went wrong. Please try again.',
+  'onboarding.nameTitle': 'What should we call you?',
+  'onboarding.nameDesc': 'This is how your family will see you in the app.',
+  'onboarding.yourNamePlaceholder': 'e.g. Arthur, CJ, Anne Marie',
+  'onboarding.continue': 'Continue',
+  'onboarding.appearAs': "You'll appear as {name}.",
+  'onboarding.changeName': 'Change',
+  'onboarding.errYourNameRequired': 'Please enter your name.',
+  'family.myName': 'Your name',
+  'family.myNameHint': 'How your family sees you in the app.',
 
   // Admin household
   'admin.household': 'Household',

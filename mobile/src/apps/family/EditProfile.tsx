@@ -376,6 +376,9 @@ export function EditProfile({
   const metric = lang !== 'en'
 
   const [form, setForm] = useState<Form>(() => emptyForm(mine))
+  // display_name lives on allowed_users, not member_profiles — members can't
+  // write that table, so it's saved through the set_display_name RPC (057).
+  const [displayName, setDisplayName] = useState(profile.display_name)
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialPhoto)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -446,6 +449,23 @@ export function EditProfile({
     const clean = (v: string) => (v.trim() ? v.trim() : null)
     const oldAvatar = mine?.avatar_path ?? null
     const newAvatar = clean(form.avatar_path)
+
+    // Name first: if it fails, bail before touching anything else rather than
+    // half-saving.
+    const dn = displayName.trim()
+    if (!dn) {
+      setSaving(false)
+      Alert.alert(t('onboarding.errYourNameRequired'))
+      return
+    }
+    if (dn !== profile.display_name) {
+      const { error: nameErr } = await supabase.rpc('set_display_name', { p_name: dn })
+      if (nameErr) {
+        setSaving(false)
+        Alert.alert(t('family.saveFailed'))
+        return
+      }
+    }
 
     const { error } = await supabase.from('member_profiles').upsert(
       {
@@ -557,6 +577,19 @@ export function EditProfile({
             contentContainerStyle={{ gap: sp.md, paddingBottom: sp.sm }}
             keyboardShouldPersistTaps="handled"
           >
+            {/* your name (allowed_users.display_name — how the family sees you) */}
+            <View style={{ gap: 6 }}>
+              <Field
+                label={t('family.myName')}
+                value={displayName}
+                onChangeText={setDisplayName}
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={40}
+              />
+              <Txt variant="faint">{t('family.myNameHint')}</Txt>
+            </View>
+
             {/* birthday */}
             <View style={{ gap: 6 }}>
               <Txt variant="label">{t('family.birthday')}</Txt>

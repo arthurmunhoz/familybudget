@@ -599,6 +599,15 @@ export const pt: Record<keyof typeof en, string> = {
   'onboarding.errAlready': 'Você já pertence a uma casa.',
   'onboarding.errTooMany': 'Muitas tentativas. Tente novamente em alguns minutos.',
   'onboarding.errGeneric': 'Algo deu errado. Tente novamente.',
+  'onboarding.nameTitle': 'Como podemos te chamar?',
+  'onboarding.nameDesc': 'É assim que sua família vai te ver no app.',
+  'onboarding.yourNamePlaceholder': 'ex. Arthur, CJ, Anne Marie',
+  'onboarding.continue': 'Continuar',
+  'onboarding.appearAs': 'Você vai aparecer como {name}.',
+  'onboarding.changeName': 'Alterar',
+  'onboarding.errYourNameRequired': 'Digite seu nome.',
+  'family.myName': 'Seu nome',
+  'family.myNameHint': 'Como sua família te vê no app.',
 
   // Admin household
   'admin.household': 'Casa',

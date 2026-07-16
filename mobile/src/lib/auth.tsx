@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react'
 import { Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
@@ -19,6 +20,21 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { clearCache } from '@/hooks/useCachedQuery'
 import type { Profile } from './types'
+
+/** Where signInWithApple parks the name Apple gives us exactly once, for
+ *  Onboarding to prefill. See the comment in signInWithApple. */
+const PENDING_NAME_KEY = 'pending-display-name'
+
+/** Read-and-clear the name captured during Apple sign-in ('' if none). */
+export async function takePendingDisplayName(): Promise<string> {
+  try {
+    const v = await AsyncStorage.getItem(PENDING_NAME_KEY)
+    if (v) await AsyncStorage.removeItem(PENDING_NAME_KEY)
+    return v ?? ''
+  } catch {
+    return ''
+  }
+}
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -71,7 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const email = session?.user.email ?? null
 
   // Manual re-fetch — called after create/join onboarding so the app re-renders
-  // from the Onboarding gate into the Hub without a full reload.
+  // from the Onboarding gate into the Hub without a full reload, and after a
+  // rename (set_display_name). It refreshes the MEMBERS list too: that list is
+  // otherwise only loaded when household_id changes, so renaming yourself would
+  // leave every screen reading `profiles` (Family, Nudges) showing the old name.
   const refreshProfile = useCallback(async () => {
     if (!email) {
       setProfile(null)
@@ -83,8 +102,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('email, display_name, household_id, is_admin, role')
       .eq('email', email)
       .maybeSingle()
-    setProfile((data as Profile) ?? null)
+    const next = (data as Profile) ?? null
+    setProfile(next)
     setProfileLoaded(true)
+    if (next?.household_id) {
+      const { data: members } = await supabase
+        .from('allowed_users')
+        .select('email, display_name, household_id, is_admin, role')
+        .eq('household_id', next.household_id)
+      setProfiles((members as Profile[]) ?? [])
+    }
   }, [email])
 
   useEffect(() => {
@@ -139,6 +166,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ],
     })
     if (!credential.identityToken) throw new Error('Apple sign-in returned no identity token')
+
+    // Apple hands over the user's name ONLY on the very first authorization for
+    // this app — never again, and never inside the identity token. So grab it
+    // here or lose it: the JWT has no `name` claim, which is why
+    // jwt_display_name() (migration 051) falls back to the email local-part and
+    // "Hide My Email" users end up named e.g. "z5khzgh5ff". Stash it for
+    // Onboarding to prefill; see PENDING_NAME_KEY.
+    const parts = [credential.fullName?.givenName, credential.fullName?.familyName]
+    const appleName = parts.filter(Boolean).join(' ').trim()
+    if (appleName) {
+      try {
+        await AsyncStorage.setItem(PENDING_NAME_KEY, appleName)
+      } catch {
+        /* best effort — onboarding just starts blank */
+      }
+    }
+
     const { error } = await supabase.auth.signInWithIdToken({
       provider: 'apple',
       token: credential.identityToken,

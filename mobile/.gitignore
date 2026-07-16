@@ -47,3 +47,6 @@ example
 targets/**/Assets.xcassets/
 targets/**/Info.plist
 targets/**/generated.entitlements
+
+# Supabase CLI scratch (created when the MCP links the project)
+supabase/.temp/

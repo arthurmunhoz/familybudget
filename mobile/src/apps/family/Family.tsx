@@ -36,7 +36,7 @@ const SLOT = 72 // horizontal slot width per avatar in the carousel
 const CAROUSEL_H = 150
 
 export default function Family() {
-  const { profile, profiles } = useAuth()
+  const { profile, profiles, refreshProfile } = useAuth()
   const { t } = useI18n()
   const { c } = useTheme()
   const { width } = useWindowDimensions()
@@ -311,6 +311,9 @@ export default function Family() {
           onSaved={() => {
             setEditing(false)
             load()
+            // The name lives on allowed_users (useAuth's profiles), not in the
+            // member_profiles cache `load()` revalidates.
+            void refreshProfile()
           }}
         />
       ) : null}

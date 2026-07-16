@@ -221,3 +221,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-054-delete-custom-category.sql (delete_custom_category: remove a custom category + reassign its entries/rules to 'other')
 --   migration-055-custom-categories-update-policy.sql (household-scoped UPDATE policy on custom_categories — edits were silently RLS-blocked)
 --   migration-056-category-overrides.sql (per-household name/icon overrides for the built-in preset categories)
+--   migration-057-set-display-name.sql (set_display_name: a member can rename themselves — Apple sign-in leaves no name in the JWT, so they were stuck with the email local-part)
