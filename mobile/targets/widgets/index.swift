@@ -207,7 +207,13 @@ struct BudgetWidgetView: View {
         }
         Spacer(minLength: 0)
         if family == .systemSmall {
-          // Narrow tile: balance on top, received/spent in a row beneath it.
+          // Narrow tile: received/spent up top, balance pinned to the bottom —
+          // it's the biggest number, so it reads last and sits nearest the edge.
+          HStack(spacing: 12) {
+            BudgetStat(label: "received", value: money(b.income, b.currency), symbol: "arrow.down", color: .green, align: .leading)
+            BudgetStat(label: "spent", value: money(b.spent, b.currency), symbol: "arrow.up", color: .red, align: .leading)
+            Spacer(minLength: 0)
+          }
           VStack(alignment: .leading, spacing: 1) {
             Text("balance").font(.caption2).foregroundStyle(.secondary)
             Text(money(b.balance, b.currency))
@@ -216,12 +222,6 @@ struct BudgetWidgetView: View {
               .minimumScaleFactor(0.6)
               .lineLimit(1)
           }
-          HStack(spacing: 12) {
-            BudgetStat(label: "received", value: money(b.income, b.currency), symbol: "arrow.down", color: .green, align: .leading)
-            BudgetStat(label: "spent", value: money(b.spent, b.currency), symbol: "arrow.up", color: .red, align: .leading)
-            Spacer(minLength: 0)
-          }
-          .padding(.top, 2)
         } else {
           // Wide tile: balance on the left; received/spent stacked on the right.
           HStack(alignment: .bottom, spacing: 8) {
@@ -247,7 +247,10 @@ struct BudgetWidgetView: View {
           }
         }
       }
-      .padding(6)
+      .padding(.vertical, 6)
+      // Small trims its side padding (into the widget's own margin) so the
+      // balance figure gets more room; the wider sizes keep the 6pt inset.
+      .padding(.horizontal, family == .systemSmall ? -6 : 6)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     } else {
       VStack(spacing: 4) {
