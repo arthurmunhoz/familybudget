@@ -187,6 +187,51 @@ const DICTS: Record<string, Record<string, string>> = {
   pt: { turns: 'faz {n}', years: '{n} anos', overdue: 'Atrasado', dueToday: 'Para hoje' },
 }
 const MAX_ITEMS = 6
+const MAX_ENTRIES = 8
+
+// ── Self-contained budget logic (same import constraint as above) ────────────
+// COPIED from src/lib/format.ts (periodEndISO) + src/lib/categories.ts.
+// KEEP IN SYNC with those.
+type Period = 'daily' | 'weekly' | 'monthly'
+
+const CATEGORY_ICON: Record<string, string> = {
+  groceries: '🛒',
+  dining: '🍽️',
+  transport: '🚗',
+  home: '🏠',
+  utilities: '💡',
+  health: '💊',
+  entertainment: '🎬',
+  shopping: '🛍️',
+  travel: '✈️',
+  subscriptions: '📺',
+  gifts: '🎁',
+  pets: '🐾',
+  salary: '💼',
+  other: '📦',
+}
+const FALLBACK_CATEGORY = 'other'
+
+function periodEndISO(period: Period, startISO: string): string {
+  if (period === 'daily') return startISO
+  if (period === 'weekly') return addDays(startISO, 6)
+  const d = parseISO(startISO)
+  return toISO(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+}
+
+/** Mirrors categoryById(): built-in (+ the household's override) → custom →
+ *  'other' (so an entry still renders if its custom category was deleted).
+ *  An override row with a null icon means "keep the default". */
+function categoryIcon(
+  id: string,
+  custom: Map<string, string>,
+  overrides: Map<string, string | null>,
+): string {
+  if (CATEGORY_ICON[id]) return overrides.get(id) ?? CATEGORY_ICON[id]
+  const c = custom.get(id)
+  if (c) return c
+  return overrides.get(FALLBACK_CATEGORY) ?? CATEGORY_ICON[FALLBACK_CATEGORY]
+}
 
 async function sendExpoPush(
   messages: {
@@ -253,6 +298,102 @@ export default async function handler(req: any, res: any) {
   const household: string = wt.household_id
 
   void db.from('widget_tokens').update({ last_used_at: new Date().toISOString() }).eq('token', token)
+
+  // ── budget ────────────────────────────────────────────────────────────────
+  // Fresh current-period stats + latest entries for ONE budget, so the Budget
+  // widget doesn't sit on whatever the app last wrote to the App Group (another
+  // member adding an entry would otherwise never show up until you open Money).
+  // Mirrors the maths in src/apps/budget/Budgets.tsx exactly: entries dated in
+  // the FUTURE are upcoming and excluded from income/spent — and from "latest",
+  // so the list never disagrees with the balance above it.
+  if (action === 'budget') {
+    const { budgetId, day } = req.body ?? {}
+    if (!day || typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      return res.status(400).json({ error: 'Missing day' })
+    }
+
+    const [bRes, ccRes, coRes] = await Promise.all([
+      db.from('budgets').select('id, name, period').eq('household_id', household).order('created_at'),
+      db.from('custom_categories').select('id, icon').eq('household_id', household),
+      db.from('category_overrides').select('base_id, icon').eq('household_id', household),
+    ])
+    const budgets = (bRes.data ?? []) as { id: string; name: string; period: Period }[]
+    if (!budgets.length) return res.status(200).json({ budget: null })
+    const b = budgets.find((x) => x.id === budgetId) ?? budgets[0]
+
+    // months/entries are scoped through their parent budget (no household_id).
+    const mRes = await db
+      .from('months')
+      .select('id, start_date')
+      .eq('budget_id', b.id)
+      .order('start_date', { ascending: false })
+    const months = (mRes.data ?? []) as { id: string; start_date: string }[]
+
+    // The current period, else the newest — same rule as the Budgets screen.
+    let monthId: string | null = null
+    for (const m of months) {
+      if (m.start_date <= day && day <= periodEndISO(b.period, m.start_date)) {
+        monthId = m.id
+        break
+      }
+    }
+    monthId = monthId ?? months[0]?.id ?? null
+
+    const base = { id: b.id, monthId, name: b.name, period: b.period, currency: '$' }
+    if (!monthId) {
+      return res
+        .status(200)
+        .json({ budget: { ...base, balance: 0, income: 0, spent: 0, entries: [] } })
+    }
+
+    const eRes = await db
+      .from('entries')
+      .select('type, amount, entry_date, label, category, created_at')
+      .eq('month_id', monthId)
+    const rows = (eRes.data ?? []) as {
+      type: string
+      amount: number
+      entry_date: string
+      label: string
+      category: string
+      created_at: string
+    }[]
+
+    let income = 0
+    let spent = 0
+    for (const e of rows) {
+      if (e.entry_date > day) continue // upcoming — not yet counted
+      if (e.type === 'income') income += Number(e.amount)
+      else spent += Number(e.amount)
+    }
+
+    const custom = new Map((ccRes.data ?? []).map((c: any) => [c.id as string, c.icon as string]))
+    const overrides = new Map(
+      (coRes.data ?? []).map((o: any) => [o.base_id as string, (o.icon ?? null) as string | null]),
+    )
+    const entries = rows
+      .filter((e) => e.entry_date <= day)
+      .sort((x, y) =>
+        x.entry_date !== y.entry_date
+          ? x.entry_date < y.entry_date
+            ? 1
+            : -1
+          : String(x.created_at) < String(y.created_at)
+            ? 1
+            : -1,
+      )
+      .slice(0, MAX_ENTRIES)
+      .map((e) => ({
+        emoji: categoryIcon(e.category, custom, overrides),
+        label: e.label,
+        amount: Number(e.amount),
+        type: e.type,
+      }))
+
+    return res
+      .status(200)
+      .json({ budget: { ...base, balance: income - spent, income, spent, entries } })
+  }
 
   // ── today ─────────────────────────────────────────────────────────────────
   // The CLIENT sends its own local `day` rather than us guessing a timezone.

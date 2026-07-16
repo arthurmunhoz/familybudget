@@ -5,7 +5,15 @@ import AppIntents
 // ── Shared ───────────────────────────────────────────────────────────────────
 let APP_GROUP = "group.com.oneroof.app"
 
+/// The one action-dispatched widget endpoint (api/widget.ts): ?action=nudge |
+/// today | budget. Authenticated with the per-device widget token, since the
+/// extension has no Supabase session. NOTE: NudgesWidget deliberately still
+/// posts to the legacy /api/widget-nudge URL (rewritten onto the same function)
+/// because that path is baked into shipped App Store builds.
+let WIDGET_ENDPOINT = "https://one-roof-app.vercel.app/api/widget"
+
 func groupDefaults() -> UserDefaults? { UserDefaults(suiteName: APP_GROUP) }
+// widgetToken() lives in NudgesWidget.swift (same target).
 
 // "Warm Hearth" tokens, ported 1:1 from mobile/src/theme/theme.ts. The app's
 // theme is a MANUAL, persisted choice (Settings → Appearance), independent of
@@ -62,8 +70,18 @@ func addEntryURL(budgetId: String, monthId: String, scan: Bool) -> URL? {
   URL(string: "oneroof:///budget/\(budgetId)/\(monthId)?\(scan ? "scan" : "add")=1")
 }
 
+/// One line of the large tile's "Latest entries" list.
+struct BudgetEntryRow: Codable {
+  let emoji: String
+  let label: String
+  let amount: Double
+  let type: String   // "income" | "expense"
+}
+
 // The app writes this JSON array into the App Group under "budgets"
-// (see mobile/src/lib/widget.ts).
+// (see mobile/src/lib/widget.ts). The live fetch (?action=budget) returns the
+// SAME shape, so both decode into this — the App Group copy just has no
+// `entries`, hence the optional.
 struct BudgetInfo: Codable, Identifiable {
   let id: String
   let monthId: String?   // current period → deep-link target for add/scan
@@ -73,6 +91,31 @@ struct BudgetInfo: Codable, Identifiable {
   let income: Double
   let spent: Double
   let currency: String
+  let entries: [BudgetEntryRow]?
+}
+
+private struct BudgetResponse: Codable {
+  let budget: BudgetInfo?
+}
+
+/// Fresh stats + latest entries for one budget, straight from the server on the
+/// widget's own timeline — so an entry added by ANOTHER member shows up without
+/// anyone opening the app. Falls back to the App Group snapshot on any failure.
+func fetchBudget(id: String?, day: String) async -> BudgetInfo? {
+  let token = widgetToken()
+  guard !token.isEmpty, let url = URL(string: WIDGET_ENDPOINT) else { return nil }
+  var req = URLRequest(url: url)
+  req.httpMethod = "POST"
+  req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+  var body: [String: Any] = ["action": "budget", "token": token, "day": day]
+  if let id { body["budgetId"] = id }
+  req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+  guard
+    let (data, resp) = try? await URLSession.shared.data(for: req),
+    (resp as? HTTPURLResponse)?.statusCode == 200,
+    let r = try? JSONDecoder().decode(BudgetResponse.self, from: data)
+  else { return nil }
+  return r.budget
 }
 
 func loadBudgets() -> [BudgetInfo] {
@@ -86,7 +129,15 @@ func loadBudgets() -> [BudgetInfo] {
 
 private let sampleBudget = BudgetInfo(
   id: "", monthId: "sample", name: "Our Home Budget", period: "monthly",
-  balance: 1240, income: 3200, spent: 1960, currency: "$")
+  balance: 1240, income: 3200, spent: 1960, currency: "$",
+  entries: [
+    BudgetEntryRow(emoji: "🛒", label: "Groceries — Publix", amount: 84, type: "expense"),
+    BudgetEntryRow(emoji: "⛽", label: "Gas", amount: 45, type: "expense"),
+    BudgetEntryRow(emoji: "💰", label: "Paycheck", amount: 2400, type: "income"),
+    BudgetEntryRow(emoji: "🍽️", label: "Dinner out", amount: 62, type: "expense"),
+    BudgetEntryRow(emoji: "💊", label: "Pharmacy", amount: 18, type: "expense"),
+    BudgetEntryRow(emoji: "📺", label: "Netflix", amount: 16, type: "expense"),
+  ])
 
 // Two small deep-link action buttons (Scan / Add) — shared by the Budget widget
 // (medium/large) and the Quick Add widget.
@@ -182,9 +233,12 @@ struct BudgetProvider: AppIntentTimelineProvider {
   }
 
   func timeline(for configuration: SelectBudgetIntent, in context: Context) async -> Timeline<BudgetEntry> {
-    let entry = BudgetEntry(date: Date(), budget: resolve(configuration))
-    let next = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date().addingTimeInterval(3600)
-    return Timeline(entries: [entry], policy: .after(next))
+    // App Group first (names/ids for the picker + an offline fallback), then
+    // refresh it from the server so the balance and entries are actually live.
+    let picked = resolve(configuration)
+    let live = await fetchBudget(id: picked?.id, day: isoDay(Date()))
+    let entry = BudgetEntry(date: Date(), budget: live ?? picked)
+    return Timeline(entries: [entry], policy: .after(nextHourBoundary()))
   }
 
   private func resolve(_ configuration: SelectBudgetIntent) -> BudgetInfo? {
@@ -239,6 +293,31 @@ struct BudgetWidgetView: View {
               BudgetStat(label: "spent", value: money(b.spent, b.currency), symbol: "arrow.up", color: .red)
             }
           }
+          // Large has the room for the period's latest entries; Medium doesn't
+          // (it's ~155pt tall and already carries the stats + both actions).
+          if family == .systemLarge, let entries = b.entries, !entries.isEmpty {
+            Divider().padding(.top, 6)
+            Text("Latest entries")
+              .font(.system(size: 9, weight: .bold))
+              .kerning(0.7)
+              .foregroundStyle(.secondary)
+              .padding(.top, 4)
+            VStack(spacing: 3) {
+              ForEach(Array(entries.prefix(6).enumerated()), id: \.offset) { _, e in
+                HStack(spacing: 7) {
+                  Text(e.emoji).font(.system(size: 13))
+                  Text(e.label).font(.system(size: 13)).lineLimit(1)
+                  Spacer(minLength: 4)
+                  Text((e.type == "income" ? "+" : "−") + money(e.amount, b.currency))
+                    .font(.system(size: 13, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(e.type == "income" ? Color.green : Color.red)
+                }
+              }
+            }
+            .padding(.top, 2)
+          }
+
           // On the tall Large size, push the buttons to the bottom.
           if family == .systemLarge { Spacer(minLength: 0) }
           if let mid = b.monthId {

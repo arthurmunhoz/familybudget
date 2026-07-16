@@ -15,10 +15,8 @@ import SwiftUI
 // fallback, and is used ONLY if it describes the current day.
 // APP_GROUP / groupDefaults() are declared in index.swift (same target).
 
-// Shared widget endpoint (action-dispatched) — see api/widget.ts. NudgesWidget
-// still posts to the legacy /api/widget-nudge path, which is rewritten to the
-// same function, because that URL is baked into the shipped App Store build.
-let TODAY_ENDPOINT = "https://one-roof-app.vercel.app/api/widget"
+// The endpoint is WIDGET_ENDPOINT (index.swift) — one action-dispatched
+// function for every widget; see api/widget.ts.
 
 struct TodayItem: Codable {
   let emoji: String
@@ -203,7 +201,7 @@ private struct AgendaResponse: Codable {
 }
 
 private func fetchAgenda(token: String, day: String, locale: String) async -> [TodayItem]? {
-  guard let url = URL(string: TODAY_ENDPOINT) else { return nil }
+  guard let url = URL(string: WIDGET_ENDPOINT) else { return nil }
   var req = URLRequest(url: url)
   req.httpMethod = "POST"
   req.setValue("application/json", forHTTPHeaderField: "Content-Type")
