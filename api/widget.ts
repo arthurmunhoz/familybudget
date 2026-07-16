@@ -19,20 +19,173 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-import {
-  KIND_EMOJI,
-  compareOccurrences,
-  formatTime,
-  occurrencesByDay,
-  yearsAt,
-} from '../src/lib/calendar'
-import { overdueEvents } from '../src/lib/petCare'
-import type { CalendarEvent, PetEvent } from '../src/lib/types'
-import { en } from '../src/lib/i18n/en'
-import { es } from '../src/lib/i18n/es'
-import { pt } from '../src/lib/i18n/pt'
+// ── Self-contained calendar / pet-care logic ─────────────────────────────────
+// COPIED from src/lib/calendar.ts + src/lib/petCare.ts rather than imported.
+// package.json sets "type": "module", so Vercel transpiles api/*.ts as ESM and
+// resolves ONLY node_modules — a relative import of ../src/lib/* builds and
+// deploys happily, then dies at runtime with:
+//   ERR_MODULE_NOT_FOUND: Cannot find module '/var/task/src/lib/calendar'
+// (learned the hard way). This is exactly why api/send-digest.ts hand-rolls its
+// own date logic too — every function under api/ must stand alone.
+// KEEP IN SYNC with src/lib/calendar.ts + src/lib/petCare.ts.
+type EventKind = 'event' | 'birthday' | 'anniversary' | 'renewal' | 'other'
+type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+interface CalendarEvent {
+  id: string
+  title: string
+  kind: EventKind
+  all_day: boolean
+  start_date: string
+  end_date: string
+  start_time: string | null
+  recurrence: EventRecurrence
+  recurrence_until: string | null
+}
+interface PetEvent {
+  pet_id: string
+  type: string
+  title: string
+  event_date: string
+  next_due: string | null
+}
+interface Occurrence {
+  event: CalendarEvent
+  start: string
+  end: string
+}
 
-const DICTS: Record<string, Record<string, string>> = { en, es, pt }
+const KIND_EMOJI: Record<EventKind, string> = {
+  event: '',
+  birthday: '🎂',
+  anniversary: '💍',
+  renewal: '📋',
+  other: '📌',
+}
+
+function parseISO(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+function toISO(d: Date): string {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+function addDays(iso: string, n: number): string {
+  const d = parseISO(iso)
+  d.setDate(d.getDate() + n)
+  return toISO(d)
+}
+function daysBetween(a: string, b: string): number {
+  return Math.round((parseISO(b).getTime() - parseISO(a).getTime()) / 86_400_000)
+}
+/** Add n months, clamping the day to the target month's length (Jan 31 → Feb 28). */
+function addMonths(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const base = new Date(y, m - 1 + n, 1)
+  const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate()
+  return toISO(new Date(base.getFullYear(), base.getMonth(), Math.min(d, lastDay)))
+}
+function nextRecurrence(iso: string, freq: EventRecurrence): string {
+  switch (freq) {
+    case 'daily':
+      return addDays(iso, 1)
+    case 'weekly':
+      return addDays(iso, 7)
+    case 'monthly':
+      return addMonths(iso, 1)
+    case 'yearly':
+      return addMonths(iso, 12)
+    default:
+      return iso
+  }
+}
+
+/** Every occurrence intersecting [rangeStart, rangeEnd] (we only ever ask for a
+ *  single day). Recurrence is expanded lazily + bounded, so an old daily event
+ *  doesn't blow up. */
+function occurrencesInRange(
+  events: CalendarEvent[],
+  rangeStart: string,
+  rangeEnd: string,
+): Occurrence[] {
+  const out: Occurrence[] = []
+  for (const ev of events) {
+    const duration = Math.max(0, daysBetween(ev.start_date, ev.end_date))
+    const target = addDays(rangeStart, -duration)
+
+    if (ev.recurrence === 'none') {
+      if (ev.start_date <= rangeEnd && ev.end_date >= rangeStart) {
+        out.push({ event: ev, start: ev.start_date, end: ev.end_date })
+      }
+      continue
+    }
+
+    let cur = ev.start_date
+    if (cur < target) {
+      const gap = daysBetween(ev.start_date, target)
+      if (ev.recurrence === 'daily') cur = addDays(ev.start_date, Math.max(0, gap))
+      else if (ev.recurrence === 'weekly')
+        cur = addDays(ev.start_date, Math.max(0, Math.floor(gap / 7)) * 7)
+    }
+    let guard = 0
+    while (cur < target && guard++ < 2000) cur = nextRecurrence(cur, ev.recurrence)
+
+    guard = 0
+    while (cur <= rangeEnd && guard++ < 2000) {
+      if (ev.recurrence_until && cur > ev.recurrence_until) break
+      const occEnd = addDays(cur, duration)
+      if (occEnd >= rangeStart) out.push({ event: ev, start: cur, end: occEnd })
+      cur = nextRecurrence(cur, ev.recurrence)
+    }
+  }
+  return out
+}
+
+/** Sort occurrences for an agenda: all-day first, then by start time. */
+function compareOccurrences(a: Occurrence, b: Occurrence): number {
+  if (a.event.all_day !== b.event.all_day) return a.event.all_day ? -1 : 1
+  const at = a.event.start_time ?? ''
+  const bt = b.event.start_time ?? ''
+  if (at !== bt) return at < bt ? -1 : 1
+  return a.event.title.localeCompare(b.event.title)
+}
+
+/** Years marked at an occurrence — age for a birthday, years for an anniversary. */
+function yearsAt(ev: CalendarEvent, occurrenceStartISO: string): number {
+  return Number(occurrenceStartISO.slice(0, 4)) - Number(ev.start_date.slice(0, 4))
+}
+
+/** "9:00 AM" from "09:00[:00]", localized. */
+function formatTime(hhmm: string, locale: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+/** Latest event per (pet, type, title) that is due today or already past.
+ *  Input must be sorted newest-first (event_date desc). */
+function overdueEvents(events: PetEvent[], today: string): PetEvent[] {
+  const latest = new Map<string, PetEvent>()
+  for (const e of events) {
+    const key = `${e.pet_id}|${e.type}|${e.title.trim().toLowerCase()}`
+    if (!latest.has(key)) latest.set(key, e)
+  }
+  return [...latest.values()]
+    .filter((e) => e.next_due)
+    .sort((a, b) => a.next_due!.localeCompare(b.next_due!))
+    .filter((e) => e.next_due! <= today)
+}
+
+// The four agenda strings, mirrored from src/lib/i18n (same reason as above —
+// the dicts can't be imported here). Keep in sync with the home.* keys.
+const DICTS: Record<string, Record<string, string>> = {
+  en: { turns: 'turns {n}', years: '{n} years', overdue: 'Overdue', dueToday: 'Due today' },
+  es: { turns: 'cumple {n}', years: '{n} años', overdue: 'Atrasado', dueToday: 'Para hoy' },
+  pt: { turns: 'faz {n}', years: '{n} anos', overdue: 'Atrasado', dueToday: 'Para hoje' },
+}
 const MAX_ITEMS = 6
 
 async function sendExpoPush(
@@ -66,8 +219,8 @@ async function sendExpoPush(
 
 /** Same {n} interpolation the app's t() does, for the four keys we need. */
 function tr(lang: string, key: string, vars?: Record<string, string | number>): string {
-  const dict = DICTS[lang] ?? en
-  let s = (dict as Record<string, string>)[key] ?? key
+  const dict = DICTS[lang] ?? DICTS.en
+  let s = dict[key] ?? DICTS.en[key] ?? key
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v))
   return s
 }
@@ -131,7 +284,7 @@ export default async function handler(req: any, res: any) {
     const petById = Object.fromEntries(pets.map((p) => [p.id, p]))
 
     // Mirrors TodaySection.tsx exactly: calendar occurrences first, then pet-care.
-    const todaysOcc = [...(occurrencesByDay(events, day, day).get(day) ?? [])].sort(
+    const todaysOcc = [...(occurrencesInRange(events, day, day))].sort(
       compareOccurrences,
     )
     const petDue = overdueEvents(petEvents, day)
@@ -142,16 +295,16 @@ export default async function handler(req: any, res: any) {
       const time = e.all_day ? null : e.start_time ? formatTime(e.start_time, loc) : null
       const subtitle =
         e.kind === 'birthday' && years > 0
-          ? tr(lang, 'home.turns', { n: years })
+          ? tr(lang, 'turns', { n: years })
           : e.kind === 'anniversary' && years > 0
-            ? tr(lang, 'home.years', { n: years })
+            ? tr(lang, 'years', { n: years })
             : time
       return { emoji: KIND_EMOJI[e.kind] || '📅', title: e.title, subtitle: subtitle ?? null }
     })
     const petItems = petDue.map((e) => ({
       emoji: petById[e.pet_id]?.emoji || '🐾',
       title: e.title,
-      subtitle: (e.next_due ?? '') < day ? tr(lang, 'home.overdue') : tr(lang, 'home.dueToday'),
+      subtitle: (e.next_due ?? '') < day ? tr(lang, 'overdue') : tr(lang, 'dueToday'),
     }))
 
     return res.status(200).json({ day, items: [...evItems, ...petItems].slice(0, MAX_ITEMS) })
