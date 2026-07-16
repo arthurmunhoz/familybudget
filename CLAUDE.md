@@ -437,8 +437,11 @@ here too:
   `api/apple.ts`) or upgrade the plan. When merging, the old public URL MUST be
   kept alive with a `vercel.json` rewrite if any SHIPPED App Store build calls
   it (`/api/widget-nudge`, `/api/apple-connect`, `/api/apple-revoke` are exactly
-  this) — those rewrites are load-bearing, not clutter. Rewrites match in order,
-  so the `/(.*)` → index.html catch-all stays last.
+  this) — those rewrites are load-bearing, not clutter: deleting one breaks Apple
+  sign-in / account deletion / the Nudges widget on every phone already out
+  there. Rewrites match in order, so the `/(.*)` → index.html catch-all stays
+  last. **`vercel.json` can hold no comments** — Vercel's schema rejects unknown
+  keys (even `_comment`), which is why this warning lives here instead.
 - Deploys are MANUAL: `npx vercel deploy --prod --yes`. Pushing to GitHub
   does NOT deploy. Production domain: one-roof-app.vercel.app.
 - Commit messages: plain, descriptive, no Co-Authored-By/AI trailers.
