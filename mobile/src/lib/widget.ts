@@ -8,6 +8,8 @@ import { ExtensionStorage } from '@bacons/apple-targets'
 const APP_GROUP = 'group.com.oneroof.app'
 // Must match the `kind:` string in NudgesWidget.swift's StaticConfiguration.
 const NUDGES_WIDGET_KIND = 'NudgesWidget'
+// Must match the `kind:` string in TodayWidget.swift's StaticConfiguration.
+const TODAY_WIDGET_KIND = 'TodayWidget'
 
 export interface BudgetWidgetItem {
   id: string
@@ -55,9 +57,14 @@ export interface TodayWidgetItem {
 export interface TodayWidgetData {
   /** Localized "Today" caption. */
   todayLabel: string
-  /** "Wed, Jul 9" (medium/large). */
+  /** The day this snapshot describes (ISO YYYY-MM-DD). The widget refuses to
+   *  show these items on a later day rather than passing yesterday's agenda
+   *  off as today's. */
+  day: string
+  /** "Wed, Jul 9" (medium/large). Fallback only — the widget re-derives the
+   *  date itself at render so it stays correct without the app running. */
   dateLong: string
-  /** "Wed 9" (small). */
+  /** "Wed 9" (small). Fallback only — see dateLong. */
   dateShort: string
   temp: number | null
   /** Unit incl. degree, e.g. "°F". */
@@ -82,6 +89,44 @@ export function syncTodayWidget(data: TodayWidgetData): void {
   try {
     s.set('today', JSON.stringify(data))
     ExtensionStorage.reloadWidget()
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
+export interface TodayWidgetConfig {
+  /** BCP-47 locale the widget formats its own date with (e.g. "en-US"). */
+  locale: string
+  /** Open-Meteo temperature unit to request. */
+  unit: 'fahrenheit' | 'celsius'
+  /** Home city coords — null when no home city is set in Settings. */
+  lat: number | null
+  lon: number | null
+  city: string | null
+  /** Localized alert line per WeatherAlertKind. The widget derives the KIND
+   *  itself from the forecast it fetches, then looks its text up here — that
+   *  keeps the copy translated without the widget knowing about i18n. */
+  alerts: Record<string, string>
+}
+
+/** Everything the Today widget needs to refresh ITSELF while the app is closed:
+ *  where to fetch weather for, which locale to format in, and the translated
+ *  alert strings. It means a widget that hasn't been fed in days still renders a
+ *  correct, live card. See TodayWidget.swift's buildToday().
+ *
+ *  Only writes when something actually CHANGED (home city, language, unit) —
+ *  the Hub re-runs this on every focus, and each reload now costs a real network
+ *  fetch out of the widget's limited refresh budget. */
+let lastTodayCfg = ''
+export function syncTodayConfig(cfg: TodayWidgetConfig): void {
+  const s = store()
+  if (!s) return
+  const json = JSON.stringify(cfg)
+  if (json === lastTodayCfg) return
+  lastTodayCfg = json
+  try {
+    s.set('today_cfg', json)
+    ExtensionStorage.reloadWidget(TODAY_WIDGET_KIND)
   } catch {
     /* native module unavailable — ignore */
   }

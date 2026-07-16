@@ -33,7 +33,7 @@ import { overdueEvents } from '../lib/petCare'
 import { TYPE_ICON } from '../apps/pets/petUi'
 import type { CalendarEvent, PetEvent } from '../lib/types'
 import { useHomeWeather, weatherIcon, type WeatherAlertKind } from '../lib/weather'
-import { syncTodayWidget, type TodayWidgetItem } from '../lib/widget'
+import { syncTodayConfig, syncTodayWidget, type TodayWidgetItem } from '../lib/widget'
 import type { TKey } from '../lib/i18n'
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 
@@ -197,11 +197,28 @@ export default function TodaySection() {
     return [...evItems, ...petItems].slice(0, 6)
   }, [todaysOcc, petDue, petById, locale, t, today])
 
+  // What the widget needs to refresh itself with the app closed (weather coords,
+  // locale, translated alert copy). Separate from the snapshot below because it
+  // stays valid indefinitely — the snapshot goes stale the moment the day turns.
+  useEffect(() => {
+    syncTodayConfig({
+      locale,
+      unit,
+      lat: location?.lat ?? null,
+      lon: location?.lon ?? null,
+      city: cityShort || null,
+      alerts: Object.fromEntries(
+        (Object.keys(WEATHER_ALERT) as WeatherAlertKind[]).map((k) => [k, t(WEATHER_ALERT[k].key)]),
+      ),
+    })
+  }, [locale, unit, location, cityShort, t])
+
   useEffect(() => {
     const [y, m, d] = today.split('-').map(Number)
     const dt = new Date(y, m - 1, d)
     syncTodayWidget({
       todayLabel: t('home.today'),
+      day: today,
       dateLong: dt.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' }),
       dateShort: dt.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' }),
       temp: weather?.temperature ?? null,

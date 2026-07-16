@@ -54,6 +54,8 @@ api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
 api/send-ping.ts         Push a household ping to everyone but the sender
 api/suggest-ping.ts      Free text → {kind,emoji,message} ping (Claude)
 api/widget-nudge.ts      Send a nudge from the iOS Home-Screen widget (per-device token, not a session)
+api/widget-today.ts      Today's agenda for the iOS Today widget (per-device token) — lets it
+                         self-refresh with the app closed; reuses src/lib/calendar+petCare
 api/ack-ping.ts          Silent push to a ping's sender when acked, for the iOS widget's "seen by"
 api/google-calendar-connect.ts  Store a user's Google OAuth tokens (service role)
 api/google-calendar-sync.ts     Pull Google Calendar events → calendar_events

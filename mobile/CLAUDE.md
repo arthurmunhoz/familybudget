@@ -31,13 +31,25 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   categories, petCare, stores, signedUrls, pings) — keep them in sync with the PWA
   or, post-cutover, treat these as the source of truth.
 - **Home-Screen widgets** `@/lib/widget.ts` + `targets/widgets/`: the widget
-  extension can't reach the app's JS/Supabase session, so all data crosses via
+  extension can't reach the app's JS/Supabase session, so app data crosses via
   the shared App Group (`ExtensionStorage`) — mirror new data the same way
   (JSON string via `.set(key, ...)`, scoped `ExtensionStorage.reloadWidget(kind)`,
   matching key names in the Swift loader). `useSyncNudgeWidget` (mounted in
   `_layout.tsx`) is the reference for "sync on login, not on screen visit."
   See `DOCUMENTATION.md` §3 for the full picture (confirmation-timeline
   mechanism, silent ack push).
+  - **A widget CAN do its own networking** — no Supabase session needed. Two
+    live examples: Nudges POSTs to `/api/widget-nudge`, and Today pulls weather
+    straight from Open-Meteo (public, keyless) plus its agenda from
+    `/api/widget-today`, both authenticated with the per-device **widget token**
+    (`widget_tokens`, migration 045). Prefer this over App-Group-only data for
+    anything that GOES STALE: a mirrored snapshot only updates when someone opens
+    the app, so a widget fed only by the App Group shows yesterday's data on a
+    phone that wasn't opened. **Never bake a formatted date into a payload** —
+    derive it in Swift from `Date()`, or it can't self-correct at midnight.
+    `today_cfg` (see `syncTodayConfig`) is the reference for "mirror the config
+    the widget needs to fetch for itself," and TodayWidget's `buildToday()` for
+    "live → last-good cache → app snapshot, and only if it's still the same day."
 - Icons: `lucide-react-native`. Images: `expo-image` + `@/lib/signedUrls`. Dates:
   `@react-native-community/datetimepicker`. Camera/photos: `expo-image-picker` +
   `expo-image-manipulator`. Files: `expo-document-picker` + `expo-file-system`
@@ -54,8 +66,19 @@ Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`
 `/api/scan-receipt` (Budget), `/api/suggest-ping` (Nudges), and `/api/ack-ping`
 (silent push to a nudge's sender when acked — see the widget note above). The
 Nudges *widget* itself talks to `/api/widget-nudge` directly from Swift, using
-a per-device widget token instead of a Supabase session (migration 045). Push
-fan-out and Google Calendar sync still need server work (see the TODO doc).
+a per-device widget token instead of a Supabase session (migration 045); the
+Today widget uses the same token against `/api/widget-today` to pull today's
+agenda on its own timeline. Push fan-out and Google Calendar sync still need
+server work (see the TODO doc).
+
+**`api/` is NOT covered by any build gate** — `tsconfig.app.json` only includes
+`src`, and Vercel compiles the functions at deploy. Type-check a new/changed
+function by hand before committing:
+```
+npx tsc --noEmit --ignoreConfig --esModuleInterop --skipLibCheck \
+  --module esnext --moduleResolution bundler --target es2022 --strict \
+  --types node api/<file>.ts
+```
 
 ## Verifying changes (no simulator in this harness)
 There is no browser/simulator in the agent harness. The gate is:
