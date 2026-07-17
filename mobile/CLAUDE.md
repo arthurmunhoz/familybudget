@@ -31,6 +31,14 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 ## Conventions (reuse these — don't reinvent)
 - **UI primitives** `@/components/ui`: `Screen`, `AppHeader`, `Card`, `Btn`,
   `Field`, `Txt({variant})`, `EmptyState`, `Loader`. Build every screen from these.
+  Also `@/components/Toast` (self-dismissing confirmation, feed it a NEW object
+  each time) and `@/components/DraggableList` (long-press-to-drag sortable —
+  device-verified working). Reorder needs `react-native-draggable-flatlist`? No:
+  it uses `useAnimatedGestureHandler`, REMOVED in reanimated 4 (we're on 4.3.1) —
+  DraggableList is a small custom sortable on the modern `Gesture.Pan` +
+  reanimated-4 APIs instead. Gestures inside a RN `<Modal>` need the modal's
+  content wrapped in `<GestureHandlerRootView>` (the app-root one doesn't reach
+  a modal's separate native hierarchy) — see `NudgeSettings.tsx`.
 - **Theme** `@/theme/theme`: `useTheme()` → `{ dark, c }`; tokens `c` =
   bg/card/cardActive/surface/surface2/text/textMuted/textFaint/accent/accentSoft/
   income/expense/border (Warm Hearth, light+dark, follows system). Also `sp`,
