@@ -103,7 +103,7 @@ export default async function handler(req: any, res: any) {
   }
   const { data: subs } = await query
 
-  webpush.setVapidDetails('mailto:arthurmunhoz@hotmail.com', vapidPublic, vapidPrivate)
+  webpush.setVapidDetails('mailto:one.roof.family.organizer@gmail.com', vapidPublic, vapidPrivate)
   const payload = JSON.stringify({
     title: `${ping.emoji} ${senderName}`,
     body: ping.message,
