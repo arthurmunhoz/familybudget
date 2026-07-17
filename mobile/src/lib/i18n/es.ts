@@ -53,6 +53,8 @@ export const es: Record<keyof typeof en, string> = {
   'pings.settingsTitle': 'Avisos rápidos',
   'pings.settingsDesc': 'Edita los avisos de un toque que ve tu familia.',
   'pings.sentToast': '{label} · enviado a {who}',
+  'pings.moveUp': 'Subir',
+  'pings.moveDown': 'Bajar',
   'pings.donePresets': 'Listo',
   'pings.addPreset': 'Agregar aviso',
   'pings.newPreset': 'Nuevo aviso',

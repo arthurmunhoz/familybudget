@@ -4,13 +4,13 @@
 // have an inline "Edit presets" toggle — removed to keep sending uncluttered).
 // Presets are owned by the screen and passed in, so edits reflect in the
 // composer without a stale-cache round-trip.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { Plus, Trash2, X } from 'lucide-react-native'
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
-import { deletePingPreset, presetText } from '@/lib/pings'
+import { deletePingPreset, presetText, reorderPingPresets } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { PresetEditor } from './PresetEditor'
@@ -28,6 +28,37 @@ export function NudgeSettings({
   const { t } = useI18n()
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<PingPreset | null>(null)
+
+  // Local copy so a reorder is instant (no refetch flash). Reconciled against
+  // the incoming presets while PRESERVING the local order: keep the current
+  // order with fresh row data (picks up edits), append any newly added, drop
+  // removed. So an edit/add/delete elsewhere updates content without snapping
+  // the order back, and a reorder we just applied survives the reload that
+  // follows it.
+  const [items, setItems] = useState<PingPreset[]>(presets)
+  useEffect(() => {
+    setItems((prev) => {
+      const byId = new Map(presets.map((p) => [p.id, p]))
+      const kept = prev.filter((p) => byId.has(p.id)).map((p) => byId.get(p.id)!)
+      const added = presets.filter((p) => !prev.some((x) => x.id === p.id))
+      return [...kept, ...added]
+    })
+  }, [presets])
+
+  async function move(index: number, dir: -1 | 1) {
+    const j = index + dir
+    if (j < 0 || j >= items.length) return
+    const next = [...items]
+    ;[next[index], next[j]] = [next[j], next[index]]
+    setItems(next) // optimistic
+    try {
+      await reorderPingPresets(next.map((p) => p.id))
+      reloadPresets()
+    } catch {
+      Alert.alert(t('pings.presetSaveFailed'))
+      reloadPresets() // resync from the server on failure
+    }
+  }
 
   function openNew() {
     setEditing(null)
@@ -70,7 +101,7 @@ export function NudgeSettings({
           </View>
 
           <ScrollView style={{ flexGrow: 0, marginTop: sp.md }} keyboardShouldPersistTaps="handled">
-            {presets.map((p) => (
+            {items.map((p, i) => (
               <Pressable
                 key={p.id}
                 onPress={() => openEdit(p)}
@@ -80,6 +111,27 @@ export function NudgeSettings({
                 ]}
                 accessibilityRole="button"
               >
+                {/* Reorder controls — dimmed at the ends. */}
+                <View style={{ marginLeft: -6 }}>
+                  <Pressable
+                    onPress={() => move(i, -1)}
+                    disabled={i === 0}
+                    hitSlop={6}
+                    accessibilityLabel={t('pings.moveUp')}
+                    style={{ opacity: i === 0 ? 0.25 : 1 }}
+                  >
+                    <ChevronUp size={18} color={c.textMuted} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => move(i, 1)}
+                    disabled={i === items.length - 1}
+                    hitSlop={6}
+                    accessibilityLabel={t('pings.moveDown')}
+                    style={{ opacity: i === items.length - 1 ? 0.25 : 1 }}
+                  >
+                    <ChevronDown size={18} color={c.textMuted} />
+                  </Pressable>
+                </View>
                 <Txt style={{ fontSize: 22 }}>{p.emoji}</Txt>
                 <Txt style={{ flex: 1, fontWeight: '600', fontSize: 15 }} numberOfLines={1}>
                   {presetText(p, t)}

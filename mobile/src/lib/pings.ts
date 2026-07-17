@@ -77,6 +77,17 @@ export async function deletePingPreset(id: string): Promise<void> {
   if (error) throw error
 }
 
+/** Persist a new preset order: rewrite sort_order to each id's position. Reindexes
+ *  the whole list (0..n-1) so gaps from earlier deletes don't matter. RLS scopes
+ *  the writes to the household. */
+export async function reorderPingPresets(orderedIds: string[]): Promise<void> {
+  const results = await Promise.all(
+    orderedIds.map((id, i) => supabase.from('ping_presets').update({ sort_order: i }).eq('id', id)),
+  )
+  const failed = results.find((r) => r.error)
+  if (failed?.error) throw failed.error
+}
+
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
 async function authToken(): Promise<string> {

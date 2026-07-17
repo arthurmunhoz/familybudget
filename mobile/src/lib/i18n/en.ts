@@ -55,6 +55,8 @@ export const en = {
   'pings.settingsTitle': 'Nudge presets',
   'pings.settingsDesc': 'Edit the one-tap nudges your family sees.',
   'pings.sentToast': '{label} · sent to {who}',
+  'pings.moveUp': 'Move up',
+  'pings.moveDown': 'Move down',
   'pings.donePresets': 'Done',
   'pings.addPreset': 'Add nudge',
   'pings.newPreset': 'New nudge',
