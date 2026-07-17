@@ -584,7 +584,8 @@ export const pt: Record<keyof typeof en, string> = {
   'login.devSignIn': 'Login de desenvolvimento',
 
   // Onboarding (primeiro login, ainda sem casa)
-  'onboarding.subtitle': 'Vamos configurar você. Crie uma casa ou entre em uma para a qual você foi convidado.',
+  'onboarding.title': 'Vamos configurar você',
+  'onboarding.subtitle': 'Crie uma casa ou entre em uma para a qual você foi convidado.',
   'onboarding.createTitle': 'Criar uma casa',
   'onboarding.createDesc': 'Comece do zero e depois convide sua família com um código.',
   'onboarding.namePlaceholder': 'Nome da casa',

@@ -585,7 +585,8 @@ export const en = {
   'login.devSignIn': 'Dev sign in',
 
   // Onboarding (first login, no household yet)
-  'onboarding.subtitle': "Let's get you set up. Create a household or join one you were invited to.",
+  'onboarding.title': "Let's get you set up",
+  'onboarding.subtitle': 'Create a household or join one you were invited to.',
   'onboarding.createTitle': 'Create a household',
   'onboarding.createDesc': 'Start fresh, then invite your family with a code.',
   'onboarding.namePlaceholder': 'Household name',

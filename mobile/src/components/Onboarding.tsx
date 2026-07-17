@@ -13,21 +13,26 @@
 // that's what creates the allowed_users row to update.
 import { useEffect, useState } from 'react'
 import { Alert, View } from 'react-native'
+import { ChevronRight } from 'lucide-react-native'
 
 import { Btn, Card, Field, Screen, Txt } from './ui'
 import { takePendingDisplayName, useAuth } from '../lib/auth'
 import { useI18n } from '../hooks/useI18n'
 import { supabase } from '../lib/supabase'
-import { sp } from '../theme/theme'
+import { sp, useTheme } from '../theme/theme'
 
 export default function Onboarding() {
   const { t } = useI18n()
+  const { c } = useTheme()
   const { refreshProfile, signOut } = useAuth()
   const [step, setStep] = useState<'name' | 'household'>('name')
   const [myName, setMyName] = useState('')
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState<'create' | 'join' | null>(null)
+  // Which path they've picked. Both cards start collapsed to a title + blurb —
+  // showing two inputs at once made the choice look like a form to fill in.
+  const [choice, setChoice] = useState<'create' | 'join' | null>(null)
 
   // Apple gives us the real name exactly once, at sign-in — use it as the
   // default. Don't clobber anything already typed if this resolves late.
@@ -109,9 +114,16 @@ export default function Onboarding() {
           <Txt variant="display" style={{ fontSize: 34 }}>
             One Roof
           </Txt>
-          <Txt variant="muted" style={{ textAlign: 'center' }}>
-            {t('onboarding.subtitle')}
+          <Txt variant="title" style={{ textAlign: 'center' }}>
+            {t('onboarding.title')}
           </Txt>
+          {/* The instruction only belongs to the household step — on the name
+              step the card asks its own question. */}
+          {step === 'household' ? (
+            <Txt variant="muted" style={{ textAlign: 'center' }}>
+              {t('onboarding.subtitle')}
+            </Txt>
+          ) : null}
         </View>
 
         {step === 'name' ? (
@@ -155,51 +167,73 @@ export default function Onboarding() {
               />
             </View>
 
-            <Card style={{ gap: sp.md }}>
-              <View style={{ gap: 2 }}>
-                <Txt variant="h2">{t('onboarding.createTitle')}</Txt>
-                <Txt variant="faint">{t('onboarding.createDesc')}</Txt>
+            <Card
+              style={{ gap: sp.md }}
+              onPress={choice === 'create' ? undefined : () => setChoice('create')}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Txt variant="h2">{t('onboarding.createTitle')}</Txt>
+                  <Txt variant="faint">{t('onboarding.createDesc')}</Txt>
+                </View>
+                {choice === 'create' ? null : <ChevronRight size={20} color={c.textMuted} />}
               </View>
-              <Field
-                value={name}
-                onChangeText={setName}
-                placeholder={t('onboarding.namePlaceholder')}
-                autoCapitalize="words"
-                maxLength={40}
-                returnKeyType="done"
-                onSubmitEditing={create}
-              />
-              <Btn
-                title={t('onboarding.createBtn')}
-                onPress={create}
-                loading={busy === 'create'}
-                disabled={busy !== null}
-              />
+              {choice === 'create' ? (
+                <>
+                  <Field
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={t('onboarding.namePlaceholder')}
+                    autoCapitalize="words"
+                    autoFocus
+                    maxLength={40}
+                    returnKeyType="done"
+                    onSubmitEditing={create}
+                  />
+                  <Btn
+                    title={t('onboarding.createBtn')}
+                    onPress={create}
+                    loading={busy === 'create'}
+                    disabled={busy !== null}
+                  />
+                </>
+              ) : null}
             </Card>
 
-            <Card style={{ gap: sp.md }}>
-              <View style={{ gap: 2 }}>
-                <Txt variant="h2">{t('onboarding.joinTitle')}</Txt>
-                <Txt variant="faint">{t('onboarding.joinDesc')}</Txt>
+            <Card
+              style={{ gap: sp.md }}
+              onPress={choice === 'join' ? undefined : () => setChoice('join')}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Txt variant="h2">{t('onboarding.joinTitle')}</Txt>
+                  <Txt variant="faint">{t('onboarding.joinDesc')}</Txt>
+                </View>
+                {choice === 'join' ? null : <ChevronRight size={20} color={c.textMuted} />}
               </View>
-              <Field
-                value={code}
-                onChangeText={(v) => setCode(v.toUpperCase())}
-                placeholder={t('onboarding.codePlaceholder')}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={8}
-                returnKeyType="done"
-                onSubmitEditing={join}
-                style={{ letterSpacing: 2 }}
-              />
-              <Btn
-                title={t('onboarding.joinBtn')}
-                onPress={join}
-                variant="secondary"
-                loading={busy === 'join'}
-                disabled={busy !== null}
-              />
+              {choice === 'join' ? (
+                <>
+                  <Field
+                    value={code}
+                    onChangeText={(v) => setCode(v.toUpperCase())}
+                    placeholder={t('onboarding.codePlaceholder')}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    autoFocus
+                    maxLength={8}
+                    returnKeyType="done"
+                    onSubmitEditing={join}
+                    style={{ letterSpacing: 2 }}
+                  />
+                  <Btn
+                    title={t('onboarding.joinBtn')}
+                    onPress={join}
+                    variant="secondary"
+                    loading={busy === 'join'}
+                    disabled={busy !== null}
+                  />
+                </>
+              ) : null}
             </Card>
 
             <Btn title={t('settings.signOut')} onPress={signOut} variant="ghost" />
