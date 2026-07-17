@@ -14,11 +14,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { Camera, Check, ChevronDown, ChevronRight, Wallet, X } from 'lucide-react-native'
+import { Camera, Check, ChevronDown, ChevronRight, Lock, Wallet, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -27,6 +28,7 @@ import { usePlus } from '@/lib/plus'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import { syncBudgetWidget, type BudgetWidgetItem } from '@/lib/widget'
+import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { formatMoney, periodEndISO, periodLabel, todayISO } from '@/lib/format'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
@@ -53,7 +55,10 @@ export default function Budgets() {
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [period, setPeriod] = useState<Period>('monthly')
+  const [isPrivate, setIsPrivate] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Which private budget's "who can view" sheet is open.
+  const [accessFor, setAccessFor] = useState<Budget | null>(null)
 
   type HomeData = { budgets: Budget[]; months: Month[]; entries: EntryLite[] }
   // One cached query for the whole home: cards render instantly on return with
@@ -152,6 +157,7 @@ export default function Budgets() {
     }
     setName('')
     setPeriod('monthly')
+    setIsPrivate(false)
     setCreateOpen(true)
   }
 
@@ -159,7 +165,11 @@ export default function Budgets() {
     const trimmed = name.trim()
     if (!trimmed) return
     setSaving(true)
-    const { error } = await supabase.from('budgets').insert({ name: trimmed, period })
+    // owner_email + household_id are stamped by column defaults; visibility is
+    // only sent when private so a non-Plus insert stays byte-identical to before.
+    const { error } = await supabase
+      .from('budgets')
+      .insert({ name: trimmed, period, ...(isPrivate ? { visibility: 'private' as const } : {}) })
     setSaving(false)
     setCreateOpen(false)
     if (error) {
@@ -196,6 +206,7 @@ export default function Budgets() {
                 months={info?.months ?? []}
                 defaultId={info?.defaultId ?? null}
                 statsById={statsById}
+                onAccess={() => setAccessFor(b)}
               />
             )
           })}
@@ -269,6 +280,30 @@ export default function Budgets() {
                   />
                 </View>
 
+                {/* Private budget (Plus). Only offered to Plus members — the DB
+                    rejects it anyway (budgets_plus_guard, migration 058). */}
+                {isPlus ? (
+                  <>
+                    <View style={{ height: 1, backgroundColor: c.border }} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Lock size={14} color={c.text} />
+                          <Txt style={{ fontWeight: '600' }}>{t('budget.private')}</Txt>
+                        </View>
+                        <Txt variant="faint" style={{ marginTop: 2 }}>
+                          {t('budget.privateHint')}
+                        </Txt>
+                      </View>
+                      <Switch
+                        value={isPrivate}
+                        onValueChange={setIsPrivate}
+                        trackColor={{ true: c.income, false: c.surface2 }}
+                      />
+                    </View>
+                  </>
+                ) : null}
+
                 <View style={{ flexDirection: 'row', gap: sp.md, marginTop: sp.sm }}>
                   <Btn title={t('common.cancel')} variant="secondary" onPress={() => setCreateOpen(false)} style={{ flex: 1 }} />
                   <Btn title={t('common.create')} onPress={create} loading={saving} disabled={!name.trim()} style={{ flex: 1 }} />
@@ -278,6 +313,10 @@ export default function Budgets() {
           </KeyboardAvoidingView>
         </Modal>
       )}
+
+      {accessFor ? (
+        <BudgetAccessSheet budget={accessFor} onClose={() => setAccessFor(null)} />
+      ) : null}
     </SafeAreaView>
   )
 }
@@ -287,11 +326,13 @@ function BudgetCard({
   months,
   defaultId,
   statsById,
+  onAccess,
 }: {
   budget: Budget
   months: Month[]
   defaultId: string | null
   statsById: Map<string, MonthStat>
+  onAccess: () => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -323,6 +364,33 @@ function BudgetCard({
         </Txt>
         <ChevronRight size={22} color={c.textFaint} />
       </Pressable>
+
+      {/* Private budgets say so, and the chip IS the way in to the access list.
+          Household budgets show nothing — they're unchanged. */}
+      {b.visibility === 'private' ? (
+        <Pressable
+          onPress={onAccess}
+          accessibilityRole="button"
+          style={({ pressed }) => ({
+            alignSelf: 'flex-start',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            marginTop: -sp.sm,
+            paddingHorizontal: 9,
+            paddingVertical: 5,
+            borderRadius: radius.sm,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: c.accent,
+            backgroundColor: pressed ? c.surface : c.accentSoft,
+          })}
+        >
+          <Lock size={12} color={c.accent} />
+          <Txt style={{ color: c.accent, fontWeight: '600', fontSize: 11 }}>
+            {t('budget.whoCanView')}
+          </Txt>
+        </Pressable>
+      ) : null}
 
       {selected ? (
         <View style={{ gap: sp.md, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>

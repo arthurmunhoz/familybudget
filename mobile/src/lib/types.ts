@@ -26,6 +26,19 @@ export interface Budget {
   name: string
   period: Period
   created_at: string
+  /** 'household' = everyone in the household sees it (the default, and every
+   *  budget that predates migration 058). 'private' = only the owner and the
+   *  people they've shared it with — enforced by RLS, not by this field. */
+  visibility?: 'household' | 'private'
+  /** Who created it and controls its access list. Null on pre-058 rows (all of
+   *  which are 'household', where it's never consulted). */
+  owner_email?: string | null
+}
+
+/** A person a private budget has been shared with (migration 058). */
+export interface BudgetMember {
+  budget_id: string
+  email: string
 }
 
 /** One budget period (named "months" historically): monthly = 1st of month,

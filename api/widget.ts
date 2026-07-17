@@ -312,12 +312,31 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Missing day' })
     }
 
-    const [bRes, ccRes, coRes] = await Promise.all([
-      db.from('budgets').select('id, name, period').eq('household_id', household).order('created_at'),
+    const [bRes, ccRes, coRes, bmRes] = await Promise.all([
+      db
+        .from('budgets')
+        .select('id, name, period, visibility, owner_email')
+        .eq('household_id', household)
+        .order('created_at'),
       db.from('custom_categories').select('id, icon').eq('household_id', household),
       db.from('category_overrides').select('base_id, icon').eq('household_id', household),
+      db.from('budget_members').select('budget_id').eq('email', senderEmail),
     ])
-    const budgets = (bRes.data ?? []) as { id: string; name: string; period: Period }[]
+
+    // PRIVATE BUDGETS (migration 058): this runs with the SERVICE ROLE, which
+    // bypasses RLS entirely — so the visibility rule has to be applied by hand
+    // here, or a household member's widget would happily list someone else's
+    // private budget. Mirrors public.can_see_budget().
+    const shared = new Set((bmRes.data ?? []).map((r: any) => r.budget_id as string))
+    const budgets = ((bRes.data ?? []) as {
+      id: string
+      name: string
+      period: Period
+      visibility: string
+      owner_email: string | null
+    }[]).filter(
+      (x) => x.visibility !== 'private' || x.owner_email === senderEmail || shared.has(x.id),
+    )
     if (!budgets.length) return res.status(200).json({ budget: null })
     const b = budgets.find((x) => x.id === budgetId) ?? budgets[0]
 

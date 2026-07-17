@@ -23,6 +23,7 @@ import {
   CalendarDays,
   Check,
   FolderLock,
+  Lock,
   MapPin,
   ReceiptText,
   Sparkles,
@@ -56,6 +57,7 @@ const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: CalendarDays, key: 'settings.plusFeatureCalendar' },
   { icon: ReceiptText, key: 'settings.plusFeatureSplit' },
   { icon: Wallet, key: 'settings.plusFeatureBudgets' },
+  { icon: Lock, key: 'settings.plusFeaturePrivate' },
   { icon: FolderLock, key: 'settings.plusFeatureVault' },
 ]
 

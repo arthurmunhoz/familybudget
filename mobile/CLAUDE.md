@@ -13,6 +13,19 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 - **Supabase** via `@/lib/supabase` (AsyncStorage session + url-polyfill). RLS is
   the security boundary — NEVER filter `household_id` client-side for security;
   column defaults stamp `household_id`/`created_by`/`sender_email`/etc. on insert.
+- **Private budgets (migration 058)**: a budget is `visibility='household'` by
+  default; a Plus member can make one `'private'` (owner = `budgets.owner_email`,
+  share list = `budget_members`). **months and entries reach the household
+  THROUGH budgets** — hiding the budgets row alone leaves every period and entry
+  readable, so all three policies go through `public.can_see_budget()`. A SELECT
+  policy on budgets must test the row's own columns and must NOT call a definer
+  function that re-queries budgets: that runs on its own snapshot, can't see the
+  row being inserted, and breaks `INSERT ... RETURNING` — which PostgREST always
+  emits (this bit us; see `is_budget_member`). Plus is gated by a TRIGGER on the
+  transition INTO private, never a blanket check: a lapsed plan must never
+  un-private a budget or lock its owner out. **Anything using the SERVICE ROLE
+  bypasses all of this** and must filter visibility by hand (see the `budget`
+  action in `api/widget.ts`).
 - No NativeWind/Tailwind — styling is the theme + `StyleSheet`/inline.
 
 ## Conventions (reuse these — don't reinvent)
