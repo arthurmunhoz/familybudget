@@ -3,11 +3,12 @@
 // to-date balance, opens one on tap, and creates a new period via a sheet that
 // suggests the current/next period and copies recurring entries forward. The
 // header menu renames or deletes the budget. RN port of budget/Months.tsx.
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { ChevronRight, MoreHorizontal, X } from 'lucide-react-native'
+import { ChevronRight, MoreHorizontal, Trash2, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -52,8 +53,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
   const [renameOpen, setRenameOpen] = useState(false)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
-  // Per-period options sheet, "who can view" sheet, visibility-change guard.
-  const [periodMenuFor, setPeriodMenuFor] = useState<Month | null>(null)
+  // "Who can view" sheet + visibility-change guard.
   const [accessOpen, setAccessOpen] = useState(false)
   const [visBusy, setVisBusy] = useState(false)
 
@@ -286,7 +286,8 @@ export default function Months({ budgetId }: { budgetId: string }) {
           : t('months.firstPeriod', { label: periodLabel(period, pickedStart) })
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
         <AppHeader
           title={budget?.name ?? '…'}
@@ -309,51 +310,16 @@ export default function Months({ budgetId }: { budgetId: string }) {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.md }}
         >
-          {months.map((m) => {
-            const balance = balances.get(m.id) ?? 0
-            return (
-              <Card key={m.id} onPress={() => router.push(`/budget/${budgetId}/${m.id}`)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                  <Txt style={{ flex: 1, fontWeight: '700', fontSize: 16 }}>
-                    {periodLabel(period, m.start_date)}
-                  </Txt>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Txt
-                      style={{
-                        fontSize: 10,
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.5,
-                        color: c.textFaint,
-                      }}
-                    >
-                      {t('common.balance')}
-                    </Txt>
-                    <Txt
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '700',
-                        fontVariant: ['tabular-nums'],
-                        color: balance >= 0 ? c.income : c.expense,
-                      }}
-                    >
-                      {formatMoney(balance)}
-                    </Txt>
-                  </View>
-                  {canManage ? (
-                    <Pressable
-                      onPress={() => setPeriodMenuFor(m)}
-                      hitSlop={8}
-                      accessibilityLabel={t('months.periodOptions')}
-                    >
-                      <MoreHorizontal size={20} color={c.textFaint} />
-                    </Pressable>
-                  ) : null}
-                  <ChevronRight size={20} color={c.textFaint} />
-                </View>
-              </Card>
-            )
-          })}
+          {months.map((m) => (
+            <PeriodCard
+              key={m.id}
+              label={periodLabel(period, m.start_date)}
+              balance={balances.get(m.id) ?? 0}
+              deletable={canManage}
+              onOpen={() => router.push(`/budget/${budgetId}/${m.id}`)}
+              onDelete={() => deletePeriod(m)}
+            />
+          ))}
         </ScrollView>
       )}
 
@@ -482,51 +448,98 @@ export default function Months({ budgetId }: { budgetId: string }) {
           </View>
         </Modal>
       )}
-      {/* per-period options */}
-      {periodMenuFor && (
-        <Modal visible animationType="fade" transparent onRequestClose={() => setPeriodMenuFor(null)}>
-          <Pressable
-            onPress={() => setPeriodMenuFor(null)}
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
-          >
-            <Pressable
-              onPress={(e) => e.stopPropagation()}
-              style={{
-                backgroundColor: c.card,
-                borderTopLeftRadius: radius.lg,
-                borderTopRightRadius: radius.lg,
-                padding: sp.md,
-                paddingBottom: sp.xl,
-                gap: sp.xs,
-              }}
-            >
-              <Txt variant="faint" style={{ paddingHorizontal: sp.md, paddingTop: sp.xs }}>
-                {periodLabel(period, periodMenuFor.start_date)}
-              </Txt>
-              <MenuRow
-                label={t('months.deletePeriod')}
-                destructive
-                onPress={() => {
-                  const m = periodMenuFor
-                  setPeriodMenuFor(null)
-                  deletePeriod(m)
-                }}
-              />
-              <Btn
-                title={t('common.cancel')}
-                variant="secondary"
-                onPress={() => setPeriodMenuFor(null)}
-                style={{ marginTop: sp.sm }}
-              />
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
-
       {accessOpen && budget ? (
         <BudgetAccessSheet budget={budget} onClose={() => setAccessOpen(false)} />
       ) : null}
-    </SafeAreaView>
+      </SafeAreaView>
+    </GestureHandlerRootView>
+  )
+}
+
+/** One period row. Swipe left to reveal a Delete action (which then confirms).
+ *  A read-only viewer (deletable=false) gets a plain card with no swipe. */
+function PeriodCard({
+  label,
+  balance,
+  onOpen,
+  onDelete,
+  deletable,
+}: {
+  label: string
+  balance: number
+  onOpen: () => void
+  onDelete: () => void
+  deletable: boolean
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const swipeRef = useRef<Swipeable>(null)
+
+  const card = (
+    <Card onPress={onOpen}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+        <Txt style={{ flex: 1, fontWeight: '700', fontSize: 16 }}>{label}</Txt>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Txt
+            style={{
+              fontSize: 10,
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              color: c.textFaint,
+            }}
+          >
+            {t('common.balance')}
+          </Txt>
+          <Txt
+            style={{
+              fontSize: 16,
+              fontWeight: '700',
+              fontVariant: ['tabular-nums'],
+              color: balance >= 0 ? c.income : c.expense,
+            }}
+          >
+            {formatMoney(balance)}
+          </Txt>
+        </View>
+        <ChevronRight size={20} color={c.textFaint} />
+      </View>
+    </Card>
+  )
+
+  if (!deletable) return card
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      renderRightActions={() => (
+        <Pressable
+          onPress={() => {
+            swipeRef.current?.close()
+            onDelete()
+          }}
+          accessibilityLabel={t('months.deletePeriod')}
+          style={{
+            width: 92,
+            marginLeft: sp.sm,
+            borderRadius: radius.md,
+            backgroundColor: c.expense,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Trash2 size={20} color="#fff" />
+          <Txt style={{ color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+            {t('common.delete')}
+          </Txt>
+        </Pressable>
+      )}
+    >
+      {card}
+    </Swipeable>
   )
 }
 
