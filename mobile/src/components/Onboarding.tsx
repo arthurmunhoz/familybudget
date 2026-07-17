@@ -12,7 +12,7 @@
 // things like "z5khzgh5ff". We can only apply the name AFTER create/join, since
 // that's what creates the allowed_users row to update.
 import { useEffect, useState } from 'react'
-import { Alert, View } from 'react-native'
+import { Alert, StyleSheet, View } from 'react-native'
 import { ChevronRight } from 'lucide-react-native'
 
 import { Btn, Card, Field, Screen, Txt } from './ui'
@@ -114,6 +114,17 @@ export default function Onboarding() {
           <Txt variant="display" style={{ fontSize: 34 }}>
             One Roof
           </Txt>
+          {/* Subtle rule parting the brand from the set-up flow. alignSelf
+              stretches it to the content width — the parent centres its
+              children, which would otherwise shrink it to nothing. */}
+          <View
+            style={{
+              alignSelf: 'stretch',
+              height: StyleSheet.hairlineWidth,
+              backgroundColor: c.border,
+              marginVertical: sp.sm,
+            }}
+          />
           <Txt variant="title" style={{ textAlign: 'center' }}>
             {t('onboarding.title')}
           </Txt>
