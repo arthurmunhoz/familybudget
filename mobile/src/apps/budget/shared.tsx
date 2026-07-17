@@ -88,7 +88,8 @@ export function Segmented<T extends string>({
   onChange,
   activeColor,
 }: {
-  options: { id: T; label: string }[]
+  /** `badge` (when > 0) renders a small count pill after the label. */
+  options: { id: T; label: string; badge?: number }[]
   value: T
   onChange: (id: T) => void
   activeColor?: string
@@ -106,16 +107,20 @@ export function Segmented<T extends string>({
     >
       {options.map((o) => {
         const active = value === o.id
+        const accent = activeColor ?? c.accent
         return (
           <Pressable
             key={o.id}
             onPress={() => onChange(o.id)}
             style={{
               flex: 1,
+              flexDirection: 'row',
+              gap: 6,
               borderRadius: radius.sm,
               paddingVertical: 9,
               alignItems: 'center',
-              backgroundColor: active ? (activeColor ?? c.accent) : 'transparent',
+              justifyContent: 'center',
+              backgroundColor: active ? accent : 'transparent',
             }}
           >
             <Txt
@@ -127,6 +132,24 @@ export function Segmented<T extends string>({
             >
               {o.label}
             </Txt>
+            {o.badge && o.badge > 0 ? (
+              <View
+                style={{
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  paddingHorizontal: 5,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  // On the active (filled) segment invert; otherwise the usual red.
+                  backgroundColor: active ? '#fff' : c.expense,
+                }}
+              >
+                <Txt style={{ fontSize: 11, fontWeight: '700', color: active ? accent : '#fff' }}>
+                  {o.badge}
+                </Txt>
+              </View>
+            ) : null}
           </Pressable>
         )
       })}

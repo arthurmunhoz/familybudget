@@ -11,15 +11,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Linking, Pressable, ScrollView, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
+import { Settings } from 'lucide-react-native'
 
-import { AppHeader, Screen, Txt } from '@/components/ui'
+import { AppHeader, Screen } from '@/components/ui'
+import { Toast, type ToastData } from '@/components/Toast'
 import { useAuth } from '@/lib/auth'
+import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
-import { ackPing } from '@/lib/pings'
+import { ackPing, fetchPingPresets } from '@/lib/pings'
 import { supabase } from '@/lib/supabase'
-import type { Ping, PingAck } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import type { Ping, PingAck, PingPreset } from '@/lib/types'
+import { sp, useTheme } from '@/theme/theme'
+import { Segmented } from '@/apps/budget/shared'
 import PingComposer from '@/apps/pings/PingComposer'
+import { NudgeSettings } from '@/apps/pings/NudgeSettings'
 import PingsHistory, { type PingWithAcks } from '@/apps/pings/PingsHistory'
 
 /** Recent household nudges (newest first), each with its acks attached. */
@@ -68,6 +73,17 @@ export default function NudgesScreen() {
   const [phones, setPhones] = useState<Record<string, string>>({})
   // Optimistic ack: mark handled immediately, before the round-trip lands.
   const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  // A NEW object each send so the toast re-triggers even for the same nudge.
+  const [toast, setToast] = useState<ToastData | null>(null)
+
+  // Presets are owned here so the composer and the settings modal share one
+  // source of truth — editing in settings reflects in the composer without a
+  // stale-cache round-trip.
+  const { data: presets = [], revalidate: reloadPresets } = useCachedQuery<PingPreset[]>(
+    'ping:presets',
+    fetchPingPresets,
+  )
 
   const load = useCallback(async () => {
     try {
@@ -132,89 +148,67 @@ export default function NudgesScreen() {
   ).length
 
   return (
-    <Screen
-      header={
-        <>
-          <AppHeader title={t('app.nudges')} />
-          <View style={{ flexDirection: 'row', gap: sp.sm, marginBottom: sp.md }}>
-            <TabBtn active={tab === 'send'} onPress={() => setTab('send')} label={t('pings.tabSend')} />
-            <TabBtn
-              active={tab === 'past'}
-              onPress={() => setTab('past')}
-              label={t('pings.tabPast')}
-              badge={unread}
+    <>
+      <Screen
+        header={
+          <>
+            <AppHeader
+              title={t('app.nudges')}
+              right={
+                <Pressable
+                  onPress={() => setSettingsOpen(true)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('pings.settings')}
+                >
+                  <Settings size={22} color={c.textMuted} />
+                </Pressable>
+              }
             />
-          </View>
-        </>
-      }
-    >
-      {tab === 'send' ? (
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: sp.xxl }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <PingComposer />
-        </ScrollView>
-      ) : (
-        <PingsHistory
-          pings={pings}
-          phones={phones}
-          ackedLocal={ackedLocal}
-          myEmail={myEmail}
-          senderName={senderName}
-          onAck={ack}
-          onCall={call}
-          focusId={focus}
-        />
-      )}
-    </Screen>
-  )
-}
+            <View style={{ marginBottom: sp.md }}>
+              <Segmented<'send' | 'past'>
+                value={tab}
+                onChange={setTab}
+                options={[
+                  { id: 'send', label: t('pings.tabSend') },
+                  { id: 'past', label: t('pings.tabPast'), badge: unread },
+                ]}
+              />
+            </View>
+          </>
+        }
+      >
+        {tab === 'send' ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: sp.xxl }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <PingComposer presets={presets} onSent={setToast} />
+          </ScrollView>
+        ) : (
+          <PingsHistory
+            pings={pings}
+            phones={phones}
+            ackedLocal={ackedLocal}
+            myEmail={myEmail}
+            senderName={senderName}
+            onAck={ack}
+            onCall={call}
+            focusId={focus}
+          />
+        )}
+      </Screen>
 
-function TabBtn({
-  active,
-  onPress,
-  label,
-  badge = 0,
-}: {
-  active: boolean
-  onPress: () => void
-  label: string
-  badge?: number
-}) {
-  const { c } = useTheme()
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      style={{
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 10,
-        borderRadius: radius.md,
-        backgroundColor: active ? c.accentSoft : c.surface,
-      }}
-    >
-      <Txt style={{ fontWeight: '700', color: active ? c.accent : c.textMuted }}>{label}</Txt>
-      {badge > 0 ? (
-        <View
-          style={{
-            minWidth: 18,
-            height: 18,
-            borderRadius: 9,
-            paddingHorizontal: 5,
-            backgroundColor: c.expense,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Txt style={{ color: '#ffffff', fontSize: 11, fontWeight: '700' }}>{badge}</Txt>
-        </View>
+      <Toast data={toast} />
+
+      {settingsOpen ? (
+        <NudgeSettings
+          presets={presets}
+          reloadPresets={reloadPresets}
+          onClose={() => setSettingsOpen(false)}
+        />
       ) : null}
-    </Pressable>
+    </>
   )
 }
