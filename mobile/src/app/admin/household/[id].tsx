@@ -8,6 +8,8 @@ import { Award, Trash2, X } from 'lucide-react-native'
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+// memberLimit mirrors the DB trigger (migration 059): free 4, Plus 12.
+import { memberLimit } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { buildFeed, type EventRow } from '@/lib/activityFeed'
@@ -15,9 +17,6 @@ import { formatDay, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
-
-/** Mirrors the database trigger (migration 016) — keep in sync. */
-const MAX_MEMBERS = 6
 
 interface UserActivity {
   user_email: string
@@ -72,7 +71,8 @@ export default function AdminHousehold() {
   })
   const { household, members, activity, isPlus, events } = data
   const feed = buildFeed(events)
-  const atLimit = members.length >= MAX_MEMBERS
+  const maxMembers = memberLimit(isPlus)
+  const atLimit = members.length >= maxMembers
   const hasOwner = members.some((u) => u.role === 'owner')
   const nameFor = (email: string) =>
     members.find((m) => m.email === email)?.display_name ?? email.split('@')[0]
@@ -113,7 +113,7 @@ export default function AdminHousehold() {
         error.code === '23505'
           ? t('admin.emailExists')
           : error.message.includes('household_member_limit')
-            ? t('admin.householdFull', { max: MAX_MEMBERS })
+            ? t('admin.householdFull', { max: maxMembers })
             : t('admin.addMemberError'),
       )
       return
@@ -214,7 +214,7 @@ export default function AdminHousehold() {
       ) : (
         <View style={{ gap: sp.md }}>
           <Txt variant="muted">
-            {members.length}/{MAX_MEMBERS} members · created {formatDay(household.created_at.slice(0, 10))}
+            {members.length}/{maxMembers} members · created {formatDay(household.created_at.slice(0, 10))}
           </Txt>
 
           {/* Comp this household to One Roof Plus for free (admin-only). */}
@@ -339,7 +339,7 @@ export default function AdminHousehold() {
           </Txt>
           {atLimit ? (
             <Card>
-              <Txt variant="muted">This household is full ({MAX_MEMBERS} members max).</Txt>
+              <Txt variant="muted">This household is full ({maxMembers} members max).</Txt>
             </Card>
           ) : (
             <View style={{ flexDirection: 'row', gap: sp.sm }}>

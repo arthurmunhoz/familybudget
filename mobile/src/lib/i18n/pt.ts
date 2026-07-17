@@ -504,6 +504,8 @@ export const pt: Record<keyof typeof en, string> = {
 
   // Household (membros + código de convite)
   'household.title': 'Casa',
+  'household.memberCount': '{count} de {max} membros',
+  'household.upgradeForMembers': 'Assine o Plus para até {max} membros',
   'household.owner': 'Dono',
   'household.inviteCode': 'Código de convite',
   'household.inviteHint': 'Compartilhe este código para a família entrar na sua casa.',
@@ -542,6 +544,7 @@ export const pt: Record<keyof typeof en, string> = {
   'settings.plusFeatureCalendar': 'Sincronização bidirecional com Google e Apple Calendar',
   'settings.plusFeatureSplit': 'Divida uma conta por item (com foto)',
   'settings.plusFeatureBudgets': 'Vários orçamentos para a família toda',
+  'settings.plusFeatureMembers': 'Até 12 membros na sua casa',
   'settings.plusFeaturePrivate': 'Orçamentos privados que só você vê',
   'settings.plusFeatureSupport': 'Apoie um app feito em família ✨',
   'settings.plusUnlock': 'Libere a casa toda com o One Roof Plus:',
@@ -619,6 +622,7 @@ export const pt: Record<keyof typeof en, string> = {
   'onboarding.errAlready': 'Você já pertence a uma casa.',
   'onboarding.errTooMany': 'Muitas tentativas. Tente novamente em alguns minutos.',
   'onboarding.errGeneric': 'Algo deu errado. Tente novamente.',
+  'onboarding.errFull': 'Esta casa já está cheia. Peça espaço a um dono ou outro código.',
   'onboarding.nameTitle': 'Como podemos te chamar?',
   'onboarding.nameDesc': 'É assim que sua família vai te ver no app.',
   'onboarding.yourNamePlaceholder': 'ex. Lucas, JP, Ana Clara',

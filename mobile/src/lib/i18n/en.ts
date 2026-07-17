@@ -505,6 +505,8 @@ export const en = {
 
   // Household (members + invite code)
   'household.title': 'Household',
+  'household.memberCount': '{count} of {max} members',
+  'household.upgradeForMembers': 'Upgrade to Plus for up to {max} members',
   'household.owner': 'Owner',
   'household.inviteCode': 'Invite code',
   'household.inviteHint': 'Share this code so family can join your household.',
@@ -543,6 +545,7 @@ export const en = {
   'settings.plusFeatureCalendar': 'Google & Apple Calendar two-way sync',
   'settings.plusFeatureSplit': 'Split a bill by item (photo scan)',
   'settings.plusFeatureBudgets': 'Multiple budgets for the whole family',
+  'settings.plusFeatureMembers': 'Up to 12 members in your household',
   'settings.plusFeaturePrivate': 'Private budgets only you can see',
   'settings.plusFeatureSupport': 'Support a family-run app ✨',
   'settings.plusUnlock': 'Unlock the whole household with One Roof Plus:',
@@ -620,6 +623,7 @@ export const en = {
   'onboarding.errAlready': "You're already in a household.",
   'onboarding.errTooMany': 'Too many attempts. Please try again in a few minutes.',
   'onboarding.errGeneric': 'Something went wrong. Please try again.',
+  'onboarding.errFull': 'This household is already full. Ask an owner for room or a different code.',
   'onboarding.nameTitle': 'What should we call you?',
   'onboarding.nameDesc': 'This is how your family will see you in the app.',
   'onboarding.yourNamePlaceholder': 'e.g. Sarah, AJ, Mary Ann',

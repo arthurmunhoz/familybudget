@@ -64,6 +64,7 @@ export default function Onboarding() {
     const m = msg.toLowerCase()
     if (m.includes('already in a household')) return t('onboarding.errAlready')
     if (m.includes('invalid code')) return t('onboarding.errInvalidCode')
+    if (m.includes('household_member_limit')) return t('onboarding.errFull')
     if (m.includes('too many')) return t('onboarding.errTooMany')
     if (m.includes('household name required')) return t('onboarding.errNameRequired')
     return t('onboarding.errGeneric')

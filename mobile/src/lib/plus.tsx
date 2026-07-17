@@ -38,6 +38,12 @@ interface PlusState {
   refresh: () => Promise<void>
 }
 
+// Household member caps, mirrored from the DB trigger (migration 059). The
+// trigger is the real enforcement; these are for UI (counts + upsell) only.
+export const MEMBER_LIMIT_FREE = 4
+export const MEMBER_LIMIT_PLUS = 12
+export const memberLimit = (isPlus: boolean) => (isPlus ? MEMBER_LIMIT_PLUS : MEMBER_LIMIT_FREE)
+
 const Ctx = createContext<PlusState | null>(null)
 
 /** Shape of the current_household_plan() RPC (migration 060). */
