@@ -85,6 +85,10 @@ export default function Months({ budgetId }: { budgetId: string }) {
   // Without this the menu would still offer both and the taps would silently do
   // nothing — RLS just matches zero rows.
   const canManage = !budget || budget.visibility !== 'private' || budget.owner_email === profile?.email
+  // Only a budget's owner may change its visibility. Owners come from creation
+  // (058) or the household-owner backfill (064); a still-ownerless budget (a
+  // household that never had an owner) lets whoever makes it private claim it.
+  const isOwner = !budget || !budget.owner_email || budget.owner_email === profile?.email
 
   // To-date balance per period; future-dated entries don't count yet.
   const balances = useMemo(() => {
@@ -407,7 +411,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
                     }}
                   />
                 </>
-              ) : (
+              ) : isOwner ? (
                 <MenuRow
                   label={t('budget.makePrivate')}
                   onPress={() => {
@@ -415,7 +419,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
                     makePrivate()
                   }}
                 />
-              )}
+              ) : null}
               <MenuRow
                 label={t('months.delete')}
                 destructive

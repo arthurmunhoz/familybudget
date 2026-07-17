@@ -229,3 +229,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-061-admin-recent-events.sql (admin_recent_events: cross-household recent-activity feed for the Admin Activity tab — returns household_id, excludes admin accounts + internal households)
 --   migration-062-activity-feed-v2.sql (semantic events: feed RPCs now return meta + filter out page_view/screen_view; admin_app_usage counts screen_view; partial index web_events_activity_idx)
 --   migration-063-admin-event-usage.sql (admin_event_usage: per-event-type counts for the admin "Feature usage" view — what's used vs not)
+--   migration-064-backfill-budget-owner.sql (data: assign pre-058 ownerless budgets to their household owner so the owner controls privacy)
