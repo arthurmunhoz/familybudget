@@ -82,6 +82,32 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 implementation lives in `src/apps/<id>/`. Nested routes use folders
 (`src/app/budget/[budgetId]/[monthId].tsx`, `src/app/pets/[petId].tsx`).
 
+## Whereabouts (family location) — Phase 1
+Live family map (route `/location`, hub tile "Whereabouts"). **Native-only**: the
+map (`@rnmapbox/maps`) and background location (`expo-location` +
+`expo-task-manager`) need a dev build + Mapbox tokens — see `WHEREABOUTS-SETUP.md`.
+- `member_locations` (migration 061) — one row per member: latest fix + `sharing`
+  / `paused_until`. Household-scoped RLS + Realtime. **Sharing is OFF by default
+  (opt-in); we null coordinates on stop/pause so no stale location leaks.**
+- `src/lib/location.ts` — data + logic: fetch/upsert my fix, `setSharing` /
+  `pauseSharing` / `resumeSharing`, foreground `captureAndUpload`, Mapbox
+  `driveEta`, `haversineMeters`, `formatDistance`/`formatEta`, nav deep-links.
+  Keep `@rnmapbox/maps` imports OUT of here (screens only).
+- `src/lib/locationTask.ts` — the background TASK (module-scope `defineTask`, same
+  pattern as `backgroundNotifications.ts`); `registerLocationTask()` runs in
+  `_layout`. `startBackgroundUpdates` takes localized foreground-service labels.
+- `src/apps/location/` — `Whereabouts` (map + bottom sheet, owns the data + one
+  Realtime channel), `MemberSheet` (detail — **leads with drive-time ETA**, then
+  distance/battery/address, navigate, nudge/call), `SharingControls` (toggle +
+  pause), `locationUi` (member colors, ringed avatar, battery chip, `timeAgo`).
+- Native config lives in `app.config.js` (layered on `app.json`): Mapbox plugin
+  (`RNMAPBOX_DOWNLOAD_TOKEN` build secret), expo-location background, iOS
+  `UIBackgroundModes: ["location"]` + Always strings, `LSApplicationQueriesSchemes`
+  (comgooglemaps/waze), Android location perms. Runtime map/Directions token is
+  `EXPO_PUBLIC_MAPBOX_TOKEN`.
+- Not yet: Places/geofences + arrive-leave push (Phase 2); Safety Radius, history,
+  driving/SOS (Phase 3 — a One Roof **Plus** feature).
+
 ## AI / server endpoints
 Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`
 (`https://one-roof-app.vercel.app`) with `Authorization: Bearer <session token>`:

@@ -13,6 +13,7 @@ import {
 
 import { AuthProvider } from '@/lib/auth';
 import { registerBackgroundNotifications } from '@/lib/backgroundNotifications';
+import { registerLocationTask } from '@/lib/locationTask';
 import { PlusProvider } from '@/lib/plus';
 import { I18nProvider } from '@/hooks/useI18n';
 import { TilePrefProvider } from '@/hooks/useTilePref';
@@ -35,8 +36,11 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   // Silent-push → Nudges widget "seen by" plumbing (backgroundNotifications.ts).
+  // Also registers the background-location task so the OS can wake it headlessly
+  // (Whereabouts) — importing the module is what defines the task.
   useEffect(() => {
     registerBackgroundNotifications();
+    registerLocationTask();
   }, []);
 
   if (!fontsLoaded) return null;

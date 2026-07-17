@@ -4,6 +4,7 @@
 import type { LucideIcon } from 'lucide-react-native'
 import {
   Bell,
+  MapPin,
   Wallet,
   ShoppingCart,
   PawPrint,
@@ -24,6 +25,7 @@ export interface HubApp {
 
 export const APPS: HubApp[] = [
   { id: 'pings', name: 'Nudges', icon: Bell, route: '/pings', description: 'A quick nudge to the family' },
+  { id: 'location', name: 'Whereabouts', icon: MapPin, route: '/location', description: 'See where everyone is' },
   { id: 'calendar', name: 'Calendar', icon: CalendarDays, route: '/calendar', description: 'Shared family schedule' },
   { id: 'budget', name: 'Money', icon: Wallet, route: '/budget', description: 'Income & spending by period' },
   { id: 'shopping', name: 'Shopping', icon: ShoppingCart, route: '/shopping', description: 'Shared list, live sync' },

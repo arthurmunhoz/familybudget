@@ -252,3 +252,25 @@ export interface CalendarEvent {
   created_by: string | null
   created_at: string
 }
+
+/** A household member's live position + sharing state (migration 061), one row
+ *  per member. `lat`/`lng` are null before the first fix, or while sharing is
+ *  off/paused (we null the coordinates then so no stale location leaks). Use
+ *  `isSharingLive()` in `@/lib/location` to decide whether to plot a pin — a row
+ *  can exist purely to carry `sharing: false`. */
+export interface MemberLocation {
+  user_email: string
+  household_id: string
+  lat: number | null
+  lng: number | null
+  /** Horizontal accuracy in meters, if reported. */
+  accuracy: number | null
+  /** Ground speed in m/s, if reported (drives the "Driving" hint). */
+  speed: number | null
+  /** Battery level 0–100, if reported. */
+  battery: number | null
+  sharing: boolean
+  /** ISO timestamp; while in the future, this member has paused sharing. */
+  paused_until: string | null
+  updated_at: string
+}

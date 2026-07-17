@@ -25,7 +25,9 @@
         "NSPhotoLibraryUsageDescription": "Attach photos for receipts, pets, profiles and documents.",
         "NSCalendarsUsageDescription": "Add your One Roof events to the device calendar.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
