@@ -126,6 +126,35 @@ Server (PWA + `api/`) deploys manually: `npx vercel deploy --prod` (production
 domain `one-roof-app.vercel.app`). RevenueCat/IAP and Google/Apple OAuth only work
 in a real build on a device, not Expo Go.
 
+### Bumping the version — the trap ⚠️
+
+`app.json` (`expo.version`, `expo.ios.buildNumber`) is the source of truth, but it
+only reaches the build through `npx expo prebuild -p ios`. **`ios/` is gitignored
+and generated**, and prebuild writes the values into
+`ios/OneRoof/Info.plist` as LITERALS — the plist does NOT reference
+`$(MARKETING_VERSION)`.
+
+So **setting Version/Build in Xcode's General tab does nothing**: it writes the
+`MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` build settings, which the app
+target then ignores in favour of the hardcoded plist. It fails silently — you
+find out from App Store Connect (`90062: CFBundleShortVersionString ... must
+contain a higher version`, and `90186: train version is closed`). This cost a
+failed 1.1.0 upload.
+
+To bump, do BOTH (they must agree):
+```bash
+# 1. app.json: expo.version + expo.ios.buildNumber
+# 2. then EITHER re-run prebuild (regenerates ios/, costs you the signing Team
+#    re-select), OR hand-patch the generated plist:
+plutil -replace CFBundleShortVersionString -string "1.1.0" ios/OneRoof/Info.plist
+plutil -replace CFBundleVersion          -string "2"     ios/OneRoof/Info.plist
+plutil -extract CFBundleShortVersionString raw ios/OneRoof/Info.plist   # verify
+```
+The **widgets** target is different: it has `GENERATE_INFOPLIST_FILE = YES`, so it
+inherits `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` from the build settings.
+Both targets must end up on the SAME version or the upload is rejected for a
+host-app/extension mismatch. Verify the archive in Organizer before uploading.
+
 ### Environment variables
 
 | Where | Vars |
