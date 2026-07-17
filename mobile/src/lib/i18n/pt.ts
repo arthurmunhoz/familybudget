@@ -693,6 +693,8 @@ export const pt: Record<keyof typeof en, string> = {
   'months.createFailed': 'Não foi possível criar — tente novamente.',
   'months.deleteConfirm':
     'Excluir “{name}” e TODOS os seus períodos e lançamentos? Isso não pode ser desfeito.',
+  'months.deleteFailed': 'Não foi possível excluir o orçamento — tente de novo.',
+  'months.renameFailed': 'Não foi possível renomear o orçamento — tente de novo.',
 
   'detail.byDate': 'Por data',
   'detail.byAmount': 'Por valor',

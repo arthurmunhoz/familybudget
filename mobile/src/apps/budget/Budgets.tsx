@@ -4,7 +4,7 @@
 // an in-card period dropdown on the right, received/spent bars, and a
 // "＋ New entry" button that deep-links into that period with the form open.
 // The dropdown switches which period the section previews. RN app.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dimensions,
   Keyboard,
@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { Camera, Check, ChevronDown, ChevronRight, Lock, Wallet, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
@@ -80,6 +80,16 @@ export default function Budgets() {
     }
   })
   const { budgets, months, entries } = data
+
+  // Refetch whenever this screen comes back into focus. useCachedQuery only
+  // fetches on MOUNT, and expo-router keeps the previous screen mounted while a
+  // new one is pushed — so returning from Months after deleting/renaming a
+  // budget showed the stale cached list forever. Same pattern as TodaySection.
+  useFocusEffect(
+    useCallback(() => {
+      void load()
+    }, [load]),
+  )
 
   // Per-month stats (for whichever period a card previews) + each budget's own
   // periods (newest-first) and the default one to show (current, else latest).

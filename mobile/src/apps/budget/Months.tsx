@@ -11,6 +11,7 @@ import { ChevronRight, MoreHorizontal, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
+import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import {
@@ -36,6 +37,7 @@ type EntryBalance = Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>
 export default function Months({ budgetId }: { budgetId: string }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const { profile } = useAuth()
 
   const [creating, setCreating] = useState(false)
 
@@ -69,6 +71,12 @@ export default function Months({ budgetId }: { budgetId: string }) {
 
   const period = budget?.period ?? 'monthly'
   const pk = CAP[period]
+
+  // A private budget can be SEEN by the people it's shared with, but renaming
+  // and deleting it stay with the owner (migration 058's budgets_update/delete).
+  // Without this the menu would still offer both and the taps would silently do
+  // nothing — RLS just matches zero rows.
+  const canManage = !budget || budget.visibility !== 'private' || budget.owner_email === profile?.email
 
   // To-date balance per period; future-dated entries don't count yet.
   const balances = useMemo(() => {
@@ -158,9 +166,13 @@ export default function Months({ budgetId }: { budgetId: string }) {
     const trimmed = name.trim()
     if (!trimmed) return
     setSaving(true)
-    await supabase.from('budgets').update({ name: trimmed }).eq('id', budgetId)
+    const { error } = await supabase.from('budgets').update({ name: trimmed }).eq('id', budgetId)
     setSaving(false)
     setRenameOpen(false)
+    if (error) {
+      Alert.alert(t('months.renameFailed'))
+      return
+    }
     load()
   }
 
@@ -172,7 +184,11 @@ export default function Months({ budgetId }: { budgetId: string }) {
         text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('budgets').delete().eq('id', budget.id)
+          const { error } = await supabase.from('budgets').delete().eq('id', budget.id)
+          if (error) {
+            Alert.alert(t('months.deleteFailed'))
+            return
+          }
           router.back()
         },
       },
@@ -198,9 +214,11 @@ export default function Months({ budgetId }: { budgetId: string }) {
         <AppHeader
           title={budget?.name ?? '…'}
           right={
-            <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} accessibilityLabel={t('months.options')}>
-              <MoreHorizontal size={22} color={c.textMuted} />
-            </Pressable>
+            canManage ? (
+              <Pressable onPress={() => setMenuOpen(true)} hitSlop={10} accessibilityLabel={t('months.options')}>
+                <MoreHorizontal size={22} color={c.textMuted} />
+              </Pressable>
+            ) : undefined
           }
         />
       </View>
@@ -265,7 +283,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
       </SafeAreaView>
 
       {/* budget options menu */}
-      {menuOpen && (
+      {menuOpen && canManage && (
         <Modal visible animationType="fade" transparent onRequestClose={() => setMenuOpen(false)}>
           <Pressable
             onPress={() => setMenuOpen(false)}

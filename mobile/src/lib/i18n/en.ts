@@ -694,6 +694,8 @@ export const en = {
   'months.createFailed': 'Could not create it — please try again.',
   'months.deleteConfirm':
     'Delete “{name}” and ALL of its periods and entries? This cannot be undone.',
+  'months.deleteFailed': 'Could not delete the budget — please try again.',
+  'months.renameFailed': 'Could not rename the budget — please try again.',
 
   'detail.byDate': 'By date',
   'detail.byAmount': 'By amount',
