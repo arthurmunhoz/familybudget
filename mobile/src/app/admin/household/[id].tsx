@@ -4,13 +4,13 @@
 import { useState } from 'react'
 import { Alert, Pressable, Switch, TextInput, View } from 'react-native'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
-import { Award, Bug, LogIn, Trash2, X, type LucideIcon } from 'lucide-react-native'
+import { Award, Trash2, X } from 'lucide-react-native'
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
-import { appForPath } from '@/lib/appRoutes'
+import { buildFeed, type EventRow } from '@/lib/activityFeed'
 import { formatDay, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
@@ -23,60 +23,6 @@ interface UserActivity {
   user_email: string
   last_seen: string
   events: number
-}
-
-/** Raw row from admin_household_events (migration 059). */
-interface EventRow {
-  id: number
-  user_email: string
-  type: string
-  path: string | null
-  target: string | null
-  created_at: string
-}
-
-/** An interpreted, ready-to-render line in the activity feed. */
-interface FeedItem {
-  id: number
-  user_email: string
-  icon: LucideIcon
-  predicate: string // reads after the actor's name: 'tapped “Save”'
-  app: string | null // app context for the sub-line, if any
-  detail: string | null // extra sub-line (e.g. an error message)
-  isError: boolean
-  created_at: string
-}
-
-const clean = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim()
-
-/** Turn a raw web_event into a readable line, or null to skip it as noise. */
-function describe(row: EventRow): Omit<FeedItem, 'user_email' | 'created_at'> | null {
-  if (row.type === 'session_start')
-    return { id: row.id, icon: LogIn, predicate: 'opened the app', app: null, detail: null, isError: false }
-  if (row.type === 'error')
-    return { id: row.id, icon: Bug, predicate: 'hit an error', app: null, detail: clean(row.target) || null, isError: true }
-  // click — the button label is the closest thing we have to an "action".
-  const label = clean(row.target)
-  // Skip chrome (back chevrons, ✕, bare arrows): require at least one letter/number.
-  if (label.length < 2 || !/[a-z0-9]/i.test(label)) return null
-  const app = appForPath(row.path)
-  return { id: row.id, icon: app.icon, predicate: `tapped “${label}”`, app: app.name, detail: null, isError: false }
-}
-
-/**
- * Interpret the raw rows and drop consecutive duplicates — the capture-phase
- * click listener can log the same label twice for one tap (nested button/link).
- */
-function buildFeed(rows: EventRow[]): FeedItem[] {
-  const out: FeedItem[] = []
-  for (const row of rows) {
-    const d = describe(row)
-    if (!d) continue
-    const prev = out[out.length - 1]
-    if (prev && prev.user_email === row.user_email && prev.predicate === d.predicate) continue
-    out.push({ ...d, user_email: row.user_email, created_at: row.created_at })
-  }
-  return out
 }
 
 type DetailData = {
