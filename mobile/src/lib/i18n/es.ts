@@ -601,7 +601,7 @@ export const es: Record<keyof typeof en, string> = {
   'onboarding.errGeneric': 'Algo salió mal. Inténtalo de nuevo.',
   'onboarding.nameTitle': '¿Cómo te llamamos?',
   'onboarding.nameDesc': 'Así te verá tu familia en la app.',
-  'onboarding.yourNamePlaceholder': 'ej. Arthur, CJ, Anne Marie',
+  'onboarding.yourNamePlaceholder': 'ej. Carlos, JC, Ana María',
   'onboarding.continue': 'Continuar',
   'onboarding.appearAs': 'Aparecerás como {name}.',
   'onboarding.changeName': 'Cambiar',

@@ -602,7 +602,7 @@ export const en = {
   'onboarding.errGeneric': 'Something went wrong. Please try again.',
   'onboarding.nameTitle': 'What should we call you?',
   'onboarding.nameDesc': 'This is how your family will see you in the app.',
-  'onboarding.yourNamePlaceholder': 'e.g. Arthur, CJ, Anne Marie',
+  'onboarding.yourNamePlaceholder': 'e.g. Sarah, AJ, Mary Ann',
   'onboarding.continue': 'Continue',
   'onboarding.appearAs': "You'll appear as {name}.",
   'onboarding.changeName': 'Change',
