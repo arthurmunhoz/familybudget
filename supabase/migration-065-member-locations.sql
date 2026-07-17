@@ -1,4 +1,4 @@
--- 061: Family location — live member positions for the Whereabouts app (Phase 1).
+-- 065: Family location — live member positions for the Whereabouts app (Phase 1).
 -- One row per member: their latest fix + sharing state. Household-scoped RLS,
 -- same invariants as pings — household_id / user_email are stamped by column
 -- defaults, reads are limited to the caller's household. Realtime so the map

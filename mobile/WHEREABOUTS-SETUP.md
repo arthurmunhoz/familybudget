@@ -8,9 +8,9 @@ location. Map + routing are **Mapbox**.
 
 ## What's already done (in code, verified by the build gate)
 
-- **DB**: `member_locations` table (migration 061) — one row per member, latest
+- **DB**: `member_locations` table (migration 065) — one row per member, latest
   fix + `sharing`/`paused_until` state, household-scoped RLS, Realtime. Applied
-  to the project and mirrored in `supabase/migration-061-member-locations.sql`.
+  to the project and mirrored in `supabase/migration-065-member-locations.sql`.
 - **App**: registered in the hub as **Whereabouts** (`/location`), i18n in
   en/es/pt, screens in `src/apps/location/`, logic in `src/lib/location.ts`, the
   background task in `src/lib/locationTask.ts`.

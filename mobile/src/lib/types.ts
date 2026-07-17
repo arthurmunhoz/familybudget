@@ -253,7 +253,7 @@ export interface CalendarEvent {
   created_at: string
 }
 
-/** A household member's live position + sharing state (migration 061), one row
+/** A household member's live position + sharing state (migration 065), one row
  *  per member. `lat`/`lng` are null before the first fix, or while sharing is
  *  off/paused (we null the coordinates then so no stale location leaks). Use
  *  `isSharingLive()` in `@/lib/location` to decide whether to plot a pin — a row

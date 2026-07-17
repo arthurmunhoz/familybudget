@@ -86,7 +86,7 @@ implementation lives in `src/apps/<id>/`. Nested routes use folders
 Live family map (route `/location`, hub tile "Whereabouts"). **Native-only**: the
 map (`@rnmapbox/maps`) and background location (`expo-location` +
 `expo-task-manager`) need a dev build + Mapbox tokens — see `WHEREABOUTS-SETUP.md`.
-- `member_locations` (migration 061) — one row per member: latest fix + `sharing`
+- `member_locations` (migration 065) — one row per member: latest fix + `sharing`
   / `paused_until`. Household-scoped RLS + Realtime. **Sharing is OFF by default
   (opt-in); we null coordinates on stop/pause so no stale location leaks.**
 - `src/lib/location.ts` — data + logic: fetch/upsert my fix, `setSharing` /

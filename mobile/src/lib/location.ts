@@ -1,6 +1,6 @@
 // Family location ("Whereabouts") — data + logic layer, Phase 1.
 //
-// One row per member in `member_locations` (migration 061). Reads/writes go
+// One row per member in `member_locations` (migration 065). Reads/writes go
 // through RLS (household stamped by column default; a user may only write their
 // OWN row). This file is pure logic + Supabase + expo-location foreground fixes
 // + the Mapbox Directions call for drive-time ETA + navigation deep-links. The
