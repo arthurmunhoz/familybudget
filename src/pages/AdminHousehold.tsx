@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import { Home, Trash2, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { Activity, Bug, Home, LogIn, Trash2, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
+import { appForPath } from '../lib/appRoutes'
 import { formatDay, timeAgo } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { Household, Profile } from '../lib/types'
@@ -16,6 +18,60 @@ interface UserActivity {
   events: number
 }
 
+/** Raw row from admin_household_events (migration 059). */
+interface EventRow {
+  id: number
+  user_email: string
+  type: string
+  path: string | null
+  target: string | null
+  created_at: string
+}
+
+/** An interpreted, ready-to-render line in the activity feed. */
+interface FeedItem {
+  id: number
+  user_email: string
+  icon: LucideIcon
+  predicate: string // reads after the actor's name: "tapped “Save”"
+  app: string | null // app context for the sub-line, if any
+  detail: string | null // extra sub-line (e.g. an error message)
+  isError: boolean
+  created_at: string
+}
+
+const clean = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim()
+
+/** Turn a raw web_event into a readable line, or null to skip it as noise. */
+function describe(row: EventRow): Omit<FeedItem, 'user_email' | 'created_at'> | null {
+  if (row.type === 'session_start')
+    return { id: row.id, icon: LogIn, predicate: 'opened the app', app: null, detail: null, isError: false }
+  if (row.type === 'error')
+    return { id: row.id, icon: Bug, predicate: 'hit an error', app: null, detail: clean(row.target) || null, isError: true }
+  // click — the button label is the closest thing we have to an "action".
+  const label = clean(row.target)
+  // Skip chrome (back chevrons, ✕, bare arrows): require at least one letter/number.
+  if (label.length < 2 || !/[a-z0-9]/i.test(label)) return null
+  const app = appForPath(row.path)
+  return { id: row.id, icon: app.icon, predicate: `tapped “${label}”`, app: app.name, detail: null, isError: false }
+}
+
+/**
+ * Interpret the raw rows and drop consecutive duplicates — the capture-phase
+ * click listener can log the same label twice for one tap (nested button/link).
+ */
+function buildFeed(rows: EventRow[]): FeedItem[] {
+  const out: FeedItem[] = []
+  for (const row of rows) {
+    const d = describe(row)
+    if (!d) continue
+    const prev = out[out.length - 1]
+    if (prev && prev.user_email === row.user_email && prev.predicate === d.predicate) continue
+    out.push({ ...d, user_email: row.user_email, created_at: row.created_at })
+  }
+  return out
+}
+
 /** Admin-only: one household's members and management actions. */
 export default function AdminHousehold() {
   const { id } = useParams<{ id: string }>()
@@ -25,6 +81,7 @@ export default function AdminHousehold() {
   const [household, setHousehold] = useState<Household | null>(null)
   const [members, setMembers] = useState<Profile[]>([])
   const [activity, setActivity] = useState<Record<string, UserActivity>>({})
+  const [feed, setFeed] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true)
 
   const [mName, setMName] = useState('')
@@ -33,7 +90,7 @@ export default function AdminHousehold() {
 
   const load = useCallback(async () => {
     if (!id) return
-    const [h, u, act] = await Promise.all([
+    const [h, u, act, ev] = await Promise.all([
       supabase.from('households').select('*').eq('id', id).single(),
       supabase
         .from('allowed_users')
@@ -41,6 +98,7 @@ export default function AdminHousehold() {
         .eq('household_id', id)
         .order('display_name'),
       supabase.rpc('admin_user_activity', { days: 30 }),
+      supabase.rpc('admin_household_events', { p_household: id, lim: 40 }),
     ])
     setHousehold(h.data)
     setMembers(u.data ?? [])
@@ -49,6 +107,7 @@ export default function AdminHousehold() {
         ((act.data ?? []) as UserActivity[]).map((a) => [a.user_email, a]),
       ),
     )
+    setFeed(buildFeed((ev.data ?? []) as EventRow[]))
     setLoading(false)
   }, [id])
 
@@ -59,6 +118,8 @@ export default function AdminHousehold() {
   if (!profile?.is_admin) return <Navigate to="/" replace />
 
   const atLimit = members.length >= MAX_MEMBERS
+  const nameFor = (email: string) =>
+    members.find((m) => m.email === email)?.display_name ?? email.split('@')[0]
 
   async function addMember() {
     const email = mEmail.trim().toLowerCase()
@@ -226,6 +287,46 @@ export default function AdminHousehold() {
                 Add
               </button>
             </div>
+          )}
+
+          <h2 className="mt-6 mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-(--text-faint)">
+            <Activity size={13} strokeWidth={2.5} aria-hidden="true" />
+            Recent activity
+          </h2>
+          {feed.length === 0 ? (
+            <p className="rounded-xl bg-(--card) px-4 py-3 text-sm text-(--text-muted)">
+              No activity recorded yet.
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {feed.map((f) => (
+                <li
+                  key={f.id}
+                  className="flex items-start gap-3 rounded-xl bg-(--card) px-3 py-2.5"
+                >
+                  <div
+                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      f.isError
+                        ? 'bg-(--accent-soft) text-(--expense)'
+                        : 'bg-(--surface) text-(--accent)'
+                    }`}
+                  >
+                    <f.icon size={15} strokeWidth={2} aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm leading-snug text-(--text)">
+                      <span className="font-medium">{nameFor(f.user_email)}</span> {f.predicate}
+                    </p>
+                    <p className="text-xs text-(--text-faint)">
+                      {[f.app, timeAgo(f.created_at)].filter(Boolean).join(' · ')}
+                    </p>
+                    {f.detail && (
+                      <p className="mt-0.5 break-words text-xs text-(--expense)">{f.detail}</p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
 
           {members.length === 0 && (

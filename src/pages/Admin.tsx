@@ -1,28 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import {
-  BarChart3,
-  Bell,
-  Bug,
-  Calculator,
-  CalendarDays,
-  CalendarHeart,
-  FolderLock,
-  Home,
-  LayoutGrid,
-  PartyPopper,
-  PawPrint,
-  Plus,
-  ShoppingCart,
-  Users,
-  Wallet,
-  Wrench,
-  X,
-} from 'lucide-react'
+import { BarChart3, Bug, Home, LayoutGrid, PartyPopper, Plus, Wrench, X } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useBack } from '../hooks/useBack'
 import { useCachedQuery } from '../hooks/useCachedQuery'
+import { APP_META } from '../lib/appRoutes'
 import { formatDuration, timeAgo } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { Household, Profile } from '../lib/types'
@@ -32,23 +15,6 @@ interface AppStat {
   icon: LucideIcon
   views: number
   seconds: number
-}
-
-// Route root → app name + icon, kept in sync with the hub apps (see apps.ts).
-const APP_META: Record<string, { name: string; icon: LucideIcon }> = {
-  '': { name: 'Hub', icon: Home },
-  budget: { name: 'Money', icon: Wallet },
-  month: { name: 'Money', icon: Wallet },
-  shopping: { name: 'Shopping', icon: ShoppingCart },
-  pings: { name: 'Nudges', icon: Bell },
-  pets: { name: 'Pets', icon: PawPrint },
-  docs: { name: 'Documents', icon: FolderLock },
-  calendar: { name: 'Calendar', icon: CalendarDays },
-  // Kept for historical analytics: 'dates' was merged into the calendar.
-  dates: { name: 'Dates', icon: CalendarHeart },
-  family: { name: 'Family', icon: Users },
-  calc: { name: 'Calculator', icon: Calculator },
-  admin: { name: 'Admin', icon: Wrench },
 }
 
 const PERIODS = [7, 30, 90]
