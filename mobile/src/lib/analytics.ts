@@ -22,6 +22,9 @@ export type EventName =
   | 'entry.created'
   | 'entry.updated'
   | 'entry.deleted'
+  | 'budget.created'
+  | 'budget.visibility_changed'
+  | 'period.deleted'
   // Shopping
   | 'shopping.added'
   | 'shopping.checked'
@@ -58,6 +61,9 @@ export const SEMANTIC_EVENTS: EventName[] = [
   'entry.created',
   'entry.updated',
   'entry.deleted',
+  'budget.created',
+  'budget.visibility_changed',
+  'period.deleted',
   'shopping.added',
   'shopping.checked',
   'shopping.removed',

@@ -24,6 +24,7 @@ import { Camera, Check, ChevronDown, ChevronRight, Lock, Wallet, X } from 'lucid
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { track } from '@/lib/analytics'
 import { usePlus } from '@/lib/plus'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
@@ -187,6 +188,7 @@ export default function Budgets() {
       if (error.message.includes('free_plan_budget_limit')) router.push('/paywall')
       return
     }
+    track('budget.created', { name: trimmed, period, private: isPrivate })
     setName('')
     setPeriod('monthly')
     load()
