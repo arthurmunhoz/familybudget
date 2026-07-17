@@ -443,8 +443,8 @@ export const es: Record<keyof typeof en, string> = {
   'family.receiveFrom': 'Puede recibir de',
   'family.universalDonor': 'Donante universal',
   'family.universalRecipient': 'Receptor universal',
-  'family.shoeMen': 'Hombre',
-  'family.shoeWomen': 'Mujer',
+  'family.shoeMen': 'H',
+  'family.shoeWomen': 'M',
 
   'budget.title': 'Presupuestos',
   'budget.empty': 'Aún no hay presupuestos.',

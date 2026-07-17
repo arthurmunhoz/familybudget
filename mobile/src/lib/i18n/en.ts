@@ -445,8 +445,8 @@ export const en = {
   'family.receiveFrom': 'Can receive from',
   'family.universalDonor': 'Universal donor',
   'family.universalRecipient': 'Universal recipient',
-  'family.shoeMen': 'Men',
-  'family.shoeWomen': 'Women',
+  'family.shoeMen': 'M',
+  'family.shoeWomen': 'W',
 
   'budget.title': 'Budgets',
   'budget.empty': 'No budgets yet.',

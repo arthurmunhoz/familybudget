@@ -329,22 +329,23 @@ function ShoeField({
     onChange(composeShoe(system, g, v))
   }
 
+  // Both pill groups ride on the label's row, gender to the right of the system.
+  // Gender is an initial per language (M/W; H/M in es/pt) — five controls have
+  // to share this row, and the spelled-out words were too wide to fit on a small
+  // screen alongside US/EU/UK.
   return (
-    <View style={{ gap: 6 }}>
-      <Txt variant="label">{label}</Txt>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-        <NumInput value={v} onChangeText={changeV} />
-        <View style={{ flex: 1 }} />
-        <UnitPills
-          value={system}
-          onChange={toggleSystem}
-          options={[
-            { value: 'US', label: 'US' },
-            { value: 'EU', label: 'EU' },
-            { value: 'UK', label: 'UK' },
-          ]}
-        />
-      </View>
+    <MeasureRow label={label}>
+      <NumInput value={v} onChangeText={changeV} />
+      <View style={{ flex: 1 }} />
+      <UnitPills
+        value={system}
+        onChange={toggleSystem}
+        options={[
+          { value: 'US', label: 'US' },
+          { value: 'EU', label: 'EU' },
+          { value: 'UK', label: 'UK' },
+        ]}
+      />
       <UnitPills
         value={gender}
         onChange={toggleGender}
@@ -353,7 +354,7 @@ function ShoeField({
           { value: 'W', label: t('family.shoeWomen') },
         ]}
       />
-    </View>
+    </MeasureRow>
   )
 }
 
