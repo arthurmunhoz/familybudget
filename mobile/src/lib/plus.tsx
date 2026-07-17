@@ -40,6 +40,9 @@ interface PlusState {
 
 const Ctx = createContext<PlusState | null>(null)
 
+/** Shape of the current_household_plan() RPC (migration 060). */
+type PlanSignal = { plus?: boolean; admin_free?: boolean }
+
 export function PlusProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth()
   const [info, setInfo] = useState<CustomerInfo | null>(null)
@@ -48,6 +51,11 @@ export function PlusProvider({ children }: { children: ReactNode }) {
   // Server-side entitlement (household_subscriptions, via RPC). Covers comps/
   // promos and cross-member purchases that RevenueCat mirrors to the DB.
   const [serverPlus, setServerPlus] = useState(false)
+  // An admin explicitly forced this household to Free for testing (admin_set_plan
+  // wrote plan='free', product='admin_test'). When set, we suppress the live
+  // RevenueCat OR below so the "preview the Free experience" toggle can actually
+  // turn Plus off even while the admin holds a real (sandbox) entitlement.
+  const [adminFree, setAdminFree] = useState(false)
 
   // Configure once, up front.
   useEffect(() => {
@@ -60,11 +68,15 @@ export function PlusProvider({ children }: { children: ReactNode }) {
     let active = true
     // Server-side plan (works even when RevenueCat isn't configured, e.g. dev).
     if (householdId) {
-      supabase.rpc('current_household_is_plus').then(({ data }) => {
-        if (active) setServerPlus(data === true)
+      supabase.rpc('current_household_plan').then(({ data }) => {
+        if (!active || !data) return
+        const p = data as PlanSignal
+        setServerPlus(p.plus === true)
+        setAdminFree(p.admin_free === true)
       })
     } else {
       setServerPlus(false)
+      setAdminFree(false)
     }
 
     if (!purchasesReady()) {
@@ -107,8 +119,10 @@ export function PlusProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (householdId) {
-      const { data } = await supabase.rpc('current_household_is_plus')
-      setServerPlus(data === true)
+      const { data } = await supabase.rpc('current_household_plan')
+      const p = (data ?? {}) as PlanSignal
+      setServerPlus(p.plus === true)
+      setAdminFree(p.admin_free === true)
     }
     if (!purchasesReady()) return
     try {
@@ -153,7 +167,9 @@ export function PlusProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value: PlusState = {
-    isPlus: hasPlus(info) || serverPlus,
+    // Server plan wins; the live RevenueCat entitlement is ORed in for post-
+    // purchase immediacy — but NOT when an admin has forced Free for testing.
+    isPlus: serverPlus || (hasPlus(info) && !adminFree),
     offering,
     available: purchasesReady(),
     loading,

@@ -224,3 +224,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-057-set-display-name.sql (set_display_name: a member can rename themselves — Apple sign-in leaves no name in the JWT, so they were stuck with the email local-part)
 --   migration-058-private-budgets.sql (budgets.visibility/owner_email + budget_members + can_see_budget/is_budget_member/is_budget_owner/can_see_month; months+entries now inherit the budget's visibility)
 --   migration-059-admin-household-events.sql (admin_household_events: recent interpreted activity feed for one household — clicks/session_start/error from web_events, admin accounts excluded)
+--   migration-060-household-plan-admin-free.sql (current_household_plan: returns {plus, admin_free} so the mobile client can suppress the RevenueCat OR when an admin forced Free for testing — fixes the Plus preview toggle not turning off)
