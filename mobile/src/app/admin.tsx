@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
-import { track } from '@/lib/analytics'
+import { SEMANTIC_EVENTS, track } from '@/lib/analytics'
 import { APP_META } from '@/lib/appRoutes'
 import { buildFeed, type EventRow, type FeedItem } from '@/lib/activityFeed'
 import { formatDuration, timeAgo } from '@/lib/format'
@@ -44,7 +44,10 @@ type ErrorRow = {
   path: string | null
   created_at: string
 }
-type AnalyticsData = { stats: AppStat[]; errors: ErrorRow[] }
+type AnalyticsData = { stats: AppStat[]; errors: ErrorRow[]; usage: Record<string, number> }
+
+/** 'entry.created' → 'entry created' for the Feature usage list. */
+const humanizeEvent = (type: string) => type.replace(/[._]/g, ' ')
 
 export default function Admin() {
   const { c } = useTheme()
@@ -100,13 +103,14 @@ export default function Admin() {
   })
   const { households, users, hhLastSeen } = base
 
-  const { data: analytics = { stats: [], errors: [] } } = useCachedQuery<AnalyticsData>(
+  const { data: analytics = { stats: [], errors: [], usage: {} } } = useCachedQuery<AnalyticsData>(
     `admin:analytics:${days}`,
     async () => {
-      const [use, time, errs] = await Promise.all([
+      const [use, time, errs, ev] = await Promise.all([
         supabase.rpc('admin_app_usage', { days }),
         supabase.rpc('admin_app_time', { days }),
         supabase.rpc('admin_recent_errors', { lim: 10 }),
+        supabase.rpc('admin_event_usage', { days }),
       ])
       const merged = new Map<string, AppStat>()
       for (const row of (use.data ?? []) as { root: string; views: number }[]) {
@@ -124,10 +128,17 @@ export default function Admin() {
       return {
         stats: [...merged.values()].sort((a, b) => b.views - a.views),
         errors: (errs.data ?? []) as ErrorRow[],
+        usage: Object.fromEntries(
+          ((ev.data ?? []) as { type: string; n: number }[]).map((r) => [r.type, Number(r.n)]),
+        ),
       }
     },
   )
-  const { stats, errors } = analytics
+  const { stats, errors, usage } = analytics
+  // Every known action + its count (0 = unused), most-used first.
+  const usageRows = SEMANTIC_EVENTS.map((type) => ({ type, n: usage[type] ?? 0 })).sort(
+    (a, b) => b.n - a.n,
+  )
 
   // Cross-household recent activity (admin_recent_events, migration 061). Cache
   // the RAW rows — the in-memory cache JSON-compares, and FeedItem carries icon
@@ -267,6 +278,26 @@ export default function Admin() {
             <Txt variant="faint" style={{ fontSize: 11 }}>
               Admin accounts and internal test households are excluded. Time is estimated from
               activity gaps (idle capped at 5 min).
+            </Txt>
+          </Card>
+
+          <Card style={{ gap: sp.sm }}>
+            <Txt style={{ fontWeight: '700' }}>Feature usage</Txt>
+            {usageRows.map((r) => (
+              <View
+                key={r.type}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Txt variant={r.n === 0 ? 'faint' : 'body'} style={{ fontSize: 13 }}>
+                  {humanizeEvent(r.type)}
+                </Txt>
+                <Txt style={{ fontWeight: '700', fontSize: 13, color: r.n === 0 ? c.textFaint : c.text }}>
+                  {r.n}
+                </Txt>
+              </View>
+            ))}
+            <Txt variant="faint" style={{ fontSize: 11 }}>
+              Actions taken in this period (0 = unused). Screen opens are counted in App usage above.
             </Txt>
           </Card>
 

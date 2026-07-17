@@ -29,6 +29,7 @@ import {
   yearsAt,
   type Occurrence,
 } from '@/lib/calendar'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { CalendarEvent } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -193,6 +194,7 @@ export default function Calendar() {
 
   async function remove(ev: CalendarEvent) {
     await supabase.from('calendar_events').delete().eq('id', ev.id)
+    track('calendar.deleted', { title: ev.title })
     load()
   }
 

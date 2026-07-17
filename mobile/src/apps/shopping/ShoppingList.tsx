@@ -275,6 +275,7 @@ export default function ShoppingList() {
     pendingRemovals.current.add(item.id)
     setItems((list) => list.filter((i) => i.id !== item.id))
     void enqueueOp({ k: 'item.remove', id: item.id })
+    track('shopping.removed', { item: item.label })
     scheduleLoad()
   }
 

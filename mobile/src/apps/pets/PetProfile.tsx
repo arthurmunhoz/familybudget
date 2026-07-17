@@ -10,6 +10,7 @@ import { AppHeader, Loader, Screen, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { formatDay } from '@/lib/format'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetEvent } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -57,6 +58,7 @@ export default function PetProfile({ petId }: { petId: string }) {
             Alert.alert(t('pets.deletePetFailed'))
             return
           }
+          track('pet.deleted', { name: pet.name })
           goBack()
         },
       },

@@ -94,6 +94,7 @@ export default function EventForm({
       return
     }
     if (!editing) track('calendar.created', { title: fields.title, kind: draft.kind })
+    else track('calendar.updated', { title: fields.title, kind: draft.kind })
     onSaved(draft.start)
   }
 

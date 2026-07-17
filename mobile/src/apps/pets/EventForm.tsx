@@ -66,6 +66,7 @@ export default function EventForm({
       return
     }
     if (!editingEvent) track('pet.event_logged', { title: fields.title, kind: draft.type })
+    else track('pet.event_updated', { title: fields.title, kind: draft.type })
     onSaved()
   }
 

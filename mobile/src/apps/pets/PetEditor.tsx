@@ -131,6 +131,7 @@ export function PetEditor({
       return
     }
     if (!pet) track('pet.created', { name: fields.name, species: fields.species })
+    else track('pet.updated', { name: fields.name, species: fields.species })
     // Clean up a replaced/removed photo file.
     const oldPhoto = pet?.photo_path ?? null
     if (oldPhoto && oldPhoto !== (photoPath || null)) {

@@ -25,19 +25,59 @@ export type EventName =
   // Shopping
   | 'shopping.added'
   | 'shopping.checked'
+  | 'shopping.removed'
   | 'shopping.cleared'
   // Pets
   | 'pet.created'
+  | 'pet.updated'
+  | 'pet.deleted'
   | 'pet.event_logged'
+  | 'pet.event_updated'
+  | 'pet.event_deleted'
   // Nudges
   | 'nudge.sent'
   // Documents
   | 'doc.uploaded'
+  | 'doc.opened'
+  | 'doc.deleted'
   // Calendar
   | 'calendar.created'
+  | 'calendar.updated'
+  | 'calendar.deleted'
   // Family / admin
   | 'member.added'
   | 'plan.changed'
+
+/**
+ * Every semantic (non-behavioral) event, in display order. The admin "Feature
+ * usage" view lists all of these with their counts — including zeros — so you
+ * can see at a glance what's used and what isn't. Keep in sync with EventName
+ * and the render CATALOG in lib/activityFeed.ts.
+ */
+export const SEMANTIC_EVENTS: EventName[] = [
+  'entry.created',
+  'entry.updated',
+  'entry.deleted',
+  'shopping.added',
+  'shopping.checked',
+  'shopping.removed',
+  'shopping.cleared',
+  'pet.created',
+  'pet.updated',
+  'pet.deleted',
+  'pet.event_logged',
+  'pet.event_updated',
+  'pet.event_deleted',
+  'nudge.sent',
+  'doc.uploaded',
+  'doc.opened',
+  'doc.deleted',
+  'calendar.created',
+  'calendar.updated',
+  'calendar.deleted',
+  'member.added',
+  'plan.changed',
+]
 
 interface EventInsert {
   user_email: string
