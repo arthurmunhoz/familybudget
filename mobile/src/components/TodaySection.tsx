@@ -4,7 +4,7 @@
 // anniversaries highlighted with their marker + "turns N"/"N years") and any
 // pet-care items due today or overdue. Tapping a row opens the relevant app.
 // Reloads on focus so it reflects new events / a changed home city.
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Pressable, View, type StyleProp, type ViewStyle } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import {
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react-native'
 
 import { Card, Txt } from './ui'
+import { CityPickerSheet } from './CityPickerSheet'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
 import { supabase } from '../lib/supabase'
@@ -120,6 +121,11 @@ export default function TodaySection() {
     loading: weatherLoading,
     reload: reloadWeather,
   } = useHomeWeather(unit)
+
+  // No city yet → set one right here (keyboard up, one tap). Once a city IS set,
+  // the same button goes to Settings' Weather section, which owns changing and
+  // removing it.
+  const [pickingCity, setPickingCity] = useState(false)
 
   type TodayData = { events: CalendarEvent[]; petEvents: PetEvent[]; pets: PetLite[] }
   const { data = { events: [], petEvents: [], pets: [] }, revalidate } =
@@ -233,6 +239,7 @@ export default function TodaySection() {
   }, [widgetItems, weather, weatherAlert, cityShort, locale, t, today])
 
   return (
+    <>
     <Card style={{ gap: sp.md, marginBottom: sp.lg }}>
       {/* date + weather */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
@@ -243,7 +250,11 @@ export default function TodaySection() {
           </Txt>
         </View>
         <Pressable
-          onPress={() => router.push({ pathname: '/settings', params: { highlight: 'weather' } })}
+          onPress={() =>
+            location
+              ? router.push({ pathname: '/settings', params: { highlight: 'weather' } })
+              : setPickingCity(true)
+          }
           hitSlop={6}
           accessibilityRole="button"
           style={{ alignItems: 'flex-end', gap: 1 }}
@@ -376,5 +387,16 @@ export default function TodaySection() {
         </View>
       )}
     </Card>
+
+    {pickingCity ? (
+      <CityPickerSheet
+        onClose={() => setPickingCity(false)}
+        onSaved={() => {
+          setPickingCity(false)
+          void reloadWeather()
+        }}
+      />
+    ) : null}
+    </>
   )
 }
