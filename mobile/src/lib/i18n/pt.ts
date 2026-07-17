@@ -603,7 +603,7 @@ export const pt: Record<keyof typeof en, string> = {
   'onboarding.nameDesc': 'É assim que sua família vai te ver no app.',
   'onboarding.yourNamePlaceholder': 'ex. Lucas, JP, Ana Clara',
   'onboarding.continue': 'Continuar',
-  'onboarding.appearAs': 'Você vai aparecer como {name}.',
+  'onboarding.appearAs': 'Você vai aparecer como',
   'onboarding.changeName': 'Alterar',
   'onboarding.errYourNameRequired': 'Digite seu nome.',
   'family.myName': 'Seu nome',

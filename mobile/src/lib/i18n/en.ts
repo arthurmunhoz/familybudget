@@ -604,7 +604,7 @@ export const en = {
   'onboarding.nameDesc': 'This is how your family will see you in the app.',
   'onboarding.yourNamePlaceholder': 'e.g. Sarah, AJ, Mary Ann',
   'onboarding.continue': 'Continue',
-  'onboarding.appearAs': "You'll appear as {name}.",
+  'onboarding.appearAs': "You'll appear as",
   'onboarding.changeName': 'Change',
   'onboarding.errYourNameRequired': 'Please enter your name.',
   'family.myName': 'Your name',

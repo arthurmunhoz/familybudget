@@ -141,8 +141,13 @@ export default function Onboarding() {
           </>
         ) : (
           <>
-            <View style={{ alignItems: 'center' }}>
-              <Txt variant="faint">{t('onboarding.appearAs', { name: myName.trim() })}</Txt>
+            {/* Echo the name back, big — they just typed it, so let them
+                actually confirm it before committing to a household. */}
+            <View style={{ alignItems: 'center', gap: 2 }}>
+              <Txt variant="faint">{t('onboarding.appearAs')}</Txt>
+              <Txt variant="title" numberOfLines={1}>
+                {myName.trim()}
+              </Txt>
               <Btn
                 title={t('onboarding.changeName')}
                 onPress={() => setStep('name')}
