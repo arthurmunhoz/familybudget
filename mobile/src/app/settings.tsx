@@ -10,6 +10,7 @@ import {
   Easing,
   Linking,
   Pressable,
+  ScrollView,
   Share,
   StyleSheet,
   View,
@@ -427,20 +428,29 @@ export default function Settings() {
   const [cityMsg, setCityMsg] = useState<TKey | null>(null)
   const unit = lang === 'en' ? 'fahrenheit' : 'celsius'
 
-  // Deep-link from the Hub's "Set city" button (?highlight=weather): hoist the
-  // Weather section to the top of the page (see weatherSection) and briefly
-  // outline it. This used to scroll to the section instead, which could never
-  // reach the top — the ScrollView clamps at the end of its content.
+  // Deep-link from the Hub's "Set city" button (?highlight=weather): scroll to
+  // the Weather section and briefly outline it.
   const params = useLocalSearchParams<{ highlight?: string }>()
-  const focusWeather = params.highlight === 'weather'
+  const scrollRef = useRef<ScrollView>(null)
+  const [weatherY, setWeatherY] = useState<number | null>(null)
   const [highlightWeather, setHighlightWeather] = useState(false)
+  const handledHighlight = useRef(false)
 
   useEffect(() => {
-    if (!focusWeather) return
-    setHighlightWeather(true)
-    const id = setTimeout(() => setHighlightWeather(false), 2400)
+    if (params.highlight !== 'weather' || weatherY == null || handledHighlight.current) return
+    // Don't lock in `handledHighlight` until the scroll actually fires — the
+    // Plus and Notifications cards above this section resolve async state
+    // (isPlus, pushOn) shortly after mount and can change height, re-firing
+    // this section's onLayout with a corrected y. Locking too early meant the
+    // scroll used a stale pre-settle offset and landed short of the card.
+    const id = setTimeout(() => {
+      handledHighlight.current = true
+      scrollRef.current?.scrollTo({ y: Math.max(0, weatherY - 12), animated: true })
+      setHighlightWeather(true)
+      setTimeout(() => setHighlightWeather(false), 2400)
+    }, 350)
     return () => clearTimeout(id)
-  }, [focusWeather])
+  }, [params.highlight, weatherY])
 
   // Reflect the current OS permission from the start (no prompt).
   useEffect(() => {
@@ -584,118 +594,9 @@ export default function Settings() {
     )
   }
 
-  // Weather / home city (drives the Today section on the home screen).
-  // Rendered FIRST when arriving from the Hub's "Set city" (?highlight=weather):
-  // it is otherwise 7th of 8 sections with only Account beneath it, so there was
-  // never enough content below for the ScrollView to bring it to the top —
-  // scrollTo() clamped at the end of the content and stranded the card mid-screen,
-  // where the keyboard covered the city suggestions. Rendering it first needs no
-  // scrolling at all.
-  const weatherSection = (
-            <View style={{ gap: sp.sm }}>
-              <Txt variant="label">{t('settings.weather')}</Txt>
-              <Card
-                style={{
-                  gap: sp.md,
-                  ...(highlightWeather ? { borderWidth: 2, borderColor: c.accent } : {}),
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                  <View
-                    style={{
-                      height: 44,
-                      width: 44,
-                      borderRadius: 22,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: homeLoc ? c.accentSoft : c.surface,
-                    }}
-                  >
-                    {homeLoc && preview ? (
-                      (() => {
-                        const WI = weatherIcon(preview.code)
-                        return <WI size={22} color={c.accent} />
-                      })()
-                    ) : (
-                      <MapPin size={20} color={homeLoc ? c.accent : c.textMuted} />
-                    )}
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Txt style={{ fontFamily: fonts.semibold }} numberOfLines={1}>
-                      {homeLoc ? homeLoc.city.split(',')[0] : t('settings.homeCity')}
-                    </Txt>
-                    <Txt variant="faint" numberOfLines={1}>
-                      {homeLoc
-                        ? preview
-                          ? `${preview.temperature}${preview.unit}`
-                          : homeLoc.city
-                        : t('settings.homeCityHint')}
-                    </Txt>
-                  </View>
-                  {homeLoc ? (
-                    <Pressable onPress={clearCity} hitSlop={8}>
-                      <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 13 }}>
-                        {t('common.remove')}
-                      </Txt>
-                    </Pressable>
-                  ) : null}
-                </View>
-
-                <Field
-                  value={cityInput}
-                  onChangeText={setCityInput}
-                  placeholder={t('settings.cityPlaceholder')}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                  onSubmitEditing={() => {
-                    if (suggestions[0]) void pickCity(suggestions[0])
-                  }}
-                />
-
-                {suggestions.length > 0 ? (
-                  <View style={{ borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, overflow: 'hidden' }}>
-                    {suggestions.map((s, i) => (
-                      <Pressable
-                        key={`${s.lat},${s.lon}`}
-                        onPress={() => void pickCity(s)}
-                        style={({ pressed }) => ({
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: sp.sm,
-                          paddingHorizontal: sp.md,
-                          paddingVertical: 10,
-                          backgroundColor: pressed ? c.cardActive : c.card,
-                          borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
-                          borderTopColor: c.border,
-                        })}
-                      >
-                        <MapPin size={14} color={c.textMuted} />
-                        <Txt numberOfLines={1} style={{ flex: 1 }}>
-                          {s.city}
-                        </Txt>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : searching ? (
-                  <Txt variant="faint">{t('settings.searchingCity')}</Txt>
-                ) : cityMsg ? (
-                  <Txt variant="faint">{t(cityMsg)}</Txt>
-                ) : null}
-              </Card>
-            </View>
-  )
-
   return (
-    <Screen scroll header={<AppHeader title={t('settings.title')} />}>
+    <Screen scroll scrollRef={scrollRef} header={<AppHeader title={t('settings.title')} />}>
       <View style={{ gap: sp.xl }}>
-        {focusWeather ? (
-          <>
-            {weatherSection}
-            <Divider />
-          </>
-        ) : null}
-
         {/* One Roof Plus */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">{t('settings.plus')}</Txt>
@@ -873,15 +774,104 @@ export default function Settings() {
 
         <Divider />
 
-        {/* Weather sits here normally; it's hoisted to the top when deep-linked.
-            Each slot carries its own trailing Divider so neither path doubles
-            them up. */}
-        {focusWeather ? null : (
-          <>
-            {weatherSection}
-            <Divider />
-          </>
-        )}
+        {/* Weather / home city (drives the Today section on the home screen) */}
+        <View
+          style={{ gap: sp.sm }}
+          onLayout={(e) => setWeatherY(e.nativeEvent.layout.y)}
+        >
+          <Txt variant="label">{t('settings.weather')}</Txt>
+          <Card
+            style={{
+              gap: sp.md,
+              ...(highlightWeather ? { borderWidth: 2, borderColor: c.accent } : {}),
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <View
+                style={{
+                  height: 44,
+                  width: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: homeLoc ? c.accentSoft : c.surface,
+                }}
+              >
+                {homeLoc && preview ? (
+                  (() => {
+                    const WI = weatherIcon(preview.code)
+                    return <WI size={22} color={c.accent} />
+                  })()
+                ) : (
+                  <MapPin size={20} color={homeLoc ? c.accent : c.textMuted} />
+                )}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt style={{ fontFamily: fonts.semibold }} numberOfLines={1}>
+                  {homeLoc ? homeLoc.city.split(',')[0] : t('settings.homeCity')}
+                </Txt>
+                <Txt variant="faint" numberOfLines={1}>
+                  {homeLoc
+                    ? preview
+                      ? `${preview.temperature}${preview.unit}`
+                      : homeLoc.city
+                    : t('settings.homeCityHint')}
+                </Txt>
+              </View>
+              {homeLoc ? (
+                <Pressable onPress={clearCity} hitSlop={8}>
+                  <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 13 }}>
+                    {t('common.remove')}
+                  </Txt>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <Field
+              value={cityInput}
+              onChangeText={setCityInput}
+              placeholder={t('settings.cityPlaceholder')}
+              autoCapitalize="words"
+              autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                if (suggestions[0]) void pickCity(suggestions[0])
+              }}
+            />
+
+            {suggestions.length > 0 ? (
+              <View style={{ borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, overflow: 'hidden' }}>
+                {suggestions.map((s, i) => (
+                  <Pressable
+                    key={`${s.lat},${s.lon}`}
+                    onPress={() => void pickCity(s)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: sp.sm,
+                      paddingHorizontal: sp.md,
+                      paddingVertical: 10,
+                      backgroundColor: pressed ? c.cardActive : c.card,
+                      borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                      borderTopColor: c.border,
+                    })}
+                  >
+                    <MapPin size={14} color={c.textMuted} />
+                    <Txt numberOfLines={1} style={{ flex: 1 }}>
+                      {s.city}
+                    </Txt>
+                  </Pressable>
+                ))}
+              </View>
+            ) : searching ? (
+              <Txt variant="faint">{t('settings.searchingCity')}</Txt>
+            ) : cityMsg ? (
+              <Txt variant="faint">{t(cityMsg)}</Txt>
+            ) : null}
+          </Card>
+        </View>
+
+        <Divider />
 
         {/* Account */}
         <View style={{ gap: sp.sm }}>
