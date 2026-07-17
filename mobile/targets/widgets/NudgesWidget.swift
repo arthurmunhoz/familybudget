@@ -247,6 +247,43 @@ struct SendNudgeIntent: AppIntent {
   }
 }
 
+// ── Nudge selection (configurable small widget) ──────────────────────────────
+// The small widget shows a SINGLE nudge; this lets the user pick which one via
+// the system "Edit Widget" long-press (same pattern as BudgetWidget's
+// SelectBudgetIntent in index.swift). Medium/large keep showing the top-N grid
+// and ignore this selection. The picker's options come straight from the
+// presets the app already mirrored into the App Group ("nudge_presets").
+struct NudgePresetEntity: AppEntity {
+  let id: String
+  let emoji: String
+  let label: String
+
+  static var typeDisplayRepresentation: TypeDisplayRepresentation { "Nudge" }
+  var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(emoji) \(label)") }
+  static var defaultQuery = NudgePresetQuery()
+}
+
+struct NudgePresetQuery: EntityQuery {
+  func entities(for identifiers: [String]) async throws -> [NudgePresetEntity] {
+    loadPresets().filter { identifiers.contains($0.id) }
+      .map { NudgePresetEntity(id: $0.id, emoji: $0.emoji, label: $0.label) }
+  }
+  func suggestedEntities() async throws -> [NudgePresetEntity] {
+    loadPresets().map { NudgePresetEntity(id: $0.id, emoji: $0.emoji, label: $0.label) }
+  }
+  func defaultResult() async -> NudgePresetEntity? {
+    loadPresets().first.map { NudgePresetEntity(id: $0.id, emoji: $0.emoji, label: $0.label) }
+  }
+}
+
+struct SelectNudgeIntent: WidgetConfigurationIntent {
+  static var title: LocalizedStringResource { "Select nudge" }
+  static var description: IntentDescription { "Choose which nudge the small widget sends." }
+
+  @Parameter(title: "Nudge") var preset: NudgePresetEntity?
+  init() {}
+}
+
 // ── Timeline ─────────────────────────────────────────────────────────────────
 struct NudgesEntry: TimelineEntry {
   let date: Date
@@ -255,6 +292,9 @@ struct NudgesEntry: TimelineEntry {
   let selected: [String]
   let hasToken: Bool
   let status: WidgetStatus?
+  // The preset the user picked for the small widget (nil = default to the
+  // first). Ignored by medium/large. Falls back to first if it was deleted.
+  let pickedId: String?
 }
 
 private let sampleNudges = NudgesEntry(
@@ -271,35 +311,38 @@ private let sampleNudges = NudgesEntry(
   ],
   selected: [],
   hasToken: true,
-  status: nil)
+  status: nil,
+  pickedId: nil)
 
-func currentNudges() -> NudgesEntry {
+func currentNudges(pickedId: String?) -> NudgesEntry {
   NudgesEntry(
     date: Date(),
     members: loadMembers(),
     presets: loadPresets(),
     selected: loadRecipients(),
     hasToken: !widgetToken().isEmpty,
-    status: loadStatus())
+    status: loadStatus(),
+    pickedId: pickedId)
 }
 
-struct NudgesProvider: TimelineProvider {
+struct NudgesProvider: AppIntentTimelineProvider {
   func placeholder(in context: Context) -> NudgesEntry { sampleNudges }
-  func getSnapshot(in context: Context, completion: @escaping (NudgesEntry) -> Void) {
-    completion(context.isPreview && loadPresets().isEmpty ? sampleNudges : currentNudges())
+
+  func snapshot(for configuration: SelectNudgeIntent, in context: Context) async -> NudgesEntry {
+    context.isPreview && loadPresets().isEmpty ? sampleNudges : currentNudges(pickedId: configuration.preset?.id)
   }
-  func getTimeline(in context: Context, completion: @escaping (Timeline<NudgesEntry>) -> Void) {
-    let now = currentNudges()
+
+  func timeline(for configuration: SelectNudgeIntent, in context: Context) async -> Timeline<NudgesEntry> {
+    let now = currentNudges(pickedId: configuration.preset?.id)
     if let status = now.status {
       // Two entries: the confirmation now, then the plain list at `until` — iOS
       // itself flips between them at that wall-clock time, no process needed.
       let reverted = NudgesEntry(
         date: status.until, members: now.members, presets: now.presets, selected: now.selected,
-        hasToken: now.hasToken, status: nil)
-      completion(Timeline(entries: [now, reverted], policy: .atEnd))
-    } else {
-      completion(Timeline(entries: [now], policy: .never))
+        hasToken: now.hasToken, status: nil, pickedId: now.pickedId)
+      return Timeline(entries: [now, reverted], policy: .atEnd)
     }
+    return Timeline(entries: [now], policy: .never)
   }
 }
 
@@ -410,8 +453,19 @@ struct NudgesWidgetView: View {
     }
   }
 
+  // Small shows the single user-picked preset (falling back to the first, e.g.
+  // when nothing's configured yet or the pick was deleted); medium/large show
+  // the top-N in their existing order.
+  private var visiblePresets: [NudgePreset] {
+    if family == .systemSmall {
+      if let id = entry.pickedId, let p = entry.presets.first(where: { $0.id == id }) { return [p] }
+      return Array(entry.presets.prefix(1))
+    }
+    return Array(entry.presets.prefix(presetCount))
+  }
+
   private var gridRows: [NudgeGridRow] {
-    nudgeGridRows(Array(entry.presets.prefix(presetCount)), columns: columns)
+    nudgeGridRows(visiblePresets, columns: columns)
   }
 
   var body: some View {
@@ -468,12 +522,12 @@ struct NudgesWidgetView: View {
 
 struct NudgesWidget: Widget {
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: "NudgesWidget", provider: NudgesProvider()) { entry in
+    AppIntentConfiguration(kind: "NudgesWidget", intent: SelectNudgeIntent.self, provider: NudgesProvider()) { entry in
       NudgesWidgetView(entry: entry)
         .containerBackground(appTheme().bg, for: .widget)
     }
     .configurationDisplayName("Nudges")
-    .description("Send a household nudge from your Home Screen.")
+    .description("Send a household nudge from your Home Screen. Long-press the small widget to pick which nudge it sends.")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }
 }
