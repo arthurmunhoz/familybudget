@@ -19,7 +19,13 @@ Character limits are Apple's; I've kept everything within them. Tweak to taste.
   *(all three go live after you deploy the PWA — `npx vercel deploy --prod`)*
 
 ## Promotional text (170 char max — editable anytime without review)
-`One home, one app. Shared calendar, shopping list, and budget — plus pet care, family documents, and quick nudges. Snap a receipt to log spending in seconds.`
+
+**v1.1 (current)** — 161/170. Deliberately explains what the app IS rather than
+what's new: with no installed base yet, nobody is coming back to read a
+changelog. Swap it for a widgets-led line once there are users to return.
+`Welcome to One Roof! Your family's calendar, shopping, budget, pets, documents, and nudges — all in one shared app. Feedback: one.roof.family.organizer@gmail.com`
+
+<sub>v1.0 was: `One home, one app. Shared calendar, shopping list, and budget — plus pet care, family documents, and quick nudges. Snap a receipt to log spending in seconds.`</sub>
 
 ## Keywords (100 char max, comma-separated, no spaces)
 `shared,grocery,list,chores,household,planner,reminders,tasks,kids,couples,home,manager,checklist,pets,bills`
