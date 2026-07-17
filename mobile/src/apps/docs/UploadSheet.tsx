@@ -9,6 +9,7 @@ import { X } from 'lucide-react-native'
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { DocCategory, Profile } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -83,6 +84,7 @@ export default function UploadSheet({
       Alert.alert(t('docs.saveFailed'))
       return
     }
+    track('doc.uploaded', { title: title.trim(), category })
     onSaved()
   }
 

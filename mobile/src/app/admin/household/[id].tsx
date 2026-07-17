@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth'
 import { memberLimit } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { track } from '@/lib/analytics'
 import { buildFeed, type EventRow } from '@/lib/activityFeed'
 import { formatDay, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
@@ -90,6 +91,7 @@ export default function AdminHousehold() {
       Alert.alert(t('admin.planError'))
       return
     }
+    track('plan.changed', { plan: next ? 'plus' : 'free', scope: 'household', household: id })
     load()
   }
 
@@ -118,6 +120,7 @@ export default function AdminHousehold() {
       )
       return
     }
+    track('member.added', { email, name })
     setMName('')
     setMEmail('')
     load()

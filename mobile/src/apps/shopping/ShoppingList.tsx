@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronLeft, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
 
 import { AppHeader, Loader, Txt } from '@/components/ui'
+import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
 import { readCache, writeCache } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
@@ -252,6 +253,7 @@ export default function ShoppingList() {
     }
     setItems((list) => [...list, optimistic])
     void enqueueOp({ k: 'item.add', tempId: id, label: trimmed, store_id: activeStoreId, added_by: profile.email })
+    track('shopping.added', { item: trimmed })
     scheduleLoad()
   }
 
@@ -265,6 +267,7 @@ export default function ShoppingList() {
       ),
     )
     void enqueueOp({ k: 'item.toggle', id: item.id, checked })
+    if (checked) track('shopping.checked', { item: item.label })
     scheduleLoad()
   }
 
@@ -281,6 +284,7 @@ export default function ShoppingList() {
     checkedIds.forEach((id) => pendingRemovals.current.add(id))
     setItems((list) => list.filter((i) => !i.checked))
     void enqueueOp({ k: 'item.clearChecked' })
+    track('shopping.cleared', { count: checkedIds.length })
     scheduleLoad()
   }
 

@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { track } from '@/lib/analytics'
 import { APP_META } from '@/lib/appRoutes'
 import { buildFeed, type EventRow, type FeedItem } from '@/lib/activityFeed'
 import { formatDuration, timeAgo } from '@/lib/format'
@@ -64,6 +65,7 @@ export default function Admin() {
         Alert.alert(t('admin.planError'))
         return
       }
+      track('plan.changed', { plan: next ? 'plus' : 'free', scope: 'self' })
       await refreshPlus()
     } finally {
       setPlanBusy(false)

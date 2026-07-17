@@ -227,3 +227,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-059-admin-household-events.sql (admin_household_events: recent interpreted activity feed for one household — clicks/session_start/error from web_events, admin accounts excluded)
 --   migration-060-household-plan-admin-free.sql (current_household_plan: returns {plus, admin_free} so the mobile client can suppress the RevenueCat OR when an admin forced Free for testing — fixes the Plus preview toggle not turning off)
 --   migration-061-admin-recent-events.sql (admin_recent_events: cross-household recent-activity feed for the Admin Activity tab — returns household_id, excludes admin accounts + internal households)
+--   migration-062-activity-feed-v2.sql (semantic events: feed RPCs now return meta + filter out page_view/screen_view; admin_app_usage counts screen_view; partial index web_events_activity_idx)

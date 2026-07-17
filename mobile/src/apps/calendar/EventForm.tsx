@@ -12,6 +12,7 @@ import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { HOUSEHOLD_COLOR, KIND_EMOJI, memberColor } from '@/lib/calendar'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { CalendarEvent, EventKind, EventRecurrence, Profile } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -92,6 +93,7 @@ export default function EventForm({
       Alert.alert(t('calendar.saveFailed'))
       return
     }
+    if (!editing) track('calendar.created', { title: fields.title, kind: draft.kind })
     onSaved(draft.start)
   }
 

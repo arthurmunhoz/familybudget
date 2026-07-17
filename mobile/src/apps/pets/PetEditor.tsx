@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { getSignedUrl } from '@/lib/signedUrls'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -129,6 +130,7 @@ export function PetEditor({
       Alert.alert(t('pets.addPetFailed'))
       return
     }
+    if (!pet) track('pet.created', { name: fields.name, species: fields.species })
     // Clean up a replaced/removed photo file.
     const oldPhoto = pet?.photo_path ?? null
     if (oldPhoto && oldPhoto !== (photoPath || null)) {
