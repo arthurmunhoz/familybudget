@@ -5,31 +5,14 @@
 import { useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, Switch, TextInput, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
-import {
-  BarChart3,
-  Bell,
-  Bug,
-  Calculator,
-  CalendarDays,
-  CalendarHeart,
-  ChevronRight,
-  FolderLock,
-  Home,
-  LayoutGrid,
-  PawPrint,
-  Plus,
-  ShoppingCart,
-  Users,
-  Wallet,
-  X,
-  type LucideIcon,
-} from 'lucide-react-native'
+import { BarChart3, Bug, ChevronRight, Home, LayoutGrid, Plus, X, type LucideIcon } from 'lucide-react-native'
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { APP_META } from '@/lib/appRoutes'
 import { formatDuration, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
@@ -40,21 +23,6 @@ interface AppStat {
   icon: LucideIcon
   views: number
   seconds: number
-}
-
-// Route root → app name + icon, kept in sync with the hub apps.
-const APP_META: Record<string, { name: string; icon: LucideIcon }> = {
-  '': { name: 'Hub', icon: Home },
-  budget: { name: 'Money', icon: Wallet },
-  month: { name: 'Money', icon: Wallet },
-  shopping: { name: 'Shopping', icon: ShoppingCart },
-  pings: { name: 'Nudges', icon: Bell },
-  pets: { name: 'Pets', icon: PawPrint },
-  docs: { name: 'Documents', icon: FolderLock },
-  calendar: { name: 'Calendar', icon: CalendarDays },
-  dates: { name: 'Dates', icon: CalendarHeart },
-  family: { name: 'Family', icon: Users },
-  calc: { name: 'Calculator', icon: Calculator },
 }
 
 const PERIODS = [7, 30, 90]

@@ -4,12 +4,13 @@
 import { useState } from 'react'
 import { Alert, Pressable, Switch, TextInput, View } from 'react-native'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
-import { Award, Trash2, X } from 'lucide-react-native'
+import { Award, Bug, LogIn, Trash2, X, type LucideIcon } from 'lucide-react-native'
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { appForPath } from '@/lib/appRoutes'
 import { formatDay, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
@@ -23,11 +24,67 @@ interface UserActivity {
   last_seen: string
   events: number
 }
+
+/** Raw row from admin_household_events (migration 059). */
+interface EventRow {
+  id: number
+  user_email: string
+  type: string
+  path: string | null
+  target: string | null
+  created_at: string
+}
+
+/** An interpreted, ready-to-render line in the activity feed. */
+interface FeedItem {
+  id: number
+  user_email: string
+  icon: LucideIcon
+  predicate: string // reads after the actor's name: 'tapped “Save”'
+  app: string | null // app context for the sub-line, if any
+  detail: string | null // extra sub-line (e.g. an error message)
+  isError: boolean
+  created_at: string
+}
+
+const clean = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim()
+
+/** Turn a raw web_event into a readable line, or null to skip it as noise. */
+function describe(row: EventRow): Omit<FeedItem, 'user_email' | 'created_at'> | null {
+  if (row.type === 'session_start')
+    return { id: row.id, icon: LogIn, predicate: 'opened the app', app: null, detail: null, isError: false }
+  if (row.type === 'error')
+    return { id: row.id, icon: Bug, predicate: 'hit an error', app: null, detail: clean(row.target) || null, isError: true }
+  // click — the button label is the closest thing we have to an "action".
+  const label = clean(row.target)
+  // Skip chrome (back chevrons, ✕, bare arrows): require at least one letter/number.
+  if (label.length < 2 || !/[a-z0-9]/i.test(label)) return null
+  const app = appForPath(row.path)
+  return { id: row.id, icon: app.icon, predicate: `tapped “${label}”`, app: app.name, detail: null, isError: false }
+}
+
+/**
+ * Interpret the raw rows and drop consecutive duplicates — the capture-phase
+ * click listener can log the same label twice for one tap (nested button/link).
+ */
+function buildFeed(rows: EventRow[]): FeedItem[] {
+  const out: FeedItem[] = []
+  for (const row of rows) {
+    const d = describe(row)
+    if (!d) continue
+    const prev = out[out.length - 1]
+    if (prev && prev.user_email === row.user_email && prev.predicate === d.predicate) continue
+    out.push({ ...d, user_email: row.user_email, created_at: row.created_at })
+  }
+  return out
+}
+
 type DetailData = {
   household: Household | null
   members: Profile[]
   activity: Record<string, UserActivity>
   isPlus: boolean
+  events: EventRow[]
 }
 
 export default function AdminHousehold() {
@@ -42,11 +99,11 @@ export default function AdminHousehold() {
   const [planBusy, setPlanBusy] = useState(false)
 
   const {
-    data = { household: null, members: [], activity: {}, isPlus: false },
+    data = { household: null, members: [], activity: {}, isPlus: false, events: [] },
     loading,
     revalidate: load,
   } = useCachedQuery<DetailData>(`admin:household:${id}`, async () => {
-    const [h, u, act, plus] = await Promise.all([
+    const [h, u, act, plus, ev] = await Promise.all([
       supabase.from('households').select('*').eq('id', id).single(),
       supabase
         .from('allowed_users')
@@ -55,6 +112,7 @@ export default function AdminHousehold() {
         .order('display_name'),
       supabase.rpc('admin_user_activity', { days: 30 }),
       supabase.rpc('admin_household_is_plus', { p_household: id }),
+      supabase.rpc('admin_household_events', { p_household: id, lim: 40 }),
     ])
     return {
       household: (h.data as Household) ?? null,
@@ -63,11 +121,15 @@ export default function AdminHousehold() {
         ((act.data ?? []) as UserActivity[]).map((a) => [a.user_email, a]),
       ),
       isPlus: plus.data === true,
+      events: (ev.data ?? []) as EventRow[],
     }
   })
-  const { household, members, activity, isPlus } = data
+  const { household, members, activity, isPlus, events } = data
+  const feed = buildFeed(events)
   const atLimit = members.length >= MAX_MEMBERS
   const hasOwner = members.some((u) => u.role === 'owner')
+  const nameFor = (email: string) =>
+    members.find((m) => m.email === email)?.display_name ?? email.split('@')[0]
 
   // Comp this household to Plus for free (or revoke). Admin-only RPC.
   async function setPlan(next: boolean) {
@@ -365,6 +427,47 @@ export default function AdminHousehold() {
               >
                 <Txt style={{ color: '#fff', fontWeight: '700' }}>Add</Txt>
               </Pressable>
+            </View>
+          )}
+
+          <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginTop: sp.sm }}>
+            Recent activity
+          </Txt>
+          {feed.length === 0 ? (
+            <Card>
+              <Txt variant="muted">No activity recorded yet.</Txt>
+            </Card>
+          ) : (
+            <View style={{ gap: sp.sm }}>
+              {feed.map((f) => (
+                <View key={f.id} style={{ flexDirection: 'row', gap: sp.md, alignItems: 'flex-start' }}>
+                  <View
+                    style={{
+                      height: 32,
+                      width: 32,
+                      borderRadius: radius.md,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: f.isError ? c.accentSoft : c.surface,
+                    }}
+                  >
+                    <f.icon size={15} color={f.isError ? c.expense : c.accent} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                    <Txt style={{ fontSize: 13 }}>
+                      <Txt style={{ fontSize: 13, fontWeight: '700' }}>{nameFor(f.user_email)}</Txt>
+                      {' '}
+                      {f.predicate}
+                    </Txt>
+                    <Txt variant="faint" style={{ fontSize: 11 }}>
+                      {[f.app, timeAgo(f.created_at)].filter(Boolean).join(' · ')}
+                    </Txt>
+                    {f.detail ? (
+                      <Txt style={{ color: c.expense, fontSize: 11 }}>{f.detail}</Txt>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
             </View>
           )}
 
