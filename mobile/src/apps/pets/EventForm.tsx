@@ -8,6 +8,7 @@ import { X } from 'lucide-react-native'
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -64,6 +65,8 @@ export default function EventForm({
       Alert.alert(t('pets.saveFailed'))
       return
     }
+    if (!editingEvent) track('pet.event_logged', { title: fields.title, kind: draft.type })
+    else track('pet.event_updated', { title: fields.title, kind: draft.type })
     onSaved()
   }
 

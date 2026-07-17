@@ -32,6 +32,7 @@ import {
   suggestCategory,
   type Category,
 } from '@/lib/categories'
+import { track } from '@/lib/analytics'
 import { addDaysISO, formatDay, formatMoney, shortName, todayISO } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { CategoryOverride, CategoryRule, CustomCategory, Entry, EntryType, Profile } from '@/lib/types'
@@ -226,6 +227,11 @@ export default function EntryForm({
       setSaving(false)
       return
     }
+    track(entry ? 'entry.updated' : 'entry.created', {
+      kind: type,
+      label: payload.label,
+      amount: parsedAmount,
+    })
     // Learn this label → category choice for future auto-categorization.
     const householdId = profiles[0]?.household_id
     if (type === 'expense' && householdId) {
@@ -249,6 +255,7 @@ export default function EntryForm({
         onPress: async () => {
           setSaving(true)
           await supabase.from('entries').delete().eq('id', entry.id)
+          track('entry.deleted', { kind: entry.type, label: entry.label, amount: entry.amount })
           onSaved()
         },
       },

@@ -5,14 +5,16 @@
 import { useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, Switch, TextInput, View } from 'react-native'
 import { Redirect, router } from 'expo-router'
-import { BarChart3, Bug, ChevronRight, Home, LayoutGrid, Plus, X, type LucideIcon } from 'lucide-react-native'
+import { Activity, BarChart3, Bug, ChevronRight, Home, LayoutGrid, Plus, X, type LucideIcon } from 'lucide-react-native'
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { SEMANTIC_EVENTS, track } from '@/lib/analytics'
 import { APP_META } from '@/lib/appRoutes'
+import { buildFeed, type EventRow, type FeedItem } from '@/lib/activityFeed'
 import { formatDuration, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
@@ -26,7 +28,7 @@ interface AppStat {
 }
 
 const PERIODS = [7, 30, 90]
-type Tab = 'analytics' | 'households'
+type Tab = 'analytics' | 'households' | 'activity'
 type SortKey = 'name' | 'created' | 'active'
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'A–Z' },
@@ -42,7 +44,10 @@ type ErrorRow = {
   path: string | null
   created_at: string
 }
-type AnalyticsData = { stats: AppStat[]; errors: ErrorRow[] }
+type AnalyticsData = { stats: AppStat[]; errors: ErrorRow[]; usage: Record<string, number> }
+
+/** 'entry.created' → 'entry created' for the Feature usage list. */
+const humanizeEvent = (type: string) => type.replace(/[._]/g, ' ')
 
 export default function Admin() {
   const { c } = useTheme()
@@ -63,6 +68,7 @@ export default function Admin() {
         Alert.alert(t('admin.planError'))
         return
       }
+      track('plan.changed', { plan: next ? 'plus' : 'free', scope: 'self' })
       await refreshPlus()
     } finally {
       setPlanBusy(false)
@@ -97,13 +103,14 @@ export default function Admin() {
   })
   const { households, users, hhLastSeen } = base
 
-  const { data: analytics = { stats: [], errors: [] } } = useCachedQuery<AnalyticsData>(
+  const { data: analytics = { stats: [], errors: [], usage: {} } } = useCachedQuery<AnalyticsData>(
     `admin:analytics:${days}`,
     async () => {
-      const [use, time, errs] = await Promise.all([
+      const [use, time, errs, ev] = await Promise.all([
         supabase.rpc('admin_app_usage', { days }),
         supabase.rpc('admin_app_time', { days }),
         supabase.rpc('admin_recent_errors', { lim: 10 }),
+        supabase.rpc('admin_event_usage', { days }),
       ])
       const merged = new Map<string, AppStat>()
       for (const row of (use.data ?? []) as { root: string; views: number }[]) {
@@ -121,10 +128,26 @@ export default function Admin() {
       return {
         stats: [...merged.values()].sort((a, b) => b.views - a.views),
         errors: (errs.data ?? []) as ErrorRow[],
+        usage: Object.fromEntries(
+          ((ev.data ?? []) as { type: string; n: number }[]).map((r) => [r.type, Number(r.n)]),
+        ),
       }
     },
   )
-  const { stats, errors } = analytics
+  const { stats, errors, usage } = analytics
+  // Every known action + its count (0 = unused), most-used first.
+  const usageRows = SEMANTIC_EVENTS.map((type) => ({ type, n: usage[type] ?? 0 })).sort(
+    (a, b) => b.n - a.n,
+  )
+
+  // Cross-household recent activity (admin_recent_events, migration 061). Cache
+  // the RAW rows — the in-memory cache JSON-compares, and FeedItem carries icon
+  // components that don't serialize; interpret them into a feed on each render.
+  const { data: recentEvents = [] } = useCachedQuery<EventRow[]>('admin:activity', async () => {
+    const { data } = await supabase.rpc('admin_recent_events', { lim: 60 })
+    return (data ?? []) as EventRow[]
+  })
+  const activityFeed = buildFeed(recentEvents)
 
   const visibleHouseholds = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -149,6 +172,8 @@ export default function Admin() {
 
   const profileName = (email: string) =>
     users.find((u) => u.email === email)?.display_name ?? email
+  const householdName = (id: string | undefined) =>
+    households.find((h) => h.id === id)?.name ?? 'Unknown'
 
   async function createHousehold() {
     const name = newHousehold.trim()
@@ -201,6 +226,7 @@ export default function Admin() {
       <View style={{ flexDirection: 'row', gap: sp.sm, backgroundColor: c.surface, borderRadius: radius.md, padding: 4, marginBottom: sp.md }}>
         {([
           { key: 'households', label: 'Households', icon: Home },
+          { key: 'activity', label: 'Activity', icon: Activity },
           { key: 'analytics', label: 'Analytics', icon: BarChart3 },
         ] as { key: Tab; label: string; icon: LucideIcon }[]).map((tb) => {
           const on = tab === tb.key
@@ -213,14 +239,14 @@ export default function Admin() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6,
+                gap: 5,
                 paddingVertical: 8,
                 borderRadius: radius.sm,
                 backgroundColor: on ? c.accent : 'transparent',
               }}
             >
-              <tb.icon size={16} color={on ? '#fff' : c.textMuted} />
-              <Txt style={{ fontWeight: '700', color: on ? '#fff' : c.textMuted }}>{tb.label}</Txt>
+              <tb.icon size={15} color={on ? '#fff' : c.textMuted} />
+              <Txt style={{ fontWeight: '700', fontSize: 13, color: on ? '#fff' : c.textMuted }}>{tb.label}</Txt>
             </Pressable>
           )
         })}
@@ -256,6 +282,26 @@ export default function Admin() {
           </Card>
 
           <Card style={{ gap: sp.sm }}>
+            <Txt style={{ fontWeight: '700' }}>Feature usage</Txt>
+            {usageRows.map((r) => (
+              <View
+                key={r.type}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Txt variant={r.n === 0 ? 'faint' : 'body'} style={{ fontSize: 13 }}>
+                  {humanizeEvent(r.type)}
+                </Txt>
+                <Txt style={{ fontWeight: '700', fontSize: 13, color: r.n === 0 ? c.textFaint : c.text }}>
+                  {r.n}
+                </Txt>
+              </View>
+            ))}
+            <Txt variant="faint" style={{ fontSize: 11 }}>
+              Actions taken in this period (0 = unused). Screen opens are counted in App usage above.
+            </Txt>
+          </Card>
+
+          <Card style={{ gap: sp.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
               <Bug size={18} color={c.text} />
               <Txt style={{ fontWeight: '700' }}>Recent errors</Txt>
@@ -274,6 +320,8 @@ export default function Admin() {
             )}
           </Card>
         </View>
+      ) : tab === 'activity' ? (
+        <ActivityFeed feed={activityFeed} actorName={profileName} householdName={householdName} />
       ) : (
         <View style={{ gap: sp.md }}>
           {/* create household */}
@@ -379,6 +427,59 @@ export default function Admin() {
         </View>
       )}
     </Screen>
+  )
+}
+
+/** Cross-household recent-activity list for the Admin "Activity" tab. */
+function ActivityFeed({
+  feed,
+  actorName,
+  householdName,
+}: {
+  feed: FeedItem[]
+  actorName: (email: string) => string
+  householdName: (id: string | undefined) => string
+}) {
+  const { c } = useTheme()
+  if (feed.length === 0) {
+    return (
+      <Card>
+        <Txt variant="muted">No activity yet.</Txt>
+      </Card>
+    )
+  }
+  return (
+    <View style={{ gap: sp.sm }}>
+      {feed.map((f) => (
+        <View key={f.id} style={{ flexDirection: 'row', gap: sp.md, alignItems: 'flex-start' }}>
+          <View
+            style={{
+              height: 32,
+              width: 32,
+              borderRadius: radius.md,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: f.isError ? c.accentSoft : c.surface,
+            }}
+          >
+            <f.icon size={15} color={f.isError ? c.expense : c.accent} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+            <Txt style={{ fontSize: 13 }}>
+              <Txt style={{ fontSize: 13, fontWeight: '700' }}>{actorName(f.user_email)}</Txt>
+              {' '}
+              {f.predicate}
+            </Txt>
+            <Txt variant="faint" style={{ fontSize: 11 }}>
+              {[householdName(f.household_id), f.app, timeAgo(f.created_at)]
+                .filter(Boolean)
+                .join(' · ')}
+            </Txt>
+            {f.detail ? <Txt style={{ color: c.expense, fontSize: 11 }}>{f.detail}</Txt> : null}
+          </View>
+        </View>
+      ))}
+    </View>
   )
 }
 

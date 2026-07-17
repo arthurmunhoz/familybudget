@@ -11,6 +11,7 @@ import {
   HankenGrotesk_600SemiBold,
 } from '@expo-google-fonts/hanken-grotesk';
 
+import { AnalyticsBridge } from '@/components/AnalyticsBridge';
 import { AuthProvider } from '@/lib/auth';
 import { registerBackgroundNotifications } from '@/lib/backgroundNotifications';
 import { registerLocationTask } from '@/lib/locationTask';
@@ -72,6 +73,7 @@ function Chrome() {
   useSyncNudgeWidget();
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <AnalyticsBridge />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
       </Stack>

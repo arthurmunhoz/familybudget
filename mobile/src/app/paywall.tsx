@@ -26,6 +26,7 @@ const BENEFIT_KEYS: TKey[] = [
   'settings.plusFeatureCalendar',
   'settings.plusFeatureSplit',
   'settings.plusFeatureBudgets',
+  'settings.plusFeatureMembers',
   'settings.plusFeaturePrivate',
   'settings.plusFeatureVault',
   'settings.plusFeatureSupport',

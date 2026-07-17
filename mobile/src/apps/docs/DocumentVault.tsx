@@ -22,6 +22,7 @@ import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { formatDay } from '@/lib/format'
 import { getSignedUrl } from '@/lib/signedUrls'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { DocCategory, FamilyDocument } from '@/lib/types'
 import { biometricAvailable, isVaultLockEnabled, setVaultLockEnabled } from '@/lib/vaultLock'
@@ -212,6 +213,7 @@ export default function DocumentVault() {
       Alert.alert(t('docs.openFailed'))
       return
     }
+    track('doc.opened', { title: doc.title, category: doc.category })
     await WebBrowser.openBrowserAsync(url)
   }
 
@@ -224,6 +226,7 @@ export default function DocumentVault() {
         onPress: async () => {
           await supabase.storage.from('documents').remove([doc.file_path])
           await supabase.from('documents').delete().eq('id', doc.id)
+          track('doc.deleted', { title: doc.title, category: doc.category })
           load()
         },
       },

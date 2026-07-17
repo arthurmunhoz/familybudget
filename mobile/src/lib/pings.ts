@@ -1,6 +1,7 @@
 // Household pings: one-tap pings shown live on every member's Hub and pushed
 // to their phones. Insert goes through RLS (household + sender stamped by column
 // defaults); the push is a best-effort call to api/send-ping.
+import { track } from './analytics'
 import { supabase } from './supabase'
 import type { TKey } from './i18n'
 import type { Ping, PingAck, PingPreset } from './types'
@@ -111,6 +112,7 @@ export async function sendPing(
     .select()
     .single()
   if (error || !data) throw error ?? new Error('Could not send ping')
+  track('nudge.sent', { message, kind, recipients: recipients?.length ?? null })
   try {
     const token = await authToken()
     await fetch('/api/send-ping', {

@@ -3,15 +3,18 @@
 // to-date balance, opens one on tap, and creates a new period via a sheet that
 // suggests the current/next period and copies recurring entries forward. The
 // header menu renames or deletes the budget. RN port of budget/Months.tsx.
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { ChevronRight, MoreHorizontal, X } from 'lucide-react-native'
+import { ChevronRight, MoreHorizontal, Trash2, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
+import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
+import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import {
@@ -27,6 +30,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
+import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { DateField } from './shared'
 
 // Period-specific i18n key suffix (month/week/day).
@@ -38,6 +42,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
   const { c } = useTheme()
   const { t } = useI18n()
   const { profile } = useAuth()
+  const { isPlus } = usePlus()
 
   const [creating, setCreating] = useState(false)
 
@@ -48,6 +53,9 @@ export default function Months({ budgetId }: { budgetId: string }) {
   const [renameOpen, setRenameOpen] = useState(false)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  // "Who can view" sheet + visibility-change guard.
+  const [accessOpen, setAccessOpen] = useState(false)
+  const [visBusy, setVisBusy] = useState(false)
 
   const {
     data: { budget, months, entries } = { budget: null, months: [], entries: [] },
@@ -77,6 +85,10 @@ export default function Months({ budgetId }: { budgetId: string }) {
   // Without this the menu would still offer both and the taps would silently do
   // nothing — RLS just matches zero rows.
   const canManage = !budget || budget.visibility !== 'private' || budget.owner_email === profile?.email
+  // Only a budget's owner may change its visibility. Owners come from creation
+  // (058) or the household-owner backfill (064); a still-ownerless budget (a
+  // household that never had an owner) lets whoever makes it private claim it.
+  const isOwner = !budget || !budget.owner_email || budget.owner_email === profile?.email
 
   // To-date balance per period; future-dated entries don't count yet.
   const balances = useMemo(() => {
@@ -195,6 +207,71 @@ export default function Months({ budgetId }: { budgetId: string }) {
     ])
   }
 
+  // Flip a budget between household-wide and private. Going private claims
+  // ownership (owner_email = me) so RLS lets me manage it; the DB trigger
+  // (budgets_plus_guard) also requires Plus, which we check first for a clear
+  // message. Going household re-opens it to everyone in the household.
+  async function setVisibility(next: 'private' | 'household') {
+    if (!budget || !profile || visBusy) return
+    setVisBusy(true)
+    const patch =
+      next === 'private'
+        ? { visibility: 'private' as const, owner_email: profile.email }
+        : { visibility: 'household' as const }
+    const { error } = await supabase.from('budgets').update(patch).eq('id', budget.id)
+    setVisBusy(false)
+    if (error) {
+      Alert.alert(t('budget.visibilityFailed'))
+      return
+    }
+    track('budget.visibility_changed', { to: next, name: budget.name })
+    load()
+  }
+
+  function makePrivate() {
+    if (!budget) return
+    if (!isPlus) {
+      Alert.alert(t('budget.plusRequired'), t('budget.plusRequiredMsg'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('budget.seePlus'), onPress: () => router.push('/paywall') },
+      ])
+      return
+    }
+    Alert.alert(t('budget.makePrivateConfirm', { name: budget.name }), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('budget.makePrivate'), onPress: () => void setVisibility('private') },
+    ])
+  }
+
+  function makeHousehold() {
+    if (!budget) return
+    Alert.alert(t('budget.makeSharedConfirm', { name: budget.name }), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('budget.makeShared'), onPress: () => void setVisibility('household') },
+    ])
+  }
+
+  // Delete one period (month row) and, via ON DELETE CASCADE, its entries.
+  function deletePeriod(m: Month) {
+    const label = periodLabel(period, m.start_date)
+    Alert.alert(t('months.deletePeriodConfirm', { label }), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase.from('months').delete().eq('id', m.id)
+          if (error) {
+            Alert.alert(t('months.periodDeleteFailed'))
+            return
+          }
+          track('period.deleted', { label })
+          load()
+        },
+      },
+    ])
+  }
+
   const hint = !pickedStart
     ? ''
     : alreadyExists
@@ -209,7 +286,8 @@ export default function Months({ budgetId }: { budgetId: string }) {
           : t('months.firstPeriod', { label: periodLabel(period, pickedStart) })
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
         <AppHeader
           title={budget?.name ?? '…'}
@@ -232,42 +310,16 @@ export default function Months({ budgetId }: { budgetId: string }) {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.md }}
         >
-          {months.map((m) => {
-            const balance = balances.get(m.id) ?? 0
-            return (
-              <Card key={m.id} onPress={() => router.push(`/budget/${budgetId}/${m.id}`)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                  <Txt style={{ flex: 1, fontWeight: '700', fontSize: 16 }}>
-                    {periodLabel(period, m.start_date)}
-                  </Txt>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Txt
-                      style={{
-                        fontSize: 10,
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.5,
-                        color: c.textFaint,
-                      }}
-                    >
-                      {t('common.balance')}
-                    </Txt>
-                    <Txt
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '700',
-                        fontVariant: ['tabular-nums'],
-                        color: balance >= 0 ? c.income : c.expense,
-                      }}
-                    >
-                      {formatMoney(balance)}
-                    </Txt>
-                  </View>
-                  <ChevronRight size={20} color={c.textFaint} />
-                </View>
-              </Card>
-            )
-          })}
+          {months.map((m) => (
+            <PeriodCard
+              key={m.id}
+              label={periodLabel(period, m.start_date)}
+              balance={balances.get(m.id) ?? 0}
+              deletable={canManage}
+              onOpen={() => router.push(`/budget/${budgetId}/${m.id}`)}
+              onDelete={() => deletePeriod(m)}
+            />
+          ))}
         </ScrollView>
       )}
 
@@ -308,6 +360,32 @@ export default function Months({ budgetId }: { budgetId: string }) {
                   setRenameOpen(true)
                 }}
               />
+              {budget?.visibility === 'private' ? (
+                <>
+                  <MenuRow
+                    label={t('budget.whoCanViewTitle')}
+                    onPress={() => {
+                      setMenuOpen(false)
+                      setAccessOpen(true)
+                    }}
+                  />
+                  <MenuRow
+                    label={t('budget.makeShared')}
+                    onPress={() => {
+                      setMenuOpen(false)
+                      makeHousehold()
+                    }}
+                  />
+                </>
+              ) : isOwner ? (
+                <MenuRow
+                  label={t('budget.makePrivate')}
+                  onPress={() => {
+                    setMenuOpen(false)
+                    makePrivate()
+                  }}
+                />
+              ) : null}
               <MenuRow
                 label={t('months.delete')}
                 destructive
@@ -370,7 +448,98 @@ export default function Months({ budgetId }: { budgetId: string }) {
           </View>
         </Modal>
       )}
-    </SafeAreaView>
+      {accessOpen && budget ? (
+        <BudgetAccessSheet budget={budget} onClose={() => setAccessOpen(false)} />
+      ) : null}
+      </SafeAreaView>
+    </GestureHandlerRootView>
+  )
+}
+
+/** One period row. Swipe left to reveal a Delete action (which then confirms).
+ *  A read-only viewer (deletable=false) gets a plain card with no swipe. */
+function PeriodCard({
+  label,
+  balance,
+  onOpen,
+  onDelete,
+  deletable,
+}: {
+  label: string
+  balance: number
+  onOpen: () => void
+  onDelete: () => void
+  deletable: boolean
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const swipeRef = useRef<Swipeable>(null)
+
+  const card = (
+    <Card onPress={onOpen}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+        <Txt style={{ flex: 1, fontWeight: '700', fontSize: 16 }}>{label}</Txt>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Txt
+            style={{
+              fontSize: 10,
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              color: c.textFaint,
+            }}
+          >
+            {t('common.balance')}
+          </Txt>
+          <Txt
+            style={{
+              fontSize: 16,
+              fontWeight: '700',
+              fontVariant: ['tabular-nums'],
+              color: balance >= 0 ? c.income : c.expense,
+            }}
+          >
+            {formatMoney(balance)}
+          </Txt>
+        </View>
+        <ChevronRight size={20} color={c.textFaint} />
+      </View>
+    </Card>
+  )
+
+  if (!deletable) return card
+
+  return (
+    <Swipeable
+      ref={swipeRef}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      renderRightActions={() => (
+        <Pressable
+          onPress={() => {
+            swipeRef.current?.close()
+            onDelete()
+          }}
+          accessibilityLabel={t('months.deletePeriod')}
+          style={{
+            width: 92,
+            marginLeft: sp.sm,
+            borderRadius: radius.md,
+            backgroundColor: c.expense,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Trash2 size={20} color="#fff" />
+          <Txt style={{ color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+            {t('common.delete')}
+          </Txt>
+        </Pressable>
+      )}
+    >
+      {card}
+    </Swipeable>
   )
 }
 

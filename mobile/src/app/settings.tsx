@@ -27,6 +27,7 @@ import {
   MapPin,
   ReceiptText,
   Sparkles,
+  Users,
   Wallet,
   X,
   type LucideIcon,
@@ -34,7 +35,7 @@ import {
 
 import { AppHeader, Btn, Card, Field, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
-import { usePlus } from '@/lib/plus'
+import { usePlus, memberLimit, MEMBER_LIMIT_PLUS } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import { LANGUAGES, type TKey } from '@/lib/i18n'
 import { getPushEnabled, registerForPush } from '@/lib/notifications'
@@ -57,6 +58,7 @@ const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: CalendarDays, key: 'settings.plusFeatureCalendar' },
   { icon: ReceiptText, key: 'settings.plusFeatureSplit' },
   { icon: Wallet, key: 'settings.plusFeatureBudgets' },
+  { icon: Users, key: 'settings.plusFeatureMembers' },
   { icon: Lock, key: 'settings.plusFeaturePrivate' },
   { icon: FolderLock, key: 'settings.plusFeatureVault' },
 ]
@@ -167,6 +169,8 @@ function HouseholdSection() {
   const { c } = useTheme()
   const { t } = useI18n()
   const { profile } = useAuth()
+  const { isPlus } = usePlus()
+  const limit = memberLimit(isPlus)
   const isOwner = profile?.role === 'owner'
   const hid = profile?.household_id ?? null
   const [name, setName] = useState<string | null>(null)
@@ -279,6 +283,19 @@ function HouseholdSection() {
               ) : null}
             </View>
           ))}
+        </View>
+
+        {/* Member count + (free owners only) a nudge to Plus for more room. The
+            DB trigger is the real cap (migration 059); this is just the pitch. */}
+        <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, paddingTop: sp.md, gap: 4 }}>
+          <Txt variant="faint">{t('household.memberCount', { count: members.length, max: limit })}</Txt>
+          {isOwner && !isPlus ? (
+            <Pressable onPress={() => router.push('/paywall')} hitSlop={6}>
+              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
+                {t('household.upgradeForMembers', { max: MEMBER_LIMIT_PLUS })}
+              </Txt>
+            </Pressable>
+          ) : null}
         </View>
       </Card>
 

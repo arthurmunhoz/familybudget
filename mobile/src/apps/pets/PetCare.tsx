@@ -19,6 +19,7 @@ import type { TKey } from '@/lib/i18n'
 import { addDaysISO, daysBetweenISO, formatDay, todayISO } from '@/lib/format'
 import { reminderEvents } from '@/lib/petCare'
 import { getSignedUrls } from '@/lib/signedUrls'
+import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetEvent } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -188,6 +189,7 @@ export default function PetCare() {
         style: 'destructive',
         onPress: async () => {
           await supabase.from('pet_events').delete().eq('id', event.id)
+          track('pet.event_deleted', { title: event.title })
           await load()
         },
       },
