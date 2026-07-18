@@ -169,6 +169,21 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     relaxes on collapse (it used to be tied to opening the sheet).
   - Your own card expands too and holds the way into `SharingControls`, which
     stays a modal: it's switches and pause presets, not detail.
+- **Map styles** (`mapMode.ts` + `MapModePicker`): Map / Satellite / Terrain,
+  from the layers button under the recenter control, remembered in AsyncStorage.
+  - `standard` still follows the theme AND `EXPO_PUBLIC_MAPBOX_STYLE_URL(_DARK)`
+    — that's the house look. Satellite/terrain are imagery and look identical in
+    either theme, because there's no dark version of a photo of the ground.
+    Satellite uses satellite-STREETS: bare satellite has no labels, which makes
+    "where is she exactly" harder rather than easier.
+  - **Changing `styleURL` tears down the old style and everything added to it.**
+    `onDidFinishLoadingStyle` bumps `styleEpoch`, which re-keys our `ShapeSource`
+    so it's re-added AFTER the new style loads — without that the safety-radius
+    circle can quietly vanish when you switch modes. Key any future source the
+    same way. (`MarkerView` pins are plain React children and are unaffected.)
+  - Helpers live in `mapMode.ts`, not in the picker file: exporting hooks
+    alongside a component breaks Fast Refresh, which is what `react-refresh`
+    flags. Same reason `Section` sits in `locationUi`.
 - Native config lives in `app.config.js` (layered on `app.json`): Mapbox plugin
   (`RNMAPBOX_DOWNLOAD_TOKEN` build secret), expo-location background, iOS
   `UIBackgroundModes: ["location"]` + Always strings, `LSApplicationQueriesSchemes`

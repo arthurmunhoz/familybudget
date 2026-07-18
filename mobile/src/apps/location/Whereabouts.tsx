@@ -17,7 +17,7 @@ import * as Localization from 'expo-localization'
 import * as Location from 'expo-location'
 import { router } from 'expo-router'
 import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
-import { MapPin, Crosshair, Landmark, ShieldAlert, ShieldCheck, Sparkles, X } from 'lucide-react-native'
+import { MapPin, Crosshair, Landmark, Layers, ShieldAlert, ShieldCheck, Sparkles, X } from 'lucide-react-native'
 
 import { AppHeader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
@@ -57,6 +57,8 @@ import {
   timeAgo,
   WatchingChip,
 } from './locationUi'
+import { MapModePicker } from './MapModePicker'
+import { resolveStyleURL, useStoredMapMode } from './mapMode'
 import { MemberDetailCard } from './MemberDetailCard'
 import { NavPicker } from './NavPicker'
 import { NudgePicker } from './NudgePicker'
@@ -260,6 +262,10 @@ export default function Whereabouts() {
     { email: string; kind: 'left' | 'entered'; title: string; dist: string }[]
   >([])
   const [sharingOpen, setSharingOpen] = useState(false)
+  const [mapMode, setMapMode] = useStoredMapMode()
+  const [mapModeOpen, setMapModeOpen] = useState(false)
+  /** Bumped each time a map style finishes loading, to re-key our own sources. */
+  const [styleEpoch, setStyleEpoch] = useState(0)
   const [placesOpen, setPlacesOpen] = useState(false)
   const [safetyOpen, setSafetyOpen] = useState(false)
   const [toast, setToast] = useState<ToastData | null>(null)
@@ -605,11 +611,12 @@ export default function Whereabouts() {
         {MAPBOX_TOKEN ? (
           <MapView
             style={{ flex: 1 }}
-            styleURL={
-              dark
-                ? MAPBOX_STYLE_URL_DARK || MAPBOX_STYLE_URL || Mapbox.StyleURL.Dark
-                : MAPBOX_STYLE_URL || Mapbox.StyleURL.Light
-            }
+            styleURL={resolveStyleURL(mapMode, dark, MAPBOX_STYLE_URL, MAPBOX_STYLE_URL_DARK)}
+            // Switching style tears the old one down, and anything we added to
+            // it goes with it. Bumping this on every style load re-keys our own
+            // sources so they're re-added AFTERWARDS — without it the safety
+            // circle can quietly vanish when you change map mode.
+            onDidFinishLoadingStyle={() => setStyleEpoch((n) => n + 1)}
             scaleBarEnabled={false}
             compassEnabled={false}
             // Mapbox's ToS requires the logo and OpenStreetMap's ODbL requires
@@ -634,6 +641,7 @@ export default function Whereabouts() {
                 accurate at every zoom (Mapbox circle radii are in pixels). */}
             {watch ? (
               <ShapeSource
+                key={`safety-${styleEpoch}`}
                 id="safety-radius"
                 shape={circlePolygon(
                   { lat: watch.center_lat, lng: watch.center_lng },
@@ -741,6 +749,25 @@ export default function Whereabouts() {
               }}
             >
               <Crosshair size={20} color={c.text} />
+            </Pressable>
+            {/* Map / Satellite / Terrain. Same control shape as recenter — it's
+                another map control, not a feature. */}
+            <Pressable
+              onPress={() => setMapModeOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('location.mapMode.title')}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: radius.md,
+                backgroundColor: c.sheet,
+                borderWidth: 1,
+                borderColor: c.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Layers size={20} color={c.text} />
             </Pressable>
           </View>
         ) : null}
@@ -890,6 +917,10 @@ export default function Whereabouts() {
 
       {navFor ? (
         <NavPicker profile={navFor.profile} to={navFor.to} onClose={() => setNavFor(null)} />
+      ) : null}
+
+      {mapModeOpen ? (
+        <MapModePicker mode={mapMode} onPick={setMapMode} onClose={() => setMapModeOpen(false)} />
       ) : null}
 
       {safetyOpen ? (
