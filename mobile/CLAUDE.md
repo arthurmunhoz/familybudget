@@ -209,6 +209,20 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     once it does, or it stays stuck with unbiased nationwide results. Biasing
     off `coords` would also anchor the next search to whatever result was last
     tapped instead of to the user.
+  - `PlaceForm`'s **Location** section states exactly one thing, chosen from
+    three states: a searched place (`picked` → address + ✕, and the search box
+    HIDES, since ✕ is now the way to change it), an existing place's own
+    reverse-geocoded address, or your current location. Editing used to fall
+    through to "Your current location", which described the phone rather than
+    the place. `repinned` is tracked separately from the coordinates because
+    `savedLabel` describes the place's ORIGINAL spot — after "use my current
+    location" it must stop being shown, or the form describes the old location
+    while saving the new one. "Use my current location" appears only when that
+    is not already the state.
+  - **`Field` sizes itself from its `fontSize`**, so the icon input's 22pt emoji
+    made it taller than the name box beside it. Both are pinned to `FIELD_H`
+    with `paddingVertical: 0` (plus `textAlignVertical` for Android, which
+    doesn't centre a fixed-height single line on its own).
   - Caveat: Search Box results are *temporary* by default and we persist the
     chosen coordinates — fine in practice, but a permanent entitlement is a
     paid Mapbox add-on if that ever needs to be airtight.
