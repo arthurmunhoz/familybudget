@@ -28,7 +28,9 @@ import { dailyChecklist, routineStatus } from '@/lib/petCare'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetEvent, PetTaskDone } from '@/lib/types'
-import { syncPetCareWidget, syncPetPhoto, type PetCareWidgetPet } from '@/lib/widget'
+import { File, Paths } from 'expo-file-system'
+
+import { APP_GROUP, reloadPetCareWidget, syncPetCareWidget, type PetCareWidgetPet } from '@/lib/widget'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { CARE_ICONS, TYPE_ICON } from './petUi'
 import { speciesEmoji } from './petMeta'
@@ -58,26 +60,19 @@ const emptyDraft: EventDraft = {
 // so re-mounts don't re-download unchanged photos.
 const mirroredPhotos: Record<string, string> = {}
 
-/** Mirror a pet photo into the App Group so the widget shows the actual pet.
- *  Photos are already ≤512px JPEG at upload (PetEditor), so the downloaded
- *  bytes are stored as base64 directly — no resize step to fail. Best-effort;
- *  failures leave the widget on its initial-letter fallback. */
+/** Mirror a pet photo into the shared App Group CONTAINER (a real file — the
+ *  canonical way to hand an image to a widget; UserDefaults strings proved
+ *  unreliable for photo-sized payloads). The widget reads
+ *  petcare_photo_<id>.jpg via its own container access. Photos are already
+ *  ≤512px JPEG at upload. Best-effort; failures leave the initial-letter tile. */
 async function mirrorPetPhoto(petId: string, photoPath: string, url: string): Promise<void> {
   try {
-    const res = await fetch(url)
-    if (!res.ok) return
-    const blob = await res.blob()
-    const dataUri = await new Promise<string>((resolve, reject) => {
-      const r = new FileReader()
-      r.onloadend = () => resolve(r.result as string)
-      r.onerror = reject
-      r.readAsDataURL(blob)
-    })
-    // "data:image/jpeg;base64,AAAA…" → the raw base64 the widget decodes.
-    const base64 = dataUri.slice(dataUri.indexOf('base64,') + 7)
-    if (!base64) return
-    syncPetPhoto(petId, base64)
+    const container = Paths.appleSharedContainers[APP_GROUP]
+    if (!container) return // Android / Expo Go — no widget to feed
+    const dest = new File(container, `petcare_photo_${petId}.jpg`)
+    await File.downloadFileAsync(url, dest, { idempotent: true })
     mirroredPhotos[petId] = photoPath
+    reloadPetCareWidget()
   } catch {
     /* ignore — the widget falls back to the initial */
   }
