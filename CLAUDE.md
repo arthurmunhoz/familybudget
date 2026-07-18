@@ -57,7 +57,7 @@ api/widget.ts            iOS Home-Screen widget backend, per-device token (not a
                          ?action=nudge (send a nudge) | ?action=today (agenda, so the
                          Today widget self-refreshes with the app closed)
 api/apple.ts             Sign in with Apple: ?action=connect | ?action=revoke
-api/ack-ping.ts          Silent push to a ping's sender when acked, for the iOS widget's "seen by"
+api/ack-ping.ts          Silent background push: (default) ping "seen by" to the sender for the iOS widget; (?action=live-wake) wake a member's device to refresh its location for Whereabouts live mode
 api/google-calendar-connect.ts  Store a user's Google OAuth tokens (service role)
 api/google-calendar-sync.ts     Pull Google Calendar events → calendar_events
 public/                    Icons, manifest, family.jpg backdrop photo

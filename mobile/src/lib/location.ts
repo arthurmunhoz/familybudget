@@ -211,6 +211,28 @@ export async function captureAndUpload(): Promise<Fix | null> {
   return fix
 }
 
+/** For the silent live-wake push (see backgroundNotifications.ts): if I'm
+ *  currently sharing, grab one high-accuracy fix now and upload it. No-op if I'm
+ *  not sharing or permission is off. Used to refresh a watched member whose app
+ *  was asleep in the background. */
+export async function captureLiveFixIfSharing(): Promise<void> {
+  const mine = await fetchMyLocation()
+  if (!isSharingEnabled(mine)) return
+  try {
+    const perm = await Location.getForegroundPermissionsAsync()
+    if (!perm.granted) return
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+    await upsertMyPosition({
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy ?? null,
+      speed: pos.coords.speed ?? null,
+    })
+  } catch {
+    // best-effort — a missed wake is caught by the next heartbeat's push
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Distance, ETA, formatting
 // ---------------------------------------------------------------------------

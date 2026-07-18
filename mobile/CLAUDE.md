@@ -110,13 +110,17 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   target device runs `useLiveResponder` (mounted in `_layout`) and, WHILE
   SHARING, ramps up to a high-accuracy `watchPositionAsync` burst so their pin
   moves near real-time, then relaxes when the request expires. Being watched
-  never turns sharing on. Only fires while the target app is active (foreground /
-  backgrounded-with-socket) — the force-quit / phone-in-pocket case needs a
-  silent push to wake it (documented follow-up). The MemberSheet ETA/address
-  refetch on a coarse ~100 m grid so live updates don't spam the Directions API.
+  never turns sharing on. The MemberSheet ETA/address refetch on a coarse ~100 m
+  grid so live updates don't spam the Directions API.
+  - **Background wake**: each live request also fires a SILENT push
+    (`api/ack-ping.ts` `?action=live-wake` → `backgroundNotifications.ts` →
+    `captureLiveFixIfSharing`) so a watched member whose app is asleep still
+    refreshes. Needs the Vercel API DEPLOYED + expo push tokens (migration 039).
+    iOS throttles silent pushes, so background freshness is best-effort (periodic
+    bursts, not continuous); continuous smoothness still needs the target app
+    foreground (the `useLiveResponder` watch).
 - Not yet: Places/geofences + arrive-leave push (Phase 2); Safety Radius, history,
-  driving/SOS (Phase 3 — a One Roof **Plus** feature); a silent-push wake so live
-  mode works with the target's app backgrounded/force-quit.
+  driving/SOS (Phase 3 — a One Roof **Plus** feature).
 
 ## AI / server endpoints
 Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`

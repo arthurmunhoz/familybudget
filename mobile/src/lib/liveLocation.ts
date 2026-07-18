@@ -29,6 +29,13 @@ async function myEmail(): Promise<string | null> {
   return data.session?.user.email ?? null
 }
 
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
+
+async function authToken(): Promise<string> {
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token ?? ''
+}
+
 /** Watcher: ask `target`'s device to go live (upsert; heartbeat re-calls this). */
 export async function requestLive(target: string): Promise<void> {
   const me = await myEmail()
@@ -41,6 +48,22 @@ export async function requestLive(target: string): Promise<void> {
     },
     { onConflict: 'requester_email,target_email' },
   )
+  // Also fire a silent push so the target's app wakes and refreshes even if it's
+  // asleep in the background — Realtime alone can't reach a suspended app.
+  // Best-effort: the foreground path works without it (and it needs the API
+  // deployed). Served by api/ack-ping.ts (?action=live-wake).
+  try {
+    const token = await authToken()
+    if (token && API_BASE) {
+      await fetch(`${API_BASE}/api/ack-ping`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'live-wake', target_email: target }),
+      })
+    }
+  } catch {
+    // best-effort push only
+  }
 }
 
 /** Watcher: cancel the live request for `target` (on closing the detail). */
