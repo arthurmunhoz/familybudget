@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase'
 import { presetText } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
@@ -218,6 +219,7 @@ export default function PingComposer({
       {/* AI free-text */}
       <View style={styles.aiRow}>
         <TextInput
+          inputAccessoryViewID={KEYBOARD_DONE_ID}
           value={text}
           onChangeText={setText}
           onSubmitEditing={sendAI}

@@ -28,6 +28,7 @@ import { CATEGORIES } from '@/lib/categories'
 import { supabase } from '@/lib/supabase'
 import type { CategoryOverride, CustomCategory } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 // Editable presets — salary is income-only, so it stays out of expense mgmt.
 const PRESETS = CATEGORIES.filter((c) => c.id !== 'salary')
@@ -207,6 +208,7 @@ export default function ManageCategoriesSheet({
   const editorRow = (onSave: () => void, saveLabel: string, key?: string) => (
     <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingVertical: sp.sm }}>
       <TextInput
+        inputAccessoryViewID={KEYBOARD_DONE_ID}
         value={draftIcon}
         onChangeText={setDraftIcon}
         placeholder="🏷️"
@@ -215,6 +217,7 @@ export default function ManageCategoriesSheet({
         style={iconInput}
       />
       <TextInput
+        inputAccessoryViewID={KEYBOARD_DONE_ID}
         value={draftName}
         onChangeText={setDraftName}
         placeholder={t('manageCats.namePlaceholder')}

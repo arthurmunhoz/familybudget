@@ -18,6 +18,7 @@ import { formatDay, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 interface UserActivity {
   user_email: string
@@ -347,6 +348,7 @@ export default function AdminHousehold() {
           ) : (
             <View style={{ flexDirection: 'row', gap: sp.sm }}>
               <TextInput
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 value={mName}
                 onChangeText={setMName}
                 placeholder={t('admin.memberName')}
@@ -354,6 +356,7 @@ export default function AdminHousehold() {
                 style={[inputStyle, { width: 90 }]}
               />
               <TextInput
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 value={mEmail}
                 onChangeText={setMEmail}
                 placeholder={t('admin.memberEmail')}

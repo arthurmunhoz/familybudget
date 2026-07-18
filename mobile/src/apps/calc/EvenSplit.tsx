@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/format'
 import { sp, useTheme } from '@/theme/theme'
 
 import { Divider, PercentPicker, ResultRow, Stepper, num } from './shared'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 export function EvenSplit() {
   const { c } = useTheme()
@@ -37,6 +38,7 @@ export function EvenSplit() {
               amount itself was greyed out. */}
           <Txt style={{ fontSize: 32, fontWeight: '600', color: bill ? c.text : c.textFaint }}>$</Txt>
           <TextInput
+            inputAccessoryViewID={KEYBOARD_DONE_ID}
             value={bill}
             onChangeText={setBill}
             keyboardType="decimal-pad"

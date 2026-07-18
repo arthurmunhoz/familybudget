@@ -44,6 +44,7 @@ import {
   type ShoeSystem,
   type WeightUnit,
 } from './units'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 type Form = {
   avatar_path: string
@@ -139,6 +140,7 @@ function NumInput({
   const { c } = useTheme()
   return (
     <TextInput
+      inputAccessoryViewID={KEYBOARD_DONE_ID}
       value={value}
       onChangeText={onChangeText}
       keyboardType="decimal-pad"

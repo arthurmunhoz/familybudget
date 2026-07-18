@@ -30,6 +30,7 @@ import { TilePrefProvider } from '@/hooks/useTilePref';
 import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 import { GLASS, GlassWash } from '@/theme/glass';
+import { KeyboardDoneBar } from '@/components/KeyboardDone';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -103,6 +104,8 @@ function Chrome() {
           <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         </Stack>
       </View>
+      {/* Mounted once; every TextInput referencing KEYBOARD_DONE_ID gets it. */}
+      <KeyboardDoneBar />
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>
   );

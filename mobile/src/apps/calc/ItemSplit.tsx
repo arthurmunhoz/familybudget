@@ -30,6 +30,7 @@ import {
   firstName,
   num,
 } from './shared'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 type BillItem = { id: string; name: string; price: string; people: string[] }
 
@@ -211,6 +212,7 @@ export function ItemSplit() {
         </View>
         <View style={{ flexDirection: 'row', gap: sp.sm, marginTop: sp.sm }}>
           <TextInput
+            inputAccessoryViewID={KEYBOARD_DONE_ID}
             value={nameInput}
             onChangeText={setNameInput}
             onSubmitEditing={() => addPerson(nameInput)}

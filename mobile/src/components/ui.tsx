@@ -21,6 +21,7 @@ import { ChevronLeft } from 'lucide-react-native'
 import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
+import { KEYBOARD_DONE_ID } from './keyboardDoneId'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
 
@@ -205,6 +206,8 @@ export function Field({
     <View style={{ gap: 6 }}>
       {label ? <Txt variant="label">{label}</Txt> : null}
       <TextInput
+        // Every Field gets the keyboard "Done" bar; a caller can still override.
+        inputAccessoryViewID={KEYBOARD_DONE_ID}
         placeholderTextColor={c.textFaint}
         style={[
           {

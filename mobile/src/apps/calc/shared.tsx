@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { radius, sp, useTheme } from '@/theme/theme'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 // Currency with extra precision for tiny per-unit prices.
 const perUnitFmt = new Intl.NumberFormat('en-US', {
@@ -97,6 +98,7 @@ export function PercentPicker({
         )
       })}
       <TextInput
+        inputAccessoryViewID={KEYBOARD_DONE_ID}
         value={custom}
         onChangeText={(txt) => {
           setCustom(txt)
@@ -161,6 +163,7 @@ export function MiniInput({
   const { c } = useTheme()
   return (
     <TextInput
+      inputAccessoryViewID={KEYBOARD_DONE_ID}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}

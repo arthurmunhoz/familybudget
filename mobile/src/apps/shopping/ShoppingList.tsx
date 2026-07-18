@@ -44,6 +44,7 @@ import { fetchStoreSuggestions, type SuggestedStore } from '@/lib/storeSuggest'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import StoreLogo from './StoreLogo'
+import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 // RN has no crypto.randomUUID on all engines — a temp id only needs to be unique
 // within this session (it's replaced by the server row on the next refetch).
@@ -588,6 +589,7 @@ export default function ShoppingList() {
 
           <View style={styles.inputRow}>
             <TextInput
+              inputAccessoryViewID={KEYBOARD_DONE_ID}
               value={label}
               onChangeText={setLabel}
               onSubmitEditing={add}
@@ -658,6 +660,7 @@ export default function ShoppingList() {
                     size={40}
                   />
                   <TextInput
+                    inputAccessoryViewID={KEYBOARD_DONE_ID}
                     value={editName}
                     onChangeText={setEditName}
                     placeholder={t('shopping.storeName')}
@@ -781,6 +784,7 @@ export default function ShoppingList() {
                 <ColorDots value={customColor} onChange={setCustomColor} c={c} compact />
                 <View style={styles.inputRow}>
                   <TextInput
+                    inputAccessoryViewID={KEYBOARD_DONE_ID}
                     value={storeInput}
                     onChangeText={setStoreInput}
                     onSubmitEditing={addCustomStore}
