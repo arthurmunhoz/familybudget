@@ -278,10 +278,13 @@ struct BudgetWidgetView: View {
     if let b = entry.budget {
       VStack(alignment: .leading, spacing: 8) {
         HStack(spacing: 6) {
-          Image(systemName: "creditcard").font(.system(size: nameSize - 1))
+          // wallet.pass, not wallet.bifold — the latter is iOS 18+ and this
+          // target deploys to 17.0, where it would render as a missing glyph.
+          Image(systemName: "wallet.pass").font(.system(size: nameSize - 1))
+          // No foregroundStyle: inherits theme.text from the root, so the name
+          // reads as a header rather than as a muted caption.
           Text(b.name)
             .font(.system(size: nameSize, weight: isSmall ? .regular : .semibold))
-            .foregroundStyle(theme.textMuted)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
         }
@@ -363,7 +366,7 @@ struct BudgetWidgetView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     } else {
       VStack(spacing: 4) {
-        Image(systemName: "creditcard").foregroundStyle(theme.textMuted)
+        Image(systemName: "wallet.pass").foregroundStyle(theme.textMuted)
         Text("Open One Roof").font(.caption).foregroundStyle(theme.textMuted)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
