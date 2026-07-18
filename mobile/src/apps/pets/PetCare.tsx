@@ -11,12 +11,12 @@
 // The routine itself is configurable per pet (RoutineSheet). Every mutation
 // also feeds the Pet Care home-screen widget: a fresh App Group snapshot +
 // a best-effort ?action=petcare-notify so OTHER members' widgets reload ASAP.
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Animated, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Image } from 'expo-image'
-import { Check, ChevronRight, PawPrint, Plus, SlidersHorizontal, X } from 'lucide-react-native'
+import { Check, PawPrint, Pencil, Plus, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -89,6 +89,14 @@ export default function PetCare() {
   const [draft, setDraft] = useState<EventDraft>(emptyDraft)
   // Optimistic overlay for checklist taps, cleared when fresh data lands.
   const [overlay, setOverlay] = useState<Record<string, boolean>>({})
+
+  // Pet chips start big and shrink as the list scrolls up (JS-driven — these
+  // interpolations feed layout props, which the native driver can't animate).
+  const scrollY = useRef(new Animated.Value(0)).current
+  const chipAvatar = scrollY.interpolate({ inputRange: [0, 60], outputRange: [36, 22], extrapolate: 'clamp' })
+  const chipEmoji = scrollY.interpolate({ inputRange: [0, 60], outputRange: [22, 14], extrapolate: 'clamp' })
+  const chipFont = scrollY.interpolate({ inputRange: [0, 60], outputRange: [16, 13], extrapolate: 'clamp' })
+  const chipPadV = scrollY.interpolate({ inputRange: [0, 60], outputRange: [10, 7], extrapolate: 'clamp' })
 
   type Data = {
     pets: Pet[]
@@ -284,16 +292,7 @@ export default function PetCare() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader
-          title={t('pets.title')}
-          right={
-            pet ? (
-              <Pressable onPress={() => setRoutineOpen(true)} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
-                <SlidersHorizontal size={20} color={c.textMuted} />
-              </Pressable>
-            ) : undefined
-          }
-        />
+        <AppHeader title={t('pets.title')} />
       </View>
 
       {loading ? (
@@ -308,68 +307,92 @@ export default function PetCare() {
           </SafeAreaView>
         </>
       ) : (
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.md }}
-        >
-          {/* pet chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: sp.sm }}>
-            {petsSorted.map((p) => {
-              const on = p.id === selectedPet
-              return (
-                <Pressable
-                  key={p.id}
-                  onPress={() => setSelectedPet(p.id)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    borderRadius: radius.pill,
-                    backgroundColor: on ? c.accent : c.surface,
-                  }}
-                >
-                  {petPhotoUrls[p.id] ? (
-                    <Image source={{ uri: petPhotoUrls[p.id] }} style={{ width: 22, height: 22, borderRadius: 11 }} />
-                  ) : (
-                    <Txt style={{ fontSize: 14 }}>{p.emoji || speciesEmoji(p.species)}</Txt>
-                  )}
-                  <Txt style={{ fontWeight: '700', fontSize: 13, color: on ? '#fff' : c.textMuted }}>{p.name}</Txt>
-                  {(overduePets[p.id] ?? 0) > 0 ? (
-                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: on ? '#fff' : c.expense }} />
-                  ) : null}
-                </Pressable>
-              )
-            })}
-            <Pressable
-              onPress={() => setShowPetForm(true)}
-              accessibilityLabel={t('pets.addPet')}
-              style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 10,
-                borderRadius: radius.pill,
-                backgroundColor: c.surface,
-              }}
+        <>
+          {/* pet chips — fixed above the list; big on load, shrink on scroll.
+              Tapping the SELECTED pet's chip again opens its profile. */}
+          <View style={{ paddingBottom: sp.sm }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: sp.sm, paddingHorizontal: sp.lg }}
             >
-              <Plus size={16} color={c.textFaint} />
-            </Pressable>
-          </ScrollView>
+              {petsSorted.map((p) => {
+                const on = p.id === selectedPet
+                return (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => (on ? router.push(`/pets/${p.id}`) : setSelectedPet(p.id))}
+                  >
+                    <Animated.View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 12,
+                        paddingVertical: chipPadV,
+                        borderRadius: radius.pill,
+                        backgroundColor: on ? c.accent : c.surface,
+                      }}
+                    >
+                      {petPhotoUrls[p.id] ? (
+                        <Animated.View
+                          style={{ width: chipAvatar, height: chipAvatar, borderRadius: 18, overflow: 'hidden' }}
+                        >
+                          <Image source={{ uri: petPhotoUrls[p.id] }} style={{ width: '100%', height: '100%' }} />
+                        </Animated.View>
+                      ) : (
+                        <Animated.Text style={{ fontSize: chipEmoji }}>
+                          {p.emoji || speciesEmoji(p.species)}
+                        </Animated.Text>
+                      )}
+                      <Animated.Text
+                        style={{ fontWeight: '700', fontSize: chipFont, color: on ? '#fff' : c.textMuted }}
+                      >
+                        {p.name}
+                      </Animated.Text>
+                      {(overduePets[p.id] ?? 0) > 0 ? (
+                        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: on ? '#fff' : c.expense }} />
+                      ) : null}
+                    </Animated.View>
+                  </Pressable>
+                )
+              })}
+              <Pressable
+                onPress={() => setShowPetForm(true)}
+                accessibilityLabel={t('pets.addPet')}
+                style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 10,
+                  borderRadius: radius.pill,
+                  backgroundColor: c.surface,
+                }}
+              >
+                <Plus size={16} color={c.textFaint} />
+              </Pressable>
+            </ScrollView>
+          </View>
 
+        <Animated.ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl * 2, gap: sp.md }}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+            useNativeDriver: false,
+          })}
+          scrollEventThrottle={16}
+        >
           {pet ? (
             <>
               {/* Today */}
               <Card style={{ gap: 2 }}>
-                <Pressable
-                  onPress={() => router.push(`/pets/${pet.id}`)}
-                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-                >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     {t('petcare.today')} · {pet.name}
                   </Txt>
-                  <ChevronRight size={16} color={c.textFaint} />
-                </Pressable>
+                  <Pressable onPress={() => setRoutineOpen(true)} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
+                    <Pencil size={15} color={c.textFaint} />
+                  </Pressable>
+                </View>
 
                 {checklist.length === 0 ? (
                   <View style={{ gap: sp.sm, paddingTop: sp.sm }}>
@@ -445,9 +468,14 @@ export default function PetCare() {
 
               {/* Care routines */}
               <Card style={{ gap: 2 }}>
-                <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  {t('petcare.routines')}
-                </Txt>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    {t('petcare.routines')}
+                  </Txt>
+                  <Pressable onPress={() => setRoutineOpen(true)} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
+                    <Pencil size={15} color={c.textFaint} />
+                  </Pressable>
+                </View>
                 {routines.length === 0 ? (
                   <View style={{ gap: sp.sm, paddingTop: sp.sm }}>
                     <Txt variant="muted">{t('petcare.noRoutines')}</Txt>
@@ -512,21 +540,42 @@ export default function PetCare() {
                 )}
               </Card>
 
-              {/* History */}
-              {history.length > 0 ? (
-                <Card style={{ gap: 2 }}>
+              {/* History — the log-event action lives HERE (it only ever adds
+                  history entries), not in a global bottom bar. */}
+              <Card style={{ gap: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       {t('pets.history')}
                     </Txt>
-                    {history.length > HISTORY_PREVIEW ? (
-                      <Pressable onPress={() => setShowAllHistory((v) => !v)} hitSlop={8}>
-                        <Txt style={{ color: c.accent, fontWeight: '600', fontSize: 12 }}>
-                          {showAllHistory ? t('common.close') : t('petcare.seeAll')}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                      {history.length > HISTORY_PREVIEW ? (
+                        <Pressable onPress={() => setShowAllHistory((v) => !v)} hitSlop={8}>
+                          <Txt style={{ color: c.textMuted, fontWeight: '600', fontSize: 12 }}>
+                            {showAllHistory ? t('common.close') : t('petcare.seeAll')}
+                          </Txt>
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        onPress={openNewEvent}
+                        hitSlop={8}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: radius.pill,
+                          backgroundColor: c.accentSoft,
+                        }}
+                      >
+                        <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 12 }}>
+                          {t('petcare.logEvent')}
                         </Txt>
                       </Pressable>
-                    ) : null}
+                    </View>
                   </View>
+                  {history.length === 0 ? (
+                    <Txt variant="muted" style={{ paddingTop: sp.sm }}>
+                      {t('petcare.noHistory')}
+                    </Txt>
+                  ) : null}
                   {(showAllHistory ? history : history.slice(0, HISTORY_PREVIEW)).map((e, i) => {
                     const Icon = TYPE_ICON[e.type]
                     return (
@@ -558,20 +607,11 @@ export default function PetCare() {
                     )
                   })}
                 </Card>
-              ) : null}
             </>
           ) : null}
-        </ScrollView>
+        </Animated.ScrollView>
+        </>
       )}
-
-      {/* bottom bar */}
-      {pets.length > 0 ? (
-        <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
-            <Btn title={t('petcare.logEvent')} onPress={openNewEvent} />
-          </View>
-        </SafeAreaView>
-      ) : null}
 
       {showPetForm ? (
         <PetForm

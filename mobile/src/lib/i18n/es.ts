@@ -468,6 +468,8 @@ export const es: Record<keyof typeof en, string> = {
   'petcare.newTask': 'Nueva tarea',
   'petcare.editTask': 'Editar tarea',
   'petcare.taskTitleHint': 'Nombre de la tarea…',
+  'petcare.repeats': 'Se repite',
+  'petcare.noHistory': 'Nada registrado aún — las visitas al veterinario y vacunas van aquí.',
   'petcare.kindDaily': 'Diaria',
   'petcare.kindInterval': 'Cada N días',
   'petcare.intervalDays': 'Repetir cada (días)',

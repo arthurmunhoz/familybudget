@@ -470,6 +470,8 @@ export const en = {
   'petcare.newTask': 'New task',
   'petcare.editTask': 'Edit task',
   'petcare.taskTitleHint': 'Task name…',
+  'petcare.repeats': 'Repeats',
+  'petcare.noHistory': 'Nothing logged yet — vet visits and vaccines go here.',
   'petcare.kindDaily': 'Daily',
   'petcare.kindInterval': 'Every N days',
   'petcare.intervalDays': 'Repeat every (days)',

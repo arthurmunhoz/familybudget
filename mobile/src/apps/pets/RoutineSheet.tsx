@@ -7,7 +7,7 @@
 // in its own GestureHandlerRootView (the app-root one doesn't reach a modal's
 // separate native hierarchy — see NudgeSettings.tsx, the reference for this).
 import { useMemo, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { GripVertical, Plus, X } from 'lucide-react-native'
 
@@ -271,7 +271,10 @@ export function RoutineSheet({
         {/* task editor */}
         {editing !== null && (
           <Modal visible animationType="fade" transparent onRequestClose={() => setEditing(null)}>
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
+            {/* KeyboardAvoiding keeps the dialog above the keyboard (title field autofocuses). */}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
               <View style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
                 <Txt variant="h2">{editing === 'new' ? t('petcare.newTask') : t('petcare.editTask')}</Txt>
                 <Field value={title} onChangeText={setTitle} placeholder={t('petcare.taskTitleHint')} autoFocus />
@@ -302,13 +305,16 @@ export function RoutineSheet({
                 </View>
 
                 {/* daily vs every-N-days */}
-                <View style={{ flexDirection: 'row', gap: sp.sm }}>
-                  <Pill_ active={kind === 'daily'} onPress={() => setKind('daily')}>
-                    {t('petcare.kindDaily')}
-                  </Pill_>
-                  <Pill_ active={kind === 'interval'} onPress={() => setKind('interval')}>
-                    {t('petcare.kindInterval')}
-                  </Pill_>
+                <View style={{ gap: 6 }}>
+                  <Txt variant="label">{t('petcare.repeats')}</Txt>
+                  <View style={{ flexDirection: 'row', gap: sp.sm }}>
+                    <Pill_ active={kind === 'daily'} onPress={() => setKind('daily')}>
+                      {t('petcare.kindDaily')}
+                    </Pill_>
+                    <Pill_ active={kind === 'interval'} onPress={() => setKind('interval')}>
+                      {t('petcare.kindInterval')}
+                    </Pill_>
+                  </View>
                 </View>
                 {kind === 'interval' ? (
                   <Field
@@ -324,7 +330,7 @@ export function RoutineSheet({
                   <Btn title={t('common.save')} onPress={save} loading={busy} disabled={!title.trim()} style={{ flex: 1 }} />
                 </View>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
         )}
       </GestureHandlerRootView>
