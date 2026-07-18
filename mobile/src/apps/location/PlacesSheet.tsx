@@ -101,7 +101,9 @@ export function PlacesSheet({
               padding: sp.lg,
               paddingBottom: insets.bottom + sp.lg,
               gap: sp.md,
-              height: '80%',
+              // Fit the content (a household with 1 place gets a short sheet),
+              // capped so a long list still leaves the map visible.
+              maxHeight: '85%',
             }}
           >
             <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center' }} />
@@ -122,7 +124,7 @@ export function PlacesSheet({
             />
 
             {tab === 'places' ? (
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: sp.lg }}>
+              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: sp.lg }}>
                 {places.map((p) => (
                   <Pressable
                     key={p.id}
@@ -198,7 +200,7 @@ export function PlacesSheet({
                 </Pressable>
               </ScrollView>
             ) : (
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: sp.lg }}>
+              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: sp.lg }}>
                 {events.map((e) => {
                   const place = placeById.get(e.place_id)
                   const who = nameFor(e.user_email)

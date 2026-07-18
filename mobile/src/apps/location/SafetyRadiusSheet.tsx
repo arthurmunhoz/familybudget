@@ -103,8 +103,11 @@ export function SafetyRadiusSheet({
             padding: sp.lg,
             paddingBottom: insets.bottom + sp.lg,
             gap: sp.md,
-            // Tall: the watch list can hold every member of the household.
-            height: '90%',
+            // Fit the content: a 1-member watch list should be a short sheet, a
+            // 6-member one taller — capped so it never swallows the whole screen.
+            // (The lists below use flexShrink so they yield once we hit the cap;
+            // RN defaults flexShrink to 0, so it has to be explicit.)
+            maxHeight: '90%',
           }}
         >
           <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center' }} />
@@ -128,7 +131,7 @@ export function SafetyRadiusSheet({
                 <Txt variant="faint">{t('location.safety.endsIn', { hours: hoursLeft })}</Txt>
               </View>
 
-              <ScrollView style={{ flex: 1 }}>
+              <ScrollView style={{ flexShrink: 1 }}>
                 {watch.watched.map((email) => {
                   const p = profiles.find((x) => x.email === email)
                   const loc = locByEmail.get(email)
@@ -197,7 +200,7 @@ export function SafetyRadiusSheet({
               )}
 
               <Txt variant="label">{t('location.safety.pickPeople')}</Txt>
-              <ScrollView style={{ flex: 1 }}>
+              <ScrollView style={{ flexShrink: 1 }}>
                 {others.map((p) => {
                   const on = picked.includes(p.email)
                   return (
