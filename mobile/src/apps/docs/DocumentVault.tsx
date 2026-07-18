@@ -236,7 +236,7 @@ export default function DocumentVault() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader title={t('docs.title')} icon={<FileText size={22} color={c.accent} />} />
+        <AppHeader title={t('docs.title')} />
       </View>
 
       {/* Face ID lock toggle — only where the device supports biometrics */}

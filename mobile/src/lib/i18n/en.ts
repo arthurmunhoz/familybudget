@@ -206,7 +206,7 @@ export const en = {
   'app.shopping.desc': 'Shared list, live sync',
   'app.pings.name': 'Nudges',
   'app.pings.desc': 'A quick nudge to the family',
-  'app.pets.name': 'Pets',
+  'app.pets.name': 'Pet Care',
   'app.pets.desc': 'Vet visits, meds & due dates',
   'app.docs.name': 'Documents',
   'app.docs.desc': 'IDs, insurance & records',
