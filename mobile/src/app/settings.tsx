@@ -2,7 +2,7 @@
 // in-app account deletion (required by Apple Guideline 5.1.1(v)). Sections are
 // separated by dividers; Plus shows a certificate badge + the included feature
 // list when active, and notifications shows a live on/off status.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AccessibilityInfo,
   Alert,
@@ -13,13 +13,16 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   View,
 } from 'react-native'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { router, useLocalSearchParams } from 'expo-router'
 import {
   Award,
   Bell,
   BellRing,
+  GripVertical,
   CalendarDays,
   Check,
   FolderLock,
@@ -34,6 +37,9 @@ import {
 } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, Field, Screen, Txt } from '@/components/ui'
+import { DraggableList } from '@/components/DraggableList'
+import { useAppPrefs } from '@/hooks/useAppPrefs'
+import { APPS } from '@/lib/apps'
 import { useAuth } from '@/lib/auth'
 import { usePlus, memberLimit, MEMBER_LIMIT_PLUS } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
@@ -433,6 +439,14 @@ export default function Settings() {
   const { c } = useTheme()
   const { mode, setMode } = useThemePref()
   const { tile, setTile } = useTilePref()
+  const { hiddenApps, appOrder, toggleApp, setAppOrder } = useAppPrefs()
+  // Every app (hidden ones dimmed), in the user's hub order — same ranking the
+  // Hub applies, so what you see here is what the home screen does.
+  const orderedApps = useMemo(() => {
+    const pos = new Map(appOrder.map((id, i) => [id, i]))
+    const rank = (id: string) => pos.get(id) ?? appOrder.length + APPS.findIndex((x) => x.id === id)
+    return [...APPS].sort((a, b) => rank(a.id) - rank(b.id))
+  }, [appOrder])
   const { profile, signOut } = useAuth()
   const { isPlus, restore } = usePlus()
   const { t, lang, setLang } = useI18n()
@@ -742,6 +756,49 @@ export default function Settings() {
             </OptionCard>
           </View>
           <Txt variant="faint">{t('settings.compactHint')}</Txt>
+        </View>
+
+        <Divider />
+
+        {/* Which apps show on the hub, and in what order */}
+        <View style={{ gap: sp.sm }}>
+          <Txt variant="label">{t('settings.apps')}</Txt>
+          <GestureHandlerRootView>
+            <Card>
+              <DraggableList
+                data={orderedApps}
+                rowHeight={52}
+                onReorder={setAppOrder}
+                renderItem={(app) => {
+                  const hidden = hiddenApps.includes(app.id)
+                  return (
+                    <View
+                      style={{
+                        height: 52,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: sp.md,
+                        paddingHorizontal: sp.xs,
+                        opacity: hidden ? 0.45 : 1,
+                      }}
+                    >
+                      <GripVertical size={16} color={c.textFaint} />
+                      <app.icon size={18} color={c.accent} />
+                      <Txt style={{ flex: 1, fontWeight: '500' }} numberOfLines={1}>
+                        {t(`app.${app.id}.name` as TKey)}
+                      </Txt>
+                      <Switch
+                        value={!hidden}
+                        onValueChange={() => toggleApp(app.id)}
+                        trackColor={{ true: c.income, false: c.surface2 }}
+                      />
+                    </View>
+                  )
+                }}
+              />
+            </Card>
+          </GestureHandlerRootView>
+          <Txt variant="faint">{t('settings.appsHint')}</Txt>
         </View>
 
         <Divider />
