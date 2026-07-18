@@ -107,6 +107,10 @@ export const es: Record<keyof typeof en, string> = {
   'location.safety.needLocation': 'Activa compartir ubicación para iniciar un radio de seguridad.',
   'location.safety.breach': '{name} salió del área',
   'location.safety.breachBody': 'a {dist} del centro',
+  'location.card.manage': 'Toca para gestionar',
+  'location.card.watching': 'Vigilando',
+  'location.nudge.title': 'Avisar a {name}',
+  'location.nudge.sent': 'Aviso enviado a {name}',
 
   'common.loading': 'Cargando…',
   'common.cancel': 'Cancelar',

@@ -146,6 +146,15 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   `/paywall`. Watches are household-readable on purpose (being inside someone's
   radius isn't a secret) and auto-expire after `WATCH_HOURS` (4h).
 - **UI gotchas (learned the hard way)**:
+  - **Never render a second `<Modal>` as a SIBLING of an already-open one** — on
+    iOS it silently fails to present and the button just looks dead. (Real bug:
+    "Add a place" did nothing because `PlacesSheet` rendered `PlaceForm`'s Modal
+    as a sibling.) Render the sub-panel INSIDE the open Modal — either as another
+    `<Modal>` nested in its children (what `NudgeSettings` → `PresetEditor` does)
+    or as an absolutely-positioned overlay (what `MemberSheet`'s nudge picker does).
+  - The roster is a HORIZONTAL card scroller so the sheet's height is constant
+    for any household size; **your own card is the sharing-controls entry point**
+    (hence no sharing button in the header).
   - Sheet/modal containers use **`c.sheet`, NEVER `c.card`** — the glass skin
     makes `card` translucent, so the map bleeds through the panel's own text.
     Same for labels drawn on top of the map (the place pills).

@@ -4,11 +4,10 @@
 // Nudge / Call actions. For a member who isn't sharing it shows a calm empty
 // state instead. For yourself it just shows your status.
 import { useEffect, useRef, useState } from 'react'
-import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native'
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
 import * as Location from 'expo-location'
-import { MapPin, Navigation, Bell, Phone } from 'lucide-react-native'
+import { Map, MapPin, Navigation, Bell, Phone, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -23,7 +22,8 @@ import {
   type NavApp,
 } from '@/lib/location'
 import { useWatchLive } from '@/lib/liveLocation'
-import type { MemberLocation, Profile } from '@/lib/types'
+import { fetchPingPresets, presetText, sendPing } from '@/lib/pings'
+import type { MemberLocation, PingPreset, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { MemberAvatar } from './locationUi'
 
@@ -59,7 +59,18 @@ function StatTile({
   )
 }
 
-function NavButton({ label, onPress, primary }: { label: string; onPress: () => void; primary?: boolean }) {
+/** One map-app hand-off. Each carries its own glyph tinted in that service's
+ *  brand colour so they're distinguishable at a glance (we don't ship their
+ *  actual trademarked logos). */
+function NavButton({
+  label,
+  icon,
+  onPress,
+}: {
+  label: string
+  icon: React.ReactNode
+  onPress: () => void
+}) {
   const { c } = useTheme()
   return (
     <Pressable
@@ -68,15 +79,17 @@ function NavButton({ label, onPress, primary }: { label: string; onPress: () => 
       style={({ pressed }) => [
         {
           flex: 1,
-          backgroundColor: primary ? c.accent : c.surface,
+          backgroundColor: c.surface,
           borderRadius: radius.md,
-          paddingVertical: 11,
+          paddingVertical: 10,
           alignItems: 'center',
+          gap: 4,
           opacity: pressed ? 0.85 : 1,
         },
       ]}
     >
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: primary ? '#fff' : c.text }}>{label}</Txt>
+      {icon}
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, color: c.text }}>{label}</Txt>
     </Pressable>
   )
 }
@@ -116,6 +129,7 @@ export function MemberSheet({
   phone,
   myLive,
   onClose,
+  onNudged,
 }: {
   profile: Profile
   location: MemberLocation | null
@@ -125,6 +139,8 @@ export function MemberSheet({
   phone?: string
   myLive: (MemberLocation & { lat: number; lng: number }) | null
   onClose: () => void
+  /** Confirmation text after a nudge is sent (the parent shows the toast). */
+  onNudged?: (text: string) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -134,6 +150,32 @@ export function MemberSheet({
   const [eta, setEta] = useState<{ minutes: number } | null>(null)
   const [etaLoading, setEtaLoading] = useState(false)
   const [address, setAddress] = useState<string | null>(null)
+
+  // Nudge picker — kept in-place so the user never leaves the map to send one.
+  const [nudgeOpen, setNudgeOpen] = useState(false)
+  const [presets, setPresets] = useState<PingPreset[]>([])
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    if (!nudgeOpen || presets.length) return
+    void fetchPingPresets()
+      .then(setPresets)
+      .catch(() => {})
+  }, [nudgeOpen, presets.length])
+
+  const sendNudge = async (p: PingPreset) => {
+    if (sending) return
+    setSending(true)
+    try {
+      await sendPing(p.preset_key ?? 'custom', p.emoji, presetText(p, t), [profile.email])
+      onNudged?.(t('location.nudge.sent', { name: profile.display_name }))
+    } catch {
+      // swallow — the picker closes either way
+    } finally {
+      setSending(false)
+      setNudgeOpen(false)
+    }
+  }
 
   // Keep the latest coords in refs so the ETA/address effects can read them
   // without re-running on every tiny move — they key on a coarse ~100 m grid.
@@ -270,19 +312,28 @@ export function MemberSheet({
 
               <Txt variant="label">{t('location.navigate')}</Txt>
               <View style={{ flexDirection: 'row', gap: sp.sm }}>
-                <NavButton label={t('location.maps.apple')} primary onPress={() => nav('apple')} />
-                <NavButton label={t('location.maps.google')} onPress={() => nav('google')} />
-                <NavButton label={t('location.maps.waze')} onPress={() => nav('waze')} />
+                <NavButton
+                  label={t('location.maps.apple')}
+                  icon={<Map size={18} color="#007AFF" />}
+                  onPress={() => nav('apple')}
+                />
+                <NavButton
+                  label={t('location.maps.google')}
+                  icon={<MapPin size={18} color="#34A853" />}
+                  onPress={() => nav('google')}
+                />
+                <NavButton
+                  label={t('location.maps.waze')}
+                  icon={<Navigation size={18} color="#05C8F7" />}
+                  onPress={() => nav('waze')}
+                />
               </View>
 
               <View style={{ flexDirection: 'row', gap: sp.sm }}>
                 <ActionButton
                   icon={<Bell size={17} color={c.text} />}
                   label={t('location.action.nudge')}
-                  onPress={() => {
-                    onClose()
-                    router.push('/pings')
-                  }}
+                  onPress={() => setNudgeOpen(true)}
                 />
                 {phone ? (
                   <ActionButton
@@ -311,6 +362,71 @@ export function MemberSheet({
             </View>
           )}
         </View>
+
+        {/* Nudge picker — an overlay INSIDE this Modal (a sibling <Modal> would
+            silently fail to present on iOS), so sending a nudge never takes the
+            user off the map. */}
+        {nudgeOpen ? (
+          <View style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setNudgeOpen(false)}
+              accessibilityLabel={t('common.cancel')}
+            />
+            <View
+              style={{
+                backgroundColor: c.sheet,
+                borderTopLeftRadius: 22,
+                borderTopRightRadius: 22,
+                padding: sp.lg,
+                paddingBottom: insets.bottom + sp.lg,
+                gap: sp.md,
+                maxHeight: '72%',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                <Txt
+                  style={{ flex: 1, fontFamily: fonts.displaySemi, fontSize: 20, color: c.text }}
+                  numberOfLines={1}
+                >
+                  {t('location.nudge.title', { name: profile.display_name })}
+                </Txt>
+                <Pressable onPress={() => setNudgeOpen(false)} hitSlop={10} accessibilityRole="button">
+                  <X size={20} color={c.textMuted} />
+                </Pressable>
+              </View>
+              <ScrollView contentContainerStyle={{ gap: sp.sm }}>
+                {presets.map((p) => (
+                  <Pressable
+                    key={p.id}
+                    disabled={sending}
+                    onPress={() => void sendNudge(p)}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: sp.md,
+                        backgroundColor: c.surface,
+                        borderRadius: radius.md,
+                        padding: sp.md,
+                        opacity: sending ? 0.5 : 1,
+                      },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Txt style={{ fontSize: 20 }}>{p.emoji}</Txt>
+                    <Txt
+                      style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: c.text }}
+                      numberOfLines={1}
+                    >
+                      {presetText(p, t)}
+                    </Txt>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        ) : null}
       </View>
     </Modal>
   )
