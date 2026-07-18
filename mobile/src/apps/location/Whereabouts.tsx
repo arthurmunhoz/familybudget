@@ -16,7 +16,6 @@ import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
 import * as Location from 'expo-location'
-import { router } from 'expo-router'
 import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
 import {
   MapPin,
@@ -674,7 +673,11 @@ export default function Whereabouts() {
                 active={!!watch}
                 badge={!isPlus}
                 icon={(col) => <ShieldCheck size={19} color={col} />}
-                onPress={() => (isPlus ? setSafetyOpen(true) : router.push('/paywall'))}
+                // Free users open the sheet too — they get one 30-minute watch a
+                // day, so bouncing them straight to the paywall would sell a
+                // feature they already partly have. The sheet states the limit,
+                // and the paywall comes up only once it's actually spent.
+                onPress={() => setSafetyOpen(true)}
               />
               <HeaderButton
                 label={t('location.places.title')}

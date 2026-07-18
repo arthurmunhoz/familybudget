@@ -3,12 +3,14 @@
 //   • watching  → live status per member (Inside / Outside + distance) and Stop.
 // Breach alerts themselves are raised by the Whereabouts screen, which already
 // has the live member_locations feed.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { ShieldCheck } from 'lucide-react-native'
+import { router } from 'expo-router'
+import { ShieldCheck, Sparkles } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
+import { usePlus } from '@/lib/plus'
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 import {
   clampRadius,
@@ -18,7 +20,17 @@ import {
   radiusUnitOptions,
   safetyRadiusPresets,
 } from '@/lib/location'
-import { isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
+import {
+  fetchLastWatchStart,
+  FREE_WATCH_MINUTES,
+  isOutside,
+  scheduleWatchEndedNotice,
+  startWatch,
+  stopWatch,
+  watchAllowanceSpent,
+  WATCH_HOURS,
+  WATCH_LIMIT_ERROR,
+} from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
 import { pickOn } from '@/theme/contrast'
@@ -66,6 +78,23 @@ export function SafetyRadiusSheet({
     return String(Math.round((watch.radius_m / u.meters) * 10) / 10)
   })
   const [busy, setBusy] = useState(false)
+  const { isPlus } = usePlus()
+  /** Free plan only: when their last watch started, so we can say the daily one
+   *  is spent BEFORE they configure a radius and get bounced by the server. */
+  const [lastStart, setLastStart] = useState<string | null>(null)
+  useEffect(() => {
+    if (isPlus) return
+    let active = true
+    void fetchLastWatchStart()
+      .then((v) => {
+        if (active) setLastStart(v)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [isPlus])
+  const spent = !isPlus && watchAllowanceSpent(lastStart)
 
   // Custom value → metres (clamped to the DB's 50–5000 range). null = unusable.
   const customMeters = (() => {
@@ -83,15 +112,30 @@ export function SafetyRadiusSheet({
     if (!myLive || !picked.length || busy || !effectiveRadius) return
     setBusy(true)
     try {
-      await startWatch({
+      const row = await startWatch({
         center: { lat: myLive.lat, lng: myLive.lng },
         radius_m: effectiveRadius,
         watched: picked,
       })
+      // A free watch is ended BY THE SERVER after 30 minutes, so say so at the
+      // moment it happens — and say why. Being quietly un-watched at the event
+      // you set this up for is the one outcome worth a notification.
+      if (row && !isPlus) {
+        await scheduleWatchEndedNotice(
+          row.expires_at,
+          t('location.safety.endedTitle'),
+          t('location.safety.endedBody'),
+        )
+      }
       onChanged()
       onClose()
-    } catch {
-      // surfaced by the caller's toast on next refresh
+    } catch (e) {
+      if (String((e as { message?: string } | null)?.message ?? '').includes(WATCH_LIMIT_ERROR)) {
+        onClose()
+        router.push('/paywall')
+        return
+      }
+      // anything else surfaces via the caller's toast on next refresh
     } finally {
       setBusy(false)
     }
@@ -105,9 +149,14 @@ export function SafetyRadiusSheet({
     onClose()
   }
 
-  const hoursLeft = watch
-    ? Math.max(1, Math.round((new Date(watch.expires_at).getTime() - Date.now()) / 3_600_000))
-    : WATCH_HOURS
+  // A free session is 30 minutes, so "Ends in about 1h" would be a lie for most
+  // of its life. Under an hour, count in minutes.
+  const msLeft = watch ? new Date(watch.expires_at).getTime() - Date.now() : 0
+  const endsInLabel = watch
+    ? msLeft < 3_600_000
+      ? t('location.safety.endsInMin', { mins: Math.max(1, Math.round(msLeft / 60_000)) })
+      : t('location.safety.endsIn', { hours: Math.round(msLeft / 3_600_000) })
+    : t('location.safety.endsIn', { hours: WATCH_HOURS })
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -155,7 +204,7 @@ export function SafetyRadiusSheet({
                 <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>
                   {t('location.safety.active', { count: watch.watched.length })}
                 </Txt>
-                <Txt variant="faint">{t('location.safety.endsIn', { hours: hoursLeft })}</Txt>
+                <Txt variant="faint">{endsInLabel}</Txt>
               </View>
 
               <Section shrink>
@@ -384,16 +433,64 @@ export function SafetyRadiusSheet({
                   across it. Same treatment as Pet Care's "Add task" and the
                   Places footer — this one keeps its filled style, though: it's
                   the primary commit action, not an "add another" affordance. */}
-              <Btn
-                title={t('location.safety.start')}
-                onPress={start}
-                disabled={!myLive || !picked.length || !effectiveRadius}
-                loading={busy}
-                style={{
-                  borderBottomLeftRadius: sheetRadius,
-                  borderBottomRightRadius: sheetRadius,
-                }}
-              />
+              {spent ? (
+                /* Their one watch is already gone. Say so here rather than
+                   letting them pick people and a radius and then bouncing them
+                   off a server error — the answer is knowable before they
+                   start. */
+                <View style={{ gap: sp.sm }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      gap: sp.sm,
+                      backgroundColor: c.surface,
+                      borderRadius: R.md,
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor: c.border,
+                      padding: sp.md,
+                    }}
+                  >
+                    <Sparkles size={16} color={c.accent} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }}>
+                        {t('location.safety.usedToday')}
+                      </Txt>
+                      <Txt variant="faint" style={{ fontSize: 11 }}>
+                        {t('location.safety.usedTodayBody')}
+                      </Txt>
+                    </View>
+                  </View>
+                  <Btn
+                    title={t('location.safety.getPlus')}
+                    onPress={() => {
+                      onClose()
+                      router.push('/paywall')
+                    }}
+                    style={{
+                      borderBottomLeftRadius: sheetRadius,
+                      borderBottomRightRadius: sheetRadius,
+                    }}
+                  />
+                </View>
+              ) : (
+                <>
+                  {!isPlus ? (
+                    <Txt variant="faint" style={{ fontSize: 11, textAlign: 'center' }}>
+                      {t('location.safety.freeNote', { mins: FREE_WATCH_MINUTES })}
+                    </Txt>
+                  ) : null}
+                  <Btn
+                    title={t('location.safety.start')}
+                    onPress={start}
+                    disabled={!myLive || !picked.length || !effectiveRadius}
+                    loading={busy}
+                    style={{
+                      borderBottomLeftRadius: sheetRadius,
+                      borderBottomRightRadius: sheetRadius,
+                    }}
+                  />
+                </>
+              )}
             </>
           )}
         </View>

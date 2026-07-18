@@ -397,9 +397,35 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   While a watch runs, watched members are kept in live mode (`requestLive`) so
   the boundary check has fresh positions. The circle is drawn as a real GeoJSON
   polygon (`circlePolygon`) because Mapbox circle radii are in PIXELS, not metres.
-  Gating: `usePlus().isPlus` — non-Plus shows a `Sparkles` badge and routes to
-  `/paywall`. Watches are household-readable on purpose (being inside someone's
-  radius isn't a secret) and auto-expire after `WATCH_HOURS` (4h).
+  Watches are household-readable on purpose (being inside someone's radius isn't
+  a secret) and auto-expire after `WATCH_HOURS` (4h).
+- **Free-plan limits (migration 072)** — both are BEFORE triggers on
+  `household_is_plus`, the same shape as migration 047's budget limit, so a
+  stale client can't bypass them and a LAPSED plan takes effect on its own.
+  Existing rows are always grandfathered; a plan change never deletes anything.
+  - **Places: one per free household.** `createPlace` throws
+    `free_plan_place_limit` → `PlaceForm` routes to `/paywall`.
+  - **Safety Radius: one watch per rolling 24h, clamped to 30 minutes.** Plus
+    keeps 4h and no daily limit. Rolling 24h, not a calendar day, so there's no
+    timezone question and no midnight to game. The trigger OVERWRITES
+    `expires_at` for free users — the client asks for 4h and gets 30 minutes,
+    which is why `startWatch` returns the server's row: the "your watch ended"
+    notice is scheduled against the time the server actually chose.
+  - `safety_watch_starts` exists because `stopWatch` DELETES the watch row, so
+    the table itself can't answer "have you already had today's watch". It's
+    append-only, own-rows-only, and written by the trigger.
+  - An UPDATE while a watch is still running counts as an EDIT: it neither
+    consumes the allowance nor extends the clock. Without that, re-saving the
+    sheet would renew the 30 minutes forever.
+  - The header button no longer routes non-Plus users to the paywall — they
+    have a real (short) session, so the sheet opens, states the limit, and the
+    paywall appears only once the allowance is actually spent (`spent`, from
+    `fetchLastWatchStart`), rather than after they've configured a radius.
+  - **The end of a free watch is announced.** `scheduleWatchEndedNotice` books
+    an OS-level local notification for the server's expiry time — not an in-app
+    timer, because the watch ends while the phone is in a pocket at the very
+    event it was set up for. `stopWatch` cancels it, or it would later announce
+    the end of something the user already ended.
 - **UI gotchas (learned the hard way)**:
   - **Never render a second `<Modal>` as a SIBLING of an already-open one** — on
     iOS it silently fails to present and the button just looks dead. (Real bug:

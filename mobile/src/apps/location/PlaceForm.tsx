@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
+import { router } from 'expo-router'
 import { LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
@@ -15,7 +16,14 @@ import { useI18n } from '@/hooks/useI18n'
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 import { formatDistance, nearestPreset, radiusPresets } from '@/lib/location'
 import { searchPlaces, type PlaceSuggestion } from '@/lib/placeSearch'
-import { createPlace, deletePlace, removePlaceWatch, updatePlace, upsertPlaceWatch } from '@/lib/places'
+import {
+  createPlace,
+  deletePlace,
+  PLACE_LIMIT_ERROR,
+  removePlaceWatch,
+  updatePlace,
+  upsertPlaceWatch,
+} from '@/lib/places'
 import type { Place, PlaceWatch, Profile } from '@/lib/types'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
 import { Section } from './locationUi'
@@ -317,7 +325,15 @@ export function PlaceForm({
         }
       }
       onSaved()
-    } catch {
+    } catch (e) {
+      // A free household keeps one place (migration 072). The server is the one
+      // that decides, so this is the error path rather than a client check —
+      // and a lapsed Plus plan lands here too, without anything being deleted.
+      if (String((e as { message?: string } | null)?.message ?? '').includes(PLACE_LIMIT_ERROR)) {
+        onClose()
+        router.push('/paywall')
+        return
+      }
       Alert.alert(t('location.places.saveFailed'))
     } finally {
       setBusy(false)

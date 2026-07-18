@@ -29,6 +29,10 @@ export interface PlaceInput {
   radius_m: number
 }
 
+/** Raised by the DB when a free household already has its one place
+ *  (migration 072) — the caller shows the paywall. */
+export const PLACE_LIMIT_ERROR = 'free_plan_place_limit'
+
 /** The saved place a point sits inside, if any. Smallest radius wins when they
  *  overlap, so "Home" inside a wider "Neighborhood" still reads as Home. */
 export function placeAt(places: Place[], point: LatLng): Place | null {
