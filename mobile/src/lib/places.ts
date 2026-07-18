@@ -107,32 +107,23 @@ export async function removePlaceWatch(placeId: string): Promise<void> {
   await supabase.from('place_watchers').delete().eq('place_id', placeId).eq('user_email', me)
 }
 
-/** Geofences "bounce" at the boundary (repeated enter/exit as GPS jitters), so
- *  ignore an identical crossing recorded in the last few minutes. */
-const DEDUP_MS = 5 * 60 * 1000
-
-/** Record MY crossing of a place, then best-effort push it to the household. */
+/** Record MY crossing of a place, then best-effort push it to the household.
+ *
+ *  The decision of whether this IS a crossing belongs to the database, not here
+ *  (migration 071): `record_place_event` compares against the last event for
+ *  this person+place and returns null unless the state actually changed. That
+ *  matters because the OS re-announces every region you're standing in each time
+ *  geofencing restarts — the client can't tell those apart from a real arrival,
+ *  and a client-side time window let one through every few minutes forever.
+ *
+ *  No id back = nothing was recorded = nothing to announce, which is exactly
+ *  what stops the repeat pushes. */
 export async function recordPlaceEvent(placeId: string, type: 'arrive' | 'leave'): Promise<void> {
-  const me = await myEmail()
-  if (!me) return
-
-  const since = new Date(Date.now() - DEDUP_MS).toISOString()
-  const { data: recent } = await supabase
-    .from('place_events')
-    .select('id')
-    .eq('place_id', placeId)
-    .eq('user_email', me)
-    .eq('type', type)
-    .gt('at', since)
-    .limit(1)
-  if (recent && recent.length) return // bounce — already recorded
-
-  const { data, error } = await supabase
-    .from('place_events')
-    .insert({ place_id: placeId, type })
-    .select('id')
-    .single()
-  if (error || !data) return
+  const { data: eventId, error } = await supabase.rpc('record_place_event', {
+    p_place_id: placeId,
+    p_type: type,
+  })
+  if (error || !eventId) return
 
   try {
     const token = await authToken()
@@ -140,7 +131,7 @@ export async function recordPlaceEvent(placeId: string, type: 'arrive' | 'leave'
       await fetch(`${API_BASE}/api/send-ping`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: 'place-event', place_event_id: data.id }),
+        body: JSON.stringify({ action: 'place-event', place_event_id: eventId }),
       })
     }
   } catch {

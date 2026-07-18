@@ -236,3 +236,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-068-safety-watches.sql (safety_watches: temporary "event mode" circle — watch chosen members and alert when one leaves the radius; breach detection runs on the watcher's device; One Roof Plus)
 --   migration-069-pet-care-routines.sql (Pet Care redesign: pet_care_tasks daily/interval routines + pet_task_done completions + pet_weights log; RLS through pets)
 --   migration-070-place-watchers.sql (place_watchers: per-user opt-in to a place's alerts + whose crossings to hear about; drops the old place-level notify flags that notified the whole household)
+--   migration-071-place-event-state-transitions.sql (record_place_event(): a crossing is recorded only when it CHANGES state, so standing inside a place can't re-fire "arrived" on every app open; advisory-locked against the two-device race, and a "leave" with no prior "arrive" is dropped)

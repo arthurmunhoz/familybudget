@@ -220,9 +220,27 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   `api/send-ping.ts` (`?action=place-event`, respects the place's notify flags).
   UI: `PlacesSheet` (Places / Activity tabs) + `PlaceForm` from the Whereabouts
   header. Gotchas: **iOS caps monitored regions at 20** (`MAX_REGIONS`) and
-  enforces a ~100 m radius floor; geofences bounce at the boundary, so
-  `recordPlaceEvent` drops a repeat of the same crossing within 5 min. A new place
-  pins to your CURRENT location (no map-drag picker yet). Push copy is English-only.
+  enforces a ~100 m radius floor. A new place pins to your CURRENT location (no
+  map-drag picker yet). Push copy is English-only.
+  - **A crossing counts only when it CHANGES state**, and that decision lives in
+    Postgres (`record_place_event`, migration 071), NOT in the client. Reason:
+    **expo-location keeps each region's state in MEMORY**, re-seeds it to
+    `Unknown` on every `startGeofencingAsync`, then calls `requestStateForRegion`
+    — so every restart re-announces `Enter` for each place you're standing in
+    (and `Exit` for the rest). The client cannot tell those from a real arrival.
+    The old client-side "same event within 5 minutes" guard let one through
+    every few minutes forever: production had **13 consecutive arrives at Home
+    and no leave**, plus pairs 77 ms apart where the guard lost the check-then-
+    insert race. The RPC compares against the last event for that person+place,
+    takes an advisory lock, and returns null when nothing changed — no row, so
+    `recordPlaceEvent` sends no push. It also drops a `leave` with no prior
+    `arrive`, or a fresh registration would announce "left School" for a school
+    they were never in. Never insert into `place_events` directly.
+  - `syncGeofences` skips `startGeofencingAsync` when the region set is
+    unchanged (fingerprint in AsyncStorage) so those phantom events aren't
+    generated in the first place. That's the optimisation; migration 071 is the
+    guarantee — expo re-registers the task on its own after a cold launch, which
+    no client-side check can intercept.
 - **Safety Radius / event mode (Phase 3, One Roof PLUS)** — migration 068
   (`safety_watches`, one row per owner), `src/lib/safetyRadius.ts` (CRUD +
   `isOutside` + `circlePolygon` + `alertBreach`) and `SafetyRadiusSheet`.
