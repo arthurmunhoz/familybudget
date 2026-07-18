@@ -306,7 +306,11 @@ export function MemberDetailCard({
               legible label. */}
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 'auto' }}>
             <IconAction
-              icon={<Navigation size={16} color={c.accent} />}
+              // c.text like its neighbours: the accent was the only thing
+              // different about this button, which read as "switched on" —
+              // exactly the false state the header buttons had. All three of
+              // these do the same kind of thing, so they look the same.
+              icon={<Navigation size={16} color={c.text} />}
               label={t('location.action.navigate')}
               onPress={onNavigate}
             />
