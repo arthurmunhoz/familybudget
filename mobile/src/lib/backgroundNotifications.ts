@@ -11,7 +11,7 @@
 import * as Notifications from 'expo-notifications'
 import * as TaskManager from 'expo-task-manager'
 
-import { writeAckStatus } from './widget'
+import { reloadPetCareWidget, writeAckStatus } from './widget'
 import { captureLiveFixIfSharing } from './location'
 
 const BACKGROUND_NOTIFICATION_TASK = 'oneroof-background-notification'
@@ -28,6 +28,12 @@ function isLiveWake(data: unknown): boolean {
 function handleAckPayload(data: unknown): void {
   if (!data || typeof data !== 'object') return
   const d = data as Record<string, unknown>
+  // Someone else marked a pet task done (api/widget petcare-done/notify): the
+  // widget just needs a reload — it re-fetches the fresh state itself.
+  if (d.type === 'petcare') {
+    reloadPetCareWidget()
+    return
+  }
   if (d.type !== 'ack') return
   const label = typeof d.label === 'string' ? d.label : ''
   if (!label) return

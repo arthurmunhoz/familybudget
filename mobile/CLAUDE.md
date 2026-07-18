@@ -70,12 +70,16 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   `_layout.tsx`) is the reference for "sync on login, not on screen visit."
   See `DOCUMENTATION.md` §3 for the full picture (confirmation-timeline
   mechanism, silent ack push).
-  - **A widget CAN do its own networking** — no Supabase session needed. Two
-    live examples: Nudges POSTs to `/api/widget-nudge`, and Today pulls weather
+  - **A widget CAN do its own networking** — no Supabase session needed. Three
+    live examples: Nudges POSTs to `/api/widget-nudge`, Today pulls weather
     straight from Open-Meteo (public, keyless) plus its agenda from
-    `/api/widget?action=today` — both authenticated with the per-device **widget
-    token** (`widget_tokens`, migration 045) and both served by the same
-    `api/widget.ts`. Prefer this over App-Group-only data for
+    `/api/widget?action=today`, and PetCare reads `?action=petcare` / marks a
+    task via `?action=petcare-done` — all authenticated with the per-device
+    **widget token** (`widget_tokens`, migration 045) and all served by the same
+    `api/widget.ts`. `petcare-done` (and the app-side `petcare-notify`) also
+    fan a SILENT push (`{type:'petcare'}`) to every other member's device;
+    `backgroundNotifications.ts` catches it and reloads their PetCare widgets —
+    that's the cross-device "breakfast just got marked done" ASAP path. Prefer this over App-Group-only data for
     anything that GOES STALE: a mirrored snapshot only updates when someone opens
     the app, so a widget fed only by the App Group shows yesterday's data on a
     phone that wasn't opened. **Never bake a formatted date into a payload** —

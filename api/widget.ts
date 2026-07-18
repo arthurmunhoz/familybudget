@@ -470,6 +470,134 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ day, items: [...evItems, ...petItems].slice(0, MAX_ITEMS) })
   }
 
+  // ── petcare ───────────────────────────────────────────────────────────────
+  // The Pet Care widget: per-pet daily checklist + interval routines
+  // (migration 069). `petcare` returns fresh state; `petcare-done` marks a task
+  // done for the token's user and silent-pushes every OTHER member's device so
+  // their widgets reload (backgroundNotifications.ts → reloadPetCareWidget);
+  // `petcare-notify` is the fan-out alone, called by the APP after its own
+  // RLS insert. Logic mirrors mobile/src/lib/petCare.ts — keep in sync.
+  if (action === 'petcare' || action === 'petcare-done' || action === 'petcare-notify') {
+    // Silent/background Expo push: no title/body/sound — wakes the app to
+    // reload the widget, never shows a notification (same as api/ack-ping.ts).
+    const fanOutReload = async (): Promise<void> => {
+      const { data: tokens } = await db
+        .from('expo_push_tokens')
+        .select('token')
+        .eq('household_id', household)
+        .neq('user_email', senderEmail)
+      const list = (tokens ?? []).map((t: { token: string }) => t.token)
+      for (let i = 0; i < list.length; i += 100) {
+        const chunk = list.slice(i, i + 100).map((to: string) => ({
+          to,
+          data: { type: 'petcare' },
+          _contentAvailable: true,
+        }))
+        try {
+          await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(chunk),
+          })
+        } catch {
+          /* best-effort */
+        }
+      }
+    }
+
+    if (action === 'petcare-notify') {
+      await fanOutReload()
+      return res.status(200).json({ ok: true })
+    }
+
+    const { day } = req.body ?? {}
+    if (!day || typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      return res.status(400).json({ error: 'Missing day' })
+    }
+
+    if (action === 'petcare-done') {
+      const { taskId } = req.body ?? {}
+      if (!taskId || typeof taskId !== 'string') return res.status(400).json({ error: 'Missing taskId' })
+      // The task must belong to the token's household — service role bypasses
+      // RLS, so this check IS the tenancy boundary.
+      const { data: task } = await db
+        .from('pet_care_tasks')
+        .select('id, title, pets!inner(household_id)')
+        .eq('id', taskId)
+        .eq('pets.household_id', household)
+        .maybeSingle()
+      if (!task) return res.status(404).json({ error: 'Unknown task' })
+      // Idempotent: unique(task_id, done_on) makes a double-tap a no-op.
+      await db
+        .from('pet_task_done')
+        .upsert(
+          { task_id: taskId, done_on: day, done_by: senderEmail },
+          { onConflict: 'task_id,done_on', ignoreDuplicates: true },
+        )
+      await fanOutReload()
+    }
+
+    // Fresh state for the widget (both petcare and petcare-done return it).
+    const [petRows, taskRows, doneRows, memberRows] = await Promise.all([
+      db.from('pets').select('id, name, emoji, species').eq('household_id', household).order('name'),
+      db
+        .from('pet_care_tasks')
+        .select('id, pet_id, kind, title, icon, interval_days, sort_order, created_at, pets!inner(household_id)')
+        .eq('pets.household_id', household)
+        .order('sort_order'),
+      db
+        .from('pet_task_done')
+        .select('task_id, done_on, done_by, pet_care_tasks!inner(pet_id, pets!inner(household_id))')
+        .eq('pet_care_tasks.pets.household_id', household)
+        .gte('done_on', addDays(day, -370)),
+      db.from('allowed_users').select('email, display_name').eq('household_id', household),
+    ])
+    const nameOf = (email: string): string => {
+      const m = (memberRows.data ?? []).find((r: { email: string }) => r.email === email)
+      return (m?.display_name || email.split('@')[0]).split(/\s+/)[0]
+    }
+    type TaskRow = {
+      id: string
+      pet_id: string
+      kind: string
+      title: string
+      icon: string
+      interval_days: number | null
+      sort_order: number
+      created_at: string
+    }
+    type DoneRow = { task_id: string; done_on: string; done_by: string }
+    const allTasks = (taskRows.data ?? []) as unknown as TaskRow[]
+    const allDone = (doneRows.data ?? []) as unknown as DoneRow[]
+    const latestByTask = new Map<string, DoneRow>()
+    for (const d of allDone) {
+      const prev = latestByTask.get(d.task_id)
+      if (!prev || d.done_on > prev.done_on) latestByTask.set(d.task_id, d)
+    }
+
+    const pets = ((petRows.data ?? []) as { id: string; name: string; emoji: string }[]).map((p) => {
+      const mine = allTasks.filter((tk) => tk.pet_id === p.id)
+      const daily = mine
+        .filter((tk) => tk.kind === 'daily')
+        .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
+        .map((tk) => {
+          const d = allDone.find((x) => x.task_id === tk.id && x.done_on === day)
+          return { id: tk.id, title: tk.title, icon: tk.icon, done: !!d, doneBy: d ? nameOf(d.done_by) : null }
+        })
+      const routines = mine
+        .filter((tk) => tk.kind === 'interval')
+        .map((tk) => {
+          const last = latestByTask.get(tk.id)
+          const dueIn = last ? daysBetween(day, last.done_on) + (tk.interval_days ?? 0) : 0
+          return { id: tk.id, title: tk.title, icon: tk.icon, dueIn }
+        })
+        .sort((a, b) => a.dueIn - b.dueIn)
+      return { id: p.id, name: p.name, emoji: p.emoji || '🐾', daily, routines }
+    })
+
+    return res.status(200).json({ day, pets })
+  }
+
   // ── nudge ─────────────────────────────────────────────────────────────────
   if (action !== 'nudge') return res.status(400).json({ error: 'Unknown action' })
 
