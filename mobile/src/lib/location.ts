@@ -318,6 +318,41 @@ export function radiusPresets(min = 0): { meters: number; label: string }[] {
   return (useImperial ? imperial : metric).filter((p) => p.meters >= min)
 }
 
+/** Just three round choices for a Safety Radius, plus a Custom escape hatch in
+ *  the UI. Deliberately short: this is a "drop a circle at the park" decision,
+ *  not a configuration exercise. */
+export function safetyRadiusPresets(): { meters: number; label: string }[] {
+  return useImperial
+    ? [
+        { meters: 76, label: '250 ft' },
+        { meters: 152, label: '500 ft' },
+        { meters: 402, label: '¼ mi' },
+      ]
+    : [
+        { meters: 100, label: '100 m' },
+        { meters: 250, label: '250 m' },
+        { meters: 500, label: '500 m' },
+      ]
+}
+
+/** Units offered by the Custom radius input, in the user's own system. */
+export function radiusUnitOptions(): { id: string; label: string; meters: number }[] {
+  return useImperial
+    ? [
+        { id: 'ft', label: 'ft', meters: 0.3048 },
+        { id: 'mi', label: 'mi', meters: 1609.34 },
+      ]
+    : [
+        { id: 'm', label: 'm', meters: 1 },
+        { id: 'km', label: 'km', meters: 1000 },
+      ]
+}
+
+/** DB check constraint on radius_m is 50..5000 — clamp custom input to it. */
+export function clampRadius(meters: number): number {
+  return Math.max(50, Math.min(5000, Math.round(meters)))
+}
+
 /** The preset closest to `meters` — keeps a chip highlighted even when the saved
  *  value came from another unit system or an older preset set. */
 export function nearestPreset(

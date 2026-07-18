@@ -7,9 +7,10 @@
 // Native-only: the map (@rnmapbox/maps) and background location need a dev build
 // + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+import { Animated, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
+import * as Location from 'expo-location'
 import { router } from 'expo-router'
 import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
 import { MapPin, Crosshair, Landmark, ShieldCheck, Sparkles } from 'lucide-react-native'
@@ -74,6 +75,43 @@ async function fetchMemberMeta(): Promise<{
   return { avatars, phones }
 }
 
+/** "Watching" badge — softly pulses so an active Safety Radius reads as ongoing
+ *  activity rather than a static label. */
+function WatchingChip() {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const pulse = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.35, duration: 850, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 850, useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+  return (
+    <Animated.View
+      style={{
+        opacity: pulse,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: c.accentSoft,
+        borderRadius: radius.pill,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+      }}
+    >
+      <ShieldCheck size={10} color={c.accent} />
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
+        {t('location.card.watching')}
+      </Txt>
+    </Animated.View>
+  )
+}
+
 /** One member as a fixed-size card in the horizontal roster. Fixed height keeps
  *  the sheet exactly as tall for a household of 2 as for one of 10. */
 function MemberCard({
@@ -83,7 +121,6 @@ function MemberCard({
   status,
   hint,
   battery,
-  isMe,
   watched,
   onPress,
 }: {
@@ -91,32 +128,29 @@ function MemberCard({
   avatarPath?: string | null
   color: string
   status: string
-  /** Secondary line — used on your OWN card ("Tap to manage"). */
+  /** Secondary line — used on your OWN card ("Manage location sharing"). */
   hint?: string
   battery: number | null
-  isMe: boolean
   /** In my active Safety Radius watch list. */
   watched: boolean
   onPress: () => void
 }) {
   const { c } = useTheme()
-  const { t } = useI18n()
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      // No selected-state border: on first load nothing should look "picked".
       style={({ pressed }) => [
         {
           width: 138,
-          height: 158,
+          height: 168,
           backgroundColor: c.surface,
           borderRadius: radius.lg,
           paddingVertical: sp.md,
           paddingHorizontal: sp.sm,
           alignItems: 'center',
           gap: 5,
-          borderWidth: isMe ? 1.5 : 0,
-          borderColor: c.accent,
         },
         pressed && { opacity: 0.7 },
       ]}
@@ -129,30 +163,17 @@ function MemberCard({
         {status}
       </Txt>
       {hint ? (
-        <Txt style={{ fontSize: 10, color: c.accent, fontFamily: fonts.semibold }} numberOfLines={1}>
+        <Txt
+          style={{ fontSize: 10, color: c.accent, fontFamily: fonts.semibold, textAlign: 'center' }}
+          numberOfLines={2}
+        >
           {hint}
         </Txt>
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 'auto' }}>
+      {/* Watching sits ABOVE the battery so the live state reads first. */}
+      <View style={{ marginTop: 'auto', alignItems: 'center', gap: 4 }}>
+        {watched ? <WatchingChip /> : null}
         {battery != null ? <BatteryChip level={battery} /> : null}
-        {watched ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 3,
-              backgroundColor: c.accentSoft,
-              borderRadius: radius.pill,
-              paddingHorizontal: 6,
-              paddingVertical: 2,
-            }}
-          >
-            <ShieldCheck size={10} color={c.accent} />
-            <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
-              {t('location.card.watching')}
-            </Txt>
-          </View>
-        ) : null}
       </View>
     </Pressable>
   )
@@ -176,6 +197,28 @@ export default function Whereabouts() {
   const [placesOpen, setPlacesOpen] = useState(false)
   const [safetyOpen, setSafetyOpen] = useState(false)
   const [toast, setToast] = useState<ToastData | null>(null)
+
+  // Where to frame the map on first load. Prefer MY position — even when I'm not
+  // sharing — so it opens on me rather than on whoever happens to be live. Only
+  // read the device position if permission is ALREADY granted (opening the map
+  // must never trigger a prompt), and it's used for framing only, never uploaded.
+  const [deviceCenter, setDeviceCenter] = useState<{ lat: number; lng: number } | null>(null)
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      try {
+        const perm = await Location.getForegroundPermissionsAsync()
+        if (!perm.granted) return
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+        if (active) setDeviceCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      } catch {
+        /* no fix — fall back to a live member, else the wide view */
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const { data: locs = [], revalidate } = useCachedQuery<MemberLocation[]>(
     'location:members',
@@ -304,16 +347,17 @@ export default function Whereabouts() {
   // Center once on the first data we get (me if available, else anyone live).
   const initialCenter = useMemo<[number, number]>(() => {
     if (myLive) return [myLive.lng, myLive.lat]
+    if (deviceCenter) return [deviceCenter.lng, deviceCenter.lat]
     if (livePins[0]) return [livePins[0].loc.lng, livePins[0].loc.lat]
     return [-98.5, 39.5] // continental US fallback until a fix arrives
-  }, [myLive, livePins])
+  }, [myLive, deviceCenter, livePins])
 
   // On first load, frame the user (or, if I'm not sharing, whoever is live) at a
   // comfortable neighborhood zoom — not zoomed in too tight. Runs once, so it
   // never fights the user's own panning afterward.
   useEffect(() => {
     if (centeredOnce.current) return
-    const focus = myLive ?? livePins[0]?.loc
+    const focus = myLive ?? deviceCenter ?? livePins[0]?.loc
     if (!focus) return
     centeredOnce.current = true
     cameraRef.current?.setCamera({
@@ -321,7 +365,7 @@ export default function Whereabouts() {
       zoomLevel: INITIAL_ZOOM,
       animationDuration: 0,
     })
-  }, [myLive, livePins])
+  }, [myLive, deviceCenter, livePins])
 
   const recenter = useCallback(() => {
     const pts = livePins.map((x) => [x.loc.lng, x.loc.lat] as [number, number])
@@ -382,7 +426,6 @@ export default function Whereabouts() {
       <View style={{ paddingHorizontal: sp.lg }}>
         <AppHeader
           title={t('app.location.name')}
-          icon={<MapPin size={20} color={c.accent} />}
           right={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.lg }}>
               {/* Safety radius — a Plus feature: the sparkle badge marks it, and
@@ -439,7 +482,7 @@ export default function Whereabouts() {
               // random spot); the effect above snaps to the user at INITIAL_ZOOM.
               defaultSettings={{
                 centerCoordinate: initialCenter,
-                zoomLevel: myLive || livePins.length ? INITIAL_ZOOM : 3,
+                zoomLevel: myLive || deviceCenter || livePins.length ? INITIAL_ZOOM : 3,
               }}
             />
             {/* Safety radius circle — a real geographic polygon, so it stays
@@ -569,24 +612,15 @@ export default function Whereabouts() {
             backgroundColor: c.sheet,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
-            paddingTop: sp.sm,
+            paddingTop: sp.md,
             paddingBottom: sp.xl,
             borderTopWidth: 1,
             borderColor: c.border,
           }}
         >
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center', marginBottom: sp.sm }} />
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'baseline',
-              paddingHorizontal: sp.lg,
-              marginBottom: sp.sm,
-            }}
-          >
+          {/* No grab handle: this sheet is fixed, and a handle implies it drags. */}
+          <View style={{ paddingHorizontal: sp.lg, marginBottom: sp.sm }}>
             <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('location.everyone')}</Txt>
-            <Txt variant="faint">{t('location.tapHint')}</Txt>
           </View>
           <ScrollView
             horizontal
@@ -606,7 +640,6 @@ export default function Whereabouts() {
                   status={statusLine(p.email)}
                   hint={isMe ? t('location.card.manage') : undefined}
                   battery={live && loc.battery != null ? loc.battery : null}
-                  isMe={isMe}
                   watched={!!watch?.watched.includes(p.email)}
                   onPress={() => (isMe ? setSharingOpen(true) : setSelected(p.email))}
                 />
