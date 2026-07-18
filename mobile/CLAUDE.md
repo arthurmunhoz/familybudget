@@ -209,20 +209,34 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     once it does, or it stays stuck with unbiased nationwide results. Biasing
     off `coords` would also anchor the next search to whatever result was last
     tapped instead of to the user.
-  - `PlaceForm`'s **Location** section states exactly one thing, chosen from
-    three states: a searched place (`picked` → address + ✕, and the search box
-    HIDES, since ✕ is now the way to change it), an existing place's own
-    reverse-geocoded address, or your current location. Editing used to fall
-    through to "Your current location", which described the phone rather than
-    the place. `repinned` is tracked separately from the coordinates because
-    `savedLabel` describes the place's ORIGINAL spot — after "use my current
-    location" it must stop being shown, or the form describes the old location
-    while saving the new one. "Use my current location" appears only when that
-    is not already the state.
+  - `PlaceForm`'s **Location** section states exactly one thing, and the whole
+    section keys off `hasPlace` (`picked || usingSaved` — a NAMED place, either
+    searched or the saved one being edited):
+    - `hasPlace` → its address + a bin to remove it, and **the search box is
+      hidden** (the bin is the way to change it). Note an existing place counts:
+      opening one used to show a search box next to an already-chosen location.
+    - otherwise → your current location, or "no location chosen yet", with the
+      search box shown.
+    - The bin **clears the location outright** (coords → null, Save disabled)
+      rather than restoring a previous spot. A trash icon that quietly undid
+      something would be lying about what it does.
+    - `usingSaved` is tracked separately from the coordinates because
+      `savedLabel` describes the place's ORIGINAL spot — after re-pinning it must
+      stop being shown, or the form describes the old location while saving the
+      new one. Editing used to fall through to "Your current location", which
+      described the phone rather than the place.
+    - The current-location action reads "Switch to my current location" when a
+      place is chosen and "Use my current location" when none is, and hides in
+      the one case where it would change nothing (no place, already on the
+      current location) so it can't be misread as a description of the state.
   - **`Field` sizes itself from its `fontSize`**, so the icon input's 22pt emoji
     made it taller than the name box beside it. Both are pinned to `FIELD_H`
     with `paddingVertical: 0` (plus `textAlignVertical` for Android, which
     doesn't centre a fixed-height single line on its own).
+  - `Section` cards separate from the sheet by a **hairline border**, not by
+    their fill: `c.surface` is a translucent overlay on `c.sheet` (10% white in
+    Dusk), so fill alone barely reads as a distinct card. An edge reads at any
+    opacity in either theme. Same trick if you add panels elsewhere in here.
   - Caveat: Search Box results are *temporary* by default and we persist the
     chosen coordinates — fine in practice, but a permanent entitlement is a
     paid Mapbox add-on if that ever needs to be airtight.

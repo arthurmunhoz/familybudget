@@ -4,11 +4,11 @@
 // "save my home" case is one tap, but you never have to travel to a place to
 // save it. Radius is a small preset set: iOS enforces a ~100 m floor on
 // geofences, so finer-grained control would be a lie.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
-import { MapPin, Search, X } from 'lucide-react-native'
+import { LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -26,11 +26,16 @@ const FIELD_H = 46
 
 /** A titled group. The form used to be one flat column of labels and controls
  *  on the same fill, which read as a wall — each group now sits on its own card
- *  under a quiet uppercase heading so the eye can find the part it wants. */
+ *  under a quiet uppercase heading so the eye can find the part it wants.
+ *
+ *  The BORDER is doing most of the work, not the fill: `c.surface` is a
+ *  translucent overlay on the sheet (10% white in Dusk), so on its own it barely
+ *  separates from the sheet behind it. A hairline edge reads at any opacity, in
+ *  either theme. */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const { c } = useTheme()
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: 7 }}>
       <Txt
         style={{
           fontFamily: fonts.semibold,
@@ -43,10 +48,56 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       >
         {title}
       </Txt>
-      <View style={{ backgroundColor: c.surface, borderRadius: R.lg, padding: sp.md, gap: sp.md }}>
+      <View
+        style={{
+          backgroundColor: c.surface,
+          borderRadius: R.lg,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: c.border,
+          padding: sp.md,
+          gap: sp.md,
+        }}
+      >
         {children}
       </View>
     </View>
+  )
+}
+
+/** Full-width action inside a Section — reads as part of the group rather than
+ *  as a stray link under it. */
+function SectionAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ReactNode
+  label: string
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 7,
+          backgroundColor: c.accentSoft,
+          borderRadius: R.md,
+          paddingVertical: 11,
+          opacity: pressed ? 0.75 : 1,
+        },
+      ]}
+    >
+      {icon}
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.accent }} numberOfLines={1}>
+        {label}
+      </Txt>
+    </Pressable>
   )
 }
 
@@ -137,6 +188,9 @@ export function PlaceForm({
   const [arrivals, setArrivals] = useState(watch?.notify_arrivals ?? true)
   const [departures, setDepartures] = useState(watch?.notify_departures ?? false)
   const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
+  /** A named place is chosen — searched, or the saved one we're editing. Drives
+   *  the whole Location section: bin instead of search, and different wording on
+   *  the current-location action. */
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     place ? { lat: place.lat, lng: place.lng } : null,
   )
@@ -159,17 +213,12 @@ export function PlaceForm({
    *  form fell back to "Your current location" while editing, which was simply
    *  untrue — it described where the phone is, not where the place is. */
   const [savedLabel, setSavedLabel] = useState<string | null>(null)
-  /** Where this form started: the saved place, or the device fix for a new one.
-   *  Clearing a searched place returns HERE rather than silently re-pinning an
-   *  existing place to wherever the phone happens to be. */
-  const initialCoords = useRef<{ lat: number; lng: number } | null>(
-    place ? { lat: place.lat, lng: place.lng } : null,
-  )
-  /** The user deliberately re-pinned to the device. Tracked separately from the
-   *  coordinates because `savedLabel` describes the place's ORIGINAL spot — once
-   *  they've re-pinned, showing that address again would describe the old
-   *  location while saving the new one. */
-  const [repinned, setRepinned] = useState(false)
+  /** Still showing the place's ORIGINAL saved spot. Goes false the moment they
+   *  pick, re-pin or remove — `savedLabel` describes that original spot, so
+   *  leaving it on screen afterwards would describe the old location while
+   *  saving the new one. */
+  const [usingSaved, setUsingSaved] = useState(!!place)
+  const hasPlace = !!picked || usingSaved
 
   useEffect(() => {
     const q = query.trim()
@@ -195,16 +244,21 @@ export function PlaceForm({
   const choose = (r: PlaceSuggestion) => {
     setCoords({ lat: r.lat, lng: r.lng })
     setPicked(r)
+    setUsingSaved(false)
     // Only prefill the name if they haven't titled it themselves.
     if (!name.trim()) setName(r.name)
     setQuery('')
     setResults([])
   }
 
-  /** Undo a search pick and go back to where the form started. */
-  const clearPicked = () => {
+  /** Bin the chosen place outright, leaving the form with NO location — the
+   *  search box comes back and Save stays disabled until they pick something.
+   *  Deliberately not an undo: a trash icon that quietly restored a previous
+   *  spot would be lying about what it does. */
+  const clearPlace = () => {
     setPicked(null)
-    if (initialCoords.current) setCoords(initialCoords.current)
+    setUsingSaved(false)
+    setCoords(null)
   }
 
   // An existing place's coordinates mean nothing on screen, so turn them into a
@@ -247,7 +301,6 @@ export function PlaceForm({
           const here = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           setCoords(here)
           setOrigin(here) // now search can rank by "closest to me"
-          initialCoords.current = here // what ✕ on a searched place returns to
         }
       } catch {
         // leave coords null → Save stays disabled with a hint
@@ -267,9 +320,8 @@ export function PlaceForm({
       const here = { lat: pos.coords.latitude, lng: pos.coords.longitude }
       setCoords(here)
       setOrigin(here)
-      initialCoords.current = here
       setPicked(null) // back to "your current location"
-      setRepinned(true)
+      setUsingSaved(false)
     } catch {
       // keep the previously saved spot
     } finally {
@@ -346,11 +398,25 @@ export function PlaceForm({
             maxHeight: '88%',
           }}
         >
-          <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 22, color: c.text }}>
-            {place ? t('location.places.edit') : t('location.places.new')}
-          </Txt>
+          {/* Title + an explicit way out. Tapping the backdrop already closed
+              the sheet, but that isn't discoverable on a form this tall. */}
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, marginBottom: sp.sm }}
+          >
+            <Txt style={{ flex: 1, fontFamily: fonts.displaySemi, fontSize: 22, color: c.text }}>
+              {place ? t('location.places.edit') : t('location.places.new')}
+            </Txt>
+            <Pressable
+              onPress={onClose}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+            >
+              <X size={20} color={c.textMuted} />
+            </Pressable>
+          </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ gap: sp.md }}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ gap: sp.lg }}>
             <Section title={t('location.places.details')}>
               {/* Icon + name. Both inputs are pinned to FIELD_H so the emoji's
                   larger type can't make its box taller than the name's. */}
@@ -415,10 +481,9 @@ export function PlaceForm({
 
             <Section title={t('location.places.location')}>
               {/* ONE unambiguous statement of where this place is:
-                    - a searched place  → its address, with ✕ to undo the pick
-                    - an existing place → its own street address (NOT "your
-                      current location", which described the phone, not the place)
-                    - a brand new place → your current location  */}
+                    - a chosen place  → its address (searched, or the saved one
+                      we're editing), with a bin to remove it
+                    - otherwise       → your current location, or nothing yet  */}
               <View
                 style={{
                   flexDirection: 'row',
@@ -430,33 +495,33 @@ export function PlaceForm({
                   paddingHorizontal: sp.md,
                 }}
               >
-                <MapPin size={16} color={c.accent} />
+                <MapPin size={16} color={hasPlace || coords ? c.accent : c.textFaint} />
                 <Txt style={{ flex: 1, fontSize: 13, color: c.text }} numberOfLines={2}>
                   {locating
                     ? t('location.locating')
                     : picked
                       ? picked.address || picked.name
-                      : place && !repinned
+                      : usingSaved
                         ? (savedLabel ?? t('location.places.savedLocation'))
                         : coords
                           ? t('location.places.currentLocation')
-                          : t('location.places.needLocation')}
+                          : t('location.places.noLocation')}
                 </Txt>
-                {picked ? (
+                {hasPlace ? (
                   <Pressable
-                    onPress={clearPicked}
+                    onPress={clearPlace}
                     hitSlop={10}
                     accessibilityRole="button"
                     accessibilityLabel={t('location.places.clearLocation')}
                   >
-                    <X size={16} color={c.textMuted} />
+                    <Trash2 size={16} color={c.expense} />
                   </Pressable>
                 ) : null}
               </View>
 
-              {/* Searching is only offered while nothing is picked — once you've
-                  chosen somewhere, the ✕ above is the way to change your mind. */}
-              {picked ? null : (
+              {/* Search is offered only when no place is chosen — once one is,
+                  the bin above is the way to change it. */}
+              {hasPlace ? null : (
                 <>
                   <Field
                     label={t('location.places.search')}
@@ -518,15 +583,22 @@ export function PlaceForm({
                 </>
               )}
 
-              {/* Re-pin to where I'm standing. Offered only when that ISN'T
-                  already the state — otherwise it reads as a description of the
-                  current location rather than an action that changes it. */}
-              {picked || (place && !repinned) ? (
-                <Pressable onPress={repin} hitSlop={6} accessibilityRole="button">
-                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.accent }}>
-                    {t('location.places.useMyLocation')}
-                  </Txt>
-                </Pressable>
+              {/* Pin to where I'm standing. Hidden in the one case where it
+                  would change nothing — no place chosen and we're ALREADY on the
+                  current location — so it never reads as a description of the
+                  state instead of an action. The wording says which it is: it
+                  SWITCHES away from a chosen place, or sets one when there's
+                  none. */}
+              {hasPlace || !coords ? (
+                <SectionAction
+                  icon={<LocateFixed size={15} color={c.accent} />}
+                  label={
+                    hasPlace
+                      ? t('location.places.switchToCurrent')
+                      : t('location.places.useMyLocation')
+                  }
+                  onPress={repin}
+                />
               ) : null}
             </Section>
 
