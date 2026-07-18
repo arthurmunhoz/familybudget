@@ -442,6 +442,10 @@ struct TodayWidgetView: View {
               }
             }
           }
+          // Small has no weather-alert banner between the date and the list, so
+          // the two blocks ran together — worst with only one or two items, where
+          // there's plenty of room to spare. Nudge the list down a little.
+          .padding(.top, isSmall ? 5 : 0)
           Spacer(minLength: 0)
         }
       }
