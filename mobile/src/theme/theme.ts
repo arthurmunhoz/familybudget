@@ -7,6 +7,10 @@ import { GLASS, glassLight, glassDark } from './glass';
 export interface ThemeTokens {
   bg: string;
   card: string;
+  /** An OPAQUE card, for panels that float over detailed content (a sheet on the
+   *  Whereabouts map) where a translucent `card` would let the background show
+   *  through the text. Identical to `card` outside the glass skin. */
+  sheet: string;
   cardActive: string;
   surface: string;
   surface2: string;
@@ -23,6 +27,7 @@ export interface ThemeTokens {
 export const light: ThemeTokens = {
   bg: '#fbf6f0',
   card: '#ffffff',
+  sheet: '#ffffff',
   cardActive: '#f4ecdf',
   surface: '#f1e8dc',
   surface2: '#ece3d6',
@@ -39,6 +44,7 @@ export const light: ThemeTokens = {
 export const dark: ThemeTokens = {
   bg: '#1b1714',
   card: '#262019',
+  sheet: '#262019',
   cardActive: '#2f2820',
   surface: '#322a21',
   surface2: '#3a332b',

@@ -90,7 +90,7 @@ function ActionButton({ icon, label, onPress }: { icon: React.ReactNode; label: 
       style={({ pressed }) => [
         {
           flex: 1,
-          backgroundColor: c.card,
+          backgroundColor: c.sheet,
           borderWidth: 1,
           borderColor: c.border,
           borderRadius: radius.md,
@@ -205,7 +205,7 @@ export function MemberSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
         <View
           style={{
-            backgroundColor: c.card,
+            backgroundColor: c.sheet,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,

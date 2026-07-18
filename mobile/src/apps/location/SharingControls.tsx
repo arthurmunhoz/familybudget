@@ -159,7 +159,7 @@ export function SharingControls({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
         <View
           style={{
-            backgroundColor: c.card,
+            backgroundColor: c.sheet,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,

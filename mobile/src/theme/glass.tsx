@@ -18,14 +18,14 @@ export const GLASS = true
 // the same ThemeTokens shape so every screen picks them up with no edits.
 export const glassLight: ThemeTokens = {
   bg: 'transparent',
-  // Mostly-opaque: `card` also backs every modal/sheet panel, which float over a
-  // dim backdrop (or the Whereabouts map), not the wash — so a see-through card
-  // there mixes with whatever's behind. High opacity stays legible everywhere;
-  // the wash showing BETWEEN and around cards is what carries the glass feel.
-  card: 'rgba(255,255,255,0.92)',
-  cardActive: 'rgba(255,255,255,0.98)',
-  surface: 'rgba(247,240,233,0.66)',
-  surface2: 'rgba(247,240,233,0.52)',
+  // Properly see-through — the wash's colour reads through the card, which is
+  // what actually makes this look like glass. Panels that sit over DETAILED
+  // content (a sheet on the map) use `sheet` instead, so they stay legible.
+  card: 'rgba(255,255,255,0.66)',
+  sheet: '#FBF4EC',
+  cardActive: 'rgba(255,255,255,0.86)',
+  surface: 'rgba(255,255,255,0.5)',
+  surface2: 'rgba(255,255,255,0.36)',
   text: '#241F1B',
   textMuted: '#6B615A',
   textFaint: '#9A908A',
@@ -38,12 +38,12 @@ export const glassLight: ThemeTokens = {
 
 export const glassDark: ThemeTokens = {
   bg: 'transparent',
-  // See glassLight.card — kept mostly-opaque so sheets/modals stay legible over
-  // the backdrop (and the map) rather than mixing with what's behind.
-  card: 'rgba(30,31,40,0.92)',
-  cardActive: 'rgba(44,46,58,0.97)',
-  surface: 'rgba(255,255,255,0.09)',
-  surface2: 'rgba(255,255,255,0.14)',
+  // See glassLight.card.
+  card: 'rgba(32,33,42,0.62)',
+  sheet: '#1B1C23',
+  cardActive: 'rgba(46,48,60,0.82)',
+  surface: 'rgba(255,255,255,0.10)',
+  surface2: 'rgba(255,255,255,0.16)',
   text: '#F3EFEA',
   textMuted: '#A7A199',
   textFaint: '#726C64',
@@ -60,21 +60,24 @@ export const glassDark: ThemeTokens = {
 const { width: W, height: H } = Dimensions.get('window')
 const BLOB = Math.max(W, H) * 0.95
 
+// Punchier than a flat tint on purpose: with see-through cards, this colour IS
+// the glass effect — the more variation behind a card, the more it reads as
+// glass rather than as a slightly-grey panel.
 const WASH = {
   light: {
-    base: '#F5ECE4',
+    base: '#F7EFE6',
     blobs: [
-      { color: '#FFD3A6', top: -BLOB * 0.35, left: -BLOB * 0.28, o: 0.55 },
-      { color: '#FFB199', top: -BLOB * 0.18, left: W - BLOB * 0.72, o: 0.5 },
-      { color: '#FFE3AE', top: H - BLOB * 0.6, left: W * 0.1, o: 0.55 },
+      { color: '#FFC489', top: -BLOB * 0.35, left: -BLOB * 0.28, o: 0.72 },
+      { color: '#FF9C80', top: -BLOB * 0.18, left: W - BLOB * 0.72, o: 0.62 },
+      { color: '#FFD98C', top: H - BLOB * 0.6, left: W * 0.1, o: 0.7 },
     ],
   },
   dark: {
-    base: '#131110',
+    base: '#121013',
     blobs: [
-      { color: '#4A3326', top: -BLOB * 0.35, left: -BLOB * 0.28, o: 0.55 },
-      { color: '#4A2C28', top: -BLOB * 0.18, left: W - BLOB * 0.72, o: 0.5 },
-      { color: '#3A3320', top: H - BLOB * 0.6, left: W * 0.1, o: 0.5 },
+      { color: '#6B4326', top: -BLOB * 0.35, left: -BLOB * 0.28, o: 0.6 },
+      { color: '#5E2F33', top: -BLOB * 0.18, left: W - BLOB * 0.72, o: 0.55 },
+      { color: '#4A3D1E', top: H - BLOB * 0.6, left: W * 0.1, o: 0.52 },
     ],
   },
 }

@@ -82,7 +82,7 @@ export function MemberAvatar({
         borderRadius: size / 2,
         backgroundColor: color,
         borderWidth: border,
-        borderColor: c.card,
+        borderColor: c.sheet,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
