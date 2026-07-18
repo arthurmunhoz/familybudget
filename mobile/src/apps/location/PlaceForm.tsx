@@ -5,7 +5,7 @@
 // save it. Radius is a small preset set: iOS enforces a ~100 m floor on
 // geofences, so finer-grained control would be a lie.
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { Crosshair, Search } from 'lucide-react-native'
@@ -208,7 +208,10 @@ export function PlaceForm({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.cancel')} />
         <View
           style={{
@@ -405,7 +408,7 @@ export function PlaceForm({
           <Btn title={t('common.save')} onPress={save} disabled={!coords || !name.trim()} loading={busy} />
           {place ? <Btn title={t('location.places.delete')} variant="ghost" onPress={remove} /> : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
