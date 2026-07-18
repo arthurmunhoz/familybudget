@@ -16,7 +16,11 @@ export interface ToastData {
 }
 
 export function Toast({ data, duration = 1900 }: { data: ToastData | null; duration?: number }) {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
+  // The pill fills with c.text (dark in light themes, light in dark themes), so
+  // the text is its inverse. Derive it from `dark` rather than c.bg — under the
+  // glass skin c.bg is transparent, which made the label invisible.
+  const onPill = dark ? '#1B1A18' : '#FFFFFF'
   const insets = useSafeAreaInsets()
   const anim = useRef(new Animated.Value(0)).current
   const [shown, setShown] = useState<ToastData | null>(null)
@@ -67,7 +71,7 @@ export function Toast({ data, duration = 1900 }: { data: ToastData | null; durat
         }}
       >
         {shown.emoji ? <Txt style={{ fontSize: 16 }}>{shown.emoji}</Txt> : null}
-        <Txt style={{ color: c.bg, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
+        <Txt style={{ color: onPill, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
           {shown.text}
         </Txt>
       </Animated.View>
