@@ -60,6 +60,22 @@ location. Map + routing are **Mapbox**.
 - The Mapbox Directions ETA call and the Maps/Waze/Google hand-off.
 - Permission prompts and the Android foreground-service notification.
 
+## Live mode (built) — deploy the API for the background wake
+
+Opening a member's detail ramps THEIR device to high-frequency GPS while you
+watch, so their pin moves smoothly. The foreground path works from the app alone.
+The **background wake** — so a watched member whose app is asleep still refreshes
+— fires a silent push via `api/ack-ping.ts` (`?action=live-wake`), so it only
+works once the Vercel API is deployed:
+
+```
+npx vercel deploy --prod --yes
+```
+
+iOS throttles silent pushes, so background updates arrive as periodic bursts, not
+a continuous stream; continuous smoothness needs the watched person's app in the
+foreground. Test with **two devices** — you can't watch yourself.
+
 ## Not in Phase 1 (next up)
 
 - **Places / geofences** + arrive/leave push ("Emma arrived at School") — Phase 2.

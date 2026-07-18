@@ -47,6 +47,7 @@ if (MAPBOX_TOKEN) {
 }
 
 const DRIVING_SPEED_MS = 3.5 // ~12.6 km/h — above walking pace → "Driving"
+const INITIAL_ZOOM = 13 // frame the user + their neighborhood on first open (not too tight)
 
 /** Member profiles' photo + phone, keyed by email (for pins + the Call button). */
 async function fetchMemberMeta(): Promise<{
@@ -157,12 +158,20 @@ export default function Whereabouts() {
     return [-98.5, 39.5] // continental US fallback until a fix arrives
   }, [myLive, livePins])
 
+  // On first load, frame the user (or, if I'm not sharing, whoever is live) at a
+  // comfortable neighborhood zoom — not zoomed in too tight. Runs once, so it
+  // never fights the user's own panning afterward.
   useEffect(() => {
     if (centeredOnce.current) return
-    if (!livePins.length && !myLive) return
+    const focus = myLive ?? livePins[0]?.loc
+    if (!focus) return
     centeredOnce.current = true
-    // defaultSettings already placed us; nothing else needed on first paint.
-  }, [livePins.length, myLive])
+    cameraRef.current?.setCamera({
+      centerCoordinate: [focus.lng, focus.lat],
+      zoomLevel: INITIAL_ZOOM,
+      animationDuration: 0,
+    })
+  }, [myLive, livePins])
 
   const recenter = useCallback(() => {
     const pts = livePins.map((x) => [x.loc.lng, x.loc.lat] as [number, number])
@@ -255,7 +264,12 @@ export default function Whereabouts() {
           >
             <Camera
               ref={cameraRef}
-              defaultSettings={{ centerCoordinate: initialCenter, zoomLevel: 12 }}
+              // Wide fallback until a fix is known (avoids flashing a zoomed-in
+              // random spot); the effect above snaps to the user at INITIAL_ZOOM.
+              defaultSettings={{
+                centerCoordinate: initialCenter,
+                zoomLevel: myLive || livePins.length ? INITIAL_ZOOM : 3,
+              }}
             />
             {livePins.map(({ p, loc }) => (
               <MarkerView key={p.email} coordinate={[loc.lng, loc.lat]} anchor={{ x: 0.5, y: 0.5 }}>

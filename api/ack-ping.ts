@@ -1,9 +1,12 @@
-// Vercel serverless: notify a ping's sender (silently) when someone acks it, so
-// their iOS Nudges widget can flash "{emoji} {label} · seen by {name}" — see
-// mobile/src/lib/backgroundNotifications.ts for the receiving side. The ack
-// itself is already inserted client-side (ping_acks, under RLS); this only
-// fans out the background push. Auth: caller must send a valid Supabase JWT
-// and belong to the ping's household — same pattern as send-ping.ts.
+// Vercel serverless: silent/background push fan-out. Two actions on one endpoint
+// (kept together because api/ is at Vercel's 12-function cap):
+//   • default (body has ping_id): notify a ping's sender when someone acks it, so
+//     their iOS Nudges widget can flash "{emoji} {label} · seen by {name}".
+//   • action:'live-wake' (body has target_email): a watcher opened a member's
+//     Whereabouts detail — wake that member's device to refresh its location
+//     (live mode). See mobile/src/lib/backgroundNotifications.ts for the receiving
+//     side of BOTH. Auth: caller must send a valid Supabase JWT and share the
+//     relevant household — same pattern as send-ping.ts.
 import { createClient } from '@supabase/supabase-js'
 
 // Silent/background push only: no title/body/sound, so it never shows a
@@ -52,10 +55,43 @@ export default async function handler(req: any, res: any) {
   const callerEmail = (await userRes.json())?.email
   if (!callerEmail) return res.status(401).json({ error: 'Unauthorized' })
 
+  const db = createClient(url, serviceKey, { auth: { persistSession: false } })
+
+  // ── Live-mode wake: nudge a member's device (silently) to wake + refresh its
+  //    location because someone is watching them in Whereabouts.
+  if ((req.body?.action ?? '') === 'live-wake') {
+    const target = req.body?.target_email
+    if (!target || typeof target !== 'string') {
+      return res.status(400).json({ error: 'Missing target_email' })
+    }
+    const { data: me } = await db
+      .from('allowed_users')
+      .select('household_id, display_name')
+      .eq('email', callerEmail)
+      .single()
+    const { data: tgt } = await db
+      .from('allowed_users')
+      .select('household_id')
+      .eq('email', target)
+      .single()
+    if (!me || !tgt || me.household_id !== tgt.household_id) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+    const { data: tokens } = await db
+      .from('expo_push_tokens')
+      .select('token')
+      .eq('user_email', target)
+    const expoSent = await sendSilentExpoPush(
+      (tokens ?? []).map((t: any) => ({
+        to: t.token,
+        data: { type: 'live-wake', by: me.display_name || callerEmail.split('@')[0] },
+      })),
+    )
+    return res.status(200).json({ ok: true, expoSent })
+  }
+
   const { ping_id } = req.body ?? {}
   if (!ping_id) return res.status(400).json({ error: 'Missing ping_id' })
-
-  const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
   const { data: ping } = await db
     .from('pings')

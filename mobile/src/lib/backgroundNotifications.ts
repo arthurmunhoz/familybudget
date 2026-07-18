@@ -12,8 +12,15 @@ import * as Notifications from 'expo-notifications'
 import * as TaskManager from 'expo-task-manager'
 
 import { writeAckStatus } from './widget'
+import { captureLiveFixIfSharing } from './location'
 
 const BACKGROUND_NOTIFICATION_TASK = 'oneroof-background-notification'
+
+/** A live-mode wake push (someone is watching me in Whereabouts) — grab a fresh
+ *  fix so their map updates even though my app was asleep. */
+function isLiveWake(data: unknown): boolean {
+  return !!data && typeof data === 'object' && (data as Record<string, unknown>).type === 'live-wake'
+}
 
 /** Shared by both delivery paths below — the background task (app
  *  backgrounded/killed) and the foreground listener (app open), since a
@@ -36,9 +43,10 @@ function handleAckPayload(data: unknown): void {
 // registerBackgroundNotifications() below ever gets a chance to run.
 TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => {
   if (error) return
-  const notification = (data as { notification?: { request?: { content?: { data?: unknown } } } })
-    ?.notification
-  handleAckPayload(notification?.request?.content?.data)
+  const payload = (data as { notification?: { request?: { content?: { data?: unknown } } } })
+    ?.notification?.request?.content?.data
+  handleAckPayload(payload)
+  if (isLiveWake(payload)) await captureLiveFixIfSharing()
 })
 
 let registered = false
@@ -51,6 +59,8 @@ export function registerBackgroundNotifications(): void {
     /* not supported on this platform/build (e.g. Expo Go, Android) — ignore */
   })
   Notifications.addNotificationReceivedListener((notification) => {
-    handleAckPayload(notification.request.content.data)
+    const payload = notification.request.content.data
+    handleAckPayload(payload)
+    if (isLiveWake(payload)) void captureLiveFixIfSharing()
   })
 }
