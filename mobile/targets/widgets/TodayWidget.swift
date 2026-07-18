@@ -290,6 +290,20 @@ func alertSymbol(_ kind: String) -> String {
   }
 }
 
+/// True when the code's multicolour glyph is essentially WHITE — overcast, fog
+/// and snow (`cloud.fill` / `cloud.fog.fill` / `cloud.snow.fill`) — so it needs
+/// a solid tint to survive the light chip. Codes whose glyph carries its own
+/// strong colour keep their natural multicolour: sun (yellow), sun-behind-cloud,
+/// the thunderstorm bolt (yellow) and rain/drizzle (blue drops).
+func weatherGlyphIsPale(_ code: Int) -> Bool {
+  switch code {
+  case 0, 1, 2: return false                    // sun.max / cloud.sun
+  case 51...57, 61...67, 80...82: return false  // drizzle / rain
+  case 95...99: return false                    // thunderstorm
+  default: return true                          // overcast, fog, snow, unknown
+  }
+}
+
 // WMO weather code → SF Symbol (matches lib/weather.ts weatherIcon).
 func weatherSymbol(_ code: Int) -> String {
   switch code {
@@ -359,6 +373,8 @@ struct TodayWidgetView: View {
   // The widget's background is appTheme().bg (the app's MANUAL light/dark
   // choice, not the system's), so contrast is judged against that same signal.
   private var lightMode: Bool { groupDefaults()?.string(forKey: "widget_theme") != "dark" }
+  /// Tint the glyph clay only when it'd otherwise be white-on-white.
+  private func needsTint(_ code: Int?) -> Bool { lightMode && weatherGlyphIsPale(code ?? -1) }
 
   private var maxItems: Int {
     switch family {
@@ -389,13 +405,13 @@ struct TodayWidgetView: View {
             // edge. Dark mode already separates cleanly — left borderless.
             VStack(alignment: .trailing, spacing: 3) {
               HStack(spacing: 4) {
-                // .multicolor draws cloud glyphs WHITE — invisible on the light
-                // chip. Light mode uses a solid clay glyph (always legible on
-                // any weather code); dark mode keeps the natural colours.
+                // Sunny/stormy/rainy codes keep their natural colours; only the
+                // white glyphs (overcast, fog, snow) take a clay tint, which is
+                // what stops them vanishing into the light chip.
                 Image(systemName: weatherSymbol(info.code ?? -1))
                   .font(.system(size: 14))
-                  .symbolRenderingMode(lightMode ? .hierarchical : .multicolor)
-                  .foregroundStyle(lightMode ? theme.accent : Color.primary)
+                  .symbolRenderingMode(needsTint(info.code) ? .hierarchical : .multicolor)
+                  .foregroundStyle(needsTint(info.code) ? theme.accent : Color.primary)
                 Text("\(Int(temp))\(info.unit ?? "°")")
                   .font(.system(size: isSmall ? 14 : 16, weight: .bold))
                   .foregroundStyle(lightMode ? theme.text : Color.primary)
