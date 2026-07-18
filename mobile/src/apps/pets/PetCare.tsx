@@ -16,7 +16,7 @@ import { Alert, Animated, AppState, Pressable, ScrollView, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Image } from 'expo-image'
-import { Check, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
+import { Check, ChevronLeft, ChevronRight, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -105,6 +105,8 @@ export default function PetCare() {
   const today = todayISO()
 
   const [selectedPet, setSelectedPet] = useState<string | null>(null)
+  // Which day the Today card shows — today by default, chevrons browse the past.
+  const [selectedDay, setSelectedDay] = useState(todayISO())
   const [showAllHistory, setShowAllHistory] = useState(false)
   const [showPetForm, setShowPetForm] = useState(false)
   // Which section's editor is open (each pencil opens ONLY its own group).
@@ -168,10 +170,10 @@ export default function PetCare() {
     }
   })
 
-  // Fresh data replaces the optimistic overlay.
+  // Fresh data replaces the optimistic overlay; so does browsing to another day.
   useEffect(() => {
     setOverlay({})
-  }, [done])
+  }, [done, selectedDay])
 
   // useCachedQuery fetches on MOUNT only, so two real-world paths went stale:
   // returning to this (still-mounted) screen, and — the widget repro — marking
@@ -214,8 +216,8 @@ export default function PetCare() {
 
   const pet = selectedPet ? (petById[selectedPet] ?? null) : null
   const checklist = useMemo(
-    () => (pet ? dailyChecklist(tasks, done, pet.id, today) : []),
-    [tasks, done, pet, today],
+    () => (pet ? dailyChecklist(tasks, done, pet.id, selectedDay) : []),
+    [tasks, done, pet, selectedDay],
   )
   const routines = useMemo(
     () => (pet ? routineStatus(tasks, done, pet.id, today) : []),
@@ -268,7 +270,7 @@ export default function PetCare() {
     const marking = !current && overlay[task.id] !== true
     setOverlay((o) => ({ ...o, [task.id]: marking }))
     if (marking) {
-      const { error } = await supabase.from('pet_task_done').insert({ task_id: task.id, done_on: today })
+      const { error } = await supabase.from('pet_task_done').insert({ task_id: task.id, done_on: selectedDay })
       // 23505 = already marked by someone else in the meantime — that's fine.
       if (error && error.code !== '23505') {
         setOverlay((o) => ({ ...o, [task.id]: false }))
@@ -338,7 +340,10 @@ export default function PetCare() {
     ])
   }
 
-  const allDone = checklist.length > 0 && checklist.every(({ task, done: d }) => (overlay[task.id] ?? !!d))
+  const allDone =
+    selectedDay === today &&
+    checklist.length > 0 &&
+    checklist.every(({ task, done: d }) => (overlay[task.id] ?? !!d))
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
@@ -372,7 +377,14 @@ export default function PetCare() {
                 return (
                   <Pressable
                     key={p.id}
-                    onPress={() => (on ? router.push(`/pets/${p.id}`) : setSelectedPet(p.id))}
+                    onPress={() => {
+                      if (on) {
+                        router.push(`/pets/${p.id}`)
+                      } else {
+                        setSelectedPet(p.id)
+                        setSelectedDay(todayISO())
+                      }
+                    }}
                   >
                     <Animated.View
                       style={{
@@ -466,9 +478,40 @@ export default function PetCare() {
                     marginBottom: sp.sm,
                   }}
                 >
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
-                    {t('petcare.today')} · {pet.name}
-                  </Txt>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginLeft: sp.xs }}>
+                    <Pressable
+                      onPress={() => setSelectedDay(addDaysISO(selectedDay, -1))}
+                      hitSlop={10}
+                      accessibilityLabel={t('petcare.prevDay')}
+                    >
+                      <ChevronLeft size={16} color={c.textFaint} />
+                    </Pressable>
+                    <Pressable onPress={() => setSelectedDay(todayISO())} hitSlop={6}>
+                      <Txt
+                        variant="label"
+                        style={{
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                          color: selectedDay === today ? undefined : c.accent,
+                        }}
+                      >
+                        {selectedDay === today
+                          ? `${t('petcare.today')} · ${pet.name}`
+                          : selectedDay === addDaysISO(today, -1)
+                            ? t('pings.yesterday')
+                            : formatDay(selectedDay)}
+                      </Txt>
+                    </Pressable>
+                    {selectedDay < today ? (
+                      <Pressable
+                        onPress={() => setSelectedDay(addDaysISO(selectedDay, 1))}
+                        hitSlop={10}
+                        accessibilityLabel={t('petcare.nextDay')}
+                      >
+                        <ChevronRight size={16} color={c.textFaint} />
+                      </Pressable>
+                    ) : null}
+                  </View>
                   <Pressable onPress={() => setRoutineOpen('daily')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
                     <Pencil size={15} color={c.textFaint} />
                   </Pressable>
