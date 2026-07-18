@@ -19,7 +19,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
-import { Camera, Check, ChevronDown, ChevronRight, Lock, Wallet, X } from 'lucide-react-native'
+import { Camera, Check, ChevronDown, ChevronRight, Lock, X } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -200,7 +200,7 @@ export default function Budgets() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader title={t('app.budget.name')} icon={<Wallet size={22} color={c.accent} />} />
+        <AppHeader title={t('app.budget.name')} />
       </View>
 
       {loading ? (
