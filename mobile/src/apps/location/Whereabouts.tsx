@@ -254,8 +254,11 @@ export default function Whereabouts() {
   const [navFor, setNavFor] = useState<{ profile: Profile; to: { lat: number; lng: number } } | null>(
     null,
   )
-  /** Safety-radius breaches showing above the roster until dismissed. */
-  const [breaches, setBreaches] = useState<{ email: string; title: string; dist: string }[]>([])
+  /** Safety-radius crossings showing above the roster until dismissed — both
+   *  directions, so `kind` decides whether it reads as an alarm or an all-clear. */
+  const [breaches, setBreaches] = useState<
+    { email: string; kind: 'left' | 'entered'; title: string; dist: string }[]
+  >([])
   const [sharingOpen, setSharingOpen] = useState(false)
   const [placesOpen, setPlacesOpen] = useState(false)
   const [safetyOpen, setSafetyOpen] = useState(false)
@@ -381,20 +384,27 @@ export default function Whereabouts() {
       if (!isSharingLive(loc)) continue
       const out = isOutside(watch, { lat: loc.lat, lng: loc.lng })
       const was = breachedRef.current.has(email)
-      if (out && !was) {
-        breachedRef.current.add(email)
-        const title = t('location.safety.breach', { name: nameFor(email) })
-        const dist = formatDistance(haversineMeters(centre, { lat: loc.lat, lng: loc.lng }))
-        void alertBreach(title, t('location.safety.breachBody', { dist }))
-        // A breach STAYS on screen until dismissed — a toast that faded after
-        // three seconds was the one alert in this app you couldn't afford to
-        // miss. Keyed by member so a second crossing can't stack duplicates.
-        setBreaches((prev) =>
-          prev.some((b) => b.email === email) ? prev : [...prev, { email, title, dist }],
-        )
-      } else if (!out && was) {
-        breachedRef.current.delete(email)
-      }
+      if (out === was) continue // no crossing since we last looked
+
+      // BOTH directions are announced. Leaving is the alarming one, but coming
+      // back is the answer to it — being told someone left and never told they
+      // returned is the worse half of the story.
+      const kind = out ? 'left' : 'entered'
+      if (out) breachedRef.current.add(email)
+      else breachedRef.current.delete(email)
+      const title = out
+        ? t('location.safety.breach', { name: nameFor(email) })
+        : t('location.safety.entered', { name: nameFor(email) })
+      const dist = formatDistance(haversineMeters(centre, { lat: loc.lat, lng: loc.lng }))
+      void alertBreach(title, t('location.safety.breachBody', { dist }))
+      // These STAY on screen until dismissed — a toast that faded after three
+      // seconds was the one alert in this app you couldn't afford to miss. One
+      // row per member, replaced on each crossing: "left" is stale the moment
+      // they're back, and stacking both would say two contradictory things.
+      setBreaches((prev) => [
+        ...prev.filter((b) => b.email !== email),
+        { email, kind, title, dist },
+      ])
     }
   }, [watch, locByEmail, nameFor, t])
 
@@ -757,13 +767,18 @@ export default function Whereabouts() {
                   backgroundColor: c.sheet,
                   borderRadius: radius.md,
                   borderWidth: 1,
-                  borderColor: c.expense,
+                  // An all-clear must not wear the alarm's colour.
+                  borderColor: b.kind === 'left' ? c.expense : c.income,
                   paddingVertical: 10,
                   paddingHorizontal: sp.md,
                   ...FLOAT_SHADOW,
                 }}
               >
-                <ShieldAlert size={18} color={c.expense} />
+                {b.kind === 'left' ? (
+                  <ShieldAlert size={18} color={c.expense} />
+                ) : (
+                  <ShieldCheck size={18} color={c.income} />
+                )}
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt
                     style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }}

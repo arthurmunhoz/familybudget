@@ -110,7 +110,7 @@ export const en = {
 
   // Whereabouts — Safety radius / event mode (Phase 3, One Roof Plus)
   'location.safety.title': 'Safety radius',
-  'location.safety.subtitle': 'Get alerted if someone leaves your surroundings',
+  'location.safety.subtitle': 'Get alerted when someone leaves or returns to your surroundings',
   'location.safety.plus': 'Plus',
   'location.safety.plusHint': 'Safety radius is a One Roof Plus feature.',
   'location.safety.pickPeople': 'Who to watch',
@@ -124,6 +124,7 @@ export const en = {
   'location.safety.endsIn': 'Ends in about {hours}h',
   'location.safety.needLocation': 'Turn on location sharing to start a safety radius.',
   'location.safety.breach': '{name} left the area',
+  'location.safety.entered': '{name} is back inside',
   'location.safety.breachBody': '{dist} from the centre',
   'location.card.manage': 'Manage location sharing',
   'location.card.watching': 'Watching',

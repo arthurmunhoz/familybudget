@@ -285,15 +285,23 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   (`safety_watches`, one row per owner), `src/lib/safetyRadius.ts` (CRUD +
   `isOutside` + `circlePolygon` + `alertBreach`) and `SafetyRadiusSheet`.
   Drop a circle centred on yourself, pick who to watch, get alerted when one
-  crosses out. **Breach detection runs on the WATCHER's device** in
-  `Whereabouts` against the live `member_locations` feed — no server job — and
-  alerts via a LOCAL notification (the watcher detects it, so no push needed)
-  AND a banner pinned above the roster that stays until the watcher dismisses it
-  — this was a Toast, but a 3-second fade is wrong for the one alert in this app
-  you can't afford to miss. Alerts fire once per crossing (the member must come
-  back inside to re-arm); the banner is keyed by member so it can't stack
-  duplicates, and it does NOT auto-clear when they come back inside (it's a
-  record that they left).
+  crosses it — **in BOTH directions**: being told someone left and never told
+  they're back is the worse half of the story. **Breach detection runs on the
+  WATCHER's device** in `Whereabouts` against the live `member_locations` feed —
+  no server job — and alerts via a LOCAL notification (the watcher detects it,
+  so no push needed) AND a banner pinned above the roster that stays until the
+  watcher dismisses it — this was a Toast, but a 3-second fade is wrong for the
+  one alert in this app you can't afford to miss. The banner carries a `kind`
+  (`left` / `entered`) so an all-clear doesn't wear the alarm's red.
+  - One alert per CROSSING, driven by `breachedRef` (who is currently outside):
+    a crossing only counts when `isOutside` differs from the remembered state.
+    That's what keeps a stationary member quiet, and it's also why starting a
+    watch on people already inside announces nothing — their state matches from
+    the first evaluation. Someone already OUTSIDE at start does alert, which is
+    correct: they are outside your radius.
+  - One row per member, replaced on each crossing rather than stacked: "left" is
+    stale the moment they're back, and showing both would say two contradictory
+    things at once. It does NOT auto-clear — dismissing is the watcher's call.
   While a watch runs, watched members are kept in live mode (`requestLive`) so
   the boundary check has fresh positions. The circle is drawn as a real GeoJSON
   polygon (`circlePolygon`) because Mapbox circle radii are in PIXELS, not metres.

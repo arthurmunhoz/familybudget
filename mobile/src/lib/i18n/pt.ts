@@ -108,7 +108,7 @@ export const pt: Record<keyof typeof en, string> = {
 
   // Whereabouts — Raio de segurança / modo evento (Fase 3, One Roof Plus)
   'location.safety.title': 'Raio de segurança',
-  'location.safety.subtitle': 'Receba um aviso se alguém se afastar de você',
+  'location.safety.subtitle': 'Receba um aviso quando alguém sair da sua área ou voltar',
   'location.safety.plus': 'Plus',
   'location.safety.plusHint': 'O raio de segurança é um recurso do One Roof Plus.',
   'location.safety.pickPeople': 'Quem vigiar',
@@ -122,6 +122,7 @@ export const pt: Record<keyof typeof en, string> = {
   'location.safety.endsIn': 'Termina em cerca de {hours} h',
   'location.safety.needLocation': 'Ative o compartilhamento de localização para iniciar um raio de segurança.',
   'location.safety.breach': '{name} saiu da área',
+  'location.safety.entered': '{name} voltou para a área',
   'location.safety.breachBody': 'a {dist} do centro',
   'location.card.manage': 'Gerenciar minha localização',
   'location.card.watching': 'Vigiando',

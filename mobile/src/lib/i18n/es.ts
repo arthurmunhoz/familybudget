@@ -108,7 +108,7 @@ export const es: Record<keyof typeof en, string> = {
 
   // Whereabouts — Radio de seguridad / modo evento (Fase 3, One Roof Plus)
   'location.safety.title': 'Radio de seguridad',
-  'location.safety.subtitle': 'Recibe un aviso si alguien se aleja de ti',
+  'location.safety.subtitle': 'Recibe un aviso cuando alguien sale de tu zona o vuelve',
   'location.safety.plus': 'Plus',
   'location.safety.plusHint': 'El radio de seguridad es una función de One Roof Plus.',
   'location.safety.pickPeople': 'A quién vigilar',
@@ -122,6 +122,7 @@ export const es: Record<keyof typeof en, string> = {
   'location.safety.endsIn': 'Termina en unas {hours} h',
   'location.safety.needLocation': 'Activa compartir ubicación para iniciar un radio de seguridad.',
   'location.safety.breach': '{name} salió del área',
+  'location.safety.entered': '{name} volvió al área',
   'location.safety.breachBody': 'a {dist} del centro',
   'location.card.manage': 'Gestionar mi ubicación',
   'location.card.watching': 'Vigilando',
