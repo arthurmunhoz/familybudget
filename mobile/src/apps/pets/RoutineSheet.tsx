@@ -23,6 +23,8 @@ import { radius, sp, useTheme } from '@/theme/theme'
 import { CARE_ICONS, CARE_ICON_IDS } from './petUi'
 
 const ROW_H = 52
+// iPhones get screen-corner-like rounding on the sheet; Android keeps the norm.
+const SHEET_RADIUS = Platform.OS === 'ios' ? 40 : radius.lg
 
 export function RoutineSheet({
   pet,
@@ -159,7 +161,6 @@ export function RoutineSheet({
   }
 
   function row(task: PetCareTask, draggable: boolean) {
-    const Icon = CARE_ICONS[task.icon] ?? CARE_ICONS.paw
     return (
       <View
         style={{
@@ -171,7 +172,6 @@ export function RoutineSheet({
         }}
       >
         {draggable ? <GripVertical size={16} color={c.textFaint} /> : null}
-        <Icon size={18} color={c.accent} />
         <Pressable onPress={() => openEdit(task)} style={{ flex: 1, minWidth: 0 }}>
           <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
             {task.title}
@@ -192,13 +192,19 @@ export function RoutineSheet({
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View
+        {/* Tapping the dimmed backdrop dismisses; taps inside the sheet don't. */}
+        <Pressable
+          onPress={onClose}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+        >
+          <Pressable
+            onPress={() => {}}
             style={{
               maxHeight: '88%',
               backgroundColor: c.sheet,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
+              // iPhones get screen-corner-like rounding; Android keeps the norm.
+              borderTopLeftRadius: SHEET_RADIUS,
+              borderTopRightRadius: SHEET_RADIUS,
             }}
           >
             <View
@@ -207,8 +213,8 @@ export function RoutineSheet({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 paddingHorizontal: sp.lg,
-                paddingTop: sp.lg,
-                paddingBottom: sp.sm,
+                paddingTop: sp.xl,
+                paddingBottom: sp.lg,
               }}
             >
               <Txt variant="h2">
@@ -259,8 +265,8 @@ export function RoutineSheet({
                 <Txt style={{ fontWeight: '600', color: c.textMuted }}>{t('petcare.addTask')}</Txt>
               </Pressable>
             </ScrollView>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
 
         {/* task editor */}
         {editing !== null && (
