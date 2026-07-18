@@ -128,9 +128,17 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
 - `src/apps/location/` — `Whereabouts` (map + bottom sheet, owns the data + one
   Realtime channel), `MemberDetailCard` (the EXPANDED roster card — **leads with
   drive-time ETA**, then distance/battery/where-they-are, navigate, nudge/call),
-  `NudgePicker` (pick a nudge to send from the map), `SharingControls` (toggle +
-  pause), `locationUi` (card geometry, member colors, ringed avatar, battery
-  chip, `WatchingChip`, `timeAgo`).
+  `NavPicker` / `NudgePicker` (pick a map app / a nudge, from the map),
+  `SharingControls` (toggle + pause), `locationUi` (card geometry, member
+  colors, ringed avatar, battery chip, `WatchingChip`, `timeAgo`).
+- The detail card carries **three** actions — Navigate, Nudge, Call. Apple/
+  Google/Waze used to be three separate buttons in that row, which left each one
+  too narrow for a readable label, so the glyph carried the whole meaning. They
+  moved behind `NavPicker`; the extra tap buys the remaining buttons enough
+  width to be legible. Both pickers are Modals owned by `Whereabouts`, not the
+  card — a card inside a horizontal scroller can't present a sheet. `NavPicker`
+  offers all three apps unconditionally because `navUrl` builds universal HTTPS
+  links: each opens the native app if installed and the web map if not.
 - **Tapping a card or a pin expands that member IN PLACE and frames them on the
   map** (`select()` in `Whereabouts`); tapping the open one collapses it. There
   is deliberately no detail modal — a sheet covered the very map you'd just

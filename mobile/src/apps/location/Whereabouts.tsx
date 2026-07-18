@@ -58,6 +58,7 @@ import {
   WatchingChip,
 } from './locationUi'
 import { MemberDetailCard } from './MemberDetailCard'
+import { NavPicker } from './NavPicker'
 import { NudgePicker } from './NudgePicker'
 import { PlacesSheet } from './PlacesSheet'
 import { SafetyRadiusSheet } from './SafetyRadiusSheet'
@@ -244,8 +245,13 @@ export default function Whereabouts() {
   })
   /** Email of the member whose roster card is expanded (null = all collapsed). */
   const [selected, setSelected] = useState<string | null>(null)
-  /** Member we're picking a nudge for — the one modal left in this flow. */
+  /** Member we're picking a nudge for. */
   const [nudgeFor, setNudgeFor] = useState<Profile | null>(null)
+  /** Member we're picking a map app for, with the destination captured at tap
+   *  time so a live position update can't move it mid-choice. */
+  const [navFor, setNavFor] = useState<{ profile: Profile; to: { lat: number; lng: number } } | null>(
+    null,
+  )
   /** Safety-radius breaches showing above the roster until dismissed. */
   const [breaches, setBreaches] = useState<{ email: string; title: string; dist: string }[]>([])
   const [sharingOpen, setSharingOpen] = useState(false)
@@ -802,6 +808,9 @@ export default function Whereabouts() {
                     places={places}
                     watched={!!watch?.watched.includes(p.email)}
                     onCollapse={() => setSelected(null)}
+                    onNavigate={() =>
+                      isSharingLive(loc) && setNavFor({ profile: p, to: { lat: loc.lat, lng: loc.lng } })
+                    }
                     onNudge={() => setNudgeFor(p)}
                     onManageSharing={() => setSharingOpen(true)}
                     onLaidOut={onExpandedLayout}
@@ -832,6 +841,10 @@ export default function Whereabouts() {
           onClose={() => setNudgeFor(null)}
           onSent={(text) => setToast({ emoji: '👋', text })}
         />
+      ) : null}
+
+      {navFor ? (
+        <NavPicker profile={navFor.profile} to={navFor.to} onClose={() => setNavFor(null)} />
       ) : null}
 
       {safetyOpen ? (

@@ -12,8 +12,8 @@
 //   168 card − 24 padding            = 144 available
 //   header 40 (the avatar sets it)
 //   + gap 8 + stats 43 (12 + 21 + 10)
-//   + gap 8 + actions 36 (10 + 15 + 1 + 10)
-//                                    = 135, leaving 9pt of slack
+//   + gap 8 + actions 40 (10 + 16 + 2 + 12)
+//                                    = 139, leaving 5pt of slack
 //
 // Text rows use explicit lineHeights so that arithmetic actually holds — the
 // display font's natural line box is taller than its fontSize and would eat the
@@ -26,7 +26,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import * as Location from 'expo-location'
-import { Bell, Map, MapPin, Navigation, Phone, Settings2, X } from 'lucide-react-native'
+import { Bell, Navigation, Phone, Settings2, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -37,8 +37,6 @@ import {
   haversineMeters,
   isPaused,
   isSharingLive,
-  openNavigation,
-  type NavApp,
 } from '@/lib/location'
 import { useWatchLive } from '@/lib/liveLocation'
 import { placeAt } from '@/lib/places'
@@ -108,14 +106,14 @@ function IconAction({
           borderRadius: radius.md,
           paddingVertical: 5,
           alignItems: 'center',
-          gap: 1,
+          gap: 2,
           opacity: pressed ? 0.7 : 1,
         },
       ]}
     >
       {icon}
       <Txt
-        style={{ fontFamily: fonts.semibold, fontSize: 8, lineHeight: 10, color: c.textMuted }}
+        style={{ fontFamily: fonts.semibold, fontSize: 10, lineHeight: 12, color: c.text }}
         numberOfLines={1}
       >
         {label}
@@ -135,6 +133,7 @@ export function MemberDetailCard({
   places,
   watched,
   onCollapse,
+  onNavigate,
   onNudge,
   onManageSharing,
   onLaidOut,
@@ -151,6 +150,9 @@ export function MemberDetailCard({
   /** In my active Safety Radius watch list. */
   watched: boolean
   onCollapse: () => void
+  /** Open the map-app picker for this member (the parent owns the modal — a
+   *  sheet can't be presented from inside a card in a horizontal scroller). */
+  onNavigate: () => void
   onNudge: () => void
   onManageSharing: () => void
   /** Our x within the roster's content, once laid out — the parent uses it to
@@ -232,10 +234,6 @@ export function MemberDetailCard({
   const etaText = etaLoading ? '…' : eta ? formatEta(eta.minutes) : '—'
   const battText = live && live.battery != null ? `${live.battery}%` : '—'
 
-  const nav = (app: NavApp) => {
-    if (live) void openNavigation(app, { lat: live.lat, lng: live.lng }, profile.display_name)
-  }
-
   return (
     <View
       onLayout={(e) => onLaidOut?.(e.nativeEvent.layout.x)}
@@ -293,30 +291,25 @@ export function MemberDetailCard({
             <Stat label={t('location.stat.distance')} value={distText} />
             <Stat label={t('location.stat.battery')} value={battText} />
           </View>
-          <View style={{ flexDirection: 'row', gap: 5, marginTop: 'auto' }}>
+          {/* Three actions, not five. The map apps used to sit here as separate
+              icon buttons, which made each one narrow enough that the glyph had
+              to carry the meaning — unreadable at this size. They live behind
+              "Navigate" now, which buys the remaining buttons enough width for a
+              legible label. */}
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 'auto' }}>
             <IconAction
-              icon={<Map size={15} color="#007AFF" />}
-              label={t('location.maps.apple')}
-              onPress={() => nav('apple')}
+              icon={<Navigation size={16} color={c.accent} />}
+              label={t('location.action.navigate')}
+              onPress={onNavigate}
             />
             <IconAction
-              icon={<MapPin size={15} color="#34A853" />}
-              label={t('location.maps.google')}
-              onPress={() => nav('google')}
-            />
-            <IconAction
-              icon={<Navigation size={15} color="#05C8F7" />}
-              label={t('location.maps.waze')}
-              onPress={() => nav('waze')}
-            />
-            <IconAction
-              icon={<Bell size={15} color={c.text} />}
+              icon={<Bell size={16} color={c.text} />}
               label={t('location.action.nudge')}
               onPress={onNudge}
             />
             {phone ? (
               <IconAction
-                icon={<Phone size={15} color={c.text} />}
+                icon={<Phone size={16} color={c.text} />}
                 label={t('location.action.call')}
                 onPress={() => void Linking.openURL(`tel:${phone}`)}
               />
