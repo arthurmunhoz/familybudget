@@ -66,9 +66,12 @@ Opening a member's detail ramps THEIR device to high-frequency GPS while you
 watch, so their pin moves smoothly. The foreground path works from the app alone.
 The **background wake** — so a watched member whose app is asleep still refreshes
 — fires a silent push via `api/ack-ping.ts` (`?action=live-wake`), so it only
-works once the Vercel API is deployed:
+works once the Vercel API is deployed. **Deploy from the REPO ROOT, not
+`mobile/`** — `mobile/` is the Expo app, the Vercel project is the root (that's
+where `api/` and `vercel.json` live):
 
 ```
+cd <repo root>          # .../family-budget
 npx vercel deploy --prod --yes
 ```
 
@@ -85,7 +88,8 @@ to the rest of the household.
 
 - A new place pins to **your current location** (no map-drag picker yet), with a
   radius preset and per-place arrival/departure toggles.
-- The arrive/leave **push** also needs the API deployed (`npx vercel deploy --prod`).
+- The arrive/leave **push** also needs the API deployed — from the **repo root**,
+  not `mobile/` (see the deploy note above).
 - Geofences only run for members who have **sharing on** and granted **Always**
   location, and they need the native build (already covered by your dev build —
   no new native modules, so a JS reload is enough for the app code).
@@ -93,10 +97,31 @@ to the rest of the household.
   **~100 m minimum radius**; crossings can take a minute to fire and may bounce at
   the boundary (we drop repeats within 5 minutes). Push copy is English-only.
 
+## Safety Radius (Phase 3, built — One Roof **Plus**)
+
+The shield button in the Whereabouts header. Drop a circle centred on you, pick
+which members to watch, and get alerted the moment one crosses out — the park /
+fair scenario.
+
+- **Plus-gated**: non-Plus users see a sparkle badge on the button and tapping
+  opens the paywall.
+- Alerts are **local notifications on your own phone** (your device does the
+  detecting, so no deploy or push setup is needed for this one).
+- An alert fires **once per crossing** — the person has to come back inside
+  before they can trigger another.
+- While a watch runs, the watched members are put in **live mode** so their
+  positions are fresh enough for the boundary to mean something.
+- The watch **auto-expires after 4 hours**, and is visible to the household on
+  purpose (being inside someone's safety radius isn't a secret).
+- Accuracy caveat: this is only as good as the watched member's location
+  freshness — if their app is asleep and the silent-push wake is throttled, a
+  crossing can be reported late.
+
 ## Not built yet (next up)
 
-- **Safety Radius / event mode** (a One Roof **Plus** feature), location history,
-  driving/SOS — Phase 3.
+- **Location history** — 7-day retention, and it must be clearly surfaced to
+  users (what's kept and for how long).
+- Driving detection / SOS check-in.
 - A map-drag picker for placing/moving a place.
 
 See the design brief for the full roadmap.

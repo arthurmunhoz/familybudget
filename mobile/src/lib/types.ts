@@ -258,6 +258,21 @@ export interface CalendarEvent {
  *  off/paused (we null the coordinates then so no stale location leaks). Use
  *  `isSharingLive()` in `@/lib/location` to decide whether to plot a pin — a row
  *  can exist purely to carry `sharing: false`. */
+/** A temporary Safety Radius / "event mode" watch (migration 068, One Roof Plus).
+ *  One per owner. Breach detection runs on the OWNER's device against the live
+ *  member_locations feed — there's no server job. */
+export interface SafetyWatch {
+  owner_email: string
+  household_id: string
+  center_lat: number
+  center_lng: number
+  radius_m: number
+  /** Emails of the members being watched. */
+  watched: string[]
+  expires_at: string
+  created_at: string
+}
+
 /** A saved household place (migration 067) monitored as a native geofence.
  *  `radius_m` is the geofence radius; iOS quietly enforces a floor around 100 m,
  *  so very small radii behave like ~100 m in practice. */

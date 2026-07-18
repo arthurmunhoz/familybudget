@@ -8,8 +8,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
-import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps'
-import { MapPin, SlidersHorizontal, Crosshair, Landmark } from 'lucide-react-native'
+import { router } from 'expo-router'
+import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
+import { MapPin, SlidersHorizontal, Crosshair, Landmark, ShieldCheck, Sparkles } from 'lucide-react-native'
 
 import { AppHeader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
@@ -30,11 +31,15 @@ import {
 } from '@/lib/location'
 import { fetchPlaces } from '@/lib/places'
 import { syncGeofences } from '@/lib/placesTask'
-import type { MemberLocation, Place, Profile } from '@/lib/types'
+import { usePlus } from '@/lib/plus'
+import { requestLive } from '@/lib/liveLocation'
+import { alertBreach, circlePolygon, fetchMyWatch, isOutside } from '@/lib/safetyRadius'
+import type { MemberLocation, Place, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { BatteryChip, buildMemberColors, MemberAvatar, timeAgo } from './locationUi'
 import { MemberSheet } from './MemberSheet'
 import { PlacesSheet } from './PlacesSheet'
+import { SafetyRadiusSheet } from './SafetyRadiusSheet'
 import { SharingControls } from './SharingControls'
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? ''
@@ -71,6 +76,7 @@ export default function Whereabouts() {
   const { c, dark } = useTheme()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
+  const { isPlus } = usePlus()
   const myEmail = profile?.email ?? null
 
   const cameraRef = useRef<Camera>(null)
@@ -82,6 +88,7 @@ export default function Whereabouts() {
   const [selected, setSelected] = useState<string | null>(null)
   const [sharingOpen, setSharingOpen] = useState(false)
   const [placesOpen, setPlacesOpen] = useState(false)
+  const [safetyOpen, setSafetyOpen] = useState(false)
   const [toast, setToast] = useState<ToastData | null>(null)
 
   const { data: locs = [], revalidate } = useCachedQuery<MemberLocation[]>(
@@ -93,11 +100,28 @@ export default function Whereabouts() {
     fetchPlaces,
   )
 
+  const { data: watch = null, revalidate: reloadWatch } = useCachedQuery<SafetyWatch | null>(
+    'location:watch',
+    fetchMyWatch,
+  )
+
   // Keep the OS geofence registration in step with the saved places (and with
   // whether I'm sharing at all — syncGeofences tears them down if I'm not).
   useEffect(() => {
     void syncGeofences()
   }, [places])
+
+  // While a safety watch runs, keep the watched members in live mode so their
+  // positions are fresh enough for a boundary alert to mean something.
+  useEffect(() => {
+    if (!watch?.watched.length) return
+    const ping = () => {
+      for (const email of watch.watched) void requestLive(email)
+    }
+    ping()
+    const id = setInterval(ping, 20_000)
+    return () => clearInterval(id)
+  }, [watch])
 
   // Miles vs km follows the device's measurement system.
   useEffect(() => {
@@ -149,6 +173,33 @@ export default function Whereabouts() {
         : (profiles.find((p) => p.email === email)?.display_name ?? email.split('@')[0]),
     [myEmail, profiles, t],
   )
+
+  // Safety Radius breach detection — lives here because this screen already has
+  // the live member_locations feed. Alerts once per crossing: a member must come
+  // back inside before they can trigger another alert (no re-alert spam).
+  const breachedRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!watch) {
+      breachedRef.current = new Set()
+      return
+    }
+    const centre = { lat: watch.center_lat, lng: watch.center_lng }
+    for (const email of watch.watched) {
+      const loc = locByEmail.get(email)
+      if (!isSharingLive(loc)) continue
+      const out = isOutside(watch, { lat: loc.lat, lng: loc.lng })
+      const was = breachedRef.current.has(email)
+      if (out && !was) {
+        breachedRef.current.add(email)
+        const title = t('location.safety.breach', { name: nameFor(email) })
+        const dist = formatDistance(haversineMeters(centre, { lat: loc.lat, lng: loc.lng }))
+        void alertBreach(title, t('location.safety.breachBody', { dist }))
+        setToast({ emoji: '⚠️', text: title })
+      } else if (!out && was) {
+        breachedRef.current.delete(email)
+      }
+    }
+  }, [watch, locByEmail, nameFor, t])
 
   const myLoc = myEmail ? locByEmail.get(myEmail) : undefined
   const myLive = isSharingLive(myLoc) ? myLoc : null
@@ -249,6 +300,23 @@ export default function Whereabouts() {
           icon={<MapPin size={20} color={c.accent} />}
           right={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.lg }}>
+              {/* Safety radius — a Plus feature: the sparkle badge marks it, and
+                  a non-Plus tap goes to the paywall instead of the sheet. */}
+              <Pressable
+                onPress={() => (isPlus ? setSafetyOpen(true) : router.push('/paywall'))}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('location.safety.title')}
+              >
+                <View>
+                  <ShieldCheck size={22} color={watch ? c.accent : c.textMuted} />
+                  {!isPlus ? (
+                    <View style={{ position: 'absolute', top: -5, right: -7 }}>
+                      <Sparkles size={12} color={c.accent} />
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
               <Pressable
                 onPress={() => setPlacesOpen(true)}
                 hitSlop={10}
@@ -295,6 +363,24 @@ export default function Whereabouts() {
                 zoomLevel: myLive || livePins.length ? INITIAL_ZOOM : 3,
               }}
             />
+            {/* Safety radius circle — a real geographic polygon, so it stays
+                accurate at every zoom (Mapbox circle radii are in pixels). */}
+            {watch ? (
+              <ShapeSource
+                id="safety-radius"
+                shape={circlePolygon(
+                  { lat: watch.center_lat, lng: watch.center_lng },
+                  watch.radius_m,
+                )}
+              >
+                <FillLayer id="safety-radius-fill" style={{ fillColor: c.accent, fillOpacity: 0.12 }} />
+                <LineLayer
+                  id="safety-radius-line"
+                  style={{ lineColor: c.accent, lineWidth: 2, lineDasharray: [2, 2] }}
+                />
+              </ShapeSource>
+            ) : null}
+
             {/* Saved places — drawn first so member pins sit on top */}
             {places.map((pl) => (
               <MarkerView key={`place-${pl.id}`} coordinate={[pl.lng, pl.lat]} anchor={{ x: 0.5, y: 0.5 }}>
@@ -486,6 +572,20 @@ export default function Whereabouts() {
           phone={meta.phones[selectedProfile.email]}
           myLive={myLive}
           onClose={() => setSelected(null)}
+        />
+      ) : null}
+
+      {safetyOpen ? (
+        <SafetyRadiusSheet
+          watch={watch}
+          profiles={profiles}
+          colors={colors}
+          locByEmail={locByEmail}
+          myEmail={myEmail}
+          myLive={myLive}
+          avatars={meta.avatars}
+          onChanged={() => void reloadWatch()}
+          onClose={() => setSafetyOpen(false)}
         />
       ) : null}
 
