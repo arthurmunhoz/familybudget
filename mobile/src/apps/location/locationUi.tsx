@@ -2,13 +2,13 @@
 // avatar (photo or initials) used both as a map pin and in lists, a small
 // battery chip, the pulsing "Watching" badge, and a localized "time ago" helper.
 import { useEffect, useRef, useState } from 'react'
-import { Animated, View } from 'react-native'
+import { Animated, StyleSheet, View } from 'react-native'
 import { Image } from 'expo-image'
 import { ShieldCheck } from 'lucide-react-native'
 
 import { getSignedUrl } from '@/lib/signedUrls'
 import { useI18n } from '@/hooks/useI18n'
-import { fonts, radius, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Txt } from '@/components/ui'
 import type { TKey } from '@/lib/i18n'
 
@@ -218,6 +218,60 @@ export function BatteryChip({ level }: { level: number }) {
         />
       </View>
       <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.textMuted }}>{level}%</Txt>
+    </View>
+  )
+}
+
+/** A titled group inside a sheet. Without these a form reads as one flat column
+ *  of labels and controls on a single fill — a wall.
+ *
+ *  The BORDER is doing most of the work, not the fill: `c.surface` is a
+ *  translucent overlay on the sheet (10% white in Dusk), so on its own it barely
+ *  separates from the sheet behind it. A hairline edge reads at any opacity, in
+ *  either theme.
+ *
+ *  `shrink` is needed when the section wraps a ScrollView that has to yield once
+ *  the sheet hits its max height: RN defaults flexShrink to 0, so EVERY link in
+ *  the chain has to opt in or the list pushes the sheet past its cap. */
+export function Section({
+  title,
+  shrink,
+  children,
+}: {
+  title?: string
+  shrink?: boolean
+  children: React.ReactNode
+}) {
+  const { c } = useTheme()
+  return (
+    <View style={{ gap: 7, flexShrink: shrink ? 1 : 0 }}>
+      {title ? (
+        <Txt
+          style={{
+            fontFamily: fonts.semibold,
+            fontSize: 11,
+            color: c.textMuted,
+            textTransform: 'uppercase',
+            letterSpacing: 0.7,
+            marginLeft: 2,
+          }}
+        >
+          {title}
+        </Txt>
+      ) : null}
+      <View
+        style={{
+          backgroundColor: c.surface,
+          borderRadius: radius.lg,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: c.border,
+          padding: sp.md,
+          gap: sp.md,
+          flexShrink: shrink ? 1 : 0,
+        }}
+      >
+        {children}
+      </View>
     </View>
   )
 }

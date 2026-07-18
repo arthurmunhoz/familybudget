@@ -18,51 +18,12 @@ import { searchPlaces, type PlaceSuggestion } from '@/lib/placeSearch'
 import { createPlace, deletePlace, removePlaceWatch, updatePlace, upsertPlaceWatch } from '@/lib/places'
 import type { Place, PlaceWatch, Profile } from '@/lib/types'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
+import { Section } from './locationUi'
 
 /** Both inputs on the icon+name row are pinned to this height. `Field` sizes
  *  itself from its fontSize, so the icon input's 22pt emoji made it visibly
  *  TALLER than the name beside it — fixing the height decouples the two. */
 const FIELD_H = 46
-
-/** A titled group. The form used to be one flat column of labels and controls
- *  on the same fill, which read as a wall — each group now sits on its own card
- *  under a quiet uppercase heading so the eye can find the part it wants.
- *
- *  The BORDER is doing most of the work, not the fill: `c.surface` is a
- *  translucent overlay on the sheet (10% white in Dusk), so on its own it barely
- *  separates from the sheet behind it. A hairline edge reads at any opacity, in
- *  either theme. */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const { c } = useTheme()
-  return (
-    <View style={{ gap: 7 }}>
-      <Txt
-        style={{
-          fontFamily: fonts.semibold,
-          fontSize: 11,
-          color: c.textMuted,
-          textTransform: 'uppercase',
-          letterSpacing: 0.7,
-          marginLeft: 2,
-        }}
-      >
-        {title}
-      </Txt>
-      <View
-        style={{
-          backgroundColor: c.surface,
-          borderRadius: R.lg,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: c.border,
-          padding: sp.md,
-          gap: sp.md,
-        }}
-      >
-        {children}
-      </View>
-    </View>
-  )
-}
 
 /** Full-width action inside a Section — reads as part of the group rather than
  *  as a stray link under it. */
@@ -188,9 +149,6 @@ export function PlaceForm({
   const [arrivals, setArrivals] = useState(watch?.notify_arrivals ?? true)
   const [departures, setDepartures] = useState(watch?.notify_departures ?? false)
   const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
-  /** A named place is chosen — searched, or the saved one we're editing. Drives
-   *  the whole Location section: bin instead of search, and different wording on
-   *  the current-location action. */
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     place ? { lat: place.lat, lng: place.lng } : null,
   )
@@ -218,6 +176,9 @@ export function PlaceForm({
    *  leaving it on screen afterwards would describe the old location while
    *  saving the new one. */
   const [usingSaved, setUsingSaved] = useState(!!place)
+  /** A named place is chosen — searched, or the saved one we're editing. Drives
+   *  the whole Location section: bin instead of search, and different wording on
+   *  the current-location action. */
   const hasPlace = !!picked || usingSaved
 
   useEffect(() => {

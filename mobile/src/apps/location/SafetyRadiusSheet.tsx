@@ -21,7 +21,7 @@ import {
 import { isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
-import { MemberAvatar } from './locationUi'
+import { MemberAvatar, Section } from './locationUi'
 
 export function SafetyRadiusSheet({
   watch,
@@ -127,7 +127,9 @@ export function SafetyRadiusSheet({
             // (the home-indicator inset sits behind the keyboard anyway).
             paddingBottom: kb > 0 ? sp.lg : sp.xl,
             marginBottom: kb,
-            gap: sp.md,
+            // sp.lg between sections, same rhythm as the place form — sp.md had
+            // everything packed together.
+            gap: sp.lg,
             // Fit the content: a 1-member watch list should be a short sheet, a
             // 6-member one taller — capped so it never swallows the whole screen.
             // (The lists below use flexShrink so they yield once we hit the cap;
@@ -155,60 +157,67 @@ export function SafetyRadiusSheet({
                 <Txt variant="faint">{t('location.safety.endsIn', { hours: hoursLeft })}</Txt>
               </View>
 
-              <ScrollView style={{ flexShrink: 1 }}>
-                {watch.watched.map((email) => {
-                  const p = profiles.find((x) => x.email === email)
-                  const loc = locByEmail.get(email)
-                  const live = isSharingLive(loc) ? loc : null
-                  const out = live ? isOutside(watch, { lat: live.lat, lng: live.lng }) : false
-                  const dist = live
-                    ? formatDistance(
-                        haversineMeters(
-                          { lat: watch.center_lat, lng: watch.center_lng },
-                          { lat: live.lat, lng: live.lng },
-                        ),
-                      )
-                    : '—'
-                  return (
-                    <View
-                      key={email}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: sp.md,
-                        paddingVertical: 10,
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderColor: c.border,
-                      }}
-                    >
-                      <MemberAvatar
-                        name={p?.display_name ?? email}
-                        avatarPath={avatars[email]}
-                        color={colors[email] ?? c.accent}
-                        size={36}
-                      />
-                      <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
-                        {p?.display_name ?? email.split('@')[0]}
-                      </Txt>
-                      <Txt variant="faint" style={{ fontSize: 12 }}>
-                        {dist}
-                      </Txt>
+              <Section shrink>
+                <ScrollView style={{ flexShrink: 1 }}>
+                  {watch.watched.map((email, i) => {
+                    const p = profiles.find((x) => x.email === email)
+                    const loc = locByEmail.get(email)
+                    const live = isSharingLive(loc) ? loc : null
+                    const out = live ? isOutside(watch, { lat: live.lat, lng: live.lng }) : false
+                    const dist = live
+                      ? formatDistance(
+                          haversineMeters(
+                            { lat: watch.center_lat, lng: watch.center_lng },
+                            { lat: live.lat, lng: live.lng },
+                          ),
+                        )
+                      : '—'
+                    return (
                       <View
+                        key={email}
                         style={{
-                          paddingHorizontal: 9,
-                          paddingVertical: 3,
-                          borderRadius: R.pill,
-                          backgroundColor: out ? c.expense : c.income,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: sp.md,
+                          paddingVertical: 10,
+                          // No rule above the first row — inside a section card it
+                          // would sit right under the card's own edge.
+                          borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                          borderColor: c.border,
                         }}
                       >
-                        <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: '#fff' }}>
-                          {out ? t('location.safety.outside') : t('location.safety.inside')}
+                        <MemberAvatar
+                          name={p?.display_name ?? email}
+                          avatarPath={avatars[email]}
+                          color={colors[email] ?? c.accent}
+                          size={36}
+                        />
+                        <Txt
+                          style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 14, color: c.text }}
+                          numberOfLines={1}
+                        >
+                          {p?.display_name ?? email.split('@')[0]}
                         </Txt>
+                        <Txt variant="faint" style={{ fontSize: 12 }}>
+                          {dist}
+                        </Txt>
+                        <View
+                          style={{
+                            paddingHorizontal: 9,
+                            paddingVertical: 3,
+                            borderRadius: R.pill,
+                            backgroundColor: out ? c.expense : c.income,
+                          }}
+                        >
+                          <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: '#fff' }}>
+                            {out ? t('location.safety.outside') : t('location.safety.inside')}
+                          </Txt>
+                        </View>
                       </View>
-                    </View>
-                  )
-                })}
-              </ScrollView>
+                    )
+                  })}
+                </ScrollView>
+              </Section>
 
               {/* Same slot as "Start watching" below, so it gets the same curve
                   — the sheet's bottom control shouldn't change shape with state. */}
@@ -228,126 +237,137 @@ export function SafetyRadiusSheet({
             <>
               {!myLive ? <Txt variant="muted">{t('location.safety.needLocation')}</Txt> : null}
 
-              <Txt variant="label">{t('location.safety.pickPeople')}</Txt>
-              <ScrollView style={{ flexShrink: 1 }}>
-                {others.map((p) => {
-                  const on = picked.includes(p.email)
-                  return (
-                    <Pressable
-                      key={p.email}
-                      onPress={() => toggle(p.email)}
-                      style={({ pressed }) => [
-                        {
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: sp.md,
-                          paddingVertical: 10,
-                          borderTopWidth: StyleSheet.hairlineWidth,
-                          borderColor: c.border,
-                        },
-                        pressed && { opacity: 0.6 },
-                      ]}
-                    >
-                      <MemberAvatar
-                        name={p.display_name}
-                        avatarPath={avatars[p.email]}
-                        color={colors[p.email] ?? c.accent}
-                        size={36}
-                      />
-                      <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
-                        {p.display_name}
-                      </Txt>
-                      <View
-                        style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 12,
-                          borderWidth: 2,
-                          borderColor: on ? c.accent : c.border,
-                          backgroundColor: on ? c.accent : 'transparent',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {on ? (
-                          <Txt style={{ color: '#fff', fontSize: 13, fontFamily: fonts.semibold }}>✓</Txt>
-                        ) : null}
-                      </View>
-                    </Pressable>
-                  )
-                })}
-              </ScrollView>
-
-              <Txt variant="label">{t('location.safety.radius')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {presets.map((p) => {
-                  const on = !custom && radiusM === p.meters
-                  return (
-                    <Pressable
-                      key={p.meters}
-                      onPress={() => {
-                        setCustom(false)
-                        setRadiusM(p.meters)
-                      }}
-                      style={{
-                        paddingVertical: 8,
-                        paddingHorizontal: 14,
-                        borderRadius: R.pill,
-                        backgroundColor: on ? c.accent : c.surface,
-                      }}
-                    >
-                      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
-                        {p.label}
-                      </Txt>
-                    </Pressable>
-                  )
-                })}
-                <Pressable
-                  onPress={() => setCustom(true)}
-                  style={{
-                    paddingVertical: 8,
-                    paddingHorizontal: 14,
-                    borderRadius: R.pill,
-                    backgroundColor: custom ? c.accent : c.surface,
-                  }}
-                >
-                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: custom ? '#fff' : c.text }}>
-                    {t('location.safety.custom')}
-                  </Txt>
-                </Pressable>
-              </View>
-
-              {custom ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                  <View style={{ flex: 1 }}>
-                    <Field
-                      value={customValue}
-                      onChangeText={setCustomValue}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </View>
-                  {units.map((u) => {
-                    const on = unitId === u.id
+              <Section title={t('location.safety.pickPeople')} shrink>
+                <ScrollView style={{ flexShrink: 1 }}>
+                  {others.map((p, i) => {
+                    const on = picked.includes(p.email)
                     return (
                       <Pressable
-                        key={u.id}
-                        onPress={() => setUnitId(u.id)}
+                        key={p.email}
+                        onPress={() => toggle(p.email)}
+                        style={({ pressed }) => [
+                          {
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: sp.md,
+                            paddingVertical: 10,
+                            borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                            borderColor: c.border,
+                          },
+                          pressed && { opacity: 0.6 },
+                        ]}
+                      >
+                        <MemberAvatar
+                          name={p.display_name}
+                          avatarPath={avatars[p.email]}
+                          color={colors[p.email] ?? c.accent}
+                          size={36}
+                        />
+                        <Txt
+                          style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 14, color: c.text }}
+                          numberOfLines={1}
+                        >
+                          {p.display_name}
+                        </Txt>
+                        <View
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            borderWidth: 2,
+                            borderColor: on ? c.accent : c.border,
+                            backgroundColor: on ? c.accent : 'transparent',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {on ? (
+                            <Txt style={{ color: '#fff', fontSize: 13, fontFamily: fonts.semibold }}>✓</Txt>
+                          ) : null}
+                        </View>
+                      </Pressable>
+                    )
+                  })}
+                </ScrollView>
+              </Section>
+
+              <Section title={t('location.safety.radius')}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+                  {presets.map((p) => {
+                    const on = !custom && radiusM === p.meters
+                    return (
+                      <Pressable
+                        key={p.meters}
+                        onPress={() => {
+                          setCustom(false)
+                          setRadiusM(p.meters)
+                        }}
                         style={{
-                          paddingVertical: 10,
-                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          paddingHorizontal: 14,
                           borderRadius: R.pill,
                           backgroundColor: on ? c.accent : c.surface,
                         }}
                       >
-                        <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
-                          {u.label}
+                        <Txt
+                          style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}
+                        >
+                          {p.label}
                         </Txt>
                       </Pressable>
                     )
                   })}
+                  <Pressable
+                    onPress={() => setCustom(true)}
+                    style={{
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                      borderRadius: R.pill,
+                      backgroundColor: custom ? c.accent : c.surface,
+                    }}
+                  >
+                    <Txt
+                      style={{ fontFamily: fonts.semibold, fontSize: 13, color: custom ? '#fff' : c.text }}
+                    >
+                      {t('location.safety.custom')}
+                    </Txt>
+                  </Pressable>
                 </View>
-              ) : null}
+
+                {custom ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                    <View style={{ flex: 1 }}>
+                      <Field
+                        value={customValue}
+                        onChangeText={setCustomValue}
+                        keyboardType="numeric"
+                        placeholder="0"
+                      />
+                    </View>
+                    {units.map((u) => {
+                      const on = unitId === u.id
+                      return (
+                        <Pressable
+                          key={u.id}
+                          onPress={() => setUnitId(u.id)}
+                          style={{
+                            paddingVertical: 10,
+                            paddingHorizontal: 16,
+                            borderRadius: R.pill,
+                            backgroundColor: on ? c.accent : c.surface,
+                          }}
+                        >
+                          <Txt
+                            style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}
+                          >
+                            {u.label}
+                          </Txt>
+                        </Pressable>
+                      )
+                    })}
+                  </View>
+                ) : null}
+              </Section>
 
               {/* Bottom corners follow the iPhone's screen curve, so the sheet's
                   final control sits down in the corner instead of cutting square
