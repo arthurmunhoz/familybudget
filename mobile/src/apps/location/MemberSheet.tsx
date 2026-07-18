@@ -3,7 +3,7 @@
 // resolved address, one-tap navigation (Apple Maps / Google / Waze), and quick
 // Nudge / Call actions. For a member who isn't sharing it shows a calm empty
 // state instead. For yourself it just shows your status.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -22,6 +22,7 @@ import {
   openNavigation,
   type NavApp,
 } from '@/lib/location'
+import { useWatchLive } from '@/lib/liveLocation'
 import type { MemberLocation, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { MemberAvatar } from './locationUi'
@@ -134,13 +135,29 @@ export function MemberSheet({
   const [etaLoading, setEtaLoading] = useState(false)
   const [address, setAddress] = useState<string | null>(null)
 
-  // Drive-time ETA from me → them (only when both of us are live and it's not me).
+  // Keep the latest coords in refs so the ETA/address effects can read them
+  // without re-running on every tiny move — they key on a coarse ~100 m grid.
+  const liveRef = useRef(live)
+  liveRef.current = live
+  const myLiveRef = useRef(myLive)
+  myLiveRef.current = myLive
+  const targetKey = live ? `${live.lat.toFixed(3)},${live.lng.toFixed(3)}` : null
+  const myKey = myLive ? `${myLive.lat.toFixed(3)},${myLive.lng.toFixed(3)}` : null
+
+  // Live mode: while this sheet is open on a sharing member (not me), ask their
+  // device to ramp up to high-frequency GPS so their pin moves in near real time.
+  useWatchLive(live && !isMe ? profile.email : null)
+
+  // Drive-time ETA from me → them. Keyed coarse so live mode's rapid updates
+  // don't spam the Directions API — refetch only when someone moves ~100 m.
   useEffect(() => {
     let active = true
     setEta(null)
-    if (!live || isMe || !myLive) return
+    const them = liveRef.current
+    const me = myLiveRef.current
+    if (!them || isMe || !me) return
     setEtaLoading(true)
-    driveEta(myLive, { lat: live.lat, lng: live.lng })
+    driveEta(me, { lat: them.lat, lng: them.lng })
       .then((r) => {
         if (active) setEta(r)
       })
@@ -150,14 +167,16 @@ export function MemberSheet({
     return () => {
       active = false
     }
-  }, [live, isMe, myLive])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey, myKey, isMe])
 
-  // Human address via the on-device geocoder (no extra key needed).
+  // Human address via the on-device geocoder (keyed coarse, same reason as ETA).
   useEffect(() => {
     let active = true
     setAddress(null)
-    if (!live) return
-    Location.reverseGeocodeAsync({ latitude: live.lat, longitude: live.lng })
+    const them = liveRef.current
+    if (!them) return
+    Location.reverseGeocodeAsync({ latitude: them.lat, longitude: them.lng })
       .then((res) => {
         if (!active) return
         const a = res[0]
@@ -169,7 +188,8 @@ export function MemberSheet({
     return () => {
       active = false
     }
-  }, [live])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey])
 
   const distText = live && myLive ? formatDistance(haversineMeters(myLive, live)) : '—'
   const etaText = etaLoading ? '…' : eta ? formatEta(eta.minutes) : '—'
@@ -198,9 +218,32 @@ export function MemberSheet({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
             <MemberAvatar name={profile.display_name} avatarPath={avatarPath} color={color} size={54} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 20, color: c.text }} numberOfLines={1}>
-                {isMe ? `${profile.display_name} · ${t('location.you')}` : profile.display_name}
-              </Txt>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Txt
+                  style={{ fontFamily: fonts.displaySemi, fontSize: 20, color: c.text, flexShrink: 1 }}
+                  numberOfLines={1}
+                >
+                  {isMe ? `${profile.display_name} · ${t('location.you')}` : profile.display_name}
+                </Txt>
+                {live && !isMe ? (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: c.income,
+                      borderRadius: radius.pill,
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} />
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 10, color: '#fff', letterSpacing: 0.5 }}>
+                      {t('location.live').toUpperCase()}
+                    </Txt>
+                  </View>
+                ) : null}
+              </View>
               {live ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <MapPin size={13} color={c.textMuted} />

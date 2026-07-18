@@ -22,6 +22,7 @@ import { AnalyticsBridge } from '@/components/AnalyticsBridge';
 import { AuthProvider } from '@/lib/auth';
 import { registerBackgroundNotifications } from '@/lib/backgroundNotifications';
 import { registerLocationTask } from '@/lib/locationTask';
+import { useLiveResponder } from '@/lib/liveLocation';
 import { PlusProvider } from '@/lib/plus';
 import { I18nProvider } from '@/hooks/useI18n';
 import { TilePrefProvider } from '@/hooks/useTilePref';
@@ -82,6 +83,7 @@ function Chrome() {
   const { mode } = useThemePref();
   const isDark = mode === 'dark';
   useSyncNudgeWidget();
+  useLiveResponder();
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <AnalyticsBridge />
