@@ -11,10 +11,10 @@
 // The routine itself is configurable per pet (RoutineSheet). Every mutation
 // also feeds the Pet Care home-screen widget: a fresh App Group snapshot +
 // a best-effort ?action=petcare-notify so OTHER members' widgets reload ASAP.
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Animated, Pressable, ScrollView, View } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Animated, AppState, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { Image } from 'expo-image'
 import { Check, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
@@ -118,10 +118,10 @@ export default function PetCare() {
   // Pet chips start big and shrink as the list scrolls up (JS-driven — these
   // interpolations feed layout props, which the native driver can't animate).
   const scrollY = useRef(new Animated.Value(0)).current
-  const chipAvatar = scrollY.interpolate({ inputRange: [0, 60], outputRange: [36, 22], extrapolate: 'clamp' })
-  const chipEmoji = scrollY.interpolate({ inputRange: [0, 60], outputRange: [22, 14], extrapolate: 'clamp' })
-  const chipFont = scrollY.interpolate({ inputRange: [0, 60], outputRange: [16, 13], extrapolate: 'clamp' })
-  const chipPadV = scrollY.interpolate({ inputRange: [0, 60], outputRange: [10, 7], extrapolate: 'clamp' })
+  const chipAvatar = scrollY.interpolate({ inputRange: [0, 80], outputRange: [52, 22], extrapolate: 'clamp' })
+  const chipEmoji = scrollY.interpolate({ inputRange: [0, 80], outputRange: [32, 14], extrapolate: 'clamp' })
+  const chipFont = scrollY.interpolate({ inputRange: [0, 80], outputRange: [18, 13], extrapolate: 'clamp' })
+  const chipPadV = scrollY.interpolate({ inputRange: [0, 80], outputRange: [12, 7], extrapolate: 'clamp' })
 
   type Data = {
     pets: Pet[]
@@ -172,6 +172,22 @@ export default function PetCare() {
   useEffect(() => {
     setOverlay({})
   }, [done])
+
+  // useCachedQuery fetches on MOUNT only, so two real-world paths went stale:
+  // returning to this (still-mounted) screen, and — the widget repro — marking
+  // a task from the Home Screen while the app sits backgrounded ON Pet Care.
+  // Focus doesn't fire for background→foreground, so both hooks are needed.
+  useFocusEffect(
+    useCallback(() => {
+      void load()
+    }, [load]),
+  )
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void load()
+    })
+    return () => sub.remove()
+  }, [load])
 
   // Mirror pet photos into the App Group for the widget (only when changed).
   useEffect(() => {
@@ -371,7 +387,7 @@ export default function PetCare() {
                     >
                       {petPhotoUrls[p.id] ? (
                         <Animated.View
-                          style={{ width: chipAvatar, height: chipAvatar, borderRadius: 18, overflow: 'hidden' }}
+                          style={{ width: chipAvatar, height: chipAvatar, borderRadius: 26, overflow: 'hidden' }}
                         >
                           <Image source={{ uri: petPhotoUrls[p.id] }} style={{ width: '100%', height: '100%' }} />
                         </Animated.View>
