@@ -5,7 +5,7 @@
 import { Platform } from 'react-native'
 import { ExtensionStorage } from '@bacons/apple-targets'
 
-const APP_GROUP = 'group.com.oneroof.app'
+export const APP_GROUP = 'group.com.oneroof.app'
 // Must match the `kind:` string in NudgesWidget.swift's StaticConfiguration.
 const NUDGES_WIDGET_KIND = 'NudgesWidget'
 // Must match the `kind:` string in TodayWidget.swift's StaticConfiguration.
@@ -213,21 +213,6 @@ export function syncPetCareWidget(day: string, pets: PetCareWidgetPet[]): void {
   if (!s) return
   try {
     s.set('petcare', JSON.stringify({ day, pets }))
-    ExtensionStorage.reloadWidget(PETCARE_WIDGET_KIND)
-  } catch {
-    /* native module unavailable — ignore */
-  }
-}
-
-/** Mirror a pet's photo (a SMALL base64 JPEG thumbnail, ~160px) into the App
- *  Group so the widget can render the actual pet instead of an icon. Widgets
- *  can't fetch signed URLs themselves; the app downscales + writes this on the
- *  Pet Care screen. */
-export function syncPetPhoto(petId: string, base64: string): void {
-  const s = store()
-  if (!s) return
-  try {
-    s.set(`petcare_photo_${petId}`, base64)
     ExtensionStorage.reloadWidget(PETCARE_WIDGET_KIND)
   } catch {
     /* native module unavailable — ignore */

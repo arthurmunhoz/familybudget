@@ -271,6 +271,13 @@ func dueLabel(_ dueIn: Int) -> String {
 }
 
 func petPhotoImage(_ id: String) -> UIImage? {
+  // The app downloads each photo into the shared container as a real file —
+  // the reliable way to hand a widget an image.
+  if let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: APP_GROUP) {
+    let file = dir.appendingPathComponent("petcare_photo_\(id).jpg")
+    if let img = UIImage(contentsOfFile: file.path) { return img }
+  }
+  // Legacy fallback: a base64 string in the app-group defaults.
   guard
     let b64 = groupDefaults()?.string(forKey: "petcare_photo_\(id)"),
     let data = Data(base64Encoded: b64)
