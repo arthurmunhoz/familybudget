@@ -28,7 +28,10 @@ export const glassLight: ThemeTokens = {
   surface2: 'rgba(255,255,255,0.36)',
   text: '#241F1B',
   textMuted: '#6B615A',
-  textFaint: '#9A908A',
+  // Darker than a "faint" grey normally would be: this text lands on a
+  // translucent card over a warm wash, so the old #9A908A only reached 2.7:1.
+  // 4.6:1 clears WCAG AA. (Applies to hints, placeholders and timestamps too.)
+  textFaint: '#73695F',
   accent: '#E2683F',
   accentSoft: 'rgba(226,104,63,0.15)',
   income: '#1F9E68',
@@ -46,7 +49,9 @@ export const glassDark: ThemeTokens = {
   surface2: 'rgba(255,255,255,0.16)',
   text: '#F3EFEA',
   textMuted: '#A7A199',
-  textFaint: '#726C64',
+  // See glassLight.textFaint — the old #726C64 only reached 3.1:1 on the dark
+  // wash; this clears AA at 4.9:1.
+  textFaint: '#948D84',
   accent: '#F2884F',
   accentSoft: 'rgba(242,136,79,0.20)',
   income: '#54C088',
