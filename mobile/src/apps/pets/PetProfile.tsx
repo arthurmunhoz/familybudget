@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Alert, Pressable, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { Scale, X } from 'lucide-react-native'
+import { Scale, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Loader, Screen, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -177,7 +177,7 @@ export default function PetProfile({ petId }: { petId: string }) {
               <Txt style={{ flex: 1, fontWeight: '500' }}>{String(w.weight)}</Txt>
               <Txt variant="faint">{formatDay(w.measured_on)}</Txt>
               <Pressable onPress={() => void removeWeight(w)} hitSlop={8} accessibilityLabel={t('common.delete')}>
-                <X size={15} color={c.textFaint} />
+                <Trash2 size={15} color={c.textFaint} />
               </Pressable>
             </View>
           ))}

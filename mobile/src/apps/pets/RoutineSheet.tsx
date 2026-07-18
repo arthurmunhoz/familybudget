@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react'
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { GripVertical, Plus, X } from 'lucide-react-native'
+import { GripVertical, Plus, Trash2, X } from 'lucide-react-native'
 
 import { DraggableList } from '@/components/DraggableList'
 import { Btn, Field, Txt } from '@/components/ui'
@@ -183,7 +183,7 @@ export function RoutineSheet({
           ) : null}
         </Pressable>
         <Pressable onPress={() => remove(task)} hitSlop={8} accessibilityLabel={t('petcare.deleteTask')}>
-          <X size={16} color={c.textFaint} />
+          <Trash2 size={16} color={c.textFaint} />
         </Pressable>
       </View>
     )
@@ -218,9 +218,14 @@ export function RoutineSheet({
               }}
             >
               <Txt variant="h2">
-                {pet.emoji} {t(section === 'daily' ? 'petcare.today' : 'petcare.routines')}
+                {t(section === 'daily' ? 'petcare.today' : 'petcare.routines')} · {pet.name}
               </Txt>
-              <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')}>
+              <Pressable
+                onPress={onClose}
+                hitSlop={10}
+                accessibilityLabel={t('common.close')}
+                style={{ marginRight: sp.sm, marginTop: 2 }}
+              >
                 <X size={22} color={c.textMuted} />
               </Pressable>
             </View>
@@ -254,8 +259,13 @@ export function RoutineSheet({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
-                  paddingVertical: 12,
-                  borderRadius: radius.md,
+                  paddingVertical: 14,
+                  // Bottom corners follow the sheet's iPhone-screen curve
+                  // (SHEET_RADIUS is the normal radius on Android).
+                  borderTopLeftRadius: radius.md,
+                  borderTopRightRadius: radius.md,
+                  borderBottomLeftRadius: SHEET_RADIUS,
+                  borderBottomRightRadius: SHEET_RADIUS,
                   borderWidth: 1,
                   borderStyle: 'dashed',
                   borderColor: c.textFaint,

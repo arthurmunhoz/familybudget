@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Image } from 'expo-image'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
-import { Check, PawPrint, Pencil, Plus, X } from 'lucide-react-native'
+import { Check, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -642,7 +642,7 @@ export default function PetCare() {
                           </Txt>
                         </View>
                         <Pressable onPress={() => removeEvent(e)} hitSlop={8} accessibilityLabel={t('common.delete')}>
-                          <X size={15} color={c.textFaint} />
+                          <Trash2 size={15} color={c.textFaint} />
                         </Pressable>
                       </Pressable>
                     )
