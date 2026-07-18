@@ -9,7 +9,7 @@ import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
 import Mapbox, { Camera, MapView, MarkerView } from '@rnmapbox/maps'
-import { MapPin, SlidersHorizontal, Crosshair } from 'lucide-react-native'
+import { MapPin, SlidersHorizontal, Crosshair, Landmark } from 'lucide-react-native'
 
 import { AppHeader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
@@ -28,10 +28,13 @@ import {
   isSharingLive,
   setUseImperial,
 } from '@/lib/location'
-import type { MemberLocation, Profile } from '@/lib/types'
+import { fetchPlaces } from '@/lib/places'
+import { syncGeofences } from '@/lib/placesTask'
+import type { MemberLocation, Place, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { BatteryChip, buildMemberColors, MemberAvatar, timeAgo } from './locationUi'
 import { MemberSheet } from './MemberSheet'
+import { PlacesSheet } from './PlacesSheet'
 import { SharingControls } from './SharingControls'
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? ''
@@ -78,12 +81,23 @@ export default function Whereabouts() {
   })
   const [selected, setSelected] = useState<string | null>(null)
   const [sharingOpen, setSharingOpen] = useState(false)
+  const [placesOpen, setPlacesOpen] = useState(false)
   const [toast, setToast] = useState<ToastData | null>(null)
 
   const { data: locs = [], revalidate } = useCachedQuery<MemberLocation[]>(
     'location:members',
     fetchMemberLocations,
   )
+  const { data: places = [], revalidate: reloadPlaces } = useCachedQuery<Place[]>(
+    'location:places',
+    fetchPlaces,
+  )
+
+  // Keep the OS geofence registration in step with the saved places (and with
+  // whether I'm sharing at all — syncGeofences tears them down if I'm not).
+  useEffect(() => {
+    void syncGeofences()
+  }, [places])
 
   // Miles vs km follows the device's measurement system.
   useEffect(() => {
@@ -234,14 +248,24 @@ export default function Whereabouts() {
           title={t('app.location.name')}
           icon={<MapPin size={20} color={c.accent} />}
           right={
-            <Pressable
-              onPress={() => setSharingOpen(true)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={t('location.openSharing')}
-            >
-              <SlidersHorizontal size={22} color={c.textMuted} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.lg }}>
+              <Pressable
+                onPress={() => setPlacesOpen(true)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('location.places.title')}
+              >
+                <Landmark size={22} color={c.textMuted} />
+              </Pressable>
+              <Pressable
+                onPress={() => setSharingOpen(true)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('location.openSharing')}
+              >
+                <SlidersHorizontal size={22} color={c.textMuted} />
+              </Pressable>
+            </View>
           }
         />
       </View>
@@ -271,6 +295,29 @@ export default function Whereabouts() {
                 zoomLevel: myLive || livePins.length ? INITIAL_ZOOM : 3,
               }}
             />
+            {/* Saved places — drawn first so member pins sit on top */}
+            {places.map((pl) => (
+              <MarkerView key={`place-${pl.id}`} coordinate={[pl.lng, pl.lat]} anchor={{ x: 0.5, y: 0.5 }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    backgroundColor: c.card,
+                    borderRadius: radius.pill,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderWidth: 1,
+                    borderColor: c.border,
+                  }}
+                >
+                  <Txt style={{ fontSize: 12 }}>{pl.icon}</Txt>
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.textMuted }}>
+                    {pl.name}
+                  </Txt>
+                </View>
+              </MarkerView>
+            ))}
             {livePins.map(({ p, loc }) => (
               <MarkerView key={p.email} coordinate={[loc.lng, loc.lat]} anchor={{ x: 0.5, y: 0.5 }}>
                 <Pressable onPress={() => setSelected(p.email)} accessibilityRole="button">
@@ -439,6 +486,15 @@ export default function Whereabouts() {
           phone={meta.phones[selectedProfile.email]}
           myLive={myLive}
           onClose={() => setSelected(null)}
+        />
+      ) : null}
+
+      {placesOpen ? (
+        <PlacesSheet
+          profiles={profiles}
+          colors={colors}
+          onClose={() => setPlacesOpen(false)}
+          onChanged={() => void reloadPlaces()}
         />
       ) : null}
 

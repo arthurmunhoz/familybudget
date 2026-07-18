@@ -76,10 +76,27 @@ iOS throttles silent pushes, so background updates arrive as periodic bursts, no
 a continuous stream; continuous smoothness needs the watched person's app in the
 foreground. Test with **two devices** — you can't watch yourself.
 
-## Not in Phase 1 (next up)
+## Places & geofences (Phase 2, built)
 
-- **Places / geofences** + arrive/leave push ("Emma arrived at School") — Phase 2.
+Save places (Home, School, Grandma's) from the **Places** button in the
+Whereabouts header. Each member's device monitors them as native geofences, and
+crossing one shows in the **Activity** feed and pushes "Emma arrived at School"
+to the rest of the household.
+
+- A new place pins to **your current location** (no map-drag picker yet), with a
+  radius preset and per-place arrival/departure toggles.
+- The arrive/leave **push** also needs the API deployed (`npx vercel deploy --prod`).
+- Geofences only run for members who have **sharing on** and granted **Always**
+  location, and they need the native build (already covered by your dev build —
+  no new native modules, so a JS reload is enough for the app code).
+- Real-world caveats: **iOS monitors at most 20 regions** per app and enforces a
+  **~100 m minimum radius**; crossings can take a minute to fire and may bounce at
+  the boundary (we drop repeats within 5 minutes). Push copy is English-only.
+
+## Not built yet (next up)
+
 - **Safety Radius / event mode** (a One Roof **Plus** feature), location history,
   driving/SOS — Phase 3.
+- A map-drag picker for placing/moving a place.
 
 See the design brief for the full roadmap.
