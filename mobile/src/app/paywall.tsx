@@ -13,6 +13,7 @@ import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { radius, sp, useTheme } from '@/theme/theme'
+import { GLASS, GlassWash } from '@/theme/glass'
 
 const PRIVACY_URL = 'https://one-roof-app.vercel.app/privacy.html'
 // Apple's standard EULA is an accepted Terms of Use for IAP.
@@ -54,7 +55,7 @@ function periodLabel(pkg: PurchasesPackage, t: (key: TKey) => string): string {
 }
 
 export default function Paywall() {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
   const { offering, isPlus, available, loading, purchase, restore } = usePlus()
   const packages = offering?.availablePackages ?? []
@@ -103,6 +104,9 @@ export default function Paywall() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
+      {/* GLASS: this is a modal ROUTE, so a transparent bg would show the screen
+          behind it. Paint the wash as an opaque backing (matches the app). */}
+      {GLASS ? <GlassWash dark={dark} /> : null}
       <ScrollView contentContainerStyle={{ padding: sp.lg, paddingBottom: sp.xxl, gap: sp.lg }}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={t('common.close')}>

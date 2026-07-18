@@ -18,10 +18,14 @@ export const GLASS = true
 // the same ThemeTokens shape so every screen picks them up with no edits.
 export const glassLight: ThemeTokens = {
   bg: 'transparent',
-  card: 'rgba(255,255,255,0.62)',
-  cardActive: 'rgba(255,255,255,0.82)',
-  surface: 'rgba(255,255,255,0.44)',
-  surface2: 'rgba(255,255,255,0.30)',
+  // Mostly-opaque: `card` also backs every modal/sheet panel, which float over a
+  // dim backdrop (or the Whereabouts map), not the wash — so a see-through card
+  // there mixes with whatever's behind. High opacity stays legible everywhere;
+  // the wash showing BETWEEN and around cards is what carries the glass feel.
+  card: 'rgba(255,255,255,0.92)',
+  cardActive: 'rgba(255,255,255,0.98)',
+  surface: 'rgba(247,240,233,0.66)',
+  surface2: 'rgba(247,240,233,0.52)',
   text: '#241F1B',
   textMuted: '#6B615A',
   textFaint: '#9A908A',
@@ -34,10 +38,12 @@ export const glassLight: ThemeTokens = {
 
 export const glassDark: ThemeTokens = {
   bg: 'transparent',
-  card: 'rgba(36,38,48,0.55)',
-  cardActive: 'rgba(48,50,62,0.72)',
-  surface: 'rgba(255,255,255,0.07)',
-  surface2: 'rgba(255,255,255,0.12)',
+  // See glassLight.card — kept mostly-opaque so sheets/modals stay legible over
+  // the backdrop (and the map) rather than mixing with what's behind.
+  card: 'rgba(30,31,40,0.92)',
+  cardActive: 'rgba(44,46,58,0.97)',
+  surface: 'rgba(255,255,255,0.09)',
+  surface2: 'rgba(255,255,255,0.14)',
   text: '#F3EFEA',
   textMuted: '#A7A199',
   textFaint: '#726C64',
