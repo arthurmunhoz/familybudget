@@ -10,7 +10,7 @@
 import { Dimensions, View } from 'react-native'
 
 import type { ThemeTokens } from './theme'
-import { pickOnAccent } from './contrast'
+import { pickOn } from './contrast'
 
 /** Master on/off. false = the app is exactly Warm Hearth again. */
 export const GLASS = true
@@ -36,7 +36,7 @@ export const glassLight: ThemeTokens = {
   // Overridden per colour scheme — see SCHEMES / glassTokens below.
   accent: '#E2683F',
   accentSoft: 'rgba(226,104,63,0.15)',
-  onAccent: pickOnAccent('#E2683F'),
+  onAccent: pickOn('#E2683F'),
   income: '#1F9E68',
   expense: '#E4554A',
   border: 'rgba(60,45,38,0.12)',
@@ -57,7 +57,7 @@ export const glassDark: ThemeTokens = {
   textFaint: '#948D84',
   accent: '#F2884F',
   accentSoft: 'rgba(242,136,79,0.20)',
-  onAccent: pickOnAccent('#F2884F'),
+  onAccent: pickOn('#F2884F'),
   income: '#54C088',
   expense: '#EF6B62',
   border: 'rgba(255,255,255,0.12)',
@@ -239,7 +239,7 @@ export function glassTokens(dark: boolean, scheme: SchemeId): ThemeTokens {
     accentSoft: dark ? s.accentSoftDark : s.accentSoft,
     // Derived, never authored: a new scheme can't forget it and silently ship
     // white-on-a-pale-accent again.
-    onAccent: pickOnAccent(dark ? s.accentDark : s.accent),
+    onAccent: pickOn(dark ? s.accentDark : s.accent),
   }
 }
 

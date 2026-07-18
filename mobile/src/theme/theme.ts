@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 
 import { useThemePref } from './theme-pref';
 import { useSchemePref } from './scheme-pref';
-import { pickOnAccent } from './contrast';
+import { pickOn } from './contrast';
 import { GLASS, glassLight, glassDark, glassTokens } from './glass';
 
 export interface ThemeTokens {
@@ -44,7 +44,7 @@ export const light: ThemeTokens = {
   textFaint: '#b3a89b',
   accent: '#c2603f',
   accentSoft: 'rgba(194,96,63,0.14)',
-  onAccent: pickOnAccent('#c2603f'),
+  onAccent: pickOn('#c2603f'),
   income: '#3c7d58',
   expense: '#cf5a4c',
   border: 'rgba(43,37,33,0.10)',
@@ -62,7 +62,7 @@ export const dark: ThemeTokens = {
   textFaint: '#7c7165',
   accent: '#da7a5b',
   accentSoft: 'rgba(218,122,91,0.22)',
-  onAccent: pickOnAccent('#da7a5b'),
+  onAccent: pickOn('#da7a5b'),
   income: '#6fb58a',
   expense: '#e07a6a',
   border: 'rgba(243,235,224,0.12)',

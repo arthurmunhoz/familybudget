@@ -21,7 +21,7 @@ import {
 import { isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
-import { pickOnAccent } from '@/theme/contrast'
+import { pickOn } from '@/theme/contrast'
 import { MemberAvatar, Section } from './locationUi'
 
 export function SafetyRadiusSheet({
@@ -217,7 +217,7 @@ export function SafetyRadiusSheet({
                             style={{
                               fontFamily: fonts.semibold,
                               fontSize: 11,
-                              color: pickOnAccent(out ? c.expense : c.income),
+                              color: pickOn(out ? c.expense : c.income),
                             }}
                           >
                             {out ? t('location.safety.outside') : t('location.safety.inside')}

@@ -1,9 +1,10 @@
-// Foreground-on-accent contrast. Its own module (no imports) on purpose: both
-// theme.ts and glass.tsx need it, and glass.tsx already takes a TYPE from
-// theme.ts — importing a VALUE back the other way would make that cycle real.
+// Foreground-on-a-coloured-fill contrast. Its own module (no imports) on
+// purpose: both theme.ts and glass.tsx need it, and glass.tsx already takes a
+// TYPE from theme.ts — importing a VALUE back the other way would make that
+// cycle real.
 
-/** Warm near-black used as the on-accent ink. Matches the app's text tone
- *  rather than pure #000, which reads harsh on a saturated fill. */
+/** Warm near-black used as the ink on a coloured fill. Matches the app's text
+ *  tone rather than pure #000, which reads harsh on a saturated fill. */
 export const INK = '#1B1A18'
 
 function luminance(hex: string): number {
@@ -21,20 +22,23 @@ function ratio(a: string, b: string): number {
 }
 
 /**
- * Which foreground actually reads on a filled accent — white or the ink,
- * whichever has more contrast.
+ * Which foreground actually reads on a given fill — white or the ink, whichever
+ * has more contrast.
  *
  * This exists because white was hardcoded on every accent-filled control, which
  * is fine for the dark accents used in LIGHT mode but fails badly for the light,
  * vivid accents used in DARK mode: every dark accent landed at 2.2–3.0:1, below
  * AA even for large text. Flipping to ink lifts those to 5.7–8.0:1.
  *
- * Anything painting text/icons on `c.accent` must use `c.onAccent`, never a
- * literal — a new scheme would otherwise silently reintroduce the bug.
+ * Accent fills are pre-resolved as `c.onAccent` — anything painting text or
+ * icons on `c.accent` must use that, never a literal, or a new scheme silently
+ * reintroduces the bug. Call this directly only for fills the palette doesn't
+ * pre-resolve: `c.income` / `c.expense` and the per-member colours both hit the
+ * same failure (white is 2.4:1 on the dark-mode income green).
  */
-export function pickOnAccent(accent: string): string {
+export function pickOn(fill: string): string {
   try {
-    return ratio(accent, '#FFFFFF') >= ratio(accent, INK) ? '#FFFFFF' : INK
+    return ratio(fill, '#FFFFFF') >= ratio(fill, INK) ? '#FFFFFF' : INK
   } catch {
     return '#FFFFFF'
   }

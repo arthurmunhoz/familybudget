@@ -9,7 +9,7 @@ import { ShieldCheck } from 'lucide-react-native'
 import { getSignedUrl } from '@/lib/signedUrls'
 import { useI18n } from '@/hooks/useI18n'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { pickOnAccent } from '@/theme/contrast'
+import { pickOn } from '@/theme/contrast'
 import { Txt } from '@/components/ui'
 import type { TKey } from '@/lib/i18n'
 
@@ -128,8 +128,7 @@ export function MemberAvatar({
       ) : (
         // Same reasoning as c.onAccent, applied to the MEMBER's colour: white
         // initials measure 2.97:1 on the amber in MEMBER_PALETTE, under AA-large.
-        // pickOnAccent is named for the accent but is a plain contrast pick.
-        <Txt style={{ fontFamily: fonts.semibold, color: pickOnAccent(color), fontSize: size * 0.4 }}>
+        <Txt style={{ fontFamily: fonts.semibold, color: pickOn(color), fontSize: size * 0.4 }}>
           {initials(name)}
         </Txt>
       )}
