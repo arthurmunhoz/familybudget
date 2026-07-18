@@ -11,17 +11,47 @@ import { Crosshair } from 'lucide-react-native'
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { nearestPreset, radiusPresets } from '@/lib/location'
-import { createPlace, deletePlace, updatePlace } from '@/lib/places'
-import type { Place } from '@/lib/types'
+import { createPlace, deletePlace, removePlaceWatch, updatePlace, upsertPlaceWatch } from '@/lib/places'
+import type { Place, PlaceWatch, Profile } from '@/lib/types'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
+
+/** Small selectable pill (used for "whose crossings" in the watch section). */
+function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          paddingVertical: 7,
+          paddingHorizontal: 13,
+          borderRadius: R.pill,
+          backgroundColor: on ? c.accent : c.sheet,
+        },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
+        {label}
+      </Txt>
+    </Pressable>
+  )
+}
 
 export function PlaceForm({
   place,
+  profiles,
+  myEmail,
+  watch,
   onClose,
   onSaved,
 }: {
   /** null = creating a new place */
   place: Place | null
+  profiles: Profile[]
+  myEmail: string | null
+  /** MY existing subscription to this place, if any. */
+  watch: PlaceWatch | null
   onClose: () => void
   onSaved: () => void
 }) {
@@ -36,8 +66,12 @@ export function PlaceForm({
   const presets = useMemo(() => radiusPresets(100), [])
   const [radiusM, setRadiusM] = useState(place?.radius_m ?? presets[0]?.meters ?? 150)
   const selectedRadius = nearestPreset(presets, radiusM)
-  const [arrivals, setArrivals] = useState(place?.notify_arrivals ?? true)
-  const [departures, setDepartures] = useState(place?.notify_departures ?? false)
+  // MY notification settings for this place — personal, not part of the place.
+  const [watchOn, setWatchOn] = useState(!!watch)
+  const [watchedPicked, setWatchedPicked] = useState<string[]>(watch?.watched ?? [])
+  const [arrivals, setArrivals] = useState(watch?.notify_arrivals ?? true)
+  const [departures, setDepartures] = useState(watch?.notify_departures ?? false)
+  const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     place ? { lat: place.lat, lng: place.lng } : null,
   )
@@ -92,11 +126,22 @@ export function PlaceForm({
         lat: coords.lat,
         lng: coords.lng,
         radius_m: radiusM,
-        notify_arrivals: arrivals,
-        notify_departures: departures,
       }
+      let id = place?.id ?? null
       if (place) await updatePlace(place.id, input)
-      else await createPlace(input)
+      else id = await createPlace(input)
+      // The place is shared; the subscription is mine alone.
+      if (id) {
+        if (watchOn) {
+          await upsertPlaceWatch(id, {
+            watched: watchedPicked,
+            notify_arrivals: arrivals,
+            notify_departures: departures,
+          })
+        } else {
+          await removePlaceWatch(id)
+        }
+      }
       onSaved()
     } catch {
       Alert.alert(t('location.places.saveFailed'))
@@ -185,21 +230,60 @@ export function PlaceForm({
               </View>
             </View>
 
-            {/* Notifications */}
+            {/* MY notifications. The place is shared with the household; this
+                subscription is personal — saving a place signs up nobody else. */}
             <View style={{ backgroundColor: c.surface, borderRadius: R.md, paddingHorizontal: sp.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 }}>
                 <Txt style={{ fontFamily: fonts.medium, fontSize: 15, color: c.text, flex: 1 }}>
-                  {t('location.places.notifyArrivals')}
+                  {t('location.places.watchTitle')}
                 </Txt>
-                <Switch value={arrivals} onValueChange={setArrivals} trackColor={{ true: c.accent, false: c.surface2 }} thumbColor="#ffffff" />
+                <Switch value={watchOn} onValueChange={setWatchOn} trackColor={{ true: c.accent, false: c.surface2 }} thumbColor="#ffffff" />
               </View>
-              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 }}>
-                <Txt style={{ fontFamily: fonts.medium, fontSize: 15, color: c.text, flex: 1 }}>
-                  {t('location.places.notifyDepartures')}
-                </Txt>
-                <Switch value={departures} onValueChange={setDepartures} trackColor={{ true: c.accent, false: c.surface2 }} thumbColor="#ffffff" />
-              </View>
+
+              {watchOn ? (
+                <>
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 }}>
+                    <Txt style={{ fontFamily: fonts.medium, fontSize: 15, color: c.text, flex: 1 }}>
+                      {t('location.places.notifyArrivals')}
+                    </Txt>
+                    <Switch value={arrivals} onValueChange={setArrivals} trackColor={{ true: c.accent, false: c.surface2 }} thumbColor="#ffffff" />
+                  </View>
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 }}>
+                    <Txt style={{ fontFamily: fonts.medium, fontSize: 15, color: c.text, flex: 1 }}>
+                      {t('location.places.notifyDepartures')}
+                    </Txt>
+                    <Switch value={departures} onValueChange={setDepartures} trackColor={{ true: c.accent, false: c.surface2 }} thumbColor="#ffffff" />
+                  </View>
+                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+                  {/* Whose crossings I care about. None picked = everyone. */}
+                  <View style={{ paddingVertical: 11, gap: 8 }}>
+                    <Txt variant="label">{t('location.places.watchWho')}</Txt>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+                      <Chip
+                        label={t('location.places.watchAll')}
+                        on={watchedPicked.length === 0}
+                        onPress={() => setWatchedPicked([])}
+                      />
+                      {others.map((p) => (
+                        <Chip
+                          key={p.email}
+                          label={p.display_name}
+                          on={watchedPicked.includes(p.email)}
+                          onPress={() =>
+                            setWatchedPicked((cur) =>
+                              cur.includes(p.email)
+                                ? cur.filter((e) => e !== p.email)
+                                : [...cur, p.email],
+                            )
+                          }
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </>
+              ) : null}
             </View>
 
             {/* Where it is */}

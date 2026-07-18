@@ -61,17 +61,17 @@ export async function syncGeofences(): Promise<void> {
   }
 
   const places = await fetchPlaces().catch(() => [] as Awaited<ReturnType<typeof fetchPlaces>>)
-  const regions = places
-    .filter((p) => p.notify_arrivals || p.notify_departures)
-    .slice(0, MAX_REGIONS)
-    .map((p) => ({
-      identifier: p.id,
-      latitude: p.lat,
-      longitude: p.lng,
-      radius: p.radius_m,
-      notifyOnEnter: p.notify_arrivals,
-      notifyOnExit: p.notify_departures,
-    }))
+  // Monitor EVERY place: my device records the crossing regardless of who's
+  // watching, and the push fan-out (place_watchers) decides who — if anyone —
+  // actually hears about it.
+  const regions = places.slice(0, MAX_REGIONS).map((p) => ({
+    identifier: p.id,
+    latitude: p.lat,
+    longitude: p.lng,
+    radius: p.radius_m,
+    notifyOnEnter: true,
+    notifyOnExit: true,
+  }))
 
   if (!regions.length) {
     if (running) await Location.stopGeofencingAsync(GEOFENCE_TASK).catch(() => {})

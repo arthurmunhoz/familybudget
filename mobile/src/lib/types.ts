@@ -320,9 +320,20 @@ export interface Place {
   lat: number
   lng: number
   radius_m: number
+  created_by: string
+  created_at: string
+}
+
+/** MY subscription to a place's alerts (migration 070). Watching is per-user:
+ *  creating or sharing a place subscribes nobody. `watched` empty = everyone in
+ *  the household; otherwise only those members' crossings notify me. */
+export interface PlaceWatch {
+  place_id: string
+  user_email: string
+  household_id: string
+  watched: string[]
   notify_arrivals: boolean
   notify_departures: boolean
-  created_by: string
   created_at: string
 }
 

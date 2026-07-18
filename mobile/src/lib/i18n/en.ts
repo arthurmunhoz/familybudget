@@ -89,6 +89,13 @@ export const en = {
   'location.activity.empty': 'No comings and goings yet',
   'location.activity.arrived': '{name} arrived at {place}',
   'location.activity.left': '{name} left {place}',
+  'location.atPlace': 'At {place}',
+  'location.places.watchTitle': 'Notify me about this place',
+  'location.places.watchWho': 'Whose comings and goings',
+  'location.places.watchAll': 'Everyone',
+  'location.places.notWatching': 'Not notifying you',
+  'location.places.watchingAll': 'Notifying you about everyone',
+  'location.places.watchingSome': 'Notifying you about {names}',
 
   // Whereabouts — Safety radius / event mode (Phase 3, One Roof Plus)
   'location.safety.title': 'Safety radius',
