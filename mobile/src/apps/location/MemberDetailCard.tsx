@@ -137,6 +137,7 @@ export function MemberDetailCard({
   onCollapse,
   onNudge,
   onManageSharing,
+  onLaidOut,
 }: {
   profile: Profile
   location: MemberLocation | null
@@ -152,6 +153,11 @@ export function MemberDetailCard({
   onCollapse: () => void
   onNudge: () => void
   onManageSharing: () => void
+  /** Our x within the roster's content, once laid out — the parent uses it to
+   *  scroll this card fully into view. Reported from onLayout rather than
+   *  computed by the parent, because the parent would have to guess at our
+   *  width before we've grown into it. */
+  onLaidOut?: (x: number) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -232,6 +238,7 @@ export function MemberDetailCard({
 
   return (
     <View
+      onLayout={(e) => onLaidOut?.(e.nativeEvent.layout.x)}
       style={{
         width: CARD_W_EXPANDED,
         height: CARD_H,

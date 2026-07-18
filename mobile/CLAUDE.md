@@ -135,11 +135,15 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   map** (`select()` in `Whereabouts`); tapping the open one collapses it. There
   is deliberately no detail modal — a sheet covered the very map you'd just
   focused. Consequences worth knowing before you touch this:
-  - **The expanded card is the same HEIGHT as a collapsed one, only wider.** The
-    roster must never grow, because Mapbox's logo and the OSM attribution are
-    pinned just above it (`logoPosition`/`attributionPosition`) and covering them
-    breaches ODbL. `MemberDetailCard` documents its 168pt height budget; text
-    rows carry explicit `lineHeight` so that budget survives font metrics.
+  - **The expanded card is the same HEIGHT as a collapsed one, only wider**, so
+    the roster never changes size and the map doesn't jump on every tap.
+    `MemberDetailCard` documents its 168pt height budget; text rows carry
+    explicit `lineHeight` so that budget survives font metrics.
+  - **Scrolling the expanded card into view happens on ITS `onLayout`, not in
+    the tap handler** (`onLaidOut` → `onExpandedLayout`, gated by a
+    `focusPending` ref). At tap time the card is still 138pt and the scroll view
+    still has its old content width, so any offset computed there is stale and
+    gets clamped short — expanding the LAST card left it cut off by 146pt.
   - **The roster FLOATS on the map — there is no panel behind it.** Each card
     carries its own opaque fill + `FLOAT_SHADOW` instead. The fill MUST be
     `c.sheet`: `c.surface` is translucent under the glass skin (10% white in
@@ -247,8 +251,13 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   Drop a circle centred on yourself, pick who to watch, get alerted when one
   crosses out. **Breach detection runs on the WATCHER's device** in
   `Whereabouts` against the live `member_locations` feed — no server job — and
-  alerts via a LOCAL notification (the watcher detects it, so no push needed).
-  Alerts fire once per crossing (the member must come back inside to re-arm).
+  alerts via a LOCAL notification (the watcher detects it, so no push needed)
+  AND a banner pinned above the roster that stays until the watcher dismisses it
+  — this was a Toast, but a 3-second fade is wrong for the one alert in this app
+  you can't afford to miss. Alerts fire once per crossing (the member must come
+  back inside to re-arm); the banner is keyed by member so it can't stack
+  duplicates, and it does NOT auto-clear when they come back inside (it's a
+  record that they left).
   While a watch runs, watched members are kept in live mode (`requestLive`) so
   the boundary check has fresh positions. The circle is drawn as a real GeoJSON
   polygon (`circlePolygon`) because Mapbox circle radii are in PIXELS, not metres.
@@ -278,7 +287,16 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     doesn't match the current unit system's presets.
   - Mapbox's logo AND the OSM attribution must stay visible — Mapbox ToS plus
     OpenStreetMap's **ODbL license** (removing attribution is a license breach,
-    not just a ToS one). They're positioned bottom-left above the roster sheet.
+    not just a ToS one). They sit **top-left**: the Live pill and recenter button
+    are top-right and the roster floats along the bottom, so it's the one corner
+    nothing else wants. Their SIZE can't be changed — `@rnmapbox/maps` exposes
+    only `logoEnabled`/`logoPosition` and `attributionEnabled`/
+    `attributionPosition`, so the (i) is already as small as it comes.
+  - **Header buttons all look identical** (`HeaderButton`): same fill, glyph in
+    `c.text`. An `active` fill was tried and removed — Places has no active state
+    at all, so next to a filled Safety Radius it read as disabled, and
+    `c.textMuted` on the translucent glass surface looked switched off in Dusk.
+    Activity is shown by pulsing the GLYPH instead (`Pulse` in `locationUi`).
 - Not yet: location history (7-day retention, must be clearly surfaced to users)
   and driving/SOS check-in; a map-drag picker for placing/moving a place.
 

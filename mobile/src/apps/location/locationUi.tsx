@@ -164,40 +164,48 @@ export function BatteryChip({ level }: { level: number }) {
   )
 }
 
+/** Wraps anything in a slow opacity heartbeat, so "this is running right now"
+ *  reads as activity instead of as a static label. Used for the Watching chip
+ *  and for the Safety Radius header glyph while a watch is live. */
+export function Pulse({ children }: { children: React.ReactNode }) {
+  const opacity = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.3, duration: 850, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 850, useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [opacity])
+  return <Animated.View style={{ opacity }}>{children}</Animated.View>
+}
+
 /** "Watching" badge — softly pulses so an active Safety Radius reads as ongoing
  *  activity rather than a static label. */
 export function WatchingChip() {
   const { c } = useTheme()
   const { t } = useI18n()
-  const pulse = useRef(new Animated.Value(1)).current
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.35, duration: 850, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 850, useNativeDriver: true }),
-      ]),
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [pulse])
   return (
-    <Animated.View
-      style={{
-        opacity: pulse,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        backgroundColor: c.accentSoft,
-        borderRadius: radius.pill,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-      }}
-    >
-      <ShieldCheck size={10} color={c.accent} />
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
-        {t('location.card.watching')}
-      </Txt>
-    </Animated.View>
+    <Pulse>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+          backgroundColor: c.accentSoft,
+          borderRadius: radius.pill,
+          paddingHorizontal: 7,
+          paddingVertical: 2,
+        }}
+      >
+        <ShieldCheck size={10} color={c.accent} />
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
+          {t('location.card.watching')}
+        </Txt>
+      </View>
+    </Pulse>
   )
 }
 

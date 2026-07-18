@@ -17,7 +17,7 @@ import * as Localization from 'expo-localization'
 import * as Location from 'expo-location'
 import { router } from 'expo-router'
 import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
-import { MapPin, Crosshair, Landmark, ShieldCheck, Sparkles } from 'lucide-react-native'
+import { MapPin, Crosshair, Landmark, ShieldAlert, ShieldCheck, Sparkles, X } from 'lucide-react-native'
 
 import { AppHeader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
@@ -50,6 +50,7 @@ import {
   CARD_W,
   FLOAT_SHADOW,
   MemberAvatar,
+  Pulse,
   ROSTER_BOTTOM_GAP,
   ROSTER_CHROME,
   ROSTER_SHADOW_PAD,
@@ -78,12 +79,11 @@ const DRIVING_SPEED_MS = 3.5 // ~12.6 km/h — above walking pace → "Driving"
 const INITIAL_ZOOM = 13 // frame the user + their neighborhood on first open (not too tight)
 const FOCUS_ZOOM = 15 // closer, for when you've picked one person to look at
 
-/** How much map the floating roster covers, bottom-up. Derived, not typed in by
- *  hand: it decides where a focused member gets centred AND where Mapbox's logo
- *  and the OSM attribution sit, and the latter must never end up underneath a
- *  card (that's an ODbL breach, not a cosmetic bug). */
+/** How much map the floating roster covers, bottom-up. Drives where a focused
+ *  member gets centred and where the breach banner sits. (The Mapbox/OSM credits
+ *  used to be derived from this too, back when they sat above the roster; they
+ *  live in the top-left now, so the roster can no longer cover them at all.) */
 const ROSTER_HEIGHT = CARD_H + ROSTER_CHROME
-const MAP_CREDIT_BOTTOM = ROSTER_HEIGHT + 12
 
 /** Member profiles' photo + phone, keyed by email (for pins + the Call button). */
 async function fetchMemberMeta(): Promise<{
@@ -100,9 +100,13 @@ async function fetchMemberMeta(): Promise<{
   return { avatars, phones }
 }
 
-/** Square header action. Reads as a button rather than a bare glyph, and fills
- *  with the accent when the thing it opens is currently ACTIVE (e.g. a safety
- *  watch is running) — state you can see without opening anything. */
+/** Square header action. Every one of these looks IDENTICAL — same fill, same
+ *  glyph weight — because a button that only some features can "light up" makes
+ *  the others read as disabled (Places has no active state at all, and next to a
+ *  filled Safety Radius it looked switched off). Activity is shown by pulsing
+ *  the GLYPH instead, which reads as "running now" without restyling the button.
+ *  Glyphs use c.text, not c.textMuted: over the translucent glass surface in
+ *  Dusk, muted was too faint to look enabled. */
 function HeaderButton({
   icon,
   label,
@@ -113,17 +117,20 @@ function HeaderButton({
   /** Rendered with the resolved foreground colour. */
   icon: (color: string) => React.ReactNode
   label: string
+  /** The thing this opens is running right now → pulse the glyph. */
   active?: boolean
   /** Plus sparkle for a gated feature. */
   badge?: boolean
   onPress: () => void
 }) {
   const { c } = useTheme()
+  const glyph = icon(active ? c.accent : c.text)
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ selected: !!active }}
       style={({ pressed }) => [
         {
           width: 36,
@@ -131,12 +138,12 @@ function HeaderButton({
           borderRadius: radius.md,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: active ? c.accent : c.surface,
+          backgroundColor: c.surface,
         },
         pressed && { opacity: 0.7 },
       ]}
     >
-      {icon(active ? '#ffffff' : c.textMuted)}
+      {active ? <Pulse>{glyph}</Pulse> : glyph}
       {badge ? (
         <View style={{ position: 'absolute', top: -4, right: -4 }}>
           <Sparkles size={12} color={c.accent} />
@@ -227,6 +234,9 @@ export default function Whereabouts() {
 
   const cameraRef = useRef<Camera>(null)
   const rosterRef = useRef<ScrollView>(null)
+  /** A selection is waiting to be scrolled into view (see onExpandedLayout).
+   *  A ref, not state, so it can't cause a render or fight a manual scroll. */
+  const focusPending = useRef(false)
   const centeredOnce = useRef(false)
   const [meta, setMeta] = useState<{ avatars: Record<string, string | null>; phones: Record<string, string> }>({
     avatars: {},
@@ -236,6 +246,8 @@ export default function Whereabouts() {
   const [selected, setSelected] = useState<string | null>(null)
   /** Member we're picking a nudge for — the one modal left in this flow. */
   const [nudgeFor, setNudgeFor] = useState<Profile | null>(null)
+  /** Safety-radius breaches showing above the roster until dismissed. */
+  const [breaches, setBreaches] = useState<{ email: string; title: string; dist: string }[]>([])
   const [sharingOpen, setSharingOpen] = useState(false)
   const [placesOpen, setPlacesOpen] = useState(false)
   const [safetyOpen, setSafetyOpen] = useState(false)
@@ -366,7 +378,12 @@ export default function Whereabouts() {
         const title = t('location.safety.breach', { name: nameFor(email) })
         const dist = formatDistance(haversineMeters(centre, { lat: loc.lat, lng: loc.lng }))
         void alertBreach(title, t('location.safety.breachBody', { dist }))
-        setToast({ emoji: '⚠️', text: title })
+        // A breach STAYS on screen until dismissed — a toast that faded after
+        // three seconds was the one alert in this app you couldn't afford to
+        // miss. Keyed by member so a second crossing can't stack duplicates.
+        setBreaches((prev) =>
+          prev.some((b) => b.email === email) ? prev : [...prev, { email, title, dist }],
+        )
       } else if (!out && was) {
         breachedRef.current.delete(email)
       }
@@ -467,13 +484,26 @@ export default function Whereabouts() {
         })
       }
 
-      // Scroll their card to the left edge. Cards before it are all collapsed
-      // (only one expands at a time), so the offset is exact.
-      const i = rows.findIndex((p) => p.email === email)
-      if (i >= 0) rosterRef.current?.scrollTo({ x: i * (CARD_W + sp.sm), animated: true })
+      // Bring their card fully into view. NOT done here: at this point the card
+      // is still 138pt wide and the content is still the old width, so any
+      // offset we computed would be stale — and near the end of the roster the
+      // scroll would be clamped short, leaving the expanded card cut off. Flag
+      // it instead and let the card scroll itself once it has actually been laid
+      // out at its final size (onExpandedLayout).
+      focusPending.current = true
     },
-    [selected, locByEmail, rows],
+    [selected, locByEmail],
   )
+
+  /** The expanded card reporting where it ended up. Scrolling to its real x is
+   *  what makes "entirely visible" true regardless of where it sits. */
+  const onExpandedLayout = useCallback((x: number) => {
+    if (!focusPending.current) return
+    focusPending.current = false
+    // Left-align it with the roster's padding: the card is 300pt and every
+    // supported screen is wider, so left-aligned == fully on screen.
+    rosterRef.current?.scrollTo({ x: Math.max(0, x - sp.lg), animated: true })
+  }, [])
 
   const statusLine = useCallback(
     (email: string): string => {
@@ -536,13 +566,14 @@ export default function Whereabouts() {
             }
             scaleBarEnabled={false}
             compassEnabled={false}
-            // Mapbox's ToS requires the logo, and OpenStreetMap's ODbL requires
-            // the attribution, so both must stay visible — but they're tucked
-            // into the bottom-left just above the floating roster, the least
-            // intrusive spot that isn't covered by it. Derived from the roster's
-            // real height so the two can't drift apart.
-            logoPosition={{ bottom: MAP_CREDIT_BOTTOM, left: 12 }}
-            attributionPosition={{ bottom: MAP_CREDIT_BOTTOM, left: 92 }}
+            // Mapbox's ToS requires the logo and OpenStreetMap's ODbL requires
+            // the attribution, so both must stay visible. Top-left: the map's
+            // own controls sit top-RIGHT and the roster floats along the bottom,
+            // so this is the one corner nothing else wants. Their SIZE is not
+            // adjustable — @rnmapbox/maps exposes only `*Enabled` and
+            // `*Position` for the ornaments, so the (i) is as small as it comes.
+            logoPosition={{ top: 8, left: 12 }}
+            attributionPosition={{ top: 8, left: 92 }}
           >
             <Camera
               ref={cameraRef}
@@ -668,6 +699,59 @@ export default function Whereabouts() {
           </View>
         ) : null}
 
+        {/* Breach alerts — pinned directly above the roster and kept there until
+            dismissed, one row per member who crossed out. */}
+        {breaches.length ? (
+          <View
+            style={{
+              position: 'absolute',
+              left: sp.lg,
+              right: sp.lg,
+              bottom: ROSTER_HEIGHT + sp.sm,
+              gap: sp.sm,
+            }}
+          >
+            {breaches.map((b) => (
+              <View
+                key={b.email}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: sp.sm,
+                  backgroundColor: c.sheet,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: c.expense,
+                  paddingVertical: 10,
+                  paddingHorizontal: sp.md,
+                  ...FLOAT_SHADOW,
+                }}
+              >
+                <ShieldAlert size={18} color={c.expense} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt
+                    style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }}
+                    numberOfLines={1}
+                  >
+                    {b.title}
+                  </Txt>
+                  <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
+                    {t('location.safety.breachBody', { dist: b.dist })}
+                  </Txt>
+                </View>
+                <Pressable
+                  onPress={() => setBreaches((prev) => prev.filter((x) => x.email !== b.email))}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.close')}
+                >
+                  <X size={16} color={c.textMuted} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {/* The roster FLOATS on the map — no panel behind it, so the map reads
             edge to edge and the cards look like they're sitting on top of it.
             Each card brings its own opaque fill + shadow instead.
@@ -720,6 +804,7 @@ export default function Whereabouts() {
                     onCollapse={() => setSelected(null)}
                     onNudge={() => setNudgeFor(p)}
                     onManageSharing={() => setSharingOpen(true)}
+                    onLaidOut={onExpandedLayout}
                   />
                 )
               }
