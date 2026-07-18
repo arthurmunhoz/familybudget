@@ -4,12 +4,13 @@
 // Breach alerts themselves are raised by the Whereabouts screen, which already
 // has the live member_locations feed.
 import { useMemo, useState } from 'react'
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ShieldCheck } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 import {
   clampRadius,
   formatDistance,
@@ -47,6 +48,7 @@ export function SafetyRadiusSheet({
   const { c } = useTheme()
   const { t } = useI18n()
   const insets = useSafeAreaInsets()
+  const kb = useKeyboardHeight()
 
   const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
   // Three round choices in the user's own units, plus Custom.
@@ -110,10 +112,7 @@ export function SafetyRadiusSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}
-      >
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
         <View
           style={{
@@ -123,7 +122,10 @@ export function SafetyRadiusSheet({
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
-            paddingBottom: insets.bottom + sp.lg,
+            // Lift the WHOLE drawer by the keyboard height. While the keyboard is
+            // up the home-indicator inset sits behind it, so don't pad twice.
+            paddingBottom: (kb > 0 ? 0 : insets.bottom) + sp.lg,
+            marginBottom: kb,
             gap: sp.md,
             // Fit the content: a 1-member watch list should be a short sheet, a
             // 6-member one taller — capped so it never swallows the whole screen.
@@ -132,7 +134,6 @@ export function SafetyRadiusSheet({
             maxHeight: '90%',
           }}
         >
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center' }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <ShieldCheck size={22} color={c.accent} />
             <View style={{ flex: 1 }}>
@@ -345,7 +346,7 @@ export function SafetyRadiusSheet({
             </>
           )}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }

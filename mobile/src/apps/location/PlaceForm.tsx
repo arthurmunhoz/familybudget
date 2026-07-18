@@ -5,13 +5,14 @@
 // save it. Radius is a small preset set: iOS enforces a ~100 m floor on
 // geofences, so finer-grained control would be a lie.
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
-import { Crosshair, Search } from 'lucide-react-native'
+import { MapPin, Search } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
 import { nearestPreset, radiusPresets } from '@/lib/location'
 import { searchPlaces, type PlaceSuggestion } from '@/lib/placeSearch'
 import { createPlace, deletePlace, removePlaceWatch, updatePlace, upsertPlaceWatch } from '@/lib/places'
@@ -61,6 +62,7 @@ export function PlaceForm({
   const { c } = useTheme()
   const { t } = useI18n()
   const insets = useSafeAreaInsets()
+  const kb = useKeyboardHeight()
 
   const [icon, setIcon] = useState(place?.icon ?? '📍')
   const [name, setName] = useState(place?.name ?? '')
@@ -208,10 +210,7 @@ export function PlaceForm({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}
-      >
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.cancel')} />
         <View
           style={{
@@ -220,12 +219,14 @@ export function PlaceForm({
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
-            paddingBottom: insets.bottom + sp.lg,
+            // Lift the WHOLE drawer by the keyboard height. While the keyboard is
+            // up the home-indicator inset sits behind it, so don't pad twice.
+            paddingBottom: (kb > 0 ? 0 : insets.bottom) + sp.lg,
+            marginBottom: kb,
             gap: sp.md,
             maxHeight: '88%',
           }}
         >
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center' }} />
           <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 22, color: c.text }}>
             {place ? t('location.places.edit') : t('location.places.new')}
           </Txt>
@@ -380,35 +381,47 @@ export function PlaceForm({
               ) : null}
             </View>
 
-            {/* Where it ended up — tap to snap it back to where you are now */}
-            {coords ? (
-              <Pressable
-                onPress={repin}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.surface, borderRadius: R.md, padding: sp.md }}
+            {/* Location — ONE unambiguous statement of where this place is.
+                Picking a search result replaces it outright. The "use my
+                location" action only appears when it's genuinely an ALTERNATIVE
+                to what's selected, so it can never be misread as the state. */}
+            <View style={{ gap: 6 }}>
+              <Txt variant="label">{t('location.places.location')}</Txt>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: c.surface,
+                  borderRadius: R.md,
+                  padding: sp.md,
+                }}
               >
-                <Crosshair size={17} color={c.accent} />
-                <Txt variant="muted" style={{ flex: 1, fontSize: 13 }} numberOfLines={2}>
+                <MapPin size={16} color={c.accent} />
+                <Txt style={{ flex: 1, fontSize: 13, color: c.text }} numberOfLines={2}>
                   {locating
                     ? t('location.locating')
                     : pinnedLabel
-                      ? t('location.places.pinnedTo', { address: pinnedLabel })
-                      : t('location.places.pinned')}
+                      ? pinnedLabel
+                      : coords
+                        ? t('location.places.currentLocation')
+                        : t('location.places.needLocation')}
                 </Txt>
-                <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.accent }}>
-                  {t('location.places.useMyLocation')}
-                </Txt>
-              </Pressable>
-            ) : (
-              <Txt variant="muted" style={{ fontSize: 13 }}>
-                {locating ? t('location.locating') : t('location.places.needLocation')}
-              </Txt>
-            )}
+              </View>
+              {pinnedLabel ? (
+                <Pressable onPress={repin} hitSlop={6}>
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.accent }}>
+                    {t('location.places.useMyLocation')}
+                  </Txt>
+                </Pressable>
+              ) : null}
+            </View>
           </ScrollView>
 
           <Btn title={t('common.save')} onPress={save} disabled={!coords || !name.trim()} loading={busy} />
           {place ? <Btn title={t('location.places.delete')} variant="ghost" onPress={remove} /> : null}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }
