@@ -218,7 +218,7 @@ export function RoutineSheet({
               }}
             >
               <Txt variant="h2" style={{ marginLeft: sp.sm }}>
-                {t(section === 'daily' ? 'petcare.today' : 'petcare.routines')} · {pet.name}
+                {t(section === 'daily' ? 'petcare.dailyRoutine' : 'petcare.routines')} · {pet.name}
               </Txt>
               <Pressable
                 onPress={onClose}
