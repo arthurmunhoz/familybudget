@@ -4,7 +4,7 @@
 //     household EXCEPT the sender.
 //   • action:'place-event' (body has place_event_id): push "Emma arrived at
 //     School" ONLY to members who subscribed to that place (place_watchers,
-//     migration 069) and asked about that member — never the whole household.
+//     migration 070) and asked about that member — never the whole household.
 // Both rows are already inserted client-side under RLS; this only fans out the
 // push. Auth: caller must send a valid Supabase JWT and own/belong to the row.
 // KNOWN LIMIT: push copy is English-only (same as the daily digest).
@@ -86,7 +86,7 @@ export default async function handler(req: any, res: any) {
     if (!place) return res.status(404).json({ error: 'Place not found' })
 
     // Who actually asked to hear about this? Per-user subscriptions (migration
-    // 069): opted into THIS place, wants THIS direction, and either watches
+    // 070): opted into THIS place, wants THIS direction, and either watches
     // everyone (empty `watched`) or this member specifically. Never the mover
     // themselves. No subscribers → nobody is notified, which is the point:
     // creating a place must not sign the household up for alerts.

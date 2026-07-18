@@ -288,7 +288,7 @@ export interface Place {
   created_at: string
 }
 
-/** MY subscription to a place's alerts (migration 069). Watching is per-user:
+/** MY subscription to a place's alerts (migration 070). Watching is per-user:
  *  creating or sharing a place subscribes nobody. `watched` empty = everyone in
  *  the household; otherwise only those members' crossings notify me. */
 export interface PlaceWatch {

@@ -119,7 +119,7 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     iOS throttles silent pushes, so background freshness is best-effort (periodic
     bursts, not continuous); continuous smoothness still needs the target app
     foreground (the `useLiveResponder` watch).
-- **Watching a place is PER-USER** (migration 069, `place_watchers`). Places are
+- **Watching a place is PER-USER** (migration 070, `place_watchers`). Places are
   shared household furniture, but creating/sharing one subscribes NOBODY —
   each member opts in per place and picks whose crossings they want
   (`watched` empty = everyone). The push fan-out in `api/send-ping.ts`

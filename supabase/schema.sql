@@ -234,4 +234,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-066-location-live-requests.sql (location_live_requests: watcher→target "live mode" requests; target ramps up to high-frequency GPS while watched, then relaxes)
 --   migration-067-places-and-geofences.sql (places + place_events: saved household places monitored as native geofences; arrive/leave events drive the activity feed + household push)
 --   migration-068-safety-watches.sql (safety_watches: temporary "event mode" circle — watch chosen members and alert when one leaves the radius; breach detection runs on the watcher's device; One Roof Plus)
---   migration-069-place-watchers.sql (place_watchers: per-user opt-in to a place's alerts + whose crossings to hear about; drops the old place-level notify flags that notified the whole household)
+--   migration-070-place-watchers.sql (place_watchers: per-user opt-in to a place's alerts + whose crossings to hear about; drops the old place-level notify flags that notified the whole household)

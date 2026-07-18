@@ -1,4 +1,4 @@
--- 069: Per-user place subscriptions (Whereabouts Phase 2 fix).
+-- 070: Per-user place subscriptions (Whereabouts Phase 2 fix).
 --
 -- Places are shared household furniture, but WATCHING one must be personal:
 -- creating "Home" should not sign the whole family up for alerts about each

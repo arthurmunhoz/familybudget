@@ -75,7 +75,7 @@ export async function fetchPlaceEvents(limit = 40): Promise<PlaceEvent[]> {
   return (data ?? []) as PlaceEvent[]
 }
 
-// ── Per-user watching (migration 069) ───────────────────────────────────────
+// ── Per-user watching (migration 070) ───────────────────────────────────────
 // Creating or sharing a place subscribes NOBODY. Each member opts in per place
 // and picks whose crossings they want to hear about.
 
