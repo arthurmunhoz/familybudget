@@ -131,8 +131,22 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   enforces a ~100 m radius floor; geofences bounce at the boundary, so
   `recordPlaceEvent` drops a repeat of the same crossing within 5 min. A new place
   pins to your CURRENT location (no map-drag picker yet). Push copy is English-only.
-- Not yet: Safety Radius, location history, driving/SOS (Phase 3 — a One Roof
-  **Plus** feature); a map-drag picker for placing/moving a place.
+- **Safety Radius / event mode (Phase 3, One Roof PLUS)** — migration 068
+  (`safety_watches`, one row per owner), `src/lib/safetyRadius.ts` (CRUD +
+  `isOutside` + `circlePolygon` + `alertBreach`) and `SafetyRadiusSheet`.
+  Drop a circle centred on yourself, pick who to watch, get alerted when one
+  crosses out. **Breach detection runs on the WATCHER's device** in
+  `Whereabouts` against the live `member_locations` feed — no server job — and
+  alerts via a LOCAL notification (the watcher detects it, so no push needed).
+  Alerts fire once per crossing (the member must come back inside to re-arm).
+  While a watch runs, watched members are kept in live mode (`requestLive`) so
+  the boundary check has fresh positions. The circle is drawn as a real GeoJSON
+  polygon (`circlePolygon`) because Mapbox circle radii are in PIXELS, not metres.
+  Gating: `usePlus().isPlus` — non-Plus shows a `Sparkles` badge and routes to
+  `/paywall`. Watches are household-readable on purpose (being inside someone's
+  radius isn't a secret) and auto-expire after `WATCH_HOURS` (4h).
+- Not yet: location history (7-day retention, must be clearly surfaced to users)
+  and driving/SOS check-in; a map-drag picker for placing/moving a place.
 
 ## AI / server endpoints
 Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`

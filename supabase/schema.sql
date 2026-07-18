@@ -233,3 +233,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-065-member-locations.sql (member_locations: one row/member with latest fix + sharing/paused_until state, household-scoped RLS + Realtime — backs the Whereabouts family-location app)
 --   migration-066-location-live-requests.sql (location_live_requests: watcher→target "live mode" requests; target ramps up to high-frequency GPS while watched, then relaxes)
 --   migration-067-places-and-geofences.sql (places + place_events: saved household places monitored as native geofences; arrive/leave events drive the activity feed + household push)
+--   migration-068-safety-watches.sql (safety_watches: temporary "event mode" circle — watch chosen members and alert when one leaves the radius; breach detection runs on the watcher's device; One Roof Plus)
