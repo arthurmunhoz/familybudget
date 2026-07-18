@@ -21,6 +21,7 @@ import {
 import { isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
+import { pickOnAccent } from '@/theme/contrast'
 import { MemberAvatar, Section } from './locationUi'
 
 export function SafetyRadiusSheet({
@@ -209,7 +210,16 @@ export function SafetyRadiusSheet({
                             backgroundColor: out ? c.expense : c.income,
                           }}
                         >
-                          <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: '#fff' }}>
+                          {/* Not an accent fill, but the identical failure: white
+                              on the DARK-mode income green measures 2.43:1, so
+                              "Inside" was washing out in Dusk. */}
+                          <Txt
+                            style={{
+                              fontFamily: fonts.semibold,
+                              fontSize: 11,
+                              color: pickOnAccent(out ? c.expense : c.income),
+                            }}
+                          >
                             {out ? t('location.safety.outside') : t('location.safety.inside')}
                           </Txt>
                         </View>
