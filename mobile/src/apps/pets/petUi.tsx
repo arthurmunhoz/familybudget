@@ -153,7 +153,7 @@ export function DateField({
             <Pressable
               onPress={() => {}}
               style={{
-                backgroundColor: c.card,
+                backgroundColor: c.sheet,
                 borderTopLeftRadius: radius.lg,
                 borderTopRightRadius: radius.lg,
                 paddingHorizontal: sp.lg,

@@ -838,7 +838,7 @@ function ColorDropdown({
               flexWrap: 'wrap',
               gap: 10,
               padding: 12,
-              backgroundColor: c.card,
+              backgroundColor: c.sheet,
               borderRadius: radius.md,
               borderWidth: 1,
               borderColor: c.border,

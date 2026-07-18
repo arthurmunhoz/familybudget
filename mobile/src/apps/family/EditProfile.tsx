@@ -503,7 +503,7 @@ export function EditProfile({
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { backgroundColor: c.card }]}>
+        <View style={[styles.sheet, { backgroundColor: c.sheet }]}>
           {/* header */}
           <View style={styles.sheetHead}>
             <Txt variant="h2">{t('family.editTitle')}</Txt>
@@ -599,7 +599,7 @@ export function EditProfile({
               <Pressable
                 onPress={() => setShowDate(true)}
                 style={{
-                  backgroundColor: c.card,
+                  backgroundColor: c.sheet,
                   borderRadius: radius.md,
                   borderWidth: StyleSheet.hairlineWidth,
                   borderColor: c.border,

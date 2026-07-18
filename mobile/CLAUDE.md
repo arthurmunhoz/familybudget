@@ -43,6 +43,17 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   bg/card/cardActive/surface/surface2/text/textMuted/textFaint/accent/accentSoft/
   income/expense/border (Warm Hearth, light+dark, follows system). Also `sp`,
   `radius`, `fonts` (Fraunces display + Hanken Grotesk UI, loaded in `_layout`).
+  - **Glass skin (`theme/glass.tsx`, `GLASS` flag)** re-skins the app: a colour
+    wash painted at the root, translucent cards, rounded Nunito titles. Set
+    `GLASS = false` to get Warm Hearth back exactly.
+  - **`card` vs `sheet` — the rule that keeps biting:** `card` is TRANSLUCENT so
+    the wash reads through it on screens. Anything floating over something other
+    than the wash — a `<Modal>` sheet (dim backdrop) or a panel on the
+    Whereabouts map — MUST use `c.sheet` (opaque) or its content visibly mixes
+    with the background. Rule of thumb: inside a `<Modal>`, use `c.sheet`.
+    `sheet === card` outside the glass skin, so it's a no-op for Warm Hearth.
+  - Under GLASS, `c.bg` is TRANSPARENT (that's how the wash shows). Never use it
+    as a foreground/inverse colour — the toast's label did and vanished.
 - **Auth** `@/lib/auth`: `useAuth()` → `{ session, profile, profiles, loading,
   signInWithApple, signInWithGoogle, devSignIn, signOut }`. `profiles` = household
   members.

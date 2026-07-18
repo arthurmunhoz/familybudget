@@ -50,7 +50,7 @@ export function PresetEditor({
       >
         <View
           style={{
-            backgroundColor: c.card,
+            backgroundColor: c.sheet,
             borderTopLeftRadius: radius.lg,
             borderTopRightRadius: radius.lg,
             padding: sp.lg,

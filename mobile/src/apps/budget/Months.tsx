@@ -344,7 +344,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
             <Pressable
               onPress={(e) => e.stopPropagation()}
               style={{
-                backgroundColor: c.card,
+                backgroundColor: c.sheet,
                 borderTopLeftRadius: radius.lg,
                 borderTopRightRadius: radius.lg,
                 padding: sp.md,
@@ -404,7 +404,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
       {renameOpen && (
         <Modal visible animationType="slide" transparent onRequestClose={() => setRenameOpen(false)}>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
-            <View style={{ backgroundColor: c.card, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
+            <View style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
               <Txt variant="h2">{t('months.renameTitle')}</Txt>
               <Field value={name} onChangeText={setName} autoFocus />
               <View style={{ flexDirection: 'row', gap: sp.md }}>
@@ -420,7 +420,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
       {createOpen && (
         <Modal visible animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
-            <View style={{ backgroundColor: c.card, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
+            <View style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Txt variant="h2">{t(`months.new${pk}Title` as TKey)}</Txt>
                 <Pressable onPress={() => setCreateOpen(false)} hitSlop={10}>

@@ -63,7 +63,7 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { backgroundColor: c.card }]} onPress={() => {}}>
+        <Pressable style={[styles.sheet, { backgroundColor: c.sheet }]} onPress={() => {}}>
           <View style={[styles.grab, { backgroundColor: c.border }]} />
 
           <Txt variant="title">{t('budget.whoCanViewTitle')}</Txt>

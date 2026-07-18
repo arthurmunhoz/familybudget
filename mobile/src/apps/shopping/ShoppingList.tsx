@@ -627,7 +627,7 @@ export default function ShoppingList() {
         >
         <Pressable style={styles.backdrop} onPress={() => setPicking(false)}>
           <Pressable
-            style={[styles.sheet, { backgroundColor: c.card, paddingBottom: insets.bottom + sp.md }]}
+            style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: insets.bottom + sp.md }]}
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.sheetHead}>

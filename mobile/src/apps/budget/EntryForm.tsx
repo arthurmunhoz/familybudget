@@ -289,7 +289,7 @@ export default function EntryForm({
             onPress={() => {}}
             style={{
               maxHeight: '92%',
-              backgroundColor: c.card,
+              backgroundColor: c.sheet,
               borderTopLeftRadius: radius.lg,
               borderTopRightRadius: radius.lg,
             }}
@@ -461,7 +461,7 @@ export default function EntryForm({
                       borderRadius: radius.pill,
                       borderWidth: 1,
                       borderColor: c.border,
-                      backgroundColor: c.card,
+                      backgroundColor: c.sheet,
                       paddingHorizontal: 14,
                       paddingVertical: 8,
                       opacity: pressed ? 0.7 : 1,

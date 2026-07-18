@@ -98,7 +98,7 @@ export default function UploadSheet({
         <View
           style={{
             maxHeight: '90%',
-            backgroundColor: c.card,
+            backgroundColor: c.sheet,
             borderTopLeftRadius: radius.lg,
             borderTopRightRadius: radius.lg,
           }}
