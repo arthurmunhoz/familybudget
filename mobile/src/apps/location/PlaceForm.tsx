@@ -1,16 +1,19 @@
-// Add or edit a saved place. A new place pins to your CURRENT location — the
-// simplest reliable way to say "this is School" without a map-drag UI; editing
-// keeps the saved spot unless you re-pin. Radius is a small preset set: iOS
-// enforces a ~100 m floor on geofences, so finer-grained control would be a lie.
+// Add or edit a saved place. Two ways to set the spot: SEARCH it by name
+// ("LA Fitness", "Tampa Elementary" — see lib/placeSearch.ts), or fall back to
+// your current location. A new place defaults to where you are so the common
+// "save my home" case is one tap, but you never have to travel to a place to
+// save it. Radius is a small preset set: iOS enforces a ~100 m floor on
+// geofences, so finer-grained control would be a lie.
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
-import { Crosshair } from 'lucide-react-native'
+import { Crosshair, Search } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { nearestPreset, radiusPresets } from '@/lib/location'
+import { searchPlaces, type PlaceSuggestion } from '@/lib/placeSearch'
 import { createPlace, deletePlace, removePlaceWatch, updatePlace, upsertPlaceWatch } from '@/lib/places'
 import type { Place, PlaceWatch, Profile } from '@/lib/types'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
@@ -78,6 +81,42 @@ export function PlaceForm({
   const [locating, setLocating] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  // Search-by-name, so you can save "LA Fitness" without driving to it.
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<PlaceSuggestion[]>([])
+  const [searching, setSearching] = useState(false)
+  /** Address of a searched place we pinned to (vs "your current location"). */
+  const [pinnedLabel, setPinnedLabel] = useState<string | null>(null)
+
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 3) {
+      setResults([])
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    // Debounced: one request after typing settles, not one per keystroke.
+    const id = setTimeout(() => {
+      void searchPlaces(q, coords)
+        .then(setResults)
+        .finally(() => setSearching(false))
+    }, 350)
+    return () => clearTimeout(id)
+    // `coords` only biases results toward you — re-searching when the pin moves
+    // would fight the user mid-type.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+
+  const choose = (r: PlaceSuggestion) => {
+    setCoords({ lat: r.lat, lng: r.lng })
+    setPinnedLabel(r.address || r.name)
+    // Only prefill the name if they haven't titled it themselves.
+    if (!name.trim()) setName(r.name)
+    setQuery('')
+    setResults([])
+  }
+
   // A brand new place pins to where you are right now.
   useEffect(() => {
     if (place) return
@@ -109,6 +148,7 @@ export function PlaceForm({
     try {
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
       setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      setPinnedLabel(null) // back to "your current location"
     } catch {
       // keep the previously saved spot
     } finally {
@@ -286,15 +326,70 @@ export function PlaceForm({
               ) : null}
             </View>
 
-            {/* Where it is */}
+            {/* Find it by name — you shouldn't have to stand in a place to save it */}
+            <View style={{ gap: 6 }}>
+              <Field
+                label={t('location.places.search')}
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t('location.places.searchPlaceholder')}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+              {searching ? (
+                <Txt variant="faint" style={{ fontSize: 12 }}>
+                  {t('location.places.searching')}
+                </Txt>
+              ) : null}
+              {results.map((r) => (
+                <Pressable
+                  key={r.id}
+                  onPress={() => choose(r)}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: sp.sm,
+                      backgroundColor: c.surface,
+                      borderRadius: R.md,
+                      padding: sp.md,
+                    },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Search size={15} color={c.textMuted} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
+                      {r.name}
+                    </Txt>
+                    {r.address ? (
+                      <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
+                        {r.address}
+                      </Txt>
+                    ) : null}
+                  </View>
+                </Pressable>
+              ))}
+              {query.trim().length >= 3 && !searching && !results.length ? (
+                <Txt variant="faint" style={{ fontSize: 12 }}>
+                  {t('location.places.noResults')}
+                </Txt>
+              ) : null}
+            </View>
+
+            {/* Where it ended up — tap to snap it back to where you are now */}
             {coords ? (
               <Pressable
                 onPress={repin}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.surface, borderRadius: R.md, padding: sp.md }}
               >
                 <Crosshair size={17} color={c.accent} />
-                <Txt variant="muted" style={{ flex: 1, fontSize: 13 }}>
-                  {locating ? t('location.locating') : t('location.places.pinned')}
+                <Txt variant="muted" style={{ flex: 1, fontSize: 13 }} numberOfLines={2}>
+                  {locating
+                    ? t('location.locating')
+                    : pinnedLabel
+                      ? t('location.places.pinnedTo', { address: pinnedLabel })
+                      : t('location.places.pinned')}
                 </Txt>
                 <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.accent }}>
                   {t('location.places.useMyLocation')}

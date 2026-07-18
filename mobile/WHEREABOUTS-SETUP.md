@@ -86,8 +86,13 @@ Whereabouts header. Each member's device monitors them as native geofences, and
 crossing one shows in the **Activity** feed and pushes "Emma arrived at School"
 to the rest of the household.
 
-- A new place pins to **your current location** (no map-drag picker yet), with a
-  radius preset.
+- **Search a place by name** — "LA Fitness", "Tampa Elementary" — so you don't
+  have to be standing there. Uses the **Mapbox** Geocoding API with the token the
+  map already needs (no Google Cloud project / second key). Picking a result sets
+  the coordinates and prefills the name; "Use my current location" is still there
+  for saving Home in one tap. All of it sits behind `searchPlaces()` in
+  `src/lib/placeSearch.ts`, so switching to Google Places later is a one-file job
+  if Mapbox's POI coverage isn't good enough for you.
 - **Watching is personal.** Creating or sharing a place notifies *nobody*. Each
   member opts in per place ("Notify me about this place") and chooses **whose**
   comings and goings they want to hear about — so you can watch the kids at

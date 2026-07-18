@@ -143,6 +143,13 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   `notify_arrivals`/`notify_departures` columns were DROPPED — they made one
   member's preference everyone's notification. Geofences are registered for
   EVERY place (the crossing is recorded regardless; the fan-out decides who hears).
+- **Place search** — `lib/placeSearch.ts` `searchPlaces(query, near)` hits the
+  **Mapbox Geocoding API** with the existing `EXPO_PUBLIC_MAPBOX_TOKEN` (no
+  second provider/key), debounced 350 ms in `PlaceForm`, biased by the user's
+  position. Deliberately the ONLY provider-specific code, so swapping to Google
+  Places is a one-file rewrite. Caveat: it's Mapbox's *temporary* geocoding
+  endpoint and we persist the chosen coordinates — fine in practice, but
+  permanent-geocoding is a paid Mapbox entitlement if that ever needs to be airtight.
 - **"At Home" status** — `placeAt(places, point)` in `lib/places.ts` resolves the
   place a member is inside (smallest radius wins on overlap); the roster card and
   the member sheet prefer it over a distance or a geocoded street address.
