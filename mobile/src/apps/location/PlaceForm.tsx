@@ -142,7 +142,7 @@ export function PlaceForm({
             {place ? t('location.places.edit') : t('location.places.new')}
           </Txt>
 
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }} contentContainerStyle={{ gap: sp.md }}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ gap: sp.md }}>
             {/* Icon + name */}
             <View style={{ flexDirection: 'row', gap: sp.sm, alignItems: 'flex-end' }}>
               <View style={{ width: 74 }}>
