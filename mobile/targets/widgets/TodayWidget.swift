@@ -385,28 +385,38 @@ struct TodayWidgetView: View {
           Spacer(minLength: 4)
           if let temp = info.temp {
             // In LIGHT mode the glyph + temperature washed into the widget's
-            // pale background, so they get their own white chip with a soft
-            // clay edge. Dark mode already separates cleanly — left borderless.
+            // pale background, so they sit on a dark chip. Dark mode already
+            // separates cleanly — no chip there.
             VStack(alignment: .trailing, spacing: 3) {
               HStack(spacing: 4) {
+                // Always the natural multicolour — clouds are WHITE by design,
+                // which is exactly why the chip below is dark rather than white.
                 Image(systemName: weatherSymbol(info.code ?? -1))
                   .font(.system(size: 14))
                   .symbolRenderingMode(.multicolor)
                 Text("\(Int(temp))\(info.unit ?? "°")")
                   .font(.system(size: isSmall ? 14 : 16, weight: .bold))
-                  .foregroundStyle(lightMode ? theme.text : Color.primary)
+                  .foregroundStyle(lightMode ? darkTheme.text : Color.primary)
+                  // Never wrap the unit onto a second line — shrink instead, so
+                  // three-digit temperatures ("100°F") still fit on one row.
+                  .lineLimit(1)
+                  .minimumScaleFactor(0.7)
+                  .fixedSize(horizontal: false, vertical: true)
               }
               .padding(.horizontal, lightMode ? 8 : 0)
               .padding(.vertical, lightMode ? 5 : 0)
-              .background(lightMode ? theme.card : Color.clear)
+              // A white chip hid the white cloud glyphs. Light mode gets the
+              // app's own warm-espresso surface instead, so every symbol reads
+              // exactly as it already does in dark mode.
+              .background(lightMode ? darkTheme.card : Color.clear)
               .clipShape(RoundedRectangle(cornerRadius: 10))
-              .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                  .stroke(lightMode ? theme.accent.opacity(0.3) : Color.clear, lineWidth: 1))
               if !isSmall, let city = info.city {
                 Text(city).font(.system(size: 10)).foregroundStyle(theme.textMuted).lineLimit(1)
               }
             }
+            // The weather block keeps its width; the date on the left shrinks
+            // first (it already carries minimumScaleFactor).
+            .layoutPriority(1)
           }
         }
 
