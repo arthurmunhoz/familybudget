@@ -2,6 +2,7 @@
 // dark = "Dusk" (warm espresso). useTheme() respects the saved appearance
 // choice (Light/Dark, default Light) from theme-pref.
 import { useThemePref } from './theme-pref';
+import { GLASS, glassLight, glassDark } from './glass';
 
 export interface ThemeTokens {
   bg: string;
@@ -59,6 +60,9 @@ export interface Theme {
 export function useTheme(): Theme {
   const { mode } = useThemePref();
   const isDark = mode === 'dark';
+  // GLASS skin (experimental, reversible) swaps in translucent tokens; see
+  // theme/glass.tsx. Flip GLASS to false there to restore Warm Hearth exactly.
+  if (GLASS) return { dark: isDark, c: isDark ? glassDark : glassLight };
   return { dark: isDark, c: isDark ? dark : light };
 }
 
@@ -68,10 +72,20 @@ export const radius = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
 
 // Brand type — Fraunces (display serif) + Hanken Grotesk (UI sans). Loaded in
 // _layout via @expo-google-fonts. Falls back to system if a name is missing.
-export const fonts = {
-  display: 'Fraunces_700Bold',
-  displaySemi: 'Fraunces_600SemiBold',
-  body: 'HankenGrotesk_400Regular',
-  medium: 'HankenGrotesk_500Medium',
-  semibold: 'HankenGrotesk_600SemiBold',
-} as const;
+// GLASS skin swaps the serif display for rounded Nunito (titles/greetings/hero
+// numbers); body stays Hanken Grotesk. Both font sets are loaded in _layout.
+export const fonts = GLASS
+  ? ({
+      display: 'Nunito_800ExtraBold',
+      displaySemi: 'Nunito_700Bold',
+      body: 'HankenGrotesk_400Regular',
+      medium: 'HankenGrotesk_500Medium',
+      semibold: 'HankenGrotesk_600SemiBold',
+    } as const)
+  : ({
+      display: 'Fraunces_700Bold',
+      displaySemi: 'Fraunces_600SemiBold',
+      body: 'HankenGrotesk_400Regular',
+      medium: 'HankenGrotesk_500Medium',
+      semibold: 'HankenGrotesk_600SemiBold',
+    } as const);
