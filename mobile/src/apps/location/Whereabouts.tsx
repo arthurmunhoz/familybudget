@@ -1,13 +1,17 @@
 // Whereabouts — the live family map. Owns the member-location data + a single
 // Realtime subscription, renders a Mapbox map with a pin per sharing member and
 // a bottom sheet of member cards scrolled HORIZONTALLY (so the sheet's height is
-// constant regardless of household size). Tapping someone else's pin or card
-// opens the member detail sheet (ETA-first); tapping YOUR OWN card opens your
-// sharing controls — that's why there's no sharing button in the header.
+// constant regardless of household size).
+//
+// Tapping a card or a pin EXPANDS that member's card in place (ETA-first detail,
+// no sheet over the map) and frames them on the map, so what you're reading
+// about stays visible behind the roster. Tapping again collapses it. Your own
+// card expands the same way and holds the way into your sharing controls —
+// that's why there's no sharing button in the header.
 // Native-only: the map (@rnmapbox/maps) and background location need a dev build
 // + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Pressable, ScrollView, View } from 'react-native'
+import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
 import * as Location from 'expo-location'
@@ -39,8 +43,18 @@ import { requestLive } from '@/lib/liveLocation'
 import { alertBreach, circlePolygon, fetchMyWatch, isOutside } from '@/lib/safetyRadius'
 import type { MemberLocation, Place, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { BatteryChip, buildMemberColors, MemberAvatar, timeAgo } from './locationUi'
-import { MemberSheet } from './MemberSheet'
+import {
+  BatteryChip,
+  buildMemberColors,
+  CARD_H,
+  CARD_W,
+  MemberAvatar,
+  SHEET_CHROME,
+  timeAgo,
+  WatchingChip,
+} from './locationUi'
+import { MemberDetailCard } from './MemberDetailCard'
+import { NudgePicker } from './NudgePicker'
 import { PlacesSheet } from './PlacesSheet'
 import { SafetyRadiusSheet } from './SafetyRadiusSheet'
 import { SharingControls } from './SharingControls'
@@ -59,6 +73,7 @@ if (MAPBOX_TOKEN) {
 
 const DRIVING_SPEED_MS = 3.5 // ~12.6 km/h — above walking pace → "Driving"
 const INITIAL_ZOOM = 13 // frame the user + their neighborhood on first open (not too tight)
+const FOCUS_ZOOM = 15 // closer, for when you've picked one person to look at
 
 /** Member profiles' photo + phone, keyed by email (for pins + the Call button). */
 async function fetchMemberMeta(): Promise<{
@@ -121,45 +136,9 @@ function HeaderButton({
   )
 }
 
-/** "Watching" badge — softly pulses so an active Safety Radius reads as ongoing
- *  activity rather than a static label. */
-function WatchingChip() {
-  const { c } = useTheme()
-  const { t } = useI18n()
-  const pulse = useRef(new Animated.Value(1)).current
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.35, duration: 850, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 850, useNativeDriver: true }),
-      ]),
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [pulse])
-  return (
-    <Animated.View
-      style={{
-        opacity: pulse,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        backgroundColor: c.accentSoft,
-        borderRadius: radius.pill,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-      }}
-    >
-      <ShieldCheck size={10} color={c.accent} />
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
-        {t('location.card.watching')}
-      </Txt>
-    </Animated.View>
-  )
-}
-
 /** One member as a fixed-size card in the horizontal roster. Fixed height keeps
- *  the sheet exactly as tall for a household of 2 as for one of 10. */
+ *  the sheet exactly as tall for a household of 2 as for one of 10 — and as tall
+ *  expanded as collapsed (see CARD_H). */
 function MemberCard({
   name,
   avatarPath,
@@ -189,8 +168,8 @@ function MemberCard({
       // No selected-state border: on first load nothing should look "picked".
       style={({ pressed }) => [
         {
-          width: 138,
-          height: 168,
+          width: CARD_W,
+          height: CARD_H,
           backgroundColor: c.surface,
           borderRadius: radius.lg,
           paddingVertical: sp.md,
@@ -233,12 +212,16 @@ export default function Whereabouts() {
   const myEmail = profile?.email ?? null
 
   const cameraRef = useRef<Camera>(null)
+  const rosterRef = useRef<ScrollView>(null)
   const centeredOnce = useRef(false)
   const [meta, setMeta] = useState<{ avatars: Record<string, string | null>; phones: Record<string, string> }>({
     avatars: {},
     phones: {},
   })
+  /** Email of the member whose roster card is expanded (null = all collapsed). */
   const [selected, setSelected] = useState<string | null>(null)
+  /** Member we're picking a nudge for — the one modal left in this flow. */
+  const [nudgeFor, setNudgeFor] = useState<Profile | null>(null)
   const [sharingOpen, setSharingOpen] = useState(false)
   const [placesOpen, setPlacesOpen] = useState(false)
   const [safetyOpen, setSafetyOpen] = useState(false)
@@ -445,6 +428,39 @@ export default function Whereabouts() {
     return [...profiles].sort((a, b) => order(a.email) - order(b.email) || a.email.localeCompare(b.email))
   }, [profiles, locByEmail, myEmail])
 
+  /** Tap a card or a pin: expand that member in place (tapping the open one
+   *  closes it), frame them on the map, and bring their card into view. */
+  const select = useCallback(
+    (email: string) => {
+      const collapsing = selected === email
+      setSelected(collapsing ? null : email)
+      if (collapsing) return
+
+      const loc = locByEmail.get(email)
+      if (isSharingLive(loc)) {
+        cameraRef.current?.setCamera({
+          centerCoordinate: [loc.lng, loc.lat],
+          zoomLevel: FOCUS_ZOOM,
+          animationDuration: 600,
+          // Push the centre up by the sheet's height, or we'd politely frame
+          // them behind the very card you just opened.
+          padding: {
+            paddingTop: 0,
+            paddingLeft: 0,
+            paddingRight: 0,
+            paddingBottom: SHEET_CHROME + CARD_H,
+          },
+        })
+      }
+
+      // Scroll their card to the left edge. Cards before it are all collapsed
+      // (only one expands at a time), so the offset is exact.
+      const i = rows.findIndex((p) => p.email === email)
+      if (i >= 0) rosterRef.current?.scrollTo({ x: i * (CARD_W + sp.sm), animated: true })
+    },
+    [selected, locByEmail, rows],
+  )
+
   const statusLine = useCallback(
     (email: string): string => {
       const loc = locByEmail.get(email)
@@ -468,8 +484,6 @@ export default function Whereabouts() {
     },
     [locByEmail, myEmail, myLive, places, t],
   )
-
-  const selectedProfile = selected ? profiles.find((p) => p.email === selected) ?? null : null
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
@@ -568,7 +582,7 @@ export default function Whereabouts() {
             ))}
             {livePins.map(({ p, loc }) => (
               <MarkerView key={p.email} coordinate={[loc.lng, loc.lat]} anchor={{ x: 0.5, y: 0.5 }}>
-                <Pressable onPress={() => setSelected(p.email)} accessibilityRole="button">
+                <Pressable onPress={() => select(p.email)} accessibilityRole="button">
                   <View
                     style={
                       p.email === myEmail
@@ -662,6 +676,7 @@ export default function Whereabouts() {
             <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('location.everyone')}</Txt>
           </View>
           <ScrollView
+            ref={rosterRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: sp.sm, paddingHorizontal: sp.lg }}
@@ -670,6 +685,27 @@ export default function Whereabouts() {
               const loc = locByEmail.get(p.email)
               const live = isSharingLive(loc)
               const isMe = p.email === myEmail
+              // The expanded card replaces the compact one in place — same
+              // height, just wider, so the sheet never changes size.
+              if (p.email === selected) {
+                return (
+                  <MemberDetailCard
+                    key={p.email}
+                    profile={p}
+                    location={loc ?? null}
+                    isMe={isMe}
+                    color={colors[p.email] ?? c.accent}
+                    avatarPath={meta.avatars[p.email]}
+                    phone={meta.phones[p.email]}
+                    myLive={myLive}
+                    places={places}
+                    watched={!!watch?.watched.includes(p.email)}
+                    onCollapse={() => setSelected(null)}
+                    onNudge={() => setNudgeFor(p)}
+                    onManageSharing={() => setSharingOpen(true)}
+                  />
+                )
+              }
               return (
                 <MemberCard
                   key={p.email}
@@ -680,7 +716,7 @@ export default function Whereabouts() {
                   hint={isMe ? t('location.card.manage') : undefined}
                   battery={live && loc.battery != null ? loc.battery : null}
                   watched={!!watch?.watched.includes(p.email)}
-                  onPress={() => (isMe ? setSharingOpen(true) : setSelected(p.email))}
+                  onPress={() => select(p.email)}
                 />
               )
             })}
@@ -688,18 +724,11 @@ export default function Whereabouts() {
         </View>
       </View>
 
-      {selectedProfile ? (
-        <MemberSheet
-          profile={selectedProfile}
-          location={locByEmail.get(selectedProfile.email) ?? null}
-          isMe={selectedProfile.email === myEmail}
-          color={colors[selectedProfile.email] ?? c.accent}
-          avatarPath={meta.avatars[selectedProfile.email]}
-          phone={meta.phones[selectedProfile.email]}
-          myLive={myLive}
-          places={places}
-          onClose={() => setSelected(null)}
-          onNudged={(text) => setToast({ emoji: '👋', text })}
+      {nudgeFor ? (
+        <NudgePicker
+          profile={nudgeFor}
+          onClose={() => setNudgeFor(null)}
+          onSent={(text) => setToast({ emoji: '👋', text })}
         />
       ) : null}
 

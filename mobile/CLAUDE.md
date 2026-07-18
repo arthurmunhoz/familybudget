@@ -112,9 +112,28 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   pattern as `backgroundNotifications.ts`); `registerLocationTask()` runs in
   `_layout`. `startBackgroundUpdates` takes localized foreground-service labels.
 - `src/apps/location/` — `Whereabouts` (map + bottom sheet, owns the data + one
-  Realtime channel), `MemberSheet` (detail — **leads with drive-time ETA**, then
-  distance/battery/address, navigate, nudge/call), `SharingControls` (toggle +
-  pause), `locationUi` (member colors, ringed avatar, battery chip, `timeAgo`).
+  Realtime channel), `MemberDetailCard` (the EXPANDED roster card — **leads with
+  drive-time ETA**, then distance/battery/where-they-are, navigate, nudge/call),
+  `NudgePicker` (pick a nudge to send from the map), `SharingControls` (toggle +
+  pause), `locationUi` (card geometry, member colors, ringed avatar, battery
+  chip, `WatchingChip`, `timeAgo`).
+- **Tapping a card or a pin expands that member IN PLACE and frames them on the
+  map** (`select()` in `Whereabouts`); tapping the open one collapses it. There
+  is deliberately no detail modal — a sheet covered the very map you'd just
+  focused. Consequences worth knowing before you touch this:
+  - **The expanded card is the same HEIGHT as a collapsed one, only wider.** The
+    sheet must never grow, because Mapbox's logo and the OSM attribution are
+    pinned just above it (`logoPosition`/`attributionPosition`) and covering them
+    breaches ODbL. `MemberDetailCard` documents its 168pt height budget; text
+    rows carry explicit `lineHeight` so that budget survives font metrics.
+  - The camera focus passes `padding.paddingBottom = SHEET_CHROME + CARD_H`, or
+    it would centre the member behind the card you just opened.
+  - Only ONE detail card is mounted at a time, which is why the ETA /
+    reverse-geocode / `useWatchLive` hooks live inside it — a household of ten
+    must not fire ten Directions requests. Live mode now starts on EXPAND and
+    relaxes on collapse (it used to be tied to opening the sheet).
+  - Your own card expands too and holds the way into `SharingControls`, which
+    stays a modal: it's switches and pause presets, not detail.
 - Native config lives in `app.config.js` (layered on `app.json`): Mapbox plugin
   (`RNMAPBOX_DOWNLOAD_TOKEN` build secret), expo-location background, iOS
   `UIBackgroundModes: ["location"]` + Always strings, `LSApplicationQueriesSchemes`
@@ -203,8 +222,9 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     `<Modal>` nested in its children (what `NudgeSettings` → `PresetEditor` does)
     or as an absolutely-positioned overlay (what `MemberSheet`'s nudge picker does).
   - The roster is a HORIZONTAL card scroller so the sheet's height is constant
-    for any household size; **your own card is the sharing-controls entry point**
-    (hence no sharing button in the header).
+    for any household size AND in either card state (see the expand note above);
+    **your own card is the sharing-controls entry point** (hence no sharing
+    button in the header).
   - Sheet/modal containers use **`c.sheet`, NEVER `c.card`** — the glass skin
     makes `card` translucent, so the map bleeds through the panel's own text.
     Same for labels drawn on top of the map (the place pills).

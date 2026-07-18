@@ -1,14 +1,32 @@
 // Shared bits for the Whereabouts screens: a stable per-member color, a ringed
 // avatar (photo or initials) used both as a map pin and in lists, a small
-// battery chip, and a localized "time ago" helper.
-import { useEffect, useState } from 'react'
-import { View } from 'react-native'
+// battery chip, the pulsing "Watching" badge, and a localized "time ago" helper.
+import { useEffect, useRef, useState } from 'react'
+import { Animated, View } from 'react-native'
 import { Image } from 'expo-image'
+import { ShieldCheck } from 'lucide-react-native'
 
 import { getSignedUrl } from '@/lib/signedUrls'
-import { fonts, useTheme } from '@/theme/theme'
+import { useI18n } from '@/hooks/useI18n'
+import { fonts, radius, useTheme } from '@/theme/theme'
 import { Txt } from '@/components/ui'
 import type { TKey } from '@/lib/i18n'
+
+/** Roster card geometry, shared by the collapsed card, the expanded detail card
+ *  and the camera padding.
+ *
+ *  THE HEIGHT IS THE SAME IN BOTH STATES ON PURPOSE — expanding grows the card
+ *  sideways only. The bottom sheet therefore never changes height, which matters
+ *  for more than tidiness: Mapbox's logo and the OpenStreetMap attribution are
+ *  pinned just above the sheet, and covering them breaches ODbL. A sheet that
+ *  grew on tap would either hide them or need its offset re-pushed to native on
+ *  every tap. Keep these two heights equal. */
+export const CARD_W = 138
+export const CARD_H = 168
+export const CARD_W_EXPANDED = 300
+/** Sheet chrome above/below the cards (title row + paddings + border), used to
+ *  work out how much map the sheet hides when framing someone. */
+export const SHEET_CHROME = 65
 
 // Distinct, warm-leaning member colors that read on both Paper and Dusk.
 export const MEMBER_PALETTE = [
@@ -127,6 +145,43 @@ export function BatteryChip({ level }: { level: number }) {
       </View>
       <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.textMuted }}>{level}%</Txt>
     </View>
+  )
+}
+
+/** "Watching" badge — softly pulses so an active Safety Radius reads as ongoing
+ *  activity rather than a static label. */
+export function WatchingChip() {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const pulse = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.35, duration: 850, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 850, useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+  return (
+    <Animated.View
+      style={{
+        opacity: pulse,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: c.accentSoft,
+        borderRadius: radius.pill,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+      }}
+    >
+      <ShieldCheck size={10} color={c.accent} />
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
+        {t('location.card.watching')}
+      </Txt>
+    </Animated.View>
   )
 }
 
