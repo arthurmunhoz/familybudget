@@ -222,24 +222,6 @@ function MemberCard({
         pressed && { opacity: 0.7 },
       ]}
     >
-      {/* Sharing settings, tucked in the corner: a small target that doesn't
-          compete with the card, and doesn't repeat the word "sharing" next to
-          the status line below. Nested Pressable, so it takes its own tap. */}
-      {onSettings ? (
-        <Pressable
-          onPress={onSettings}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={t('location.card.manage')}
-          style={({ pressed }) => [
-            { position: 'absolute', top: 6, right: 6, padding: 4 },
-            pressed && { opacity: 0.5 },
-          ]}
-        >
-          <Settings2 size={15} color={c.textMuted} />
-        </Pressable>
-      ) : null}
-
       <MemberAvatar name={name} avatarPath={avatarPath} color={color} size={44} />
       <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }} numberOfLines={1}>
         {name}
@@ -282,7 +264,35 @@ function MemberCard({
       )}
       <View style={{ marginTop: 'auto', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
         {watched ? <WatchingChip /> : null}
-        {!onSettings && battery != null ? <BatteryChip level={battery} /> : null}
+        {onSettings ? (
+          // Nested Pressable, so it takes its own tap without also firing the
+          // card underneath (which frames you on the map).
+          <Pressable
+            onPress={onSettings}
+            accessibilityRole="button"
+            accessibilityLabel={t('location.card.manage')}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                alignSelf: 'stretch',
+                backgroundColor: c.accentSoft,
+                borderRadius: radius.md,
+                paddingVertical: 7,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Settings2 size={13} color={c.accent} />
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.accent }} numberOfLines={1}>
+              {t('location.card.sharing')}
+            </Txt>
+          </Pressable>
+        ) : battery != null ? (
+          <BatteryChip level={battery} />
+        ) : null}
       </View>
     </Pressable>
   )

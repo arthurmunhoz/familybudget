@@ -219,8 +219,12 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     Deliberately absent: where you are (you know) and your battery (the phone
     shows one already). Tapping it frames you on the map and stops there, so
     `MemberDetailCard` has no `isMe` branch. The state line sits in the same
-    slot as other cards' status line rather than pinned to the bottom — bottom
-    was tried and left ~60pt of hole through the middle of the card.
+    slot as other cards' status line, with the button filling the bottom row —
+    that's where the other cards put their battery/watching chips, so the card
+    keeps the roster's rhythm.
+  - The expanded card's ✕ is `alignSelf: 'flex-start'`. The header row's height
+    comes from the 40pt avatar, so centring it put a 17pt glyph ~23pt down while
+    every other element starts at the 12pt padding — it read as sagging.
 - **Map styles** (`mapMode.ts` + `MapModePicker`): Map / Satellite / Terrain,
   from the layers button under the recenter control, remembered in AsyncStorage.
   - The picker is a row of option cards mirroring **Settings' Appearance

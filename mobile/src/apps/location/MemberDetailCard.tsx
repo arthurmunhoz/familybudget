@@ -283,6 +283,12 @@ export function MemberDetailCard({
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={t('common.close')}
+          // Top-aligned, not centred on the row. The row's height comes from the
+          // 40pt avatar, so centring put this 17pt glyph ~23pt below the card's
+          // top while everything else starts at the 12pt padding — it read as
+          // sagging. Flush to the top makes the inset 12 from the top and 12
+          // from the right: an actual corner.
+          style={{ alignSelf: 'flex-start' }}
         >
           <X size={17} color={c.textMuted} />
         </Pressable>
