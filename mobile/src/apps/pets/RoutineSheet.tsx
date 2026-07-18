@@ -20,19 +20,23 @@ import { templateTasks } from '@/lib/petCare'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetTaskIcon } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
-import { CARE_ICONS, CARE_ICON_IDS, Pill_ } from './petUi'
+import { CARE_ICONS, CARE_ICON_IDS } from './petUi'
 
 const ROW_H = 52
 
 export function RoutineSheet({
   pet,
   tasks,
+  section,
   onClose,
   onChanged,
 }: {
   pet: Pet
-  /** This pet's tasks (both kinds). */
+  /** This pet's tasks (both kinds — the template check needs the full picture). */
   tasks: PetCareTask[]
+  /** Which section's pencil opened this: only that group is shown, and a new
+   *  task belongs to it (so there's no Repeats selector to explain). */
+  section: 'daily' | 'interval'
   onClose: () => void
   /** Reload + widget notify — called after every successful write. */
   onChanged: () => void
@@ -45,7 +49,7 @@ export function RoutineSheet({
   const [editing, setEditing] = useState<PetCareTask | 'new' | null>(null)
   const [title, setTitle] = useState('')
   const [icon, setIcon] = useState<PetTaskIcon>('paw')
-  const [kind, setKind] = useState<'daily' | 'interval'>('daily')
+  const kind = section
   const [intervalDays, setIntervalDays] = useState('7')
 
   const daily = useMemo(
@@ -63,8 +67,7 @@ export function RoutineSheet({
   function openNew() {
     setEditing('new')
     setTitle('')
-    setIcon('paw')
-    setKind('daily')
+    setIcon(section === 'interval' ? 'bath' : 'paw')
     setIntervalDays('7')
   }
 
@@ -72,7 +75,6 @@ export function RoutineSheet({
     setEditing(task)
     setTitle(task.title)
     setIcon(task.icon)
-    setKind(task.kind)
     setIntervalDays(String(task.interval_days ?? 7))
   }
 
@@ -210,7 +212,7 @@ export function RoutineSheet({
               }}
             >
               <Txt variant="h2">
-                {pet.emoji} {t('petcare.editRoutine')}
+                {pet.emoji} {t(section === 'daily' ? 'petcare.today' : 'petcare.routines')}
               </Txt>
               <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')}>
                 <X size={22} color={c.textMuted} />
@@ -226,20 +228,12 @@ export function RoutineSheet({
                 <Btn title={t('petcare.useTemplate')} variant="secondary" onPress={seedTemplate} loading={busy} />
               ) : null}
 
-              {daily.length > 0 ? (
-                <View>
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-                    {t('petcare.kindDaily')}
-                  </Txt>
-                  <DraggableList data={daily} rowHeight={ROW_H} onReorder={reorder} renderItem={(item) => row(item, true)} />
-                </View>
+              {section === 'daily' && daily.length > 0 ? (
+                <DraggableList data={daily} rowHeight={ROW_H} onReorder={reorder} renderItem={(item) => row(item, true)} />
               ) : null}
 
-              {intervals.length > 0 ? (
+              {section === 'interval' && intervals.length > 0 ? (
                 <View>
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-                    {t('petcare.routines')}
-                  </Txt>
                   {intervals.map((task) => (
                     <View key={task.id}>{row(task, false)}</View>
                   ))}
@@ -304,18 +298,7 @@ export function RoutineSheet({
                   })}
                 </View>
 
-                {/* daily vs every-N-days */}
-                <View style={{ gap: 6 }}>
-                  <Txt variant="label">{t('petcare.repeats')}</Txt>
-                  <View style={{ flexDirection: 'row', gap: sp.sm }}>
-                    <Pill_ active={kind === 'daily'} onPress={() => setKind('daily')}>
-                      {t('petcare.kindDaily')}
-                    </Pill_>
-                    <Pill_ active={kind === 'interval'} onPress={() => setKind('interval')}>
-                      {t('petcare.kindInterval')}
-                    </Pill_>
-                  </View>
-                </View>
+                {/* The section decides daily vs interval — no selector needed. */}
                 {kind === 'interval' ? (
                   <Field
                     label={t('petcare.intervalDays')}

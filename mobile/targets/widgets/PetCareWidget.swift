@@ -1,6 +1,7 @@
 import WidgetKit
 import SwiftUI
 import AppIntents
+import UIKit
 
 // ── Pet Care widget ──────────────────────────────────────────────────────────
 // Small: the selected pet + one BIG button that marks the next undone daily
@@ -44,21 +45,6 @@ struct PetCarePetW: Codable, Identifiable {
 struct PetCareState: Codable {
   let day: String
   var pets: [PetCarePetW]
-}
-
-/// Routine-task icon ids → SF Symbols. KEEP IN SYNC with CARE_ICONS in
-/// mobile/src/apps/pets/petUi.tsx (same ids → Lucide in the app).
-func careSymbol(_ icon: String) -> String {
-  switch icon {
-  case "bowl": return "fork.knife"
-  case "walk": return "figure.walk"
-  case "treat": return "gift"
-  case "pill": return "pills"
-  case "bath": return "shower"
-  case "nails": return "scissors"
-  case "teeth": return "sparkles"
-  default: return "pawprint"
-  }
 }
 
 // isoDay(_:) is shared from TodayWidget.swift (same target).
@@ -264,7 +250,12 @@ struct PetCareProvider: AppIntentTimelineProvider {
   }
 }
 
+
 // ── Views ────────────────────────────────────────────────────────────────────
+// Design language: the pet's PHOTO (mirrored by the app as a small base64
+// thumbnail, "petcare_photo_<id>") or an initial-letter tile — never stock
+// symbols — and rounded-square surfaces with room to breathe.
+
 func nextUndone(_ pet: PetCarePetW) -> PetCareTaskW? {
   pet.daily.first { !$0.done }
 }
@@ -279,59 +270,50 @@ func dueLabel(_ dueIn: Int) -> String {
   return "in \(dueIn)d"
 }
 
-/// The identity caption + big action button — the whole small widget, and the
-/// left half of medium.
-struct PetActionPane: View {
+func petPhotoImage(_ id: String) -> UIImage? {
+  guard
+    let b64 = groupDefaults()?.string(forKey: "petcare_photo_\(id)"),
+    let data = Data(base64Encoded: b64)
+  else { return nil }
+  return UIImage(data: data)
+}
+
+/// The pet as a rounded square: their photo, or their initial on a soft tint.
+struct PetPhotoTile: View {
   let pet: PetCarePetW
+  let corner: CGFloat
   let theme: WarmHearth
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 4) {
-        Text(pet.emoji).font(.system(size: 13))
-        Text(pet.name).font(.caption).fontWeight(.semibold).foregroundStyle(theme.textMuted).lineLimit(1)
-        Spacer(minLength: 0)
-        if overdueCount(pet) > 0 {
-          Circle().fill(theme.expense).frame(width: 7, height: 7)
-        }
-      }
-      if let task = nextUndone(pet) {
-        // The action IS the widget: one tap marks this task done and the pane
-        // advances to the next undone task.
-        Button(intent: MarkTaskDoneIntent(taskId: task.id)) {
-          VStack(spacing: 6) {
-            Image(systemName: careSymbol(task.icon)).font(.system(size: 24, weight: .semibold))
-            Text(task.title)
-              .font(.system(size: 13, weight: .semibold))
-              .multilineTextAlignment(.center)
-              .lineLimit(2)
-              .minimumScaleFactor(0.8)
-            Text("Tap when done").font(.system(size: 9)).opacity(0.75)
-          }
-          .foregroundStyle(.white)
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
-          .background(theme.accent)
-          .clipShape(RoundedRectangle(cornerRadius: 14))
-        }
-        .buttonStyle(.plain)
+    GeometryReader { geo in
+      if let img = petPhotoImage(pet.id) {
+        Image(uiImage: img)
+          .resizable()
+          .aspectRatio(contentMode: .fill)
+          .frame(width: geo.size.width, height: geo.size.height)
+          .clipShape(RoundedRectangle(cornerRadius: corner))
       } else {
-        VStack(spacing: 6) {
-          Image(systemName: "checkmark.circle.fill").font(.system(size: 26)).foregroundStyle(.green)
-          Text(pet.daily.isEmpty ? "No routine yet" : "All done today")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(theme.textMuted)
-          if let urgent = pet.routines.first, urgent.dueIn <= 0 {
-            Text("\(urgent.title) · \(dueLabel(urgent.dueIn))")
-              .font(.system(size: 10))
-              .foregroundStyle(theme.expense)
-              .lineLimit(1)
-          }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        RoundedRectangle(cornerRadius: corner)
+          .fill(theme.accent.opacity(0.15))
+          .overlay(
+            Text(String(pet.name.prefix(1)).uppercased())
+              .font(.system(size: geo.size.height * 0.4, weight: .semibold, design: .rounded))
+              .foregroundStyle(theme.accent)
+          )
       }
     }
+  }
+}
+
+/// Fixed-size variant for list headers.
+struct PetPhotoBadge: View {
+  let pet: PetCarePetW
+  let size: CGFloat
+  let theme: WarmHearth
+
+  var body: some View {
+    PetPhotoTile(pet: pet, corner: size * 0.32, theme: theme)
+      .frame(width: size, height: size)
   }
 }
 
@@ -345,110 +327,126 @@ struct PetCareWidgetView: View {
       let primary = state.pets.first { $0.id == entry.selectedId } ?? state.pets[0]
       switch family {
       case .systemSmall:
-        PetActionPane(pet: primary, theme: theme)
-      case .systemMedium:
-        HStack(spacing: 10) {
-          PetActionPane(pet: primary, theme: theme)
-            .frame(maxWidth: .infinity)
-          Divider()
-          // The other pets: mark each one's next task from the same widget.
-          VStack(alignment: .leading, spacing: 8) {
-            let others = state.pets.filter { $0.id != primary.id }
-            if others.isEmpty {
-              // Single-pet household: the right half shows the routines instead.
-              ForEach(primary.routines.prefix(3)) { r in
-                HStack(spacing: 6) {
-                  Image(systemName: careSymbol(r.icon)).font(.system(size: 11)).foregroundStyle(theme.textMuted)
-                  Text(r.title).font(.system(size: 12)).foregroundStyle(theme.text).lineLimit(1)
-                  Spacer(minLength: 2)
-                  Text(dueLabel(r.dueIn))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(r.dueIn <= 0 ? theme.expense : theme.textMuted)
-                }
-              }
-            } else {
-              ForEach(others.prefix(3)) { p in
-                HStack(spacing: 6) {
-                  Text(p.emoji).font(.system(size: 13))
-                  VStack(alignment: .leading, spacing: 0) {
-                    Text(p.name).font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.text).lineLimit(1)
-                    Text(nextUndone(p)?.title ?? "All done")
-                      .font(.system(size: 10))
-                      .foregroundStyle(theme.textMuted)
-                      .lineLimit(1)
-                  }
-                  Spacer(minLength: 2)
-                  if let task = nextUndone(p) {
-                    Button(intent: MarkTaskDoneIntent(taskId: task.id)) {
-                      Image(systemName: "circle")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(theme.accent)
-                    }
-                    .buttonStyle(.plain)
-                  } else {
-                    Image(systemName: "checkmark.circle.fill")
-                      .font(.system(size: 18))
-                      .foregroundStyle(.green)
-                  }
-                }
-              }
-            }
+        // Identity caption + the action, which IS the widget.
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 6) {
+            PetPhotoBadge(pet: primary, size: 20, theme: theme)
+            Text(primary.name).font(.caption).fontWeight(.semibold).foregroundStyle(theme.textMuted).lineLimit(1)
             Spacer(minLength: 0)
+            if overdueCount(primary) > 0 { Circle().fill(theme.expense).frame(width: 7, height: 7) }
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
+          if let task = nextUndone(primary) {
+            Button(intent: MarkTaskDoneIntent(taskId: task.id)) {
+              VStack(alignment: .leading, spacing: 4) {
+                Text("Next up").font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.7))
+                Text(task.title)
+                  .font(.system(size: 17, weight: .semibold, design: .rounded))
+                  .foregroundStyle(.white)
+                  .lineLimit(2)
+                  .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                HStack(spacing: 5) {
+                  Image(systemName: "checkmark.circle").font(.system(size: 13, weight: .semibold))
+                  Text("Tap when done").font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(.white.opacity(0.85))
+              }
+              .padding(12)
+              .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+              .background(theme.accent)
+              .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+          } else {
+            AllDoneTile(pet: primary, theme: theme)
+          }
+        }
+      case .systemMedium:
+        // One pet only: the photo on the left, the next task as a matching
+        // rounded square on the right (the whole tile marks it done).
+        HStack(spacing: 12) {
+          PetPhotoTile(pet: primary, corner: 18, theme: theme)
+            .aspectRatio(1, contentMode: .fit)
+          if let task = nextUndone(primary) {
+            Button(intent: MarkTaskDoneIntent(taskId: task.id)) {
+              VStack(alignment: .leading, spacing: 5) {
+                Text(primary.name.uppercased())
+                  .font(.system(size: 10, weight: .semibold))
+                  .kerning(0.8)
+                  .foregroundStyle(theme.textMuted)
+                Text(task.title)
+                  .font(.system(size: 19, weight: .semibold, design: .rounded))
+                  .foregroundStyle(theme.text)
+                  .lineLimit(2)
+                  .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                HStack(spacing: 6) {
+                  Image(systemName: "checkmark.circle").font(.system(size: 14, weight: .semibold))
+                  Text("Tap when done").font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(theme.accent)
+              }
+              .padding(14)
+              .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+              .background(theme.card)
+              .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
+            .buttonStyle(.plain)
+          } else {
+            AllDoneTile(pet: primary, theme: theme, named: true)
+          }
         }
       default:
-        // Large: a mini Pet Care page — every pet's checklist + urgent routines.
-        VStack(alignment: .leading, spacing: 8) {
-          HStack(spacing: 5) {
-            Image(systemName: "pawprint").font(.caption)
-            Text("Pet Care").font(.caption).foregroundStyle(theme.textMuted)
-          }
+        // Large: every pet gets an airy block — photo, name, status, and the
+        // day's tasks as clean text rows. Only overdue routines earn a line.
+        VStack(alignment: .leading, spacing: 14) {
           ForEach(state.pets.prefix(3)) { p in
-            VStack(alignment: .leading, spacing: 4) {
-              HStack(spacing: 5) {
-                Text(p.emoji).font(.system(size: 13))
-                Text(p.name).font(.system(size: 13, weight: .bold)).foregroundStyle(theme.text)
+            VStack(alignment: .leading, spacing: 8) {
+              HStack(spacing: 10) {
+                PetPhotoBadge(pet: p, size: 34, theme: theme)
+                Text(p.name)
+                  .font(.system(size: 16, weight: .semibold, design: .rounded))
+                  .foregroundStyle(theme.text)
                 Spacer(minLength: 0)
                 if overdueCount(p) > 0 {
                   Text("\(overdueCount(p)) overdue")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(theme.expense)
                 } else if nextUndone(p) == nil && !p.daily.isEmpty {
-                  Text("all done")
-                    .font(.system(size: 9, weight: .bold))
+                  Text("All done")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.green)
                 }
               }
               ForEach(p.daily.prefix(4)) { task in
-                HStack(spacing: 7) {
+                HStack(spacing: 9) {
                   if task.done {
-                    Image(systemName: "checkmark.circle.fill").font(.system(size: 15)).foregroundStyle(.green)
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 16)).foregroundStyle(.green)
                   } else {
                     Button(intent: MarkTaskDoneIntent(taskId: task.id)) {
-                      Image(systemName: "circle").font(.system(size: 15)).foregroundStyle(theme.accent)
+                      Image(systemName: "circle").font(.system(size: 16)).foregroundStyle(theme.accent)
                     }
                     .buttonStyle(.plain)
                   }
                   Text(task.title)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .strikethrough(task.done)
                     .foregroundStyle(task.done ? theme.textMuted : theme.text)
                     .lineLimit(1)
-                  Spacer(minLength: 2)
-                  if let by = task.doneBy { Text(by).font(.system(size: 9)).foregroundStyle(theme.textMuted) }
+                  Spacer(minLength: 4)
+                  if let by = task.doneBy {
+                    Text(by).font(.system(size: 11)).foregroundStyle(theme.textMuted)
+                  }
                 }
               }
-              ForEach(p.routines.filter { $0.dueIn <= 3 }.prefix(2)) { r in
-                HStack(spacing: 7) {
-                  Image(systemName: careSymbol(r.icon)).font(.system(size: 11)).foregroundStyle(theme.textMuted)
-                  Text(r.title).font(.system(size: 11)).foregroundStyle(theme.textMuted).lineLimit(1)
-                  Spacer(minLength: 2)
-                  Text(dueLabel(r.dueIn))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(r.dueIn <= 0 ? theme.expense : theme.textMuted)
-                }
+              ForEach(p.routines.filter { $0.dueIn < 0 }.prefix(1)) { r in
+                Text("\(r.title) · \(dueLabel(r.dueIn))")
+                  .font(.system(size: 11, weight: .medium))
+                  .foregroundStyle(theme.expense)
               }
+            }
+            if p.id != state.pets.prefix(3).last?.id {
+              Divider()
             }
           }
           Spacer(minLength: 0)
@@ -462,6 +460,40 @@ struct PetCareWidgetView: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+  }
+}
+
+/// Quiet "nothing left to do" card, shared by small and medium.
+struct AllDoneTile: View {
+  let pet: PetCarePetW
+  let theme: WarmHearth
+  var named: Bool = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 5) {
+      if named {
+        Text(pet.name.uppercased())
+          .font(.system(size: 10, weight: .semibold))
+          .kerning(0.8)
+          .foregroundStyle(theme.textMuted)
+      }
+      Spacer(minLength: 0)
+      Image(systemName: "checkmark.circle.fill").font(.system(size: 22)).foregroundStyle(.green)
+      Text(pet.daily.isEmpty ? "No routine yet" : "All done today")
+        .font(.system(size: 14, weight: .semibold, design: .rounded))
+        .foregroundStyle(theme.text)
+      if let urgent = pet.routines.first, urgent.dueIn <= 0 {
+        Text("\(urgent.title) · \(dueLabel(urgent.dueIn))")
+          .font(.system(size: 11))
+          .foregroundStyle(theme.expense)
+          .lineLimit(1)
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    .background(theme.card)
+    .clipShape(RoundedRectangle(cornerRadius: 18))
   }
 }
 
