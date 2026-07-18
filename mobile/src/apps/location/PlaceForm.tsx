@@ -2,7 +2,7 @@
 // simplest reliable way to say "this is School" without a map-drag UI; editing
 // keeps the saved spot unless you re-pin. Radius is a small preset set: iOS
 // enforces a ~100 m floor on geofences, so finer-grained control would be a lie.
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
@@ -10,12 +10,10 @@ import { Crosshair } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
-import { formatDistance } from '@/lib/location'
+import { nearestPreset, radiusPresets } from '@/lib/location'
 import { createPlace, deletePlace, updatePlace } from '@/lib/places'
 import type { Place } from '@/lib/types'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
-
-const RADIUS_PRESETS = [100, 150, 250, 500, 1000]
 
 export function PlaceForm({
   place,
@@ -33,7 +31,11 @@ export function PlaceForm({
 
   const [icon, setIcon] = useState(place?.icon ?? '📍')
   const [name, setName] = useState(place?.name ?? '')
-  const [radiusM, setRadiusM] = useState(place?.radius_m ?? 150)
+  // Familiar radii in the user's own units. Floor at 100 m — iOS geofences can't
+  // reliably go smaller, so offering "250 ft" here would be a promise we can't keep.
+  const presets = useMemo(() => radiusPresets(100), [])
+  const [radiusM, setRadiusM] = useState(place?.radius_m ?? presets[0]?.meters ?? 150)
+  const selectedRadius = nearestPreset(presets, radiusM)
   const [arrivals, setArrivals] = useState(place?.notify_arrivals ?? true)
   const [departures, setDepartures] = useState(place?.notify_departures ?? false)
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
@@ -125,7 +127,8 @@ export function PlaceForm({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.cancel')} />
         <View
           style={{
-            backgroundColor: c.card,
+            // c.sheet, not c.card — the glass skin's card is translucent.
+            backgroundColor: c.sheet,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
@@ -160,12 +163,12 @@ export function PlaceForm({
             <View style={{ gap: 6 }}>
               <Txt variant="label">{t('location.places.radius')}</Txt>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {RADIUS_PRESETS.map((m) => {
-                  const on = radiusM === m
+                {presets.map((p) => {
+                  const on = selectedRadius === p.meters
                   return (
                     <Pressable
-                      key={m}
-                      onPress={() => setRadiusM(m)}
+                      key={p.meters}
+                      onPress={() => setRadiusM(p.meters)}
                       style={{
                         paddingVertical: 8,
                         paddingHorizontal: 14,
@@ -174,7 +177,7 @@ export function PlaceForm({
                       }}
                     >
                       <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
-                        {formatDistance(m)}
+                        {p.label}
                       </Txt>
                     </Pressable>
                   )

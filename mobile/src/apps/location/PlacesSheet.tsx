@@ -94,7 +94,8 @@ export function PlacesSheet({
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
           <View
             style={{
-              backgroundColor: c.card,
+              // c.sheet, not c.card — the glass skin's card is translucent.
+              backgroundColor: c.sheet,
               borderTopLeftRadius: 22,
               borderTopRightRadius: 22,
               padding: sp.lg,

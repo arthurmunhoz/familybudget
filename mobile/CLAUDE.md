@@ -145,6 +145,20 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   Gating: `usePlus().isPlus` — non-Plus shows a `Sparkles` badge and routes to
   `/paywall`. Watches are household-readable on purpose (being inside someone's
   radius isn't a secret) and auto-expire after `WATCH_HOURS` (4h).
+- **UI gotchas (learned the hard way)**:
+  - Sheet/modal containers use **`c.sheet`, NEVER `c.card`** — the glass skin
+    makes `card` translucent, so the map bleeds through the panel's own text.
+    Same for labels drawn on top of the map (the place pills).
+  - Radius pickers use `radiusPresets(min)` from `lib/location.ts`, which authors
+    round labels **per unit system** (500 ft / ¼ mi vs 250 m) rather than
+    converting metres — running 150 m through `formatDistance` gives a US user
+    "492 ft", which reads as broken. Places passes a **100 m floor** (the iOS
+    geofence minimum); Safety Radius has no floor because it's detected
+    client-side. `nearestPreset()` keeps a chip highlighted when a saved value
+    doesn't match the current unit system's presets.
+  - Mapbox's logo AND the OSM attribution must stay visible — Mapbox ToS plus
+    OpenStreetMap's **ODbL license** (removing attribution is a license breach,
+    not just a ToS one). They're positioned bottom-left above the roster sheet.
 - Not yet: location history (7-day retention, must be clearly surfaced to users)
   and driving/SOS check-in; a map-drag picker for placing/moving a place.
 

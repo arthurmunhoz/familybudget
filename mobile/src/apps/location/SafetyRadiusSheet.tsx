@@ -10,8 +10,14 @@ import { ShieldCheck } from 'lucide-react-native'
 
 import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
-import { formatDistance, haversineMeters, isSharingLive } from '@/lib/location'
-import { RADIUS_PRESETS, isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
+import {
+  formatDistance,
+  haversineMeters,
+  isSharingLive,
+  nearestPreset,
+  radiusPresets,
+} from '@/lib/location'
+import { isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
 import { MemberAvatar } from './locationUi'
@@ -42,8 +48,12 @@ export function SafetyRadiusSheet({
   const insets = useSafeAreaInsets()
 
   const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
+  // Radius choices in the user's own units (500 ft / ¼ mi, not "152 m").
+  const presets = useMemo(() => radiusPresets(), [])
   const [picked, setPicked] = useState<string[]>(watch?.watched ?? [])
-  const [radiusM, setRadiusM] = useState(watch?.radius_m ?? 150)
+  const [radiusM, setRadiusM] = useState(watch?.radius_m ?? presets[1]?.meters ?? 150)
+  // Keep a chip highlighted even if the saved value isn't exactly a preset.
+  const selectedRadius = nearestPreset(presets, radiusM)
   const [busy, setBusy] = useState(false)
 
   const toggle = (email: string) =>
@@ -85,13 +95,16 @@ export function SafetyRadiusSheet({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
         <View
           style={{
-            backgroundColor: c.card,
+            // c.sheet (not c.card): the glass skin makes `card` translucent, which
+            // would let the map bleed through this panel's text.
+            backgroundColor: c.sheet,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
             paddingBottom: insets.bottom + sp.lg,
             gap: sp.md,
-            maxHeight: '85%',
+            // Tall: the watch list can hold every member of the household.
+            height: '90%',
           }}
         >
           <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center' }} />
@@ -115,7 +128,7 @@ export function SafetyRadiusSheet({
                 <Txt variant="faint">{t('location.safety.endsIn', { hours: hoursLeft })}</Txt>
               </View>
 
-              <ScrollView style={{ flexGrow: 0 }}>
+              <ScrollView style={{ flex: 1 }}>
                 {watch.watched.map((email) => {
                   const p = profiles.find((x) => x.email === email)
                   const loc = locByEmail.get(email)
@@ -184,7 +197,7 @@ export function SafetyRadiusSheet({
               )}
 
               <Txt variant="label">{t('location.safety.pickPeople')}</Txt>
-              <ScrollView style={{ flexGrow: 0 }}>
+              <ScrollView style={{ flex: 1 }}>
                 {others.map((p) => {
                   const on = picked.includes(p.email)
                   return (
@@ -235,12 +248,12 @@ export function SafetyRadiusSheet({
 
               <Txt variant="label">{t('location.safety.radius')}</Txt>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {RADIUS_PRESETS.map((m) => {
-                  const on = radiusM === m
+                {presets.map((p) => {
+                  const on = selectedRadius === p.meters
                   return (
                     <Pressable
-                      key={m}
-                      onPress={() => setRadiusM(m)}
+                      key={p.meters}
+                      onPress={() => setRadiusM(p.meters)}
                       style={{
                         paddingVertical: 8,
                         paddingHorizontal: 14,
@@ -249,7 +262,7 @@ export function SafetyRadiusSheet({
                       }}
                     >
                       <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
-                        {formatDistance(m)}
+                        {p.label}
                       </Txt>
                     </Pressable>
                   )
