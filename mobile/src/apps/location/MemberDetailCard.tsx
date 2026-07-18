@@ -26,7 +26,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import * as Location from 'expo-location'
-import { Bell, Navigation, Phone, Settings2, X } from 'lucide-react-native'
+import { Bell, Navigation, Phone, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -43,7 +43,6 @@ import { placeAt } from '@/lib/places'
 import type { MemberLocation, Place, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import {
-  BatteryGauge,
   CARD_H,
   CARD_W_EXPANDED,
   FLOAT_SHADOW,
@@ -143,7 +142,6 @@ export function MemberDetailCard({
   onCollapse,
   onNavigate,
   onNudge,
-  onManageSharing,
   onLaidOut,
 }: {
   profile: Profile
@@ -162,7 +160,6 @@ export function MemberDetailCard({
    *  sheet can't be presented from inside a card in a horizontal scroller). */
   onNavigate: () => void
   onNudge: () => void
-  onManageSharing: () => void
   /** Our x within the roster's content, once laid out — the parent uses it to
    *  scroll this card fully into view. Reported from onLayout rather than
    *  computed by the parent, because the parent would have to guess at our
@@ -327,47 +324,6 @@ export function MemberDetailCard({
               />
             ) : null}
           </View>
-        </>
-      ) : isMe ? (
-        <>
-          {/* Your own card has a full-width row going spare, so the battery is
-              drawn as an actual battery filled to the charge rather than as a
-              number with a caption. Falls back to the plain tile when the level
-              is unknown — an empty shell would read as "flat", not "no idea". */}
-          {live && live.battery != null ? (
-            <BatteryGauge level={live.battery} />
-          ) : live ? (
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <Stat label={t('location.stat.battery')} value={battText} />
-            </View>
-          ) : null}
-          {/* Sharing has real switches and pause presets, so it stays its own
-              sheet — this is the way in, matching the collapsed card's hint. */}
-          <Pressable
-            onPress={onManageSharing}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                backgroundColor: c.accentSoft,
-                borderRadius: radius.md,
-                paddingVertical: 9,
-                marginTop: 'auto',
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <Settings2 size={15} color={c.accent} />
-            <Txt
-              style={{ fontFamily: fonts.semibold, fontSize: 12, lineHeight: 15, color: c.accent }}
-              numberOfLines={1}
-            >
-              {t('location.card.manage')}
-            </Txt>
-          </Pressable>
         </>
       ) : (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: sp.sm }}>

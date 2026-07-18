@@ -129,6 +129,7 @@ export const pt: Record<keyof typeof en, string> = {
   'location.safety.entered': '{name} voltou para a área',
   'location.safety.breachBody': 'a {dist} do centro',
   'location.card.manage': 'Gerenciar minha localização',
+  'location.card.sharing': 'Compartilhar',
   'location.card.watching': 'Vigiando',
   'location.nudge.title': 'Cutucar {name}',
   'location.nudge.sent': 'Cutucada enviada para {name}',

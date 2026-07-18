@@ -5,9 +5,10 @@
 //
 // Tapping a card or a pin EXPANDS that member's card in place (ETA-first detail,
 // no sheet over the map) and frames them on the map, so what you're reading
-// about stays visible behind the roster. Tapping again collapses it. Your own
-// card expands the same way and holds the way into your sharing controls —
-// that's why there's no sharing button in the header.
+// about stays visible behind the roster. Tapping again collapses it. YOUR OWN
+// card is the exception: it never expands — it carries your battery and a button
+// into sharing controls on its compact face, and says nothing about where you
+// are, because you know. That's also why there's no sharing button in the header.
 // Native-only: the map (@rnmapbox/maps) and background location need a dev build
 // + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -17,7 +18,17 @@ import * as Localization from 'expo-localization'
 import * as Location from 'expo-location'
 import { router } from 'expo-router'
 import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
-import { MapPin, Crosshair, Landmark, Layers, ShieldAlert, ShieldCheck, Sparkles, X } from 'lucide-react-native'
+import {
+  MapPin,
+  Crosshair,
+  Landmark,
+  Layers,
+  Settings2,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from 'lucide-react-native'
 
 import { AppHeader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
@@ -45,6 +56,7 @@ import type { MemberLocation, Place, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import {
   BatteryChip,
+  BatteryGauge,
   buildMemberColors,
   CARD_H,
   CARD_W,
@@ -166,23 +178,25 @@ function MemberCard({
   avatarPath,
   color,
   status,
-  hint,
   battery,
   watched,
   onPress,
+  onSettings,
 }: {
   name: string
   avatarPath?: string | null
   color: string
   status: string
-  /** Secondary line — used on your OWN card ("Manage location sharing"). */
-  hint?: string
   battery: number | null
   /** In my active Safety Radius watch list. */
   watched: boolean
   onPress: () => void
+  /** Present only on YOUR card — swaps the status line for a battery gauge and
+   *  a button straight into sharing controls. */
+  onSettings?: () => void
 }) {
   const { c } = useTheme()
+  const { t } = useI18n()
   return (
     <Pressable
       onPress={onPress}
@@ -210,21 +224,49 @@ function MemberCard({
       <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }} numberOfLines={1}>
         {name}
       </Txt>
-      <Txt variant="muted" style={{ fontSize: 11, textAlign: 'center' }} numberOfLines={2}>
-        {status}
-      </Txt>
-      {hint ? (
-        <Txt
-          style={{ fontSize: 10, color: c.accent, fontFamily: fonts.semibold, textAlign: 'center' }}
-          numberOfLines={2}
-        >
-          {hint}
+      {/* YOUR card says nothing about where you are — you already know, and the
+          line was spending the card's best row telling you so. It gets a real
+          battery and a way straight into sharing instead. */}
+      {onSettings ? null : (
+        <Txt variant="muted" style={{ fontSize: 11, textAlign: 'center' }} numberOfLines={2}>
+          {status}
         </Txt>
-      ) : null}
-      {/* Watching sits ABOVE the battery so the live state reads first. */}
-      <View style={{ marginTop: 'auto', alignItems: 'center', gap: 4 }}>
+      )}
+      <View style={{ marginTop: 'auto', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
         {watched ? <WatchingChip /> : null}
-        {battery != null ? <BatteryChip level={battery} /> : null}
+        {onSettings ? (
+          <>
+            {battery != null ? <BatteryGauge level={battery} height={24} /> : null}
+            <Pressable
+              onPress={onSettings}
+              accessibilityRole="button"
+              accessibilityLabel={t('location.card.manage')}
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 5,
+                  alignSelf: 'stretch',
+                  backgroundColor: c.accentSoft,
+                  borderRadius: radius.md,
+                  paddingVertical: 7,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Settings2 size={13} color={c.accent} />
+              <Txt
+                style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.accent }}
+                numberOfLines={1}
+              >
+                {t('location.card.sharing')}
+              </Txt>
+            </Pressable>
+          </>
+        ) : battery != null ? (
+          <BatteryChip level={battery} />
+        ) : null}
       </View>
     </Pressable>
   )
@@ -262,7 +304,7 @@ export default function Whereabouts() {
     { email: string; kind: 'left' | 'entered'; title: string; dist: string }[]
   >([])
   const [sharingOpen, setSharingOpen] = useState(false)
-  const [mapMode, setMapMode] = useStoredMapMode()
+  const { mode: mapMode, choose: setMapMode, ready: mapModeReady } = useStoredMapMode()
   const [mapModeOpen, setMapModeOpen] = useState(false)
   /** Bumped each time a map style finishes loading, to re-key our own sources. */
   const [styleEpoch, setStyleEpoch] = useState(0)
@@ -443,8 +485,14 @@ export default function Whereabouts() {
     if (centeredOnce.current) return
     const focus = myLive ?? deviceCenter ?? livePins[0]?.loc
     if (!focus) return
+    // Claim the one shot only once there's actually a camera to aim. The map
+    // mounts a beat after this screen (it waits for the stored style), and
+    // marking it done against a null ref would spend the single centring pass
+    // on nothing — leaving the map parked on the fallback view.
+    const camera = cameraRef.current
+    if (!camera) return
     centeredOnce.current = true
-    cameraRef.current?.setCamera({
+    camera.setCamera({
       centerCoordinate: [focus.lng, focus.lat],
       zoomLevel: INITIAL_ZOOM,
       animationDuration: 0,
@@ -512,11 +560,16 @@ export default function Whereabouts() {
   }, [profiles, locByEmail, myEmail])
 
   /** Tap a card or a pin: expand that member in place (tapping the open one
-   *  closes it), frame them on the map, and bring their card into view. */
+   *  closes it), frame them on the map, and bring their card into view.
+   *
+   *  YOUR OWN card is framed but never expanded. Everything the expanded version
+   *  offered you — your battery, the way into sharing — now lives on the compact
+   *  card, so opening it would just show the same two things again. */
   const select = useCallback(
     (email: string) => {
-      const collapsing = selected === email
-      setSelected(collapsing ? null : email)
+      const isMine = email === myEmail
+      const collapsing = !isMine && selected === email
+      setSelected(isMine ? null : collapsing ? null : email)
       if (collapsing) return
 
       const loc = locByEmail.get(email)
@@ -542,9 +595,9 @@ export default function Whereabouts() {
       // scroll would be clamped short, leaving the expanded card cut off. Flag
       // it instead and let the card scroll itself once it has actually been laid
       // out at its final size (onExpandedLayout).
-      focusPending.current = true
+      if (!isMine) focusPending.current = true
     },
-    [selected, locByEmail],
+    [selected, locByEmail, myEmail],
   )
 
   /** The expanded card reporting where it ended up. Scrolling to its real x is
@@ -608,7 +661,7 @@ export default function Whereabouts() {
       </View>
 
       <View style={{ flex: 1 }}>
-        {MAPBOX_TOKEN ? (
+        {MAPBOX_TOKEN && mapModeReady ? (
           <MapView
             style={{ flex: 1 }}
             styleURL={resolveStyleURL(mapMode, dark, MAPBOX_STYLE_URL, MAPBOX_STYLE_URL_DARK)}
@@ -884,7 +937,6 @@ export default function Whereabouts() {
                       isSharingLive(loc) && setNavFor({ profile: p, to: { lat: loc.lat, lng: loc.lng } })
                     }
                     onNudge={() => setNudgeFor(p)}
-                    onManageSharing={() => setSharingOpen(true)}
                     onLaidOut={onExpandedLayout}
                   />
                 )
@@ -896,10 +948,10 @@ export default function Whereabouts() {
                   avatarPath={meta.avatars[p.email]}
                   color={colors[p.email] ?? c.accent}
                   status={statusLine(p.email)}
-                  hint={isMe ? t('location.card.manage') : undefined}
                   battery={live && loc.battery != null ? loc.battery : null}
                   watched={!!watch?.watched.includes(p.email)}
                   onPress={() => select(p.email)}
+                  onSettings={isMe ? () => setSharingOpen(true) : undefined}
                 />
               )
             })}

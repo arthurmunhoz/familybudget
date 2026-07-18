@@ -167,8 +167,13 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     reverse-geocode / `useWatchLive` hooks live inside it — a household of ten
     must not fire ten Directions requests. Live mode now starts on EXPAND and
     relaxes on collapse (it used to be tied to opening the sheet).
-  - Your own card expands too and holds the way into `SharingControls`, which
-    stays a modal: it's switches and pause presets, not detail.
+  - **Your own card is the exception: it never expands.** Its compact face
+    carries a full `BatteryGauge` and a button straight into `SharingControls`
+    (still a modal — switches and pause presets, not detail), and it shows NO
+    location line, because you already know where you are; that row was the best
+    real estate on the card, spent telling you nothing. Tapping it frames you on
+    the map and stops there — expanding would only repeat the battery and the
+    sharing button. `MemberDetailCard` therefore has no `isMe` branch.
 - **Map styles** (`mapMode.ts` + `MapModePicker`): Map / Satellite / Terrain,
   from the layers button under the recenter control, remembered in AsyncStorage.
   - `standard` still follows the theme AND `EXPO_PUBLIC_MAPBOX_STYLE_URL(_DARK)`
@@ -184,6 +189,12 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   - Helpers live in `mapMode.ts`, not in the picker file: exporting hooks
     alongside a component breaks Fast Refresh, which is what `react-refresh`
     flags. Same reason `Section` sits in `locationUi`.
+  - The map is not mounted until the stored mode has been READ (`ready`).
+    AsyncStorage is async, so otherwise a satellite user watches the plain map
+    load and flip on every open — which reads as "it forgot my choice" even
+    though it didn't. Because of that gate, the one-shot centring effect must
+    check `cameraRef.current` BEFORE setting `centeredOnce` — claiming the shot
+    against a null ref would leave the map parked on the fallback view.
 - Native config lives in `app.config.js` (layered on `app.json`): Mapbox plugin
   (`RNMAPBOX_DOWNLOAD_TOKEN` build secret), expo-location background, iOS
   `UIBackgroundModes: ["location"]` + Always strings, `LSApplicationQueriesSchemes`

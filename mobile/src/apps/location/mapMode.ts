@@ -36,15 +36,24 @@ export function resolveStyleURL(
 
 /** Remembered across launches — a map style is a preference, not a per-visit
  *  choice. Failures are swallowed: the default is a perfectly good map. */
-export function useStoredMapMode(): [MapMode, (m: MapMode) => void] {
+export function useStoredMapMode(): { mode: MapMode; choose: (m: MapMode) => void; ready: boolean } {
   const [mode, setMode] = useState<MapMode>('standard')
+  // `ready` exists so the map isn't mounted with the DEFAULT style first and
+  // then swapped a frame later: storage is async, so a satellite user would
+  // watch the plain map load and flip on every single open, which looks exactly
+  // like the preference wasn't remembered at all.
+  const [ready, setReady] = useState(false)
   useEffect(() => {
     let active = true
     AsyncStorage.getItem(STORAGE_KEY)
       .then((v) => {
-        if (active && (v === 'satellite' || v === 'terrain' || v === 'standard')) setMode(v)
+        if (!active) return
+        if (v === 'satellite' || v === 'terrain' || v === 'standard') setMode(v)
       })
       .catch(() => {})
+      .finally(() => {
+        if (active) setReady(true)
+      })
     return () => {
       active = false
     }
@@ -53,5 +62,5 @@ export function useStoredMapMode(): [MapMode, (m: MapMode) => void] {
     setMode(m)
     void AsyncStorage.setItem(STORAGE_KEY, m).catch(() => {})
   }
-  return [mode, choose]
+  return { mode, choose, ready }
 }

@@ -131,6 +131,7 @@ export const en = {
   'location.safety.entered': '{name} is back inside',
   'location.safety.breachBody': '{dist} from the centre',
   'location.card.manage': 'Manage location sharing',
+  'location.card.sharing': 'Sharing',
   'location.card.watching': 'Watching',
   'location.nudge.title': 'Nudge {name}',
   'location.nudge.sent': 'Nudge sent to {name}',
