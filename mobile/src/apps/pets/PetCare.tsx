@@ -478,44 +478,58 @@ export default function PetCare() {
                     marginBottom: sp.sm,
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginLeft: sp.xs }}>
-                    <Pressable
-                      onPress={() => setSelectedDay(addDaysISO(selectedDay, -1))}
-                      hitSlop={10}
-                      accessibilityLabel={t('petcare.prevDay')}
-                    >
-                      <ChevronLeft size={16} color={c.textFaint} />
-                    </Pressable>
-                    <Pressable onPress={() => setSelectedDay(todayISO())} hitSlop={6}>
-                      <Txt
-                        variant="label"
-                        style={{
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.5,
-                          color: selectedDay === today ? undefined : c.accent,
-                        }}
-                      >
-                        {selectedDay === today
-                          ? `${t('petcare.today')} · ${pet.name}`
-                          : selectedDay === addDaysISO(today, -1)
-                            ? t('pings.yesterday')
-                            : formatDay(selectedDay)}
-                      </Txt>
-                    </Pressable>
-                    {selectedDay < today ? (
-                      <Pressable
-                        onPress={() => setSelectedDay(addDaysISO(selectedDay, 1))}
-                        hitSlop={10}
-                        accessibilityLabel={t('petcare.nextDay')}
-                      >
-                        <ChevronRight size={16} color={c.textFaint} />
-                      </Pressable>
-                    ) : null}
-                  </View>
+                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
+                    {t('petcare.dailyRoutine')}
+                  </Txt>
                   <Pressable onPress={() => setRoutineOpen('daily')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
                     <Pencil size={15} color={c.textFaint} />
                   </Pressable>
                 </View>
+
+                {/* day selector — its own band, separated from title and list */}
+                <View style={{ height: 1, backgroundColor: c.border }} />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: sp.sm,
+                  }}
+                >
+                  <Pressable
+                    onPress={() => setSelectedDay(addDaysISO(selectedDay, -1))}
+                    hitSlop={10}
+                    accessibilityLabel={t('petcare.prevDay')}
+                    style={{ paddingHorizontal: sp.sm }}
+                  >
+                    <ChevronLeft size={20} color={c.textMuted} />
+                  </Pressable>
+                  <Pressable onPress={() => setSelectedDay(todayISO())} hitSlop={6}>
+                    <Txt
+                      style={{
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: selectedDay === today ? c.text : c.accent,
+                      }}
+                    >
+                      {selectedDay === today
+                        ? t('petcare.today')
+                        : selectedDay === addDaysISO(today, -1)
+                          ? t('pings.yesterday')
+                          : formatDay(selectedDay)}
+                    </Txt>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setSelectedDay(addDaysISO(selectedDay, 1))}
+                    hitSlop={10}
+                    accessibilityLabel={t('petcare.nextDay')}
+                    disabled={selectedDay >= today}
+                    style={{ paddingHorizontal: sp.sm, opacity: selectedDay < today ? 1 : 0.25 }}
+                  >
+                    <ChevronRight size={20} color={c.textMuted} />
+                  </Pressable>
+                </View>
+                <View style={{ height: 1, backgroundColor: c.border, marginBottom: sp.xs }} />
 
                 {checklist.length === 0 ? (
                   <View style={{ gap: sp.sm, paddingTop: sp.sm }}>
