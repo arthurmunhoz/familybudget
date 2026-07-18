@@ -9,7 +9,6 @@ export const en = {
   // Whereabouts — family location (Phase 1)
   'app.location.name': 'Whereabouts',
   'app.location.desc': 'See where everyone is',
-  'location.everyone': 'Everyone',
   'location.you': 'You',
   'location.live': 'Live',
   'location.recenter': 'Recenter',

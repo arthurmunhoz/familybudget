@@ -7,7 +7,6 @@ export const pt: Record<keyof typeof en, string> = {
   // Whereabouts — localização da família (Fase 1)
   'app.location.name': 'Localização',
   'app.location.desc': 'Veja onde todos estão',
-  'location.everyone': 'Todos',
   'location.you': 'Você',
   'location.live': 'Ao vivo',
   'location.recenter': 'Centralizar',

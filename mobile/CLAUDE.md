@@ -122,12 +122,21 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   is deliberately no detail modal — a sheet covered the very map you'd just
   focused. Consequences worth knowing before you touch this:
   - **The expanded card is the same HEIGHT as a collapsed one, only wider.** The
-    sheet must never grow, because Mapbox's logo and the OSM attribution are
+    roster must never grow, because Mapbox's logo and the OSM attribution are
     pinned just above it (`logoPosition`/`attributionPosition`) and covering them
     breaches ODbL. `MemberDetailCard` documents its 168pt height budget; text
     rows carry explicit `lineHeight` so that budget survives font metrics.
-  - The camera focus passes `padding.paddingBottom = SHEET_CHROME + CARD_H`, or
-    it would centre the member behind the card you just opened.
+  - **The roster FLOATS on the map — there is no panel behind it.** Each card
+    carries its own opaque fill + `FLOAT_SHADOW` instead. The fill MUST be
+    `c.sheet`: `c.surface` is translucent under the glass skin (10% white in
+    Dusk) and a card using it would all but disappear over the tiles — the same
+    trap as `c.card`, one layer down. The scroll strip still swallows touches
+    across its full width even though it looks like open map (a horizontal
+    ScrollView has to claim the gesture), so it's kept to just the cards' height.
+  - `ROSTER_HEIGHT` (= `CARD_H + ROSTER_CHROME`) is the single source for both
+    the camera's `padding.paddingBottom` — without it a focused member is
+    centred behind the card you just opened — and `MAP_CREDIT_BOTTOM`. Keep them
+    DERIVED; a hand-typed offset is how the attribution ends up under a card.
   - Only ONE detail card is mounted at a time, which is why the ETA /
     reverse-geocode / `useWatchLive` hooks live inside it — a household of ten
     must not fire ten Directions requests. Live mode now starts on EXPAND and

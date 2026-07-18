@@ -44,7 +44,7 @@ import { useWatchLive } from '@/lib/liveLocation'
 import { placeAt } from '@/lib/places'
 import type { MemberLocation, Place, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { CARD_H, CARD_W_EXPANDED, MemberAvatar, WatchingChip, timeAgo } from './locationUi'
+import { CARD_H, CARD_W_EXPANDED, FLOAT_SHADOW, MemberAvatar, WatchingChip, timeAgo } from './locationUi'
 
 /** One compact stat. The ETA tile is `primary` so it reads first. */
 function Stat({ label, value, primary }: { label: string; value: string; primary?: boolean }) {
@@ -235,12 +235,16 @@ export function MemberDetailCard({
       style={{
         width: CARD_W_EXPANDED,
         height: CARD_H,
-        backgroundColor: c.surface,
+        // c.sheet, NOT c.surface — this floats straight on the map, and surface
+        // is translucent under the glass skin (10% white in Dusk), which would
+        // let the tiles show through the text. Same rule as any map panel.
+        backgroundColor: c.sheet,
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: c.accent,
         padding: sp.md,
         gap: sp.sm,
+        ...FLOAT_SHADOW,
       }}
     >
       {/* Header: who, where, and a way back to the compact card. */}

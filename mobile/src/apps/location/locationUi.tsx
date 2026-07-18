@@ -16,17 +16,33 @@ import type { TKey } from '@/lib/i18n'
  *  and the camera padding.
  *
  *  THE HEIGHT IS THE SAME IN BOTH STATES ON PURPOSE — expanding grows the card
- *  sideways only. The bottom sheet therefore never changes height, which matters
- *  for more than tidiness: Mapbox's logo and the OpenStreetMap attribution are
- *  pinned just above the sheet, and covering them breaches ODbL. A sheet that
+ *  sideways only. The roster therefore never changes height, which matters for
+ *  more than tidiness: Mapbox's logo and the OpenStreetMap attribution are
+ *  pinned just above the cards, and covering them breaches ODbL. A roster that
  *  grew on tap would either hide them or need its offset re-pushed to native on
  *  every tap. Keep these two heights equal. */
 export const CARD_W = 138
 export const CARD_H = 168
 export const CARD_W_EXPANDED = 300
-/** Sheet chrome above/below the cards (title row + paddings + border), used to
- *  work out how much map the sheet hides when framing someone. */
-export const SHEET_CHROME = 65
+/** Breathing room the floating roster needs around the cards themselves.
+ *  A horizontal ScrollView clips to its bounds, so without the shadow padding
+ *  the cards' drop shadows would be sliced off top and bottom. */
+export const ROSTER_SHADOW_PAD = 10
+export const ROSTER_BOTTOM_GAP = 12
+/** Everything the roster occupies besides the card. CARD_H + this is how much
+ *  map it covers, which is what BOTH the camera padding and the Mapbox logo
+ *  offset are derived from — keep them derived, never hardcode a total. */
+export const ROSTER_CHROME = ROSTER_SHADOW_PAD * 2 + ROSTER_BOTTOM_GAP
+
+/** Cards float directly on the map, so they carry their own lift. Matches the
+ *  Toast's shadow — the app's other free-floating element. */
+export const FLOAT_SHADOW = {
+  shadowColor: '#000',
+  shadowOpacity: 0.22,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 5 },
+  elevation: 6,
+} as const
 
 // Distinct, warm-leaning member colors that read on both Paper and Dusk.
 export const MEMBER_PALETTE = [

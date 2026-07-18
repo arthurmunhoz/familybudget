@@ -48,8 +48,11 @@ import {
   buildMemberColors,
   CARD_H,
   CARD_W,
+  FLOAT_SHADOW,
   MemberAvatar,
-  SHEET_CHROME,
+  ROSTER_BOTTOM_GAP,
+  ROSTER_CHROME,
+  ROSTER_SHADOW_PAD,
   timeAgo,
   WatchingChip,
 } from './locationUi'
@@ -74,6 +77,13 @@ if (MAPBOX_TOKEN) {
 const DRIVING_SPEED_MS = 3.5 // ~12.6 km/h — above walking pace → "Driving"
 const INITIAL_ZOOM = 13 // frame the user + their neighborhood on first open (not too tight)
 const FOCUS_ZOOM = 15 // closer, for when you've picked one person to look at
+
+/** How much map the floating roster covers, bottom-up. Derived, not typed in by
+ *  hand: it decides where a focused member gets centred AND where Mapbox's logo
+ *  and the OSM attribution sit, and the latter must never end up underneath a
+ *  card (that's an ODbL breach, not a cosmetic bug). */
+const ROSTER_HEIGHT = CARD_H + ROSTER_CHROME
+const MAP_CREDIT_BOTTOM = ROSTER_HEIGHT + 12
 
 /** Member profiles' photo + phone, keyed by email (for pins + the Call button). */
 async function fetchMemberMeta(): Promise<{
@@ -170,12 +180,16 @@ function MemberCard({
         {
           width: CARD_W,
           height: CARD_H,
-          backgroundColor: c.surface,
+          // c.sheet, NOT c.surface — these float straight on the map now, and
+          // surface is translucent under the glass skin (10% white in Dusk),
+          // which would leave the card all but invisible over the tiles.
+          backgroundColor: c.sheet,
           borderRadius: radius.lg,
           paddingVertical: sp.md,
           paddingHorizontal: sp.sm,
           alignItems: 'center',
           gap: 5,
+          ...FLOAT_SHADOW,
         },
         pressed && { opacity: 0.7 },
       ]}
@@ -448,7 +462,7 @@ export default function Whereabouts() {
             paddingTop: 0,
             paddingLeft: 0,
             paddingRight: 0,
-            paddingBottom: SHEET_CHROME + CARD_H,
+            paddingBottom: ROSTER_HEIGHT,
           },
         })
       }
@@ -524,10 +538,11 @@ export default function Whereabouts() {
             compassEnabled={false}
             // Mapbox's ToS requires the logo, and OpenStreetMap's ODbL requires
             // the attribution, so both must stay visible — but they're tucked
-            // into the bottom-left just above the roster sheet, the least
-            // intrusive spot that isn't covered by it.
-            logoPosition={{ bottom: 332, left: 12 }}
-            attributionPosition={{ bottom: 332, left: 92 }}
+            // into the bottom-left just above the floating roster, the least
+            // intrusive spot that isn't covered by it. Derived from the roster's
+            // real height so the two can't drift apart.
+            logoPosition={{ bottom: MAP_CREDIT_BOTTOM, left: 12 }}
+            attributionPosition={{ bottom: MAP_CREDIT_BOTTOM, left: 92 }}
           >
             <Camera
               ref={cameraRef}
@@ -653,33 +668,35 @@ export default function Whereabouts() {
           </View>
         ) : null}
 
-        {/* Bottom sheet — one card per member, scrolled HORIZONTALLY so the sheet
-            is exactly as tall for a household of 2 as for one of 10. Your own
-            card is the entry point to your sharing controls. */}
+        {/* The roster FLOATS on the map — no panel behind it, so the map reads
+            edge to edge and the cards look like they're sitting on top of it.
+            Each card brings its own opaque fill + shadow instead.
+            One card per member, scrolled HORIZONTALLY so the roster is exactly
+            as tall for a household of 2 as for one of 10. Your own card is the
+            entry point to your sharing controls.
+            NOTE: this strip still swallows touches over its full width even
+            though it now looks like open map — a horizontal ScrollView has to
+            claim the gesture. It's kept to exactly the cards' height so the
+            dead band is as small as possible; pan the map above it. */}
         <View
           style={{
             position: 'absolute',
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: c.sheet,
-            borderTopLeftRadius: 22,
-            borderTopRightRadius: 22,
-            paddingTop: sp.md,
-            paddingBottom: sp.xl,
-            borderTopWidth: 1,
-            borderColor: c.border,
+            paddingBottom: ROSTER_BOTTOM_GAP,
           }}
         >
-          {/* No grab handle: this sheet is fixed, and a handle implies it drags. */}
-          <View style={{ paddingHorizontal: sp.lg, marginBottom: sp.sm }}>
-            <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('location.everyone')}</Txt>
-          </View>
           <ScrollView
             ref={rosterRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: sp.sm, paddingHorizontal: sp.lg }}
+            contentContainerStyle={{
+              gap: sp.sm,
+              paddingHorizontal: sp.lg,
+              // Room for the cards' shadows — the scroll view clips to bounds.
+              paddingVertical: ROSTER_SHADOW_PAD,
+            }}
           >
             {rows.map((p) => {
               const loc = locByEmail.get(p.email)
