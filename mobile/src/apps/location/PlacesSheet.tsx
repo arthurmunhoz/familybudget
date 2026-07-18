@@ -114,7 +114,6 @@ export function PlacesSheet({
               maxHeight: '85%',
             }}
           >
-            <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center' }} />
             <View>
               <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 22, color: c.text }}>
                 {t('location.places.title')}

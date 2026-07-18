@@ -262,7 +262,6 @@ export function MemberSheet({
             gap: sp.md,
           }}
         >
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center' }} />
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
             <MemberAvatar name={profile.display_name} avatarPath={avatarPath} color={color} size={54} />
