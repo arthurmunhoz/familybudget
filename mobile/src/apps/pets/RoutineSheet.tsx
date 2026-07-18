@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react'
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { GripVertical, Plus, X } from 'lucide-react-native'
+import { GripVertical, Plus, Trash2, X } from 'lucide-react-native'
 
 import { DraggableList } from '@/components/DraggableList'
 import { Btn, Field, Txt } from '@/components/ui'
@@ -20,19 +20,25 @@ import { templateTasks } from '@/lib/petCare'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetTaskIcon } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
-import { CARE_ICONS, CARE_ICON_IDS, Pill_ } from './petUi'
+import { CARE_ICONS, CARE_ICON_IDS } from './petUi'
 
 const ROW_H = 52
+// iPhones get screen-corner-like rounding on the sheet; Android keeps the norm.
+const SHEET_RADIUS = Platform.OS === 'ios' ? 40 : radius.lg
 
 export function RoutineSheet({
   pet,
   tasks,
+  section,
   onClose,
   onChanged,
 }: {
   pet: Pet
-  /** This pet's tasks (both kinds). */
+  /** This pet's tasks (both kinds — the template check needs the full picture). */
   tasks: PetCareTask[]
+  /** Which section's pencil opened this: only that group is shown, and a new
+   *  task belongs to it (so there's no Repeats selector to explain). */
+  section: 'daily' | 'interval'
   onClose: () => void
   /** Reload + widget notify — called after every successful write. */
   onChanged: () => void
@@ -45,7 +51,7 @@ export function RoutineSheet({
   const [editing, setEditing] = useState<PetCareTask | 'new' | null>(null)
   const [title, setTitle] = useState('')
   const [icon, setIcon] = useState<PetTaskIcon>('paw')
-  const [kind, setKind] = useState<'daily' | 'interval'>('daily')
+  const kind = section
   const [intervalDays, setIntervalDays] = useState('7')
 
   const daily = useMemo(
@@ -63,8 +69,7 @@ export function RoutineSheet({
   function openNew() {
     setEditing('new')
     setTitle('')
-    setIcon('paw')
-    setKind('daily')
+    setIcon(section === 'interval' ? 'bath' : 'paw')
     setIntervalDays('7')
   }
 
@@ -72,7 +77,6 @@ export function RoutineSheet({
     setEditing(task)
     setTitle(task.title)
     setIcon(task.icon)
-    setKind(task.kind)
     setIntervalDays(String(task.interval_days ?? 7))
   }
 
@@ -157,7 +161,6 @@ export function RoutineSheet({
   }
 
   function row(task: PetCareTask, draggable: boolean) {
-    const Icon = CARE_ICONS[task.icon] ?? CARE_ICONS.paw
     return (
       <View
         style={{
@@ -169,7 +172,6 @@ export function RoutineSheet({
         }}
       >
         {draggable ? <GripVertical size={16} color={c.textFaint} /> : null}
-        <Icon size={18} color={c.accent} />
         <Pressable onPress={() => openEdit(task)} style={{ flex: 1, minWidth: 0 }}>
           <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
             {task.title}
@@ -181,7 +183,7 @@ export function RoutineSheet({
           ) : null}
         </Pressable>
         <Pressable onPress={() => remove(task)} hitSlop={8} accessibilityLabel={t('petcare.deleteTask')}>
-          <X size={16} color={c.textFaint} />
+          <Trash2 size={16} color={c.textFaint} />
         </Pressable>
       </View>
     )
@@ -190,13 +192,19 @@ export function RoutineSheet({
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View
+        {/* Tapping the dimmed backdrop dismisses; taps inside the sheet don't. */}
+        <Pressable
+          onPress={onClose}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+        >
+          <Pressable
+            onPress={() => {}}
             style={{
               maxHeight: '88%',
               backgroundColor: c.sheet,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
+              // iPhones get screen-corner-like rounding; Android keeps the norm.
+              borderTopLeftRadius: SHEET_RADIUS,
+              borderTopRightRadius: SHEET_RADIUS,
             }}
           >
             <View
@@ -205,14 +213,19 @@ export function RoutineSheet({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 paddingHorizontal: sp.lg,
-                paddingTop: sp.lg,
-                paddingBottom: sp.sm,
+                paddingTop: sp.xl,
+                paddingBottom: sp.lg,
               }}
             >
               <Txt variant="h2">
-                {pet.emoji} {t('petcare.editRoutine')}
+                {t(section === 'daily' ? 'petcare.today' : 'petcare.routines')} · {pet.name}
               </Txt>
-              <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')}>
+              <Pressable
+                onPress={onClose}
+                hitSlop={10}
+                accessibilityLabel={t('common.close')}
+                style={{ marginRight: sp.sm, marginTop: 2 }}
+              >
                 <X size={22} color={c.textMuted} />
               </Pressable>
             </View>
@@ -226,20 +239,12 @@ export function RoutineSheet({
                 <Btn title={t('petcare.useTemplate')} variant="secondary" onPress={seedTemplate} loading={busy} />
               ) : null}
 
-              {daily.length > 0 ? (
-                <View>
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-                    {t('petcare.kindDaily')}
-                  </Txt>
-                  <DraggableList data={daily} rowHeight={ROW_H} onReorder={reorder} renderItem={(item) => row(item, true)} />
-                </View>
+              {section === 'daily' && daily.length > 0 ? (
+                <DraggableList data={daily} rowHeight={ROW_H} onReorder={reorder} renderItem={(item) => row(item, true)} />
               ) : null}
 
-              {intervals.length > 0 ? (
+              {section === 'interval' && intervals.length > 0 ? (
                 <View>
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
-                    {t('petcare.routines')}
-                  </Txt>
                   {intervals.map((task) => (
                     <View key={task.id}>{row(task, false)}</View>
                   ))}
@@ -254,8 +259,13 @@ export function RoutineSheet({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
-                  paddingVertical: 12,
-                  borderRadius: radius.md,
+                  paddingVertical: 14,
+                  // Bottom corners follow the sheet's iPhone-screen curve
+                  // (SHEET_RADIUS is the normal radius on Android).
+                  borderTopLeftRadius: radius.md,
+                  borderTopRightRadius: radius.md,
+                  borderBottomLeftRadius: SHEET_RADIUS,
+                  borderBottomRightRadius: SHEET_RADIUS,
                   borderWidth: 1,
                   borderStyle: 'dashed',
                   borderColor: c.textFaint,
@@ -265,8 +275,8 @@ export function RoutineSheet({
                 <Txt style={{ fontWeight: '600', color: c.textMuted }}>{t('petcare.addTask')}</Txt>
               </Pressable>
             </ScrollView>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
 
         {/* task editor */}
         {editing !== null && (
@@ -304,18 +314,7 @@ export function RoutineSheet({
                   })}
                 </View>
 
-                {/* daily vs every-N-days */}
-                <View style={{ gap: 6 }}>
-                  <Txt variant="label">{t('petcare.repeats')}</Txt>
-                  <View style={{ flexDirection: 'row', gap: sp.sm }}>
-                    <Pill_ active={kind === 'daily'} onPress={() => setKind('daily')}>
-                      {t('petcare.kindDaily')}
-                    </Pill_>
-                    <Pill_ active={kind === 'interval'} onPress={() => setKind('interval')}>
-                      {t('petcare.kindInterval')}
-                    </Pill_>
-                  </View>
-                </View>
+                {/* The section decides daily vs interval — no selector needed. */}
                 {kind === 'interval' ? (
                   <Field
                     label={t('petcare.intervalDays')}

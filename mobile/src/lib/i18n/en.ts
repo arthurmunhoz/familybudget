@@ -478,7 +478,7 @@ export const en = {
   'petcare.noDaily': 'No daily tasks yet — set up the routine.',
   'petcare.noRoutines': 'No care routines yet.',
   'petcare.every': 'every {days}d',
-  'petcare.addTask': '＋ Add task',
+  'petcare.addTask': 'Add task',
   'petcare.newTask': 'New task',
   'petcare.editTask': 'Edit task',
   'petcare.taskTitleHint': 'Task name…',

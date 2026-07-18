@@ -16,7 +16,8 @@ import { Alert, Animated, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Image } from 'expo-image'
-import { Check, PawPrint, Pencil, Plus, X } from 'lucide-react-native'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+import { Check, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -28,7 +29,7 @@ import { dailyChecklist, routineStatus } from '@/lib/petCare'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetEvent, PetTaskDone } from '@/lib/types'
-import { syncPetCareWidget, type PetCareWidgetPet } from '@/lib/widget'
+import { syncPetCareWidget, syncPetPhoto, type PetCareWidgetPet } from '@/lib/widget'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { CARE_ICONS, TYPE_ICON } from './petUi'
 import { speciesEmoji } from './petMeta'
@@ -52,6 +53,35 @@ const emptyDraft: EventDraft = {
   date: todayISO(),
   nextDue: '',
   notes: '',
+}
+
+// Which photo_path each pet's widget thumbnail was mirrored from — module-level
+// so re-mounts don't re-download unchanged photos.
+const mirroredPhotos: Record<string, string> = {}
+
+/** Downscale a pet photo to a ~160px JPEG and mirror it into the App Group so
+ *  the widget shows the actual pet. Best-effort; failures leave the widget on
+ *  its initial-letter fallback. */
+async function mirrorPetPhoto(petId: string, photoPath: string, url: string): Promise<void> {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader()
+      r.onloadend = () => resolve(r.result as string)
+      r.onerror = reject
+      r.readAsDataURL(blob)
+    })
+    const ctx = ImageManipulator.manipulate(dataUri).resize({ width: 160 })
+    const ref = await ctx.renderAsync()
+    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7, base64: true })
+    if (out.base64) {
+      syncPetPhoto(petId, out.base64)
+      mirroredPhotos[petId] = photoPath
+    }
+  } catch {
+    /* ignore — the widget falls back to the initial */
+  }
 }
 
 /** Best-effort: tell the server someone changed pet care, so it silent-pushes
@@ -83,7 +113,8 @@ export default function PetCare() {
   const [selectedPet, setSelectedPet] = useState<string | null>(null)
   const [showAllHistory, setShowAllHistory] = useState(false)
   const [showPetForm, setShowPetForm] = useState(false)
-  const [routineOpen, setRoutineOpen] = useState(false)
+  // Which section's editor is open (each pencil opens ONLY its own group).
+  const [routineOpen, setRoutineOpen] = useState<'daily' | 'interval' | null>(null)
   const [showEventForm, setShowEventForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null)
   const [draft, setDraft] = useState<EventDraft>(emptyDraft)
@@ -147,6 +178,16 @@ export default function PetCare() {
   useEffect(() => {
     setOverlay({})
   }, [done])
+
+  // Mirror pet photos into the App Group for the widget (only when changed).
+  useEffect(() => {
+    for (const p of pets) {
+      const url = petPhotoUrls[p.id]
+      if (p.photo_path && url && mirroredPhotos[p.id] !== p.photo_path) {
+        void mirrorPetPhoto(p.id, p.photo_path, url)
+      }
+    }
+  }, [pets, petPhotoUrls])
 
   const petsSorted = useMemo(() => [...pets].sort((a, b) => a.name.localeCompare(b.name)), [pets])
   const petById = useMemo(() => Object.fromEntries(pets.map((p) => [p.id, p])), [pets])
@@ -389,7 +430,7 @@ export default function PetCare() {
                   <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     {t('petcare.today')} · {pet.name}
                   </Txt>
-                  <Pressable onPress={() => setRoutineOpen(true)} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
+                  <Pressable onPress={() => setRoutineOpen('daily')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
                     <Pencil size={15} color={c.textFaint} />
                   </Pressable>
                 </View>
@@ -397,7 +438,7 @@ export default function PetCare() {
                 {checklist.length === 0 ? (
                   <View style={{ gap: sp.sm, paddingTop: sp.sm }}>
                     <Txt variant="muted">{t('petcare.noDaily')}</Txt>
-                    <Btn title={t('petcare.editRoutine')} variant="secondary" onPress={() => setRoutineOpen(true)} />
+                    <Btn title={t('petcare.editRoutine')} variant="secondary" onPress={() => setRoutineOpen('daily')} />
                   </View>
                 ) : (
                   <>
@@ -472,14 +513,14 @@ export default function PetCare() {
                   <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     {t('petcare.routines')}
                   </Txt>
-                  <Pressable onPress={() => setRoutineOpen(true)} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
+                  <Pressable onPress={() => setRoutineOpen('interval')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
                     <Pencil size={15} color={c.textFaint} />
                   </Pressable>
                 </View>
                 {routines.length === 0 ? (
                   <View style={{ gap: sp.sm, paddingTop: sp.sm }}>
                     <Txt variant="muted">{t('petcare.noRoutines')}</Txt>
-                    <Btn title={t('petcare.editRoutine')} variant="secondary" onPress={() => setRoutineOpen(true)} />
+                    <Btn title={t('petcare.editRoutine')} variant="secondary" onPress={() => setRoutineOpen('interval')} />
                   </View>
                 ) : (
                   routines.map(({ task, dueIn, lastDone }, i) => {
@@ -601,7 +642,7 @@ export default function PetCare() {
                           </Txt>
                         </View>
                         <Pressable onPress={() => removeEvent(e)} hitSlop={8} accessibilityLabel={t('common.delete')}>
-                          <X size={15} color={c.textFaint} />
+                          <Trash2 size={15} color={c.textFaint} />
                         </Pressable>
                       </Pressable>
                     )
@@ -628,7 +669,8 @@ export default function PetCare() {
         <RoutineSheet
           pet={pet}
           tasks={petTasks}
-          onClose={() => setRoutineOpen(false)}
+          section={routineOpen}
+          onClose={() => setRoutineOpen(null)}
           onChanged={afterMutation}
         />
       ) : null}

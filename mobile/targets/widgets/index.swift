@@ -139,8 +139,8 @@ private let sampleBudget = BudgetInfo(
     BudgetEntryRow(emoji: "📺", label: "Netflix", amount: 16, type: "expense"),
   ])
 
-// Two small deep-link action buttons (Scan / Add) — shared by the Budget widget
-// (medium/large) and the Quick Add widget.
+// Two small deep-link action buttons (Scan / Add) for the Budget widget
+// (medium/large).
 struct AddEntryButtons: View {
   let budgetId: String
   let monthId: String
@@ -360,7 +360,6 @@ struct OneRoofWidgets: WidgetBundle {
     BudgetWidget()
     NudgesWidget()
     TodayWidget()
-    QuickAddWidget()
     PetCareWidget()
   }
 }

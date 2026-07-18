@@ -476,7 +476,7 @@ export const es: Record<keyof typeof en, string> = {
   'petcare.noDaily': 'Sin tareas diarias aún — configura la rutina.',
   'petcare.noRoutines': 'Sin rutinas de cuidado aún.',
   'petcare.every': 'cada {days}d',
-  'petcare.addTask': '＋ Agregar tarea',
+  'petcare.addTask': 'Agregar tarea',
   'petcare.newTask': 'Nueva tarea',
   'petcare.editTask': 'Editar tarea',
   'petcare.taskTitleHint': 'Nombre de la tarea…',
