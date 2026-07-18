@@ -262,13 +262,28 @@ struct BudgetWidgetView: View {
   var entry: BudgetEntry
   @Environment(\.widgetFamily) var family
   private var theme: WarmHearth { appTheme() }
+  private var isSmall: Bool { family == .systemSmall }
+  /// Budget name. Small stays at caption size — that tile is already tight and
+  /// the balance figure is what it's there for; the wider sizes have the room to
+  /// let the name read as an actual header.
+  private var nameSize: CGFloat {
+    switch family {
+    case .systemSmall: return 12
+    case .systemMedium: return 16
+    default: return 18
+    }
+  }
 
   var body: some View {
     if let b = entry.budget {
       VStack(alignment: .leading, spacing: 8) {
         HStack(spacing: 6) {
-          Image(systemName: "creditcard").font(.caption)
-          Text(b.name).font(.caption).foregroundStyle(theme.textMuted).lineLimit(1)
+          Image(systemName: "creditcard").font(.system(size: nameSize - 1))
+          Text(b.name)
+            .font(.system(size: nameSize, weight: isSmall ? .regular : .semibold))
+            .foregroundStyle(theme.textMuted)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
         Spacer(minLength: 0)
         if family == .systemSmall {

@@ -356,6 +356,9 @@ struct TodayWidgetView: View {
   var entry: TodayEntry
   @Environment(\.widgetFamily) var family
   private var theme: WarmHearth { appTheme() }
+  // The widget's background is appTheme().bg (the app's MANUAL light/dark
+  // choice, not the system's), so contrast is judged against that same signal.
+  private var lightMode: Bool { groupDefaults()?.string(forKey: "widget_theme") != "dark" }
 
   private var maxItems: Int {
     switch family {
@@ -381,14 +384,25 @@ struct TodayWidgetView: View {
           }
           Spacer(minLength: 4)
           if let temp = info.temp {
-            VStack(alignment: .trailing, spacing: 0) {
-              HStack(spacing: 3) {
+            // In LIGHT mode the glyph + temperature washed into the widget's
+            // pale background, so they get their own white chip with a soft
+            // clay edge. Dark mode already separates cleanly — left borderless.
+            VStack(alignment: .trailing, spacing: 3) {
+              HStack(spacing: 4) {
                 Image(systemName: weatherSymbol(info.code ?? -1))
                   .font(.system(size: 14))
                   .symbolRenderingMode(.multicolor)
                 Text("\(Int(temp))\(info.unit ?? "°")")
                   .font(.system(size: isSmall ? 14 : 16, weight: .bold))
+                  .foregroundStyle(lightMode ? theme.text : Color.primary)
               }
+              .padding(.horizontal, lightMode ? 8 : 0)
+              .padding(.vertical, lightMode ? 5 : 0)
+              .background(lightMode ? theme.card : Color.clear)
+              .clipShape(RoundedRectangle(cornerRadius: 10))
+              .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                  .stroke(lightMode ? theme.accent.opacity(0.3) : Color.clear, lineWidth: 1))
               if !isSmall, let city = info.city {
                 Text(city).font(.system(size: 10)).foregroundStyle(theme.textMuted).lineLimit(1)
               }
@@ -408,7 +422,7 @@ struct TodayWidgetView: View {
           }
           .padding(.horizontal, 8)
           .padding(.vertical, 6)
-          .background(theme.accent.opacity(0.15))
+          .background(theme.accent.opacity(lightMode ? 0.22 : 0.15))
           .clipShape(RoundedRectangle(cornerRadius: 8))
         }
 
