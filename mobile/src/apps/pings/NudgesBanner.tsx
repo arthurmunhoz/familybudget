@@ -165,7 +165,14 @@ export default function NudgesBanner() {
         return (
           <View
             key={p.id}
-            style={[styles.row, { backgroundColor: c.card, borderLeftColor: isHigh ? c.expense : c.accent }]}
+            style={[
+              styles.row,
+              {
+                backgroundColor: c.card,
+                borderColor: c.border,
+                borderLeftColor: isHigh ? c.expense : c.accent,
+              },
+            ]}
           >
             {/* Body → deep-link to the Past tab, highlighting this nudge. */}
             <Pressable
@@ -188,25 +195,36 @@ export default function NudgesBanner() {
                 and dismiss the banner — without having to call. Other nudges just
                 get Got it. */}
             <View style={styles.actions}>
+              {/* Call is the primary, urgent action → filled. */}
               {isHigh && phone ? (
                 <Pressable
                   onPress={() => void Linking.openURL(`tel:${phone}`)}
-                  style={[styles.actionBtn, { backgroundColor: c.expense }]}
+                  style={[
+                    styles.actionBtn,
+                    // Same 1.5 border as the outlined Got it (just invisible here)
+                    // so the two buttons end up exactly the same height.
+                    { backgroundColor: c.expense, borderWidth: 1.5, borderColor: c.expense },
+                  ]}
                   accessibilityRole="button"
                   accessibilityLabel={t('pings.call')}
                 >
                   <Phone size={14} strokeWidth={2.5} color="#ffffff" />
-                  <Txt style={styles.actionTxt}>{t('pings.call')}</Txt>
+                  <Txt style={[styles.actionTxt, { color: '#ffffff' }]}>{t('pings.call')}</Txt>
                 </Pressable>
               ) : null}
+              {/* Got it is the quiet acknowledge → outlined, so it never competes
+                  with Call when both are on screen. */}
               <Pressable
                 onPress={() => ack(p.id)}
-                style={[styles.actionBtn, { backgroundColor: c.accent }]}
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.accent },
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={t('pings.gotIt')}
               >
-                <ThumbsUp size={14} strokeWidth={2.5} color="#ffffff" />
-                <Txt style={styles.actionTxt}>{t('pings.gotIt')}</Txt>
+                <ThumbsUp size={14} strokeWidth={2.5} color={c.accent} />
+                <Txt style={[styles.actionTxt, { color: c.accent }]}>{t('pings.gotIt')}</Txt>
               </Pressable>
             </View>
           </View>
@@ -221,7 +239,15 @@ export default function NudgesBanner() {
           ? t('pings.seenBy', { names: ackers.join(', ') })
           : t('pings.noAcks')
         return (
-          <View key={p.id} style={[styles.row, { backgroundColor: c.surface }]}>
+          <View
+            key={p.id}
+            style={[
+              styles.row,
+              // Same glass card as a received nudge — only the rail colour says
+              // which it is (muted = one I sent, nothing to act on).
+              { backgroundColor: c.card, borderColor: c.border, borderLeftColor: c.textFaint },
+            ]}
+          >
             <Pressable
               onPress={() => router.push({ pathname: '/pings', params: { tab: 'past', focus: p.id } })}
               style={styles.body}
@@ -255,11 +281,15 @@ export default function NudgesBanner() {
 }
 
 const styles = StyleSheet.create({
+  // One shared shape for BOTH received and sent nudges — glass card, hairline
+  // rim, colour-coded left rail. Only the rail colour and the trailing control
+  // differ, so they read as one component in two states.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.sm,
     borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
     borderLeftWidth: 4,
     borderLeftColor: 'transparent',
     paddingVertical: 10,
@@ -277,7 +307,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  actionTxt: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
+  // Colour is set per-button (filled Call = white, outlined Got it = accent).
+  actionTxt: { fontWeight: '700', fontSize: 13 },
   dismissBtn: {
     height: 30,
     width: 30,
