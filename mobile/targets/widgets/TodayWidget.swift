@@ -290,20 +290,6 @@ func alertSymbol(_ kind: String) -> String {
   }
 }
 
-/// True when the code's multicolour glyph is essentially WHITE — overcast, fog
-/// and snow (`cloud.fill` / `cloud.fog.fill` / `cloud.snow.fill`) — so it needs
-/// a solid tint to survive the light chip. Codes whose glyph carries its own
-/// strong colour keep their natural multicolour: sun (yellow), sun-behind-cloud,
-/// the thunderstorm bolt (yellow) and rain/drizzle (blue drops).
-func weatherGlyphIsPale(_ code: Int) -> Bool {
-  switch code {
-  case 0, 1, 2: return false                    // sun.max / cloud.sun
-  case 51...57, 61...67, 80...82: return false  // drizzle / rain
-  case 95...99: return false                    // thunderstorm
-  default: return true                          // overcast, fog, snow, unknown
-  }
-}
-
 // WMO weather code → SF Symbol (matches lib/weather.ts weatherIcon).
 func weatherSymbol(_ code: Int) -> String {
   switch code {
@@ -373,8 +359,6 @@ struct TodayWidgetView: View {
   // The widget's background is appTheme().bg (the app's MANUAL light/dark
   // choice, not the system's), so contrast is judged against that same signal.
   private var lightMode: Bool { groupDefaults()?.string(forKey: "widget_theme") != "dark" }
-  /// Tint the glyph clay only when it'd otherwise be white-on-white.
-  private func needsTint(_ code: Int?) -> Bool { lightMode && weatherGlyphIsPale(code ?? -1) }
 
   private var maxItems: Int {
     switch family {
@@ -401,33 +385,31 @@ struct TodayWidgetView: View {
           Spacer(minLength: 4)
           if let temp = info.temp {
             // In LIGHT mode the glyph + temperature washed into the widget's
-            // pale background, so they get their own chip with a soft clay
-            // edge. Dark mode already separates cleanly — left borderless.
+            // pale background, so they sit on a dark chip. Dark mode already
+            // separates cleanly — no chip there.
             VStack(alignment: .trailing, spacing: 3) {
               HStack(spacing: 4) {
-                // Sunny/stormy/rainy codes keep their natural colours; only the
-                // white glyphs (overcast, fog, snow) take a clay tint, which is
-                // what stops them vanishing into the light chip.
+                // Always the natural multicolour — clouds are WHITE by design,
+                // which is exactly why the chip below is dark rather than white.
                 Image(systemName: weatherSymbol(info.code ?? -1))
                   .font(.system(size: 14))
-                  .symbolRenderingMode(needsTint(info.code) ? .hierarchical : .multicolor)
-                  .foregroundStyle(needsTint(info.code) ? theme.accent : Color.primary)
+                  .symbolRenderingMode(.multicolor)
                 Text("\(Int(temp))\(info.unit ?? "°")")
                   .font(.system(size: isSmall ? 14 : 16, weight: .bold))
-                  .foregroundStyle(lightMode ? theme.text : Color.primary)
+                  .foregroundStyle(lightMode ? darkTheme.text : Color.primary)
                   // Never wrap the unit onto a second line — shrink instead, so
                   // three-digit temperatures ("100°F") still fit on one row.
                   .lineLimit(1)
                   .minimumScaleFactor(0.7)
                   .fixedSize(horizontal: false, vertical: true)
               }
-              .padding(.horizontal, lightMode ? 7 : 0)
-              .padding(.vertical, lightMode ? 4 : 0)
-              .background(lightMode ? theme.card : Color.clear)
-              .clipShape(RoundedRectangle(cornerRadius: 9))
-              .overlay(
-                RoundedRectangle(cornerRadius: 9)
-                  .stroke(lightMode ? theme.accent.opacity(0.3) : Color.clear, lineWidth: 1))
+              .padding(.horizontal, lightMode ? 8 : 0)
+              .padding(.vertical, lightMode ? 5 : 0)
+              // A white chip hid the white cloud glyphs. Light mode gets the
+              // app's own warm-espresso surface instead, so every symbol reads
+              // exactly as it already does in dark mode.
+              .background(lightMode ? darkTheme.card : Color.clear)
+              .clipShape(RoundedRectangle(cornerRadius: 10))
               if !isSmall, let city = info.city {
                 Text(city).font(.system(size: 10)).foregroundStyle(theme.textMuted).lineLimit(1)
               }
