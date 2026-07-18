@@ -28,7 +28,7 @@ export default function PetForm({
         <View
           style={{
             maxHeight: '92%',
-            backgroundColor: c.card,
+            backgroundColor: c.sheet,
             borderTopLeftRadius: radius.lg,
             borderTopRightRadius: radius.lg,
           }}

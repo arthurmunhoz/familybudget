@@ -265,7 +265,7 @@ export default function Budgets() {
               {/* Swallow taps so pressing the card doesn't dismiss the keyboard. */}
               <Pressable
                 onPress={() => {}}
-                style={{ backgroundColor: c.card, borderRadius: 18, padding: sp.lg, gap: sp.md }}
+                style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Txt variant="h2">{t('budget.newTitle')}</Txt>
@@ -552,7 +552,7 @@ function PeriodDropdown({
               right: pos.right,
               minWidth: 180,
               maxHeight: 280,
-              backgroundColor: c.card,
+              backgroundColor: c.sheet,
               borderRadius: radius.md,
               borderWidth: 1,
               borderColor: c.border,

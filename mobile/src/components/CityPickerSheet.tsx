@@ -69,7 +69,7 @@ export function CityPickerSheet({ onClose, onSaved }: { onClose: () => void; onS
           <View
             style={{
               maxHeight: '88%',
-              backgroundColor: c.card,
+              backgroundColor: c.sheet,
               borderTopLeftRadius: radius.lg,
               borderTopRightRadius: radius.lg,
             }}

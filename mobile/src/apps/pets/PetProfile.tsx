@@ -2,17 +2,19 @@
 // a pet card, so the fields are editable in place (via the shared PetEditor):
 // no separate "edit" step. Below the editor: that pet's event history
 // (read-only) and a delete-pet action.
-import { Alert, Pressable, View } from 'react-native'
+import { useState } from 'react'
+import { Alert, Pressable, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
+import { Scale, X } from 'lucide-react-native'
 
 import { AppHeader, Loader, Screen, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
-import { formatDay } from '@/lib/format'
+import { formatDay, todayISO } from '@/lib/format'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
-import type { Pet, PetEvent } from '@/lib/types'
+import type { Pet, PetEvent, PetWeight } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { TYPE_ICON } from './petUi'
 import { PetEditor } from './PetEditor'
@@ -21,24 +23,58 @@ export default function PetProfile({ petId }: { petId: string }) {
   const { c } = useTheme()
   const { t } = useI18n()
 
+  const [newWeight, setNewWeight] = useState('')
+  const [savingWeight, setSavingWeight] = useState(false)
+
   const {
-    data: { pet, events } = { pet: null, events: [] },
+    data: { pet, events, weights } = { pet: null, events: [], weights: [] },
     loading,
     revalidate: load,
-  } = useCachedQuery<{ pet: Pet | null; events: PetEvent[] }>(`pet:${petId}`, async () => {
-    const [petRes, evRes] = await Promise.all([
-      supabase.from('pets').select('*').eq('id', petId).single(),
-      supabase
-        .from('pet_events')
-        .select('*')
-        .eq('pet_id', petId)
-        .order('event_date', { ascending: false }),
-    ])
-    return {
-      pet: (petRes.data as Pet | null) ?? null,
-      events: (evRes.data ?? []) as PetEvent[],
+  } = useCachedQuery<{ pet: Pet | null; events: PetEvent[]; weights: PetWeight[] }>(
+    `pet:${petId}`,
+    async () => {
+      const [petRes, evRes, wRes] = await Promise.all([
+        supabase.from('pets').select('*').eq('id', petId).single(),
+        supabase
+          .from('pet_events')
+          .select('*')
+          .eq('pet_id', petId)
+          .order('event_date', { ascending: false }),
+        supabase
+          .from('pet_weights')
+          .select('*')
+          .eq('pet_id', petId)
+          .order('measured_on', { ascending: false }),
+      ])
+      return {
+        pet: (petRes.data as Pet | null) ?? null,
+        events: (evRes.data ?? []) as PetEvent[],
+        weights: (wRes.data ?? []) as PetWeight[],
+      }
+    },
+  )
+
+  async function addWeight() {
+    const value = Number(newWeight.replace(',', '.'))
+    if (!pet || savingWeight || !value || value <= 0) return
+    setSavingWeight(true)
+    const { error } = await supabase
+      .from('pet_weights')
+      .insert({ pet_id: pet.id, weight: value, measured_on: todayISO() })
+    setSavingWeight(false)
+    if (error) {
+      Alert.alert(t('pets.saveFailed'))
+      return
     }
-  })
+    track('pet.weight_logged', { pet: pet.name, weight: value })
+    setNewWeight('')
+    load()
+  }
+
+  async function removeWeight(w: PetWeight) {
+    await supabase.from('pet_weights').delete().eq('id', w.id)
+    load()
+  }
 
   function goBack() {
     if (router.canGoBack()) router.back()
@@ -78,6 +114,74 @@ export default function PetProfile({ petId }: { petId: string }) {
       <View style={{ gap: sp.xl, paddingTop: sp.sm }}>
         {/* editable fields */}
         <PetEditor pet={pet} onSaved={load} />
+
+        {/* weight log — quick to update at a vet visit */}
+        <View style={{ gap: sp.sm }}>
+          <Txt
+            style={{
+              fontSize: 12,
+              fontWeight: '600',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              color: c.textFaint,
+            }}
+          >
+            {t('petcare.weightLog')}
+          </Txt>
+          <View style={{ flexDirection: 'row', gap: sp.sm }}>
+            <TextInput
+              value={newWeight}
+              onChangeText={setNewWeight}
+              placeholder={t('petcare.weightHint')}
+              placeholderTextColor={c.textFaint}
+              keyboardType="decimal-pad"
+              style={{
+                flex: 1,
+                backgroundColor: c.surface,
+                borderRadius: radius.md,
+                paddingHorizontal: sp.md,
+                paddingVertical: 10,
+                fontSize: 16,
+                color: c.text,
+              }}
+            />
+            <Pressable
+              onPress={addWeight}
+              disabled={savingWeight || !newWeight.trim()}
+              style={{
+                paddingHorizontal: sp.lg,
+                borderRadius: radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: c.accent,
+                opacity: savingWeight || !newWeight.trim() ? 0.5 : 1,
+              }}
+            >
+              <Txt style={{ color: '#fff', fontWeight: '700' }}>{t('common.add')}</Txt>
+            </Pressable>
+          </View>
+          {weights.map((w) => (
+            <View
+              key={w.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: sp.md,
+                backgroundColor: c.surface,
+                borderRadius: radius.md,
+                paddingHorizontal: sp.lg,
+                paddingVertical: sp.sm,
+              }}
+            >
+              <Scale size={16} color={c.textMuted} />
+              <Txt style={{ flex: 1, fontWeight: '500' }}>{String(w.weight)}</Txt>
+              <Txt variant="faint">{formatDay(w.measured_on)}</Txt>
+              <Pressable onPress={() => void removeWeight(w)} hitSlop={8} accessibilityLabel={t('common.delete')}>
+                <X size={15} color={c.textFaint} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
 
         {/* event history (read-only) */}
         {events.length > 0 && (

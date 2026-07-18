@@ -5,9 +5,15 @@ import { useState } from 'react'
 import { Modal, Platform, Pressable, View } from 'react-native'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import {
+  Bath,
+  Bone,
+  Cookie,
   FileText,
+  Footprints,
+  PawPrint,
   Pill,
   Scissors,
+  Sparkles,
   Stethoscope,
   Syringe,
   type LucideIcon,
@@ -17,7 +23,7 @@ import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { formatDay } from '@/lib/format'
 import { radius, sp, useTheme } from '@/theme/theme'
-import type { PetEventType } from '@/lib/types'
+import type { PetEventType, PetTaskIcon } from '@/lib/types'
 
 export const TYPE_ICON: Record<PetEventType, LucideIcon> = {
   vet: Stethoscope,
@@ -27,6 +33,20 @@ export const TYPE_ICON: Record<PetEventType, LucideIcon> = {
   other: FileText,
 }
 export const TYPES = Object.keys(TYPE_ICON) as PetEventType[]
+
+/** Routine-task icon ids → Lucide. The widget maps the SAME ids to SF Symbols
+ *  (PetCareWidget.swift) — keep the two in sync. */
+export const CARE_ICONS: Record<PetTaskIcon, LucideIcon> = {
+  bowl: Bone,
+  walk: Footprints,
+  treat: Cookie,
+  pill: Pill,
+  bath: Bath,
+  nails: Scissors,
+  teeth: Sparkles,
+  paw: PawPrint,
+}
+export const CARE_ICON_IDS = Object.keys(CARE_ICONS) as PetTaskIcon[]
 
 /** A selectable rounded chip — accent when active, surface otherwise. */
 export function Pill_({
@@ -153,7 +173,7 @@ export function DateField({
             <Pressable
               onPress={() => {}}
               style={{
-                backgroundColor: c.card,
+                backgroundColor: c.sheet,
                 borderTopLeftRadius: radius.lg,
                 borderTopRightRadius: radius.lg,
                 paddingHorizontal: sp.lg,

@@ -361,5 +361,6 @@ struct OneRoofWidgets: WidgetBundle {
     NudgesWidget()
     TodayWidget()
     QuickAddWidget()
+    PetCareWidget()
   }
 }

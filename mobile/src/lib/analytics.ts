@@ -37,6 +37,10 @@ export type EventName =
   | 'pet.event_logged'
   | 'pet.event_updated'
   | 'pet.event_deleted'
+  | 'petcare.task_done'
+  | 'petcare.task_added'
+  | 'petcare.task_deleted'
+  | 'pet.weight_logged'
   // Nudges
   | 'nudge.sent'
   // Documents
@@ -74,6 +78,10 @@ export const SEMANTIC_EVENTS: EventName[] = [
   'pet.event_logged',
   'pet.event_updated',
   'pet.event_deleted',
+  'petcare.task_done',
+  'petcare.task_added',
+  'petcare.task_deleted',
+  'pet.weight_logged',
   'nudge.sent',
   'doc.uploaded',
   'doc.opened',

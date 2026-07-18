@@ -116,7 +116,7 @@ export function NudgeSettings({
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={[styles.sheet, { backgroundColor: c.card }]} onPress={() => {}}>
+          <Pressable style={[styles.sheet, { backgroundColor: c.sheet }]} onPress={() => {}}>
             <View style={[styles.grab, { backgroundColor: c.border }]} />
 
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>

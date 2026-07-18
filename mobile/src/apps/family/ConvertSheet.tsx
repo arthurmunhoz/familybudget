@@ -30,7 +30,7 @@ export function ConvertSheet({
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* Inner press-catcher so taps on the sheet don't close it. */}
-        <Pressable style={[styles.sheet, { backgroundColor: c.card }]} onPress={() => {}}>
+        <Pressable style={[styles.sheet, { backgroundColor: c.sheet }]} onPress={() => {}}>
           <View style={[styles.grab, { backgroundColor: c.border }]} />
 
           <Txt variant="label">{label}</Txt>

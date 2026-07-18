@@ -10,6 +10,8 @@ const APP_GROUP = 'group.com.oneroof.app'
 const NUDGES_WIDGET_KIND = 'NudgesWidget'
 // Must match the `kind:` string in TodayWidget.swift's StaticConfiguration.
 const TODAY_WIDGET_KIND = 'TodayWidget'
+// Must match the `kind:` string in PetCareWidget.swift.
+const PETCARE_WIDGET_KIND = 'PetCareWidget'
 
 export interface BudgetWidgetItem {
   id: string
@@ -173,6 +175,56 @@ export function syncNudgeWidget(data: {
     s.set('nudge_members', JSON.stringify(data.members))
     s.set('nudge_presets', JSON.stringify(data.presets))
     ExtensionStorage.reloadWidget(NUDGES_WIDGET_KIND)
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
+// ── Pet Care widget ──────────────────────────────────────────────────────────
+// Snapshot shape shared with the live api/widget?action=petcare response, so
+// the Swift widget decodes ONE struct from either source (like BudgetInfo).
+
+export interface PetCareWidgetTask {
+  id: string
+  title: string
+  icon: string
+  done: boolean
+  doneBy: string | null
+}
+export interface PetCareWidgetRoutine {
+  id: string
+  title: string
+  icon: string
+  /** Days until due; 0 = today, negative = overdue. */
+  dueIn: number
+}
+export interface PetCareWidgetPet {
+  id: string
+  name: string
+  emoji: string
+  daily: PetCareWidgetTask[]
+  routines: PetCareWidgetRoutine[]
+}
+
+/** Offline fallback + the pet picker's entity list. `day` lets the widget
+ *  refuse to show a stale checklist on a later day (same rule as Today). */
+export function syncPetCareWidget(day: string, pets: PetCareWidgetPet[]): void {
+  const s = store()
+  if (!s) return
+  try {
+    s.set('petcare', JSON.stringify({ day, pets }))
+    ExtensionStorage.reloadWidget(PETCARE_WIDGET_KIND)
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
+/** Reload only — used by the silent-push handler when ANOTHER member marks a
+ *  task done, so this device's widget re-fetches the fresh state. */
+export function reloadPetCareWidget(): void {
+  if (Platform.OS !== 'ios') return
+  try {
+    ExtensionStorage.reloadWidget(PETCARE_WIDGET_KIND)
   } catch {
     /* native module unavailable — ignore */
   }
