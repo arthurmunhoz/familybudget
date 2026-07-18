@@ -87,6 +87,13 @@ export const pt: Record<keyof typeof en, string> = {
   'location.activity.empty': 'Ainda não há chegadas nem saídas',
   'location.activity.arrived': '{name} chegou em {place}',
   'location.activity.left': '{name} saiu de {place}',
+  'location.atPlace': 'Em {place}',
+  'location.places.watchTitle': 'Avisar-me sobre este lugar',
+  'location.places.watchWho': 'De quem você quer saber',
+  'location.places.watchAll': 'Todos',
+  'location.places.notWatching': 'Sem avisos para você',
+  'location.places.watchingAll': 'Avisamos você sobre todos',
+  'location.places.watchingSome': 'Avisamos você sobre {names}',
 
   // Whereabouts — Raio de segurança / modo evento (Fase 3, One Roof Plus)
   'location.safety.title': 'Raio de segurança',

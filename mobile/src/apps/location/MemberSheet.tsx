@@ -23,7 +23,8 @@ import {
 } from '@/lib/location'
 import { useWatchLive } from '@/lib/liveLocation'
 import { fetchPingPresets, presetText, sendPing } from '@/lib/pings'
-import type { MemberLocation, PingPreset, Profile } from '@/lib/types'
+import { placeAt } from '@/lib/places'
+import type { MemberLocation, PingPreset, Place, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { MemberAvatar } from './locationUi'
 
@@ -128,6 +129,7 @@ export function MemberSheet({
   avatarPath,
   phone,
   myLive,
+  places,
   onClose,
   onNudged,
 }: {
@@ -138,6 +140,8 @@ export function MemberSheet({
   avatarPath?: string | null
   phone?: string
   myLive: (MemberLocation & { lat: number; lng: number }) | null
+  /** Saved places, so we can say "At Home" instead of a street address. */
+  places: Place[]
   onClose: () => void
   /** Confirmation text after a nudge is sent (the parent shows the toast). */
   onNudged?: (text: string) => void
@@ -233,6 +237,9 @@ export function MemberSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetKey])
 
+  /** The saved place they're inside, if any. */
+  const here = live ? placeAt(places, { lat: live.lat, lng: live.lng }) : null
+
   const distText = live && myLive ? formatDistance(haversineMeters(myLive, live)) : '—'
   const etaText = etaLoading ? '…' : eta ? formatEta(eta.minutes) : '—'
   const battText = live && live.battery != null ? `${live.battery}%` : '—'
@@ -290,7 +297,11 @@ export function MemberSheet({
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <MapPin size={13} color={c.textMuted} />
                   <Txt variant="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
-                    {address ?? t('location.locating')}
+                    {/* A saved place beats a street address: "At Home" is what
+                        you actually want to read. */}
+                    {here
+                      ? t('location.atPlace', { place: here.name })
+                      : (address ?? t('location.locating'))}
                   </Txt>
                 </View>
               ) : (

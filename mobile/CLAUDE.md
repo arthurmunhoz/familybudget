@@ -119,6 +119,18 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     iOS throttles silent pushes, so background freshness is best-effort (periodic
     bursts, not continuous); continuous smoothness still needs the target app
     foreground (the `useLiveResponder` watch).
+- **Watching a place is PER-USER** (migration 069, `place_watchers`). Places are
+  shared household furniture, but creating/sharing one subscribes NOBODY —
+  each member opts in per place and picks whose crossings they want
+  (`watched` empty = everyone). The push fan-out in `api/send-ping.ts`
+  (`?action=place-event`) reads `place_watchers` with the service role, so a
+  crossing only reaches people who asked for it. The old place-level
+  `notify_arrivals`/`notify_departures` columns were DROPPED — they made one
+  member's preference everyone's notification. Geofences are registered for
+  EVERY place (the crossing is recorded regardless; the fan-out decides who hears).
+- **"At Home" status** — `placeAt(places, point)` in `lib/places.ts` resolves the
+  place a member is inside (smallest radius wins on overlap); the roster card and
+  the member sheet prefer it over a distance or a geocoded street address.
 - **Places & geofences (Phase 2)** — migration 067 (`places` + `place_events`),
   `src/lib/places.ts` (CRUD + `recordPlaceEvent`) and `src/lib/placesTask.ts` (the
   module-scope geofence TASK + `syncGeofences`). Each member's device monitors the

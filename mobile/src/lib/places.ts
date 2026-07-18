@@ -6,7 +6,8 @@
 // Realtime and pushes "Emma arrived at School" to the rest of the household via
 // api/send-ping (?action=place-event).
 import { supabase } from './supabase'
-import type { Place, PlaceEvent } from './types'
+import { haversineMeters, type LatLng } from './location'
+import type { Place, PlaceEvent, PlaceWatch } from './types'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
@@ -26,8 +27,18 @@ export interface PlaceInput {
   lat: number
   lng: number
   radius_m: number
-  notify_arrivals: boolean
-  notify_departures: boolean
+}
+
+/** The saved place a point sits inside, if any. Smallest radius wins when they
+ *  overlap, so "Home" inside a wider "Neighborhood" still reads as Home. */
+export function placeAt(places: Place[], point: LatLng): Place | null {
+  let best: Place | null = null
+  for (const p of places) {
+    if (haversineMeters({ lat: p.lat, lng: p.lng }, point) <= p.radius_m) {
+      if (!best || p.radius_m < best.radius_m) best = p
+    }
+  }
+  return best
 }
 
 /** The household's saved places (RLS scopes to our household). */
@@ -37,9 +48,11 @@ export async function fetchPlaces(): Promise<Place[]> {
   return (data ?? []) as Place[]
 }
 
-export async function createPlace(input: PlaceInput): Promise<void> {
-  const { error } = await supabase.from('places').insert(input)
+/** Returns the new place's id so the caller can attach their own watch to it. */
+export async function createPlace(input: PlaceInput): Promise<string | null> {
+  const { data, error } = await supabase.from('places').insert(input).select('id').single()
   if (error) throw error
+  return (data as { id: string } | null)?.id ?? null
 }
 
 export async function updatePlace(id: string, input: Partial<PlaceInput>): Promise<void> {
@@ -60,6 +73,38 @@ export async function fetchPlaceEvents(limit = 40): Promise<PlaceEvent[]> {
     .order('at', { ascending: false })
     .limit(limit)
   return (data ?? []) as PlaceEvent[]
+}
+
+// ── Per-user watching (migration 069) ───────────────────────────────────────
+// Creating or sharing a place subscribes NOBODY. Each member opts in per place
+// and picks whose crossings they want to hear about.
+
+/** My watch rows keyed by place_id (RLS returns only mine). */
+export async function fetchMyPlaceWatches(): Promise<Record<string, PlaceWatch>> {
+  const { data } = await supabase.from('place_watchers').select('*')
+  const out: Record<string, PlaceWatch> = {}
+  for (const w of (data ?? []) as PlaceWatch[]) out[w.place_id] = w
+  return out
+}
+
+/** Start (or update) watching a place. `watched` empty = everyone. */
+export async function upsertPlaceWatch(
+  placeId: string,
+  opts: { watched: string[]; notify_arrivals: boolean; notify_departures: boolean },
+): Promise<void> {
+  const me = await myEmail()
+  if (!me) return
+  const { error } = await supabase
+    .from('place_watchers')
+    .upsert({ place_id: placeId, user_email: me, ...opts }, { onConflict: 'place_id,user_email' })
+  if (error) throw error
+}
+
+/** Stop watching a place — no more alerts for me (others are unaffected). */
+export async function removePlaceWatch(placeId: string): Promise<void> {
+  const me = await myEmail()
+  if (!me) return
+  await supabase.from('place_watchers').delete().eq('place_id', placeId).eq('user_email', me)
 }
 
 /** Geofences "bounce" at the boundary (repeated enter/exit as GPS jitters), so

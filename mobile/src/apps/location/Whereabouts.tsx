@@ -32,7 +32,7 @@ import {
   isSharingLive,
   setUseImperial,
 } from '@/lib/location'
-import { fetchPlaces } from '@/lib/places'
+import { fetchPlaces, placeAt } from '@/lib/places'
 import { syncGeofences } from '@/lib/placesTask'
 import { usePlus } from '@/lib/plus'
 import { requestLive } from '@/lib/liveLocation'
@@ -73,6 +73,52 @@ async function fetchMemberMeta(): Promise<{
     if (r.phone) phones[r.email] = r.phone
   }
   return { avatars, phones }
+}
+
+/** Square header action. Reads as a button rather than a bare glyph, and fills
+ *  with the accent when the thing it opens is currently ACTIVE (e.g. a safety
+ *  watch is running) — state you can see without opening anything. */
+function HeaderButton({
+  icon,
+  label,
+  active,
+  badge,
+  onPress,
+}: {
+  /** Rendered with the resolved foreground colour. */
+  icon: (color: string) => React.ReactNode
+  label: string
+  active?: boolean
+  /** Plus sparkle for a gated feature. */
+  badge?: boolean
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        {
+          width: 36,
+          height: 36,
+          borderRadius: radius.md,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: active ? c.accent : c.surface,
+        },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      {icon(active ? '#ffffff' : c.textMuted)}
+      {badge ? (
+        <View style={{ position: 'absolute', top: -4, right: -4 }}>
+          <Sparkles size={12} color={c.accent} />
+        </View>
+      ) : null}
+    </Pressable>
+  )
 }
 
 /** "Watching" badge — softly pulses so an active Safety Radius reads as ongoing
@@ -404,19 +450,23 @@ export default function Whereabouts() {
       const loc = locByEmail.get(email)
       const me = email === myEmail
       if (isSharingLive(loc)) {
+        const ago = timeAgo(loc.updated_at, t)
+        // Being at a saved place is the most useful thing we can say — "At Home"
+        // beats "0.2 mi away", for your own card as much as anyone else's.
+        const here = placeAt(places, { lat: loc.lat, lng: loc.lng })
+        if (here) return `${t('location.atPlace', { place: here.name })} · ${ago}`
         const driving = loc.speed != null && loc.speed > DRIVING_SPEED_MS
         const dist =
           !me && myLive
             ? t('location.away', { dist: formatDistance(haversineMeters(myLive, loc)) })
             : t('location.status.sharing')
-        const ago = timeAgo(loc.updated_at, t)
         const head = driving ? `${t('location.status.driving')} · ` : ''
         return me ? `${t('location.status.sharing')} · ${ago}` : `${head}${dist} · ${ago}`
       }
       if (isPaused(loc)) return t('location.status.paused')
       return t('location.status.off')
     },
-    [locByEmail, myEmail, myLive, t],
+    [locByEmail, myEmail, myLive, places, t],
   )
 
   const selectedProfile = selected ? profiles.find((p) => p.email === selected) ?? null : null
@@ -427,32 +477,21 @@ export default function Whereabouts() {
         <AppHeader
           title={t('app.location.name')}
           right={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.lg }}>
-              {/* Safety radius — a Plus feature: the sparkle badge marks it, and
-                  a non-Plus tap goes to the paywall instead of the sheet. */}
-              <Pressable
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+              {/* Safety radius — a Plus feature: the sparkle marks it, a non-Plus
+                  tap goes to the paywall, and the button fills while a watch runs. */}
+              <HeaderButton
+                label={t('location.safety.title')}
+                active={!!watch}
+                badge={!isPlus}
+                icon={(col) => <ShieldCheck size={19} color={col} />}
                 onPress={() => (isPlus ? setSafetyOpen(true) : router.push('/paywall'))}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={t('location.safety.title')}
-              >
-                <View>
-                  <ShieldCheck size={22} color={watch ? c.accent : c.textMuted} />
-                  {!isPlus ? (
-                    <View style={{ position: 'absolute', top: -5, right: -7 }}>
-                      <Sparkles size={12} color={c.accent} />
-                    </View>
-                  ) : null}
-                </View>
-              </Pressable>
-              <Pressable
+              />
+              <HeaderButton
+                label={t('location.places.title')}
+                icon={(col) => <Landmark size={19} color={col} />}
                 onPress={() => setPlacesOpen(true)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={t('location.places.title')}
-              >
-                <Landmark size={22} color={c.textMuted} />
-              </Pressable>
+              />
             </View>
           }
         />
@@ -658,6 +697,7 @@ export default function Whereabouts() {
           avatarPath={meta.avatars[selectedProfile.email]}
           phone={meta.phones[selectedProfile.email]}
           myLive={myLive}
+          places={places}
           onClose={() => setSelected(null)}
           onNudged={(text) => setToast({ emoji: '👋', text })}
         />
@@ -680,6 +720,7 @@ export default function Whereabouts() {
       {placesOpen ? (
         <PlacesSheet
           profiles={profiles}
+          myEmail={myEmail}
           colors={colors}
           onClose={() => setPlacesOpen(false)}
           onChanged={() => void reloadPlaces()}

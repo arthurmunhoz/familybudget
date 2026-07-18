@@ -11,8 +11,8 @@ import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { formatDistance } from '@/lib/location'
-import { fetchPlaceEvents, fetchPlaces } from '@/lib/places'
-import type { Place, PlaceEvent, Profile } from '@/lib/types'
+import { fetchMyPlaceWatches, fetchPlaceEvents, fetchPlaces } from '@/lib/places'
+import type { Place, PlaceEvent, PlaceWatch, Profile } from '@/lib/types'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
 import { Segmented } from '@/apps/budget/shared'
 import { timeAgo } from './locationUi'
@@ -20,11 +20,13 @@ import { PlaceForm } from './PlaceForm'
 
 export function PlacesSheet({
   profiles,
+  myEmail,
   colors,
   onClose,
   onChanged,
 }: {
   profiles: Profile[]
+  myEmail: string | null
   colors: Record<string, string>
   onClose: () => void
   /** Places changed — the map + geofence registration should refresh. */
@@ -37,15 +39,18 @@ export function PlacesSheet({
   const [tab, setTab] = useState<'places' | 'activity'>('places')
   const [places, setPlaces] = useState<Place[]>([])
   const [events, setEvents] = useState<PlaceEvent[]>([])
+  const [watches, setWatches] = useState<Record<string, PlaceWatch>>({})
   const [editing, setEditing] = useState<Place | 'new' | null>(null)
 
   const load = useCallback(async () => {
-    const [p, e] = await Promise.all([
+    const [p, e, w] = await Promise.all([
       fetchPlaces().catch(() => [] as Place[]),
       fetchPlaceEvents().catch(() => [] as PlaceEvent[]),
+      fetchMyPlaceWatches().catch(() => ({}) as Record<string, PlaceWatch>),
     ])
     setPlaces(p)
     setEvents(e)
+    setWatches(w)
   }, [])
 
   useEffect(() => {
@@ -72,14 +77,17 @@ export function PlacesSheet({
     [profiles],
   )
 
-  const notifyLabel = (p: Place): string =>
-    p.notify_arrivals && p.notify_departures
-      ? t('location.places.notifyBoth')
-      : p.notify_arrivals
-        ? t('location.places.notifyArrivalsOnly')
-        : p.notify_departures
-          ? t('location.places.notifyDeparturesOnly')
-          : t('location.places.notifyOff')
+  /** MY subscription state for a place — watching is personal, so this only
+   *  ever describes what *I* will be told about. */
+  const watchLabel = (placeId: string): string => {
+    const w = watches[placeId]
+    if (!w) return t('location.places.notWatching')
+    if (!w.watched.length) return t('location.places.watchingAll')
+    const names = w.watched
+      .map((e) => profiles.find((p) => p.email === e)?.display_name ?? e.split('@')[0])
+      .join(', ')
+    return t('location.places.watchingSome', { names })
+  }
 
   const afterSave = () => {
     setEditing(null)
@@ -158,7 +166,7 @@ export function PlacesSheet({
                         {p.name}
                       </Txt>
                       <Txt variant="muted" style={{ fontSize: 12 }} numberOfLines={1}>
-                        {notifyLabel(p)} · {formatDistance(p.radius_m)}
+                        {watchLabel(p.id)} · {formatDistance(p.radius_m)}
                       </Txt>
                     </View>
                   </Pressable>
@@ -257,6 +265,9 @@ export function PlacesSheet({
         {editing ? (
           <PlaceForm
             place={editing === 'new' ? null : editing}
+            profiles={profiles}
+            myEmail={myEmail}
+            watch={editing === 'new' ? null : (watches[editing.id] ?? null)}
             onClose={() => setEditing(null)}
             onSaved={afterSave}
           />

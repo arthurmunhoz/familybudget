@@ -87,7 +87,13 @@ crossing one shows in the **Activity** feed and pushes "Emma arrived at School"
 to the rest of the household.
 
 - A new place pins to **your current location** (no map-drag picker yet), with a
-  radius preset and per-place arrival/departure toggles.
+  radius preset.
+- **Watching is personal.** Creating or sharing a place notifies *nobody*. Each
+  member opts in per place ("Notify me about this place") and chooses **whose**
+  comings and goings they want to hear about — so you can watch the kids at
+  School without your wife getting pinged every time you arrive.
+- When someone is inside a place, their card reads **"At Home"** / "At Gym"
+  instead of a distance.
 - The arrive/leave **push** also needs the API deployed — from the **repo root**,
   not `mobile/` (see the deploy note above).
 - Geofences only run for members who have **sharing on** and granted **Always**

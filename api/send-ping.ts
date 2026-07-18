@@ -3,7 +3,8 @@
 //   • default (body has ping_id): push a freshly-created ping to everyone in the
 //     household EXCEPT the sender.
 //   • action:'place-event' (body has place_event_id): push "Emma arrived at
-//     School" to the household except the member who moved (Whereabouts Phase 2).
+//     School" ONLY to members who subscribed to that place (place_watchers,
+//     migration 069) and asked about that member — never the whole household.
 // Both rows are already inserted client-side under RLS; this only fans out the
 // push. Auth: caller must send a valid Supabase JWT and own/belong to the row.
 // KNOWN LIMIT: push copy is English-only (same as the daily digest).
@@ -79,14 +80,29 @@ export default async function handler(req: any, res: any) {
 
     const { data: place } = await db
       .from('places')
-      .select('name, icon, notify_arrivals, notify_departures')
+      .select('name, icon')
       .eq('id', ev.place_id)
       .single()
     if (!place) return res.status(404).json({ error: 'Place not found' })
 
-    // Respect the place's own notification settings.
-    const wanted = ev.type === 'arrive' ? place.notify_arrivals : place.notify_departures
-    if (!wanted) return res.status(200).json({ ok: true, skipped: true })
+    // Who actually asked to hear about this? Per-user subscriptions (migration
+    // 069): opted into THIS place, wants THIS direction, and either watches
+    // everyone (empty `watched`) or this member specifically. Never the mover
+    // themselves. No subscribers → nobody is notified, which is the point:
+    // creating a place must not sign the household up for alerts.
+    const { data: watchers } = await db
+      .from('place_watchers')
+      .select('user_email, watched, notify_arrivals, notify_departures')
+      .eq('place_id', ev.place_id)
+    const recipients = (watchers ?? [])
+      .filter((w: any) => w.user_email !== ev.user_email)
+      .filter((w: any) => (ev.type === 'arrive' ? w.notify_arrivals : w.notify_departures))
+      .filter(
+        (w: any) =>
+          !Array.isArray(w.watched) || w.watched.length === 0 || w.watched.includes(ev.user_email),
+      )
+      .map((w: any) => w.user_email as string)
+    if (!recipients.length) return res.status(200).json({ ok: true, skipped: true })
 
     const { data: mover } = await db
       .from('allowed_users')
@@ -101,7 +117,7 @@ export default async function handler(req: any, res: any) {
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth')
       .eq('household_id', ev.household_id)
-      .neq('user_email', ev.user_email)
+      .in('user_email', recipients)
 
     webpush.setVapidDetails('mailto:one.roof.family.organizer@gmail.com', vapidPublic, vapidPrivate)
     const placePayload = JSON.stringify({ title, body, url: '/location', tag: `place-${ev.id}` })
@@ -124,7 +140,7 @@ export default async function handler(req: any, res: any) {
       .from('expo_push_tokens')
       .select('token')
       .eq('household_id', ev.household_id)
-      .neq('user_email', ev.user_email)
+      .in('user_email', recipients)
     const placeExpoSent = await sendExpoPush(
       (placeTokens ?? []).map((t: any) => ({
         to: t.token,
