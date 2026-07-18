@@ -37,7 +37,7 @@ type DetailData = {
 export default function AdminHousehold() {
   const { c } = useTheme()
   const { t } = useI18n()
-  const { profile } = useAuth()
+  const { profile, profileLoaded } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
 
   const [mName, setMName] = useState('')
@@ -96,7 +96,10 @@ export default function AdminHousehold() {
     load()
   }
 
-  if (profile && !profile.is_admin) return <Redirect href="/" />
+  // Same guard as /admin — decide only once the profile lookup has resolved,
+  // never while `profile` is still null and in flight.
+  if (!profileLoaded) return <Loader />
+  if (!profile?.is_admin) return <Redirect href="/" />
 
   async function addMember() {
     const email = mEmail.trim().toLowerCase()
