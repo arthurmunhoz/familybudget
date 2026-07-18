@@ -16,7 +16,6 @@ import { Alert, Animated, Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Image } from 'expo-image'
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { Check, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
@@ -59,12 +58,14 @@ const emptyDraft: EventDraft = {
 // so re-mounts don't re-download unchanged photos.
 const mirroredPhotos: Record<string, string> = {}
 
-/** Downscale a pet photo to a ~160px JPEG and mirror it into the App Group so
- *  the widget shows the actual pet. Best-effort; failures leave the widget on
- *  its initial-letter fallback. */
+/** Mirror a pet photo into the App Group so the widget shows the actual pet.
+ *  Photos are already ≤512px JPEG at upload (PetEditor), so the downloaded
+ *  bytes are stored as base64 directly — no resize step to fail. Best-effort;
+ *  failures leave the widget on its initial-letter fallback. */
 async function mirrorPetPhoto(petId: string, photoPath: string, url: string): Promise<void> {
   try {
     const res = await fetch(url)
+    if (!res.ok) return
     const blob = await res.blob()
     const dataUri = await new Promise<string>((resolve, reject) => {
       const r = new FileReader()
@@ -72,13 +73,11 @@ async function mirrorPetPhoto(petId: string, photoPath: string, url: string): Pr
       r.onerror = reject
       r.readAsDataURL(blob)
     })
-    const ctx = ImageManipulator.manipulate(dataUri).resize({ width: 160 })
-    const ref = await ctx.renderAsync()
-    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7, base64: true })
-    if (out.base64) {
-      syncPetPhoto(petId, out.base64)
-      mirroredPhotos[petId] = photoPath
-    }
+    // "data:image/jpeg;base64,AAAA…" → the raw base64 the widget decodes.
+    const base64 = dataUri.slice(dataUri.indexOf('base64,') + 7)
+    if (!base64) return
+    syncPetPhoto(petId, base64)
+    mirroredPhotos[petId] = photoPath
   } catch {
     /* ignore — the widget falls back to the initial */
   }
