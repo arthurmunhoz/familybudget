@@ -12,7 +12,6 @@ import { supabase } from './supabase'
 import { haversineMeters, type LatLng } from './location'
 import type { SafetyWatch } from './types'
 
-export const RADIUS_PRESETS = [100, 150, 250, 500, 1000]
 /** How long a watch runs before it auto-expires (matches the DB default). */
 export const WATCH_HOURS = 4
 

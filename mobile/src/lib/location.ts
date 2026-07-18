@@ -293,6 +293,43 @@ export function formatDistance(meters: number): string {
   return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`
 }
 
+/** Round, familiar radius choices in the user's OWN units. Storing metres and
+ *  running them through formatDistance gives nonsense like "328 ft" — people
+ *  think in 500 ft and ¼ mi, so the labels are authored per unit system and the
+ *  metre value is just what we persist. `min` drops values under a floor (iOS
+ *  geofences can't go below ~100 m; the Safety Radius has no such limit). */
+export function radiusPresets(min = 0): { meters: number; label: string }[] {
+  const imperial = [
+    { meters: 76, label: '250 ft' },
+    { meters: 152, label: '500 ft' },
+    { meters: 305, label: '1000 ft' },
+    { meters: 402, label: '¼ mi' },
+    { meters: 805, label: '½ mi' },
+    { meters: 1609, label: '1 mi' },
+  ]
+  const metric = [
+    { meters: 50, label: '50 m' },
+    { meters: 100, label: '100 m' },
+    { meters: 250, label: '250 m' },
+    { meters: 500, label: '500 m' },
+    { meters: 1000, label: '1 km' },
+    { meters: 2000, label: '2 km' },
+  ]
+  return (useImperial ? imperial : metric).filter((p) => p.meters >= min)
+}
+
+/** The preset closest to `meters` — keeps a chip highlighted even when the saved
+ *  value came from another unit system or an older preset set. */
+export function nearestPreset(
+  presets: { meters: number; label: string }[],
+  meters: number,
+): number {
+  if (!presets.length) return meters
+  return presets.reduce((a, b) =>
+    Math.abs(b.meters - meters) < Math.abs(a.meters - meters) ? b : a,
+  ).meters
+}
+
 export function formatEta(minutes: number): string {
   if (minutes < 60) return `${minutes} min`
   const h = Math.floor(minutes / 60)

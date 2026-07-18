@@ -349,10 +349,12 @@ export default function Whereabouts() {
             }
             scaleBarEnabled={false}
             compassEnabled={false}
-            // Keep Mapbox's logo + attribution up top so the bottom sheet can't
-            // cover them (their ToS requires both stay visible).
-            logoPosition={{ top: 12, left: 16 }}
-            attributionPosition={{ top: 12, left: 96 }}
+            // Mapbox's ToS requires the logo, and OpenStreetMap's ODbL requires
+            // the attribution, so both must stay visible — but they're tucked
+            // into the bottom-left just above the roster sheet, the least
+            // intrusive spot that isn't covered by it.
+            logoPosition={{ bottom: 332, left: 12 }}
+            attributionPosition={{ bottom: 332, left: 92 }}
           >
             <Camera
               ref={cameraRef}
@@ -389,7 +391,8 @@ export default function Whereabouts() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 4,
-                    backgroundColor: c.card,
+                    // Opaque so the place label stays readable over the map.
+                    backgroundColor: c.sheet,
                     borderRadius: radius.pill,
                     paddingHorizontal: 8,
                     paddingVertical: 4,
