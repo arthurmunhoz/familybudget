@@ -119,8 +119,20 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     iOS throttles silent pushes, so background freshness is best-effort (periodic
     bursts, not continuous); continuous smoothness still needs the target app
     foreground (the `useLiveResponder` watch).
-- Not yet: Places/geofences + arrive-leave push (Phase 2); Safety Radius, history,
-  driving/SOS (Phase 3 — a One Roof **Plus** feature).
+- **Places & geofences (Phase 2)** — migration 067 (`places` + `place_events`),
+  `src/lib/places.ts` (CRUD + `recordPlaceEvent`) and `src/lib/placesTask.ts` (the
+  module-scope geofence TASK + `syncGeofences`). Each member's device monitors the
+  household's places via OS region monitoring (cheap on battery); crossing one is
+  recorded by THAT device (RLS only allows recording your own crossings), which
+  drives the Activity feed via Realtime and pushes "Emma arrived at School" via
+  `api/send-ping.ts` (`?action=place-event`, respects the place's notify flags).
+  UI: `PlacesSheet` (Places / Activity tabs) + `PlaceForm` from the Whereabouts
+  header. Gotchas: **iOS caps monitored regions at 20** (`MAX_REGIONS`) and
+  enforces a ~100 m radius floor; geofences bounce at the boundary, so
+  `recordPlaceEvent` drops a repeat of the same crossing within 5 min. A new place
+  pins to your CURRENT location (no map-drag picker yet). Push copy is English-only.
+- Not yet: Safety Radius, location history, driving/SOS (Phase 3 — a One Roof
+  **Plus** feature); a map-drag picker for placing/moving a place.
 
 ## AI / server endpoints
 Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`

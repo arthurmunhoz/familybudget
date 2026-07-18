@@ -1,7 +1,12 @@
-// Vercel serverless: push a freshly-created household ping to everyone in the
-// household EXCEPT the sender. The ping row is already inserted client-side
-// under RLS; this just fans out the web-push. Auth: caller must send a valid
-// Supabase JWT and belong to the ping's household.
+// Vercel serverless: household push fan-out. Two actions on one endpoint (kept
+// together because api/ is at Vercel's 12-function cap):
+//   • default (body has ping_id): push a freshly-created ping to everyone in the
+//     household EXCEPT the sender.
+//   • action:'place-event' (body has place_event_id): push "Emma arrived at
+//     School" to the household except the member who moved (Whereabouts Phase 2).
+// Both rows are already inserted client-side under RLS; this only fans out the
+// push. Auth: caller must send a valid Supabase JWT and own/belong to the row.
+// KNOWN LIMIT: push copy is English-only (same as the daily digest).
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
@@ -54,10 +59,86 @@ export default async function handler(req: any, res: any) {
   const callerEmail = (await userRes.json())?.email
   if (!callerEmail) return res.status(401).json({ error: 'Unauthorized' })
 
+  const db = createClient(url, serviceKey, { auth: { persistSession: false } })
+
+  // ── Place event: "Emma arrived at School". The event row is already inserted
+  //    by the crossing member's own device (RLS); this fans the push out to the
+  //    rest of the household.
+  if ((req.body?.action ?? '') === 'place-event') {
+    const eventId = req.body?.place_event_id
+    if (!eventId) return res.status(400).json({ error: 'Missing place_event_id' })
+
+    const { data: ev } = await db
+      .from('place_events')
+      .select('id, household_id, place_id, user_email, type')
+      .eq('id', eventId)
+      .single()
+    if (!ev) return res.status(404).json({ error: 'Event not found' })
+    // Only the member the crossing belongs to may announce it.
+    if (ev.user_email !== callerEmail) return res.status(403).json({ error: 'Forbidden' })
+
+    const { data: place } = await db
+      .from('places')
+      .select('name, icon, notify_arrivals, notify_departures')
+      .eq('id', ev.place_id)
+      .single()
+    if (!place) return res.status(404).json({ error: 'Place not found' })
+
+    // Respect the place's own notification settings.
+    const wanted = ev.type === 'arrive' ? place.notify_arrivals : place.notify_departures
+    if (!wanted) return res.status(200).json({ ok: true, skipped: true })
+
+    const { data: mover } = await db
+      .from('allowed_users')
+      .select('display_name')
+      .eq('email', ev.user_email)
+      .single()
+    const moverName = mover?.display_name || ev.user_email.split('@')[0]
+    const title = `${place.icon || '📍'} ${place.name}`
+    const body = ev.type === 'arrive' ? `${moverName} arrived` : `${moverName} left`
+
+    const { data: subs } = await db
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth')
+      .eq('household_id', ev.household_id)
+      .neq('user_email', ev.user_email)
+
+    webpush.setVapidDetails('mailto:one.roof.family.organizer@gmail.com', vapidPublic, vapidPrivate)
+    const placePayload = JSON.stringify({ title, body, url: '/location', tag: `place-${ev.id}` })
+    let placeSent = 0
+    const placeStale: string[] = []
+    for (const s of subs ?? []) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          placePayload,
+        )
+        placeSent++
+      } catch (err: any) {
+        if (err?.statusCode === 404 || err?.statusCode === 410) placeStale.push(s.endpoint)
+      }
+    }
+    if (placeStale.length) await db.from('push_subscriptions').delete().in('endpoint', placeStale)
+
+    const { data: placeTokens } = await db
+      .from('expo_push_tokens')
+      .select('token')
+      .eq('household_id', ev.household_id)
+      .neq('user_email', ev.user_email)
+    const placeExpoSent = await sendExpoPush(
+      (placeTokens ?? []).map((t: any) => ({
+        to: t.token,
+        title,
+        body,
+        data: { url: '/location' },
+        sound: 'default' as const,
+      })),
+    )
+    return res.status(200).json({ ok: true, sent: placeSent, expoSent: placeExpoSent })
+  }
+
   const { ping_id } = req.body ?? {}
   if (!ping_id) return res.status(400).json({ error: 'Missing ping_id' })
-
-  const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
   const { data: ping } = await db
     .from('pings')

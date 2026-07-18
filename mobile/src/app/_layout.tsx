@@ -16,6 +16,7 @@ import { AuthProvider } from '@/lib/auth';
 import { registerBackgroundNotifications } from '@/lib/backgroundNotifications';
 import { registerLocationTask } from '@/lib/locationTask';
 import { useLiveResponder } from '@/lib/liveLocation';
+import { registerGeofenceTask } from '@/lib/placesTask';
 import { PlusProvider } from '@/lib/plus';
 import { I18nProvider } from '@/hooks/useI18n';
 import { TilePrefProvider } from '@/hooks/useTilePref';
@@ -43,6 +44,7 @@ export default function RootLayout() {
   useEffect(() => {
     registerBackgroundNotifications();
     registerLocationTask();
+    registerGeofenceTask();
   }, []);
 
   if (!fontsLoaded) return null;

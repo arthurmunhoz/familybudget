@@ -258,6 +258,34 @@ export interface CalendarEvent {
  *  off/paused (we null the coordinates then so no stale location leaks). Use
  *  `isSharingLive()` in `@/lib/location` to decide whether to plot a pin — a row
  *  can exist purely to carry `sharing: false`. */
+/** A saved household place (migration 067) monitored as a native geofence.
+ *  `radius_m` is the geofence radius; iOS quietly enforces a floor around 100 m,
+ *  so very small radii behave like ~100 m in practice. */
+export interface Place {
+  id: string
+  household_id: string
+  name: string
+  icon: string
+  lat: number
+  lng: number
+  radius_m: number
+  notify_arrivals: boolean
+  notify_departures: boolean
+  created_by: string
+  created_at: string
+}
+
+/** A member crossing a place's geofence (migration 067) — drives the activity
+ *  feed and the "Emma arrived at School" push. */
+export interface PlaceEvent {
+  id: string
+  household_id: string
+  place_id: string
+  user_email: string
+  type: 'arrive' | 'leave'
+  at: string
+}
+
 export interface MemberLocation {
   user_email: string
   household_id: string
