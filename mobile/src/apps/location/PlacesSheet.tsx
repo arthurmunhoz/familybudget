@@ -18,6 +18,15 @@ import { Segmented } from '@/apps/budget/shared'
 import { timeAgo } from './locationUi'
 import { PlaceForm } from './PlaceForm'
 
+/** Roughly the iPhone display's corner radius, for a footer that sits flush in
+ *  the bottom corners and should curve WITH the screen rather than cut across
+ *  it. iOS exposes no API for the real value and it varies by device (~39pt on
+ *  X/11 Pro, ~47 on 12–14, ~55 on the Pros), so this is a middle figure: it
+ *  reads as concentric on every current handset, and slightly under-shooting is
+ *  the safe direction — a radius larger than the screen's would visibly bulge,
+ *  while a smaller one just leaves a hairline of sheet in the corner. */
+const SCREEN_CORNER = 40
+
 export function PlacesSheet({
   profiles,
   myEmail,
@@ -106,8 +115,11 @@ export function PlacesSheet({
               backgroundColor: c.sheet,
               borderTopLeftRadius: 22,
               borderTopRightRadius: 22,
-              padding: sp.lg,
-              paddingBottom: insets.bottom + sp.lg,
+              paddingTop: sp.lg,
+              paddingHorizontal: sp.lg,
+              // No bottom padding: the Add footer runs to the sheet's edge and
+              // carries the safe-area inset itself, so it can sit right down in
+              // the screen's corner instead of floating above a band of nothing.
               gap: sp.md,
               // Fit the content (a household with 1 place gets a short sheet),
               // capped so a long list still leaves the map visible.
@@ -182,32 +194,14 @@ export function PlacesSheet({
                   </View>
                 ) : null}
 
-                <Pressable
-                  onPress={() => setEditing('new')}
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 7,
-                      marginTop: sp.md,
-                      paddingVertical: 13,
-                      borderRadius: R.md,
-                      borderWidth: 1,
-                      borderStyle: 'dashed',
-                      borderColor: c.border,
-                    },
-                    pressed && { opacity: 0.6 },
-                  ]}
-                >
-                  <Plus size={17} color={c.accent} />
-                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.accent }}>
-                    {t('location.places.add')}
-                  </Txt>
-                </Pressable>
               </ScrollView>
             ) : (
-              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: sp.lg }}>
+              // Activity has no footer to carry the safe-area inset (the sheet
+              // stopped padding its own bottom), so this list carries it.
+              <ScrollView
+                style={{ flexShrink: 1 }}
+                contentContainerStyle={{ paddingBottom: sp.lg + insets.bottom }}
+              >
                 {events.map((e) => {
                   const place = placeById.get(e.place_id)
                   const who = nameFor(e.user_email)
@@ -254,6 +248,41 @@ export function PlacesSheet({
                 ) : null}
               </ScrollView>
             )}
+
+            {/* Pinned footer, full-bleed to the sheet's edges and curved to
+                follow the screen's own corners. Also fixes a smaller problem:
+                this used to be the last row INSIDE the list, so on a household
+                with a lot of places you had to scroll to the bottom to add one. */}
+            {tab === 'places' ? (
+              <Pressable
+                onPress={() => setEditing('new')}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 7,
+                    // Cancel the sheet's horizontal padding so it reaches the edges.
+                    marginHorizontal: -sp.lg,
+                    paddingTop: 14,
+                    // The fill runs under the home indicator; the label stays above it.
+                    paddingBottom: 14 + insets.bottom,
+                    backgroundColor: c.accentSoft,
+                    borderTopLeftRadius: R.lg,
+                    borderTopRightRadius: R.lg,
+                    borderBottomLeftRadius: SCREEN_CORNER,
+                    borderBottomRightRadius: SCREEN_CORNER,
+                  },
+                  pressed && { opacity: 0.75 },
+                ]}
+              >
+                <Plus size={17} color={c.accent} />
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.accent }}>
+                  {t('location.places.add')}
+                </Txt>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
