@@ -212,13 +212,15 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     reverse-geocode / `useWatchLive` hooks live inside it — a household of ten
     must not fire ten Directions requests. Live mode now starts on EXPAND and
     relaxes on collapse (it used to be tied to opening the sheet).
-  - **Your own card is the exception: it never expands.** Its compact face
-    carries a full `BatteryGauge` and a button straight into `SharingControls`
-    (still a modal — switches and pause presets, not detail), and it shows NO
-    location line, because you already know where you are; that row was the best
-    real estate on the card, spent telling you nothing. Tapping it frames you on
-    the map and stops there — expanding would only repeat the battery and the
-    sharing button. `MemberDetailCard` therefore has no `isMe` branch.
+  - **Your own card is the exception: it never expands.** In place of everyone
+    else's location line it shows your SHARING STATE — a coloured dot plus
+    on / paused / off — with a settings gear in the corner opening
+    `SharingControls` (still a modal: switches and pause presets, not detail).
+    Deliberately absent: where you are (you know) and your battery (the phone
+    shows one already). Tapping it frames you on the map and stops there, so
+    `MemberDetailCard` has no `isMe` branch. The state line sits in the same
+    slot as other cards' status line rather than pinned to the bottom — bottom
+    was tried and left ~60pt of hole through the middle of the card.
 - **Map styles** (`mapMode.ts` + `MapModePicker`): Map / Satellite / Terrain,
   from the layers button under the recenter control, remembered in AsyncStorage.
   - The picker is a row of option cards mirroring **Settings' Appearance

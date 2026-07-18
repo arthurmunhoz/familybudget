@@ -6,9 +6,9 @@
 // Tapping a card or a pin EXPANDS that member's card in place (ETA-first detail,
 // no sheet over the map) and frames them on the map, so what you're reading
 // about stays visible behind the roster. Tapping again collapses it. YOUR OWN
-// card is the exception: it never expands — it carries your battery and a button
-// into sharing controls on its compact face, and says nothing about where you
-// are, because you know. That's also why there's no sharing button in the header.
+// card is the exception: it never expands — it says whether you're SHARING
+// (not where you are, which you know) and carries a settings button in its
+// corner. That's also why there's no sharing button in the header.
 // Native-only: the map (@rnmapbox/maps) and background location need a dev build
 // + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -56,7 +56,6 @@ import type { MemberLocation, Place, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import {
   BatteryChip,
-  BatteryGauge,
   buildMemberColors,
   CARD_H,
   CARD_W,
@@ -182,6 +181,7 @@ function MemberCard({
   watched,
   onPress,
   onSettings,
+  sharing,
 }: {
   name: string
   avatarPath?: string | null
@@ -191,9 +191,11 @@ function MemberCard({
   /** In my active Safety Radius watch list. */
   watched: boolean
   onPress: () => void
-  /** Present only on YOUR card — swaps the status line for a battery gauge and
-   *  a button straight into sharing controls. */
+  /** Present only on YOUR card — swaps the location line for your sharing STATE
+   *  and puts a settings button in the corner. */
   onSettings?: () => void
+  /** Your own sharing state, shown in place of the location line. */
+  sharing?: 'on' | 'paused' | 'off'
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -220,53 +222,67 @@ function MemberCard({
         pressed && { opacity: 0.7 },
       ]}
     >
+      {/* Sharing settings, tucked in the corner: a small target that doesn't
+          compete with the card, and doesn't repeat the word "sharing" next to
+          the status line below. Nested Pressable, so it takes its own tap. */}
+      {onSettings ? (
+        <Pressable
+          onPress={onSettings}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('location.card.manage')}
+          style={({ pressed }) => [
+            { position: 'absolute', top: 6, right: 6, padding: 4 },
+            pressed && { opacity: 0.5 },
+          ]}
+        >
+          <Settings2 size={15} color={c.textMuted} />
+        </Pressable>
+      ) : null}
+
       <MemberAvatar name={name} avatarPath={avatarPath} color={color} size={44} />
       <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }} numberOfLines={1}>
         {name}
       </Txt>
-      {/* YOUR card says nothing about where you are — you already know, and the
-          line was spending the card's best row telling you so. It gets a real
-          battery and a way straight into sharing instead. */}
-      {onSettings ? null : (
+      {/* YOUR card says nothing about where you ARE — you already know, and that
+          line was spending the card's best row telling you so. What you can't
+          see without asking is whether you're currently sharing, so that's what
+          it says instead. No battery: the phone already has one on screen. */}
+      {onSettings ? (
+        // Sits in the same slot as everyone else's location line, so your card
+        // keeps the roster's rhythm instead of leaving a hole in the middle.
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+          <View
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: 4,
+              backgroundColor:
+                sharing === 'on' ? c.income : sharing === 'paused' ? '#c8862a' : c.textFaint,
+            }}
+          />
+          <Txt
+            variant="muted"
+            style={{ fontSize: 11, flexShrink: 1, textAlign: 'center' }}
+            numberOfLines={2}
+          >
+            {t(
+              sharing === 'on'
+                ? 'location.status.sharing'
+                : sharing === 'paused'
+                  ? 'location.status.paused'
+                  : 'location.status.off',
+            )}
+          </Txt>
+        </View>
+      ) : (
         <Txt variant="muted" style={{ fontSize: 11, textAlign: 'center' }} numberOfLines={2}>
           {status}
         </Txt>
       )}
       <View style={{ marginTop: 'auto', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
         {watched ? <WatchingChip /> : null}
-        {onSettings ? (
-          <>
-            {battery != null ? <BatteryGauge level={battery} height={24} /> : null}
-            <Pressable
-              onPress={onSettings}
-              accessibilityRole="button"
-              accessibilityLabel={t('location.card.manage')}
-              style={({ pressed }) => [
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 5,
-                  alignSelf: 'stretch',
-                  backgroundColor: c.accentSoft,
-                  borderRadius: radius.md,
-                  paddingVertical: 7,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Settings2 size={13} color={c.accent} />
-              <Txt
-                style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.accent }}
-                numberOfLines={1}
-              >
-                {t('location.card.sharing')}
-              </Txt>
-            </Pressable>
-          </>
-        ) : battery != null ? (
-          <BatteryChip level={battery} />
-        ) : null}
+        {!onSettings && battery != null ? <BatteryChip level={battery} /> : null}
       </View>
     </Pressable>
   )
@@ -952,6 +968,9 @@ export default function Whereabouts() {
                   watched={!!watch?.watched.includes(p.email)}
                   onPress={() => select(p.email)}
                   onSettings={isMe ? () => setSharingOpen(true) : undefined}
+                  sharing={
+                    isMe ? (live ? 'on' : isPaused(loc) ? 'paused' : 'off') : undefined
+                  }
                 />
               )
             })}
