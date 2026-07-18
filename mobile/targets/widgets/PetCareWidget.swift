@@ -536,8 +536,8 @@ struct PetCareWidgetView: View {
       }
     } else {
       VStack(spacing: 4) {
-        Image(systemName: "pawprint").foregroundStyle(.secondary)
-        Text("Open One Roof").font(.caption).foregroundStyle(.secondary)
+        Image(systemName: "pawprint").foregroundStyle(appTheme().textMuted)
+        Text("Open One Roof").font(.caption).foregroundStyle(appTheme().textMuted)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

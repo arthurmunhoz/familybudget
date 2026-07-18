@@ -46,6 +46,36 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   - **Glass skin (`theme/glass.tsx`, `GLASS` flag)** re-skins the app: a colour
     wash painted at the root, translucent cards, rounded Nunito titles. Set
     `GLASS = false` to get Warm Hearth back exactly.
+  - **Colour schemes (`SCHEMES` in `glass.tsx` + `theme/scheme-pref.tsx`)** — the
+    user picks one in Settings. A scheme repaints ONLY `accent`/`accentSoft` and
+    the wash; neutrals, income green and expense red are shared, which is what
+    keeps every scheme the same app. `glassTokens(dark, scheme)` composes it and
+    `useTheme()` calls that — screens need no changes. Stored per DEVICE in
+    AsyncStorage, mirroring `theme-pref` (appearance is per-device here;
+    only language syncs to the account). Adding a scheme = one entry in `SCHEMES`
+    (light + dark accent AND wash) plus `settings.scheme.<id>` in all 3 dicts.
+    Two families: **branded** (warm tinted wash — the One Roof look) and
+    **palettes** (near-neutral wash, accent does the work). A neutral wash needs
+    ONE blob tinted with the scheme's hue or the glass dies — the effect comes
+    from variation behind a translucent card, and flat grey gives it nothing to
+    read through.
+    Rules for a new accent: it must not read as the expense red (`#E4554A`) or
+    the income green (`#1F9E68`) — the original `#E2683F` failed the first,
+    painting primary buttons and negative amounts nearly alike. A neutral wash
+    buys headroom here (that's how `field`/`slateGreen`/`slateRed` work: they sit
+    far enough apart in LIGHTNESS, ~1.6–2.1 ratio, not just hue).
+  - **`c.onAccent` — text/icons on an accent-filled surface. NEVER hardcode
+    `'#fff'` there.** `pickOnAccent()` (`theme/contrast.ts`, its own module to
+    avoid a real import cycle with `theme.ts`) returns white or the ink
+    `#1B1A18`, whichever wins, and `glassTokens` DERIVES it — a new scheme can't
+    forget it. This was a live bug: white was hardcoded at 43 sites, fine for the
+    dark accents of light mode but 2.2–3.0:1 for the light accents of dark mode,
+    below AA even for large text. Worst case is now 4.65:1 across all 22
+    accent/mode combos. When adding a scheme, check BOTH modes clear 4.5 against
+    the better of white/ink; if neither reaches it (the old `#C2603F` was 4.17:1
+    both ways — no foreground could save it), darken the accent ~6% instead.
+    **Every `<GlassWash>` needs the `scheme` prop** — there are two (`_layout`
+    and the `paywall` modal route); tsc catches a missed one.
   - **`card` vs `sheet` — the rule that keeps biting:** `card` is TRANSLUCENT so
     the wash reads through it on screens. Anything floating over something other
     than the wash — a `<Modal>` sheet (dim backdrop) or a panel on the
@@ -87,6 +117,21 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `today_cfg` (see `syncTodayConfig`) is the reference for "mirror the config
     the widget needs to fetch for itself," and TodayWidget's `buildToday()` for
     "live → last-good cache → app snapshot, and only if it's still the same day."
+  - **A widget must colour itself from `appTheme()`, never from SwiftUI's
+    semantic colours.** `.primary`/`.secondary`/`.fill.tertiary`/`Color.green`/
+    `Color.accentColor` all follow the DEVICE's light/dark setting, but the app's
+    theme is a manual choice mirrored into the App Group as `widget_theme` — so a
+    semantic-coloured widget renders dark next to a light-themed app. This is
+    what made the Budget tile "always black". `index.swift` declares the
+    `WarmHearth` tokens (incl. `income` and `onAccent`) and `appTheme()`; use
+    those, set `.containerBackground(appTheme().bg, for: .widget)`, and put an
+    explicit `.foregroundStyle(theme.text)` on the root — anything without its
+    own colour otherwise inherits `.primary` and goes white on a light card.
+    All four widgets are clean as of this sweep — grep for
+    `foregroundStyle(.secondary)|.fill.tertiary|Color.accentColor|Color.green`
+    in `targets/widgets/` before shipping a widget change. (The one deliberate
+    exception is PetCare's green "all done" card, which is a success colour, not
+    a themed surface.)
   - **An interactive widget button fires on a press-and-hold that's too short to
     raise the system context menu** — so any `Button(intent:)` whose action is
     hard to take back is a hazard, and it's worse here because the tiles cover the

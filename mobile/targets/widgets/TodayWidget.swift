@@ -355,6 +355,7 @@ struct TodayProvider: TimelineProvider {
 struct TodayWidgetView: View {
   var entry: TodayEntry
   @Environment(\.widgetFamily) var family
+  private var theme: WarmHearth { appTheme() }
 
   private var maxItems: Int {
     switch family {
@@ -372,7 +373,7 @@ struct TodayWidgetView: View {
           VStack(alignment: .leading, spacing: 0) {
             Text(info.todayLabel.uppercased())
               .font(.system(size: 10, weight: .bold))
-              .foregroundStyle(.secondary)
+              .foregroundStyle(theme.textMuted)
             Text(isSmall ? info.dateShort : info.dateLong)
               .font(.system(size: isSmall ? 15 : 18, weight: .bold))
               .lineLimit(1)
@@ -389,7 +390,7 @@ struct TodayWidgetView: View {
                   .font(.system(size: isSmall ? 14 : 16, weight: .bold))
               }
               if !isSmall, let city = info.city {
-                Text(city).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                Text(city).font(.system(size: 10)).foregroundStyle(theme.textMuted).lineLimit(1)
               }
             }
           }
@@ -407,7 +408,7 @@ struct TodayWidgetView: View {
           }
           .padding(.horizontal, 8)
           .padding(.vertical, 6)
-          .background(Color.accentColor.opacity(0.15))
+          .background(theme.accent.opacity(0.15))
           .clipShape(RoundedRectangle(cornerRadius: 8))
         }
 
@@ -416,10 +417,10 @@ struct TodayWidgetView: View {
           // intentionally "clear day" instead of a top-stuck label + blank space.
           Spacer(minLength: 0)
           VStack(spacing: 6) {
-            Image(systemName: "checkmark.circle").font(.title3).foregroundStyle(.secondary)
+            Image(systemName: "checkmark.circle").font(.title3).foregroundStyle(theme.textMuted)
             Text(info.emptyLabel)
               .font(.caption)
-              .foregroundStyle(.secondary)
+              .foregroundStyle(theme.textMuted)
               .multilineTextAlignment(.center)
           }
           .frame(maxWidth: .infinity)
@@ -435,7 +436,7 @@ struct TodayWidgetView: View {
                 if !isSmall, let sub = item.subtitle {
                   Text("· \(sub)")
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.textMuted)
                     .lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -449,11 +450,15 @@ struct TodayWidgetView: View {
           Spacer(minLength: 0)
         }
       }
+      // Without this, anything that sets no colour of its own (the date, the
+      // agenda titles) inherits .primary — which follows the DEVICE appearance
+      // and turns white on our light background.
+      .foregroundStyle(theme.text)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
       VStack(spacing: 4) {
-        Image(systemName: "calendar").foregroundStyle(.secondary)
-        Text("Open One Roof").font(.caption).foregroundStyle(.secondary)
+        Image(systemName: "calendar").foregroundStyle(theme.textMuted)
+        Text("Open One Roof").font(.caption).foregroundStyle(theme.textMuted)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -464,7 +469,8 @@ struct TodayWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "TodayWidget", provider: TodayProvider()) { entry in
       TodayWidgetView(entry: entry)
-        .containerBackground(.fill.tertiary, for: .widget)
+        // The app's own Light/Dark choice, NOT the device's. See index.swift.
+        .containerBackground(appTheme().bg, for: .widget)
     }
     .configurationDisplayName("Today")
     .description("Today's agenda and weather at a glance.")

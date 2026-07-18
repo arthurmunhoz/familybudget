@@ -37,6 +37,9 @@ import { Segmented } from './shared'
 
 const PERIODS: Period[] = ['monthly', 'weekly', 'daily']
 
+// iPhones get screen-corner-like rounding on the bottom bar button.
+const NEW_BUDGET_RADIUS = Platform.OS === 'ios' ? 40 : 12
+
 type EntryLite = Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>
 
 interface MonthStat {
@@ -239,9 +242,18 @@ export default function Budgets() {
           style={({ pressed }) => ({
             alignItems: 'center',
             justifyContent: 'center',
-            paddingVertical: 18,
-            borderTopWidth: StyleSheet.hairlineWidth,
-            borderTopColor: c.border,
+            marginHorizontal: sp.lg,
+            marginTop: sp.sm,
+            paddingVertical: 16,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: c.textFaint,
+            // Bottom corners follow the iPhone screen curve (normal on Android)
+            // — same treatment as Pet Care's "Add task" button.
+            borderTopLeftRadius: radius.md,
+            borderTopRightRadius: radius.md,
+            borderBottomLeftRadius: NEW_BUDGET_RADIUS,
+            borderBottomRightRadius: NEW_BUDGET_RADIUS,
             opacity: loading ? 0.5 : pressed ? 0.6 : 1,
           })}
         >
@@ -478,7 +490,7 @@ function BudgetCard({
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>
+              <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>
                 {t('detail.newEntry')}
               </Txt>
             </Pressable>

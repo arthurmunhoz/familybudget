@@ -168,7 +168,7 @@ export function Btn({
 }) {
   const { c } = useTheme()
   const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surface : 'transparent'
-  const fg = variant === 'primary' ? '#ffffff' : c.text
+  const fg = variant === 'primary' ? c.onAccent : c.text
   return (
     <Pressable
       accessibilityRole="button"

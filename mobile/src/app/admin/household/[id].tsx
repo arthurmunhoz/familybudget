@@ -380,7 +380,7 @@ export default function AdminHousehold() {
                   opacity: !mName.trim() || !mEmail.trim() || busy ? 0.5 : 1,
                 }}
               >
-                <Txt style={{ color: '#fff', fontWeight: '700' }}>Add</Txt>
+                <Txt style={{ color: c.onAccent, fontWeight: '700' }}>Add</Txt>
               </Pressable>
             </View>
           )}

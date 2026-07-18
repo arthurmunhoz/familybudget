@@ -236,7 +236,7 @@ export default function PingComposer({
           accessibilityRole="button"
           accessibilityLabel={t('pings.send')}
         >
-          <Send size={18} strokeWidth={2.5} color="#ffffff" />
+          <Send size={18} strokeWidth={2.5} color={c.onAccent} />
         </Pressable>
       </View>
       <View style={styles.hint}>

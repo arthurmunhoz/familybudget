@@ -118,7 +118,7 @@ function UnitPills<T extends string>({
               borderLeftColor: c.border,
             }}
           >
-            <Txt style={{ color: on ? '#fff' : c.textMuted, fontWeight: '600', fontSize: 13 }}>
+            <Txt style={{ color: on ? c.onAccent : c.textMuted, fontWeight: '600', fontSize: 13 }}>
               {o.label}
             </Txt>
           </Pressable>
@@ -555,7 +555,7 @@ export function EditProfile({
                   { right: -2, bottom: -2, backgroundColor: c.accent, borderColor: c.card },
                 ]}
               >
-                <Camera size={16} color="#fff" />
+                <Camera size={16} color={c.onAccent} />
               </Pressable>
               {/* remove — top-right */}
               {form.avatar_path ? (
@@ -741,7 +741,7 @@ function Chip({
         backgroundColor: active ? c.accent : c.surface,
       }}
     >
-      <Txt style={{ color: active ? '#fff' : c.text, fontWeight: '600', fontSize: 14 }}>
+      <Txt style={{ color: active ? c.onAccent : c.text, fontWeight: '600', fontSize: 14 }}>
         {label}
       </Txt>
     </Pressable>

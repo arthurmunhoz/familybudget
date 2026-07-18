@@ -251,8 +251,8 @@ export default function Admin() {
                 backgroundColor: on ? c.accent : 'transparent',
               }}
             >
-              <tb.icon size={15} color={on ? '#fff' : c.textMuted} />
-              <Txt style={{ fontWeight: '700', fontSize: 13, color: on ? '#fff' : c.textMuted }}>{tb.label}</Txt>
+              <tb.icon size={15} color={on ? c.onAccent : c.textMuted} />
+              <Txt style={{ fontWeight: '700', fontSize: 13, color: on ? c.onAccent : c.textMuted }}>{tb.label}</Txt>
             </Pressable>
           )
         })}
@@ -358,7 +358,7 @@ export default function Admin() {
                   opacity: !newHousehold.trim() || busy ? 0.5 : 1,
                 }}
               >
-                <Txt style={{ color: '#fff', fontWeight: '700' }}>Create</Txt>
+                <Txt style={{ color: c.onAccent, fontWeight: '700' }}>Create</Txt>
               </Pressable>
             </View>
           </Card>
@@ -519,7 +519,7 @@ function Pills<T extends string | number>({
               backgroundColor: on ? c.accent : c.surface,
             }}
           >
-            <Txt style={{ fontWeight: '700', color: on ? '#fff' : c.textMuted }}>{label(v)}</Txt>
+            <Txt style={{ fontWeight: '700', color: on ? c.onAccent : c.textMuted }}>{label(v)}</Txt>
           </Pressable>
         )
       })}

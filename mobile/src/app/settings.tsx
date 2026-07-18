@@ -57,6 +57,8 @@ import {
 import { supabase } from '@/lib/supabase'
 import { dark, fonts, light, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
+import { useSchemePref } from '@/theme/scheme-pref'
+import { GLASS, SCHEMES, SCHEME_IDS, type SchemeId } from '@/theme/glass'
 import { useTilePref, type TileStyle } from '@/hooks/useTilePref'
 
 const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
@@ -362,6 +364,56 @@ function ThemePreview({ p }: { p: typeof light }) {
   )
 }
 
+// Mini preview of a COLOUR SCHEME: the wash it paints behind everything, plus a
+// glass card and the accent on top. Rendered in the currently-active light/dark
+// mode, since a scheme defines both and you only ever see one at a time.
+function SchemePreview({ id, dark }: { id: SchemeId; dark: boolean }) {
+  const s = SCHEMES[id]
+  const w = dark ? s.washDark : s.wash
+  const accent = dark ? s.accentDark : s.accent
+  // The real wash is three huge offscreen circles; at this size they'd just be
+  // flat fills, so shrink them into the corners to keep the same read.
+  const spots = [
+    { top: -14, left: -14 },
+    { top: -10, right: -12 },
+    { bottom: -16, left: 18 },
+  ]
+  return (
+    <View style={{ height: 74, borderRadius: 10, backgroundColor: w.base, padding: 8, overflow: 'hidden', justifyContent: 'flex-end' }}>
+      {w.blobs.map((b, i) => (
+        <View
+          key={i}
+          style={{
+            position: 'absolute',
+            ...spots[i],
+            width: 52,
+            height: 52,
+            borderRadius: 26,
+            backgroundColor: b.color,
+            opacity: b.o,
+          }}
+        />
+      ))}
+      <View
+        style={{
+          height: 30,
+          borderRadius: 8,
+          backgroundColor: dark ? 'rgba(32,33,42,0.62)' : 'rgba(255,255,255,0.66)',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(60,45,38,0.12)',
+          padding: 5,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+        }}
+      >
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: accent }} />
+        <View style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: accent, opacity: 0.28 }} />
+      </View>
+    </View>
+  )
+}
+
 // Mini preview of the home tile density (uses the active theme).
 function TilePreview({ compact }: { compact: boolean }) {
   const { c } = useTheme()
@@ -436,8 +488,10 @@ function OptionCard({
 }
 
 export default function Settings() {
-  const { c } = useTheme()
+  // `dark` is aliased: this module also imports the Warm Hearth `dark` token set.
+  const { c, dark: isDark } = useTheme()
   const { mode, setMode } = useThemePref()
+  const { scheme, setScheme } = useSchemePref()
   const { tile, setTile } = useTilePref()
   const { hiddenApps, appOrder, toggleApp, setAppOrder } = useAppPrefs()
   // Every app (hidden ones dimmed), in the user's hub order — same ranking the
@@ -741,6 +795,35 @@ export default function Settings() {
             </OptionCard>
           </View>
         </View>
+
+        {/* Colour scheme — only meaningful under the glass skin, whose accent
+            and background wash are what a scheme repaints. Warm Hearth has a
+            single fixed accent, so this is hidden when GLASS is off. */}
+        {GLASS ? (
+          <>
+            <Divider />
+            <View style={{ gap: sp.sm }}>
+              <Txt variant="label">{t('settings.colorScheme')}</Txt>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: sp.sm, paddingRight: sp.sm }}
+              >
+                {SCHEME_IDS.map((id) => (
+                  <View key={id} style={{ width: 108 }}>
+                    <OptionCard
+                      selected={scheme === id}
+                      onPress={() => setScheme(id)}
+                      label={t(`settings.scheme.${id}` as TKey)}
+                    >
+                      <SchemePreview id={id} dark={isDark} />
+                    </OptionCard>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </>
+        ) : null}
 
         <Divider />
 

@@ -484,7 +484,7 @@ function FilterChip({
         backgroundColor: active ? c.accent : c.surface,
       }}
     >
-      <Txt style={{ color: active ? '#fff' : c.textMuted, fontWeight: '600', fontSize: 14 }}>
+      <Txt style={{ color: active ? c.onAccent : c.textMuted, fontWeight: '600', fontSize: 14 }}>
         {children}
       </Txt>
     </Pressable>

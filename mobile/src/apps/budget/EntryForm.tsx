@@ -429,7 +429,7 @@ export default function EntryForm({
                     }}
                   >
                     <Txt style={{ fontSize: 14 }}>{selectedCat.icon}</Txt>
-                    <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: '#fff' }}>
+                    <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.onAccent }}>
                       {catName(selectedCat)}
                     </Txt>
                   </View>
@@ -570,7 +570,7 @@ export default function EntryForm({
                         opacity: creatingCat || !newCatName.trim() ? 0.5 : pressed ? 0.85 : 1,
                       })}
                     >
-                      <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>
+                      <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>
                         {t('common.add')}
                       </Txt>
                     </Pressable>

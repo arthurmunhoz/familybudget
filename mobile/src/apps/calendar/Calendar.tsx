@@ -361,7 +361,7 @@ export default function Calendar() {
                 >
                   <Txt
                     style={{
-                      color: active ? '#fff' : c.textMuted,
+                      color: active ? c.onAccent : c.textMuted,
                       fontWeight: '600',
                     }}
                   >
@@ -438,7 +438,7 @@ export default function Calendar() {
                           <Txt
                             style={{
                               fontSize: 14,
-                              color: isSelected ? '#fff' : isToday ? c.accent : c.text,
+                              color: isSelected ? c.onAccent : isToday ? c.accent : c.text,
                               fontWeight: isSelected || isToday ? '700' : '400',
                             }}
                           >
@@ -633,7 +633,7 @@ function EventRow({
             backgroundColor: soon ? c.accent : c.surface,
           }}
         >
-          <Txt style={{ fontSize: 12, fontWeight: '700', color: soon ? '#fff' : c.textMuted }}>
+          <Txt style={{ fontSize: 12, fontWeight: '700', color: soon ? c.onAccent : c.textMuted }}>
             {countdown}
           </Txt>
         </View>

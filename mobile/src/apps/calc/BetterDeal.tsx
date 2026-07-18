@@ -146,7 +146,7 @@ export function BetterDeal() {
                 onPress={() => setUnit(u)}
                 style={[styles.unitChip, { backgroundColor: active ? c.accent : c.surface }]}
               >
-                <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? '#ffffff' : c.textMuted }}>
+                <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? c.onAccent : c.textMuted }}>
                   {u === 'each' ? t('calc.unitEach') : u}
                 </Txt>
               </Pressable>

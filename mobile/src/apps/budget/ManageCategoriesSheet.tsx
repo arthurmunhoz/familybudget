@@ -237,7 +237,7 @@ export default function ManageCategoriesSheet({
           opacity: busy || !draftName.trim() ? 0.5 : pressed ? 0.85 : 1,
         })}
       >
-        <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>{saveLabel}</Txt>
+        <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>{saveLabel}</Txt>
       </Pressable>
       <Pressable onPress={cancelEdit} hitSlop={8} accessibilityLabel={t('common.cancel')}>
         <X size={20} color={c.textMuted} />

@@ -235,7 +235,7 @@ export function PetEditor({
                   backgroundColor: active ? c.accent : c.surface,
                 }}
               >
-                <Txt style={{ color: active ? '#fff' : c.textMuted, fontWeight: '600' }}>
+                <Txt style={{ color: active ? c.onAccent : c.textMuted, fontWeight: '600' }}>
                   {s.emoji} {t(`pets.species.${s.id}` as TKey)}
                 </Txt>
               </Pressable>
