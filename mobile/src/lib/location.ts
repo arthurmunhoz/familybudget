@@ -120,6 +120,25 @@ export async function upsertMyFix(fix: Fix): Promise<void> {
     )
 }
 
+/** Persist just a position (no battery) — used by live mode's high-frequency
+ *  updates, where re-reading the battery every few seconds would be wasteful and
+ *  passing battery: null would wipe the last good reading. */
+export async function upsertMyPosition(p: {
+  lat: number
+  lng: number
+  accuracy: number | null
+  speed: number | null
+}): Promise<void> {
+  const email = await myEmail()
+  if (!email) return
+  await supabase
+    .from('member_locations')
+    .upsert(
+      { user_email: email, lat: p.lat, lng: p.lng, accuracy: p.accuracy, speed: p.speed },
+      { onConflict: 'user_email' },
+    )
+}
+
 /** Turn sharing on or off. Turning OFF nulls the coordinates so no stale
  *  location lingers for the household to read. */
 export async function setSharing(on: boolean): Promise<void> {

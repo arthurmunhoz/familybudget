@@ -105,8 +105,18 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   `UIBackgroundModes: ["location"]` + Always strings, `LSApplicationQueriesSchemes`
   (comgooglemaps/waze), Android location perms. Runtime map/Directions token is
   `EXPO_PUBLIC_MAPBOX_TOKEN`.
+- **Live mode** (migration 066, `src/lib/liveLocation.ts`): opening a member's
+  detail writes a `location_live_requests` row (heartbeated while open); the
+  target device runs `useLiveResponder` (mounted in `_layout`) and, WHILE
+  SHARING, ramps up to a high-accuracy `watchPositionAsync` burst so their pin
+  moves near real-time, then relaxes when the request expires. Being watched
+  never turns sharing on. Only fires while the target app is active (foreground /
+  backgrounded-with-socket) — the force-quit / phone-in-pocket case needs a
+  silent push to wake it (documented follow-up). The MemberSheet ETA/address
+  refetch on a coarse ~100 m grid so live updates don't spam the Directions API.
 - Not yet: Places/geofences + arrive-leave push (Phase 2); Safety Radius, history,
-  driving/SOS (Phase 3 — a One Roof **Plus** feature).
+  driving/SOS (Phase 3 — a One Roof **Plus** feature); a silent-push wake so live
+  mode works with the target's app backgrounded/force-quit.
 
 ## AI / server endpoints
 Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`

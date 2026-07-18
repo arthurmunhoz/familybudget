@@ -231,3 +231,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-063-admin-event-usage.sql (admin_event_usage: per-event-type counts for the admin "Feature usage" view — what's used vs not)
 --   migration-064-backfill-budget-owner.sql (data: assign pre-058 ownerless budgets to their household owner so the owner controls privacy)
 --   migration-065-member-locations.sql (member_locations: one row/member with latest fix + sharing/paused_until state, household-scoped RLS + Realtime — backs the Whereabouts family-location app)
+--   migration-066-location-live-requests.sql (location_live_requests: watcher→target "live mode" requests; target ramps up to high-frequency GPS while watched, then relaxes)
