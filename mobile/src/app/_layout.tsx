@@ -30,6 +30,7 @@ import { AppPrefsProvider } from '@/hooks/useAppPrefs';
 import { TilePrefProvider } from '@/hooks/useTilePref';
 import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
+import { SchemePrefProvider, useSchemePref } from '@/theme/scheme-pref';
 import { GLASS, GlassWash } from '@/theme/glass';
 import { KeyboardDoneBar } from '@/components/KeyboardDone';
 
@@ -68,11 +69,13 @@ export default function RootLayout() {
         <PlusProvider>
           <I18nProvider>
             <ThemePrefProvider>
-              <TilePrefProvider>
-                <AppPrefsProvider>
-                  <Chrome />
-                </AppPrefsProvider>
-              </TilePrefProvider>
+              <SchemePrefProvider>
+                <TilePrefProvider>
+                  <AppPrefsProvider>
+                    <Chrome />
+                  </AppPrefsProvider>
+                </TilePrefProvider>
+              </SchemePrefProvider>
             </ThemePrefProvider>
           </I18nProvider>
         </PlusProvider>
@@ -87,6 +90,7 @@ export default function RootLayout() {
 // which screen the user actually opens.
 function Chrome() {
   const { mode } = useThemePref();
+  const { scheme } = useSchemePref();
   const isDark = mode === 'dark';
   useSyncNudgeWidget();
   useLiveResponder();
@@ -97,7 +101,7 @@ function Chrome() {
           navigator's screen backgrounds transparent so it shows through. When
           GLASS is off this whole block is inert and the app is untouched. */}
       <View style={{ flex: 1 }}>
-        {GLASS ? <GlassWash dark={isDark} /> : null}
+        {GLASS ? <GlassWash dark={isDark} scheme={scheme} /> : null}
         <Stack
           screenOptions={{
             headerShown: false,

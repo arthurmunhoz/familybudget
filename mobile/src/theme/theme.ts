@@ -4,7 +4,9 @@
 import { Platform } from 'react-native';
 
 import { useThemePref } from './theme-pref';
-import { GLASS, glassLight, glassDark } from './glass';
+import { useSchemePref } from './scheme-pref';
+import { pickOnAccent } from './contrast';
+import { GLASS, glassLight, glassDark, glassTokens } from './glass';
 
 export interface ThemeTokens {
   bg: string;
@@ -21,6 +23,10 @@ export interface ThemeTokens {
   textFaint: string;
   accent: string;
   accentSoft: string;
+  /** Text/icon colour to use ON an accent-filled surface. NEVER hardcode a
+   *  literal white on `accent` — the light, vivid accents used in dark mode need
+   *  dark ink instead. See theme/contrast.ts. */
+  onAccent: string;
   income: string;
   expense: string;
   border: string;
@@ -38,6 +44,7 @@ export const light: ThemeTokens = {
   textFaint: '#b3a89b',
   accent: '#c2603f',
   accentSoft: 'rgba(194,96,63,0.14)',
+  onAccent: pickOnAccent('#c2603f'),
   income: '#3c7d58',
   expense: '#cf5a4c',
   border: 'rgba(43,37,33,0.10)',
@@ -55,6 +62,7 @@ export const dark: ThemeTokens = {
   textFaint: '#7c7165',
   accent: '#da7a5b',
   accentSoft: 'rgba(218,122,91,0.22)',
+  onAccent: pickOnAccent('#da7a5b'),
   income: '#6fb58a',
   expense: '#e07a6a',
   border: 'rgba(243,235,224,0.12)',
@@ -67,10 +75,12 @@ export interface Theme {
 
 export function useTheme(): Theme {
   const { mode } = useThemePref();
+  const { scheme } = useSchemePref();
   const isDark = mode === 'dark';
   // GLASS skin (experimental, reversible) swaps in translucent tokens; see
   // theme/glass.tsx. Flip GLASS to false there to restore Warm Hearth exactly.
-  if (GLASS) return { dark: isDark, c: isDark ? glassDark : glassLight };
+  // The user's colour scheme repaints only accent/accentSoft on top of those.
+  if (GLASS) return { dark: isDark, c: glassTokens(isDark, scheme) };
   return { dark: isDark, c: isDark ? dark : light };
 }
 
