@@ -119,7 +119,7 @@ export default function PetCare() {
   // interpolations feed layout props, which the native driver can't animate).
   const scrollY = useRef(new Animated.Value(0)).current
   const chipAvatar = scrollY.interpolate({ inputRange: [0, 80], outputRange: [52, 22], extrapolate: 'clamp' })
-  const chipEmoji = scrollY.interpolate({ inputRange: [0, 80], outputRange: [32, 14], extrapolate: 'clamp' })
+  const chipInitial = scrollY.interpolate({ inputRange: [0, 80], outputRange: [21, 10], extrapolate: 'clamp' })
   const chipFont = scrollY.interpolate({ inputRange: [0, 80], outputRange: [18, 13], extrapolate: 'clamp' })
   const chipPadV = scrollY.interpolate({ inputRange: [0, 80], outputRange: [12, 7], extrapolate: 'clamp' })
 
@@ -392,9 +392,22 @@ export default function PetCare() {
                           <Image source={{ uri: petPhotoUrls[p.id] }} style={{ width: '100%', height: '100%' }} />
                         </Animated.View>
                       ) : (
-                        <Animated.Text style={{ fontSize: chipEmoji }}>
-                          {p.emoji || speciesEmoji(p.species)}
-                        </Animated.Text>
+                        <Animated.View
+                          style={{
+                            width: chipAvatar,
+                            height: chipAvatar,
+                            borderRadius: 26,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: on ? 'rgba(255,255,255,0.28)' : c.accentSoft,
+                          }}
+                        >
+                          <Animated.Text
+                            style={{ fontSize: chipInitial, fontWeight: '700', color: on ? '#fff' : c.accent }}
+                          >
+                            {(p.name.trim().charAt(0) || '?').toUpperCase()}
+                          </Animated.Text>
+                        </Animated.View>
                       )}
                       <Animated.Text
                         style={{ fontWeight: '700', fontSize: chipFont, color: on ? '#fff' : c.textMuted }}
@@ -411,15 +424,24 @@ export default function PetCare() {
               <Pressable
                 onPress={() => setShowPetForm(true)}
                 accessibilityLabel={t('pets.addPet')}
-                style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingHorizontal: 10,
-                  borderRadius: radius.pill,
-                  backgroundColor: c.surface,
-                }}
+                style={{ justifyContent: 'center' }}
               >
-                <Plus size={16} color={c.textFaint} />
+                {/* avatar-sized placeholder — reads as "a photo goes here" */}
+                <Animated.View
+                  style={{
+                    width: chipAvatar,
+                    height: chipAvatar,
+                    borderRadius: 26,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1.5,
+                    borderStyle: 'dashed',
+                    borderColor: c.textFaint,
+                    backgroundColor: c.surface,
+                  }}
+                >
+                  <Plus size={18} color={c.textMuted} />
+                </Animated.View>
               </Pressable>
             </ScrollView>
           </View>
@@ -436,8 +458,15 @@ export default function PetCare() {
             <>
               {/* Today */}
               <Card style={{ gap: 2 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: sp.sm,
+                  }}
+                >
+                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
                     {t('petcare.today')} · {pet.name}
                   </Txt>
                   <Pressable onPress={() => setRoutineOpen('daily')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
@@ -519,8 +548,15 @@ export default function PetCare() {
 
               {/* Care routines */}
               <Card style={{ gap: 2 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: sp.sm,
+                  }}
+                >
+                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
                     {t('petcare.routines')}
                   </Txt>
                   <Pressable onPress={() => setRoutineOpen('interval')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
@@ -594,8 +630,15 @@ export default function PetCare() {
               {/* History — the log-event action lives HERE (it only ever adds
                   history entries), not in a global bottom bar. */}
               <Card style={{ gap: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: sp.sm,
+                    }}
+                  >
+                    <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
                       {t('pets.history')}
                     </Txt>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>

@@ -76,6 +76,8 @@ export default function EventForm({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
       >
+        {/* the dimmed area above the sheet dismisses on tap */}
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View
           style={{
             maxHeight: '90%',
