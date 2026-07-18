@@ -30,9 +30,11 @@ location. Map + routing are **Mapbox**.
    - `mobile/.env.local` (git-ignored, loaded by Expo):
      ```
      EXPO_PUBLIC_MAPBOX_TOKEN=pk.your_public_token
-     # optional — a custom Mapbox Studio style (e.g. a Warm Hearth theme).
-     # Omit to use the standard light/dark styles.
-     EXPO_PUBLIC_MAPBOX_STYLE_URL=mapbox://styles/you/your_style_id
+     # optional — custom Mapbox Studio styles (e.g. a Warm Hearth theme). If only
+     # the first is set it's used for BOTH themes; add _DARK for a proper Dusk map.
+     # Changing these needs a Metro restart: npx expo start --clear
+     EXPO_PUBLIC_MAPBOX_STYLE_URL=mapbox://styles/you/your_light_style_id
+     EXPO_PUBLIC_MAPBOX_STYLE_URL_DARK=mapbox://styles/you/your_dark_style_id
      ```
    - your shell / EAS secret for the build:
      ```
