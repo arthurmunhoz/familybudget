@@ -4,7 +4,7 @@
 // shows up the moment someone's device reports it.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { Plus } from 'lucide-react-native'
+import { Crosshair, Plus } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -23,6 +23,7 @@ export function PlacesSheet({
   colors,
   onClose,
   onChanged,
+  onShowOnMap,
 }: {
   profiles: Profile[]
   myEmail: string | null
@@ -30,6 +31,9 @@ export function PlacesSheet({
   onClose: () => void
   /** Places changed — the map + geofence registration should refresh. */
   onChanged: () => void
+  /** Frame a place on the map. The parent owns the camera, and closes this
+   *  sheet on the way — the map is the thing you asked to look at. */
+  onShowOnMap: (place: Place) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -171,6 +175,28 @@ export function PlacesSheet({
                         {watchLabel(p.id)} · {formatDistance(p.radius_m)}
                       </Txt>
                     </View>
+                    {/* Frame this place on the map. Icon-only and muted on
+                        purpose: tapping the ROW still means edit, and this
+                        shouldn't compete with that. A nested Pressable takes the
+                        touch itself, so it doesn't open the editor as well. */}
+                    <Pressable
+                      onPress={() => onShowOnMap(p)}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('location.places.showOnMap')}
+                      style={({ pressed }) => [
+                        {
+                          width: 34,
+                          height: 34,
+                          borderRadius: R.md,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        },
+                        pressed && { opacity: 0.5 },
+                      ]}
+                    >
+                      <Crosshair size={17} color={c.textMuted} />
+                    </Pressable>
                   </Pressable>
                 ))}
 

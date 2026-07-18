@@ -85,6 +85,8 @@ const FOCUS_ZOOM = 15 // closer, for when you've picked one person to look at
  *  used to be derived from this too, back when they sat above the roster; they
  *  live in the top-left now, so the roster can no longer cover them at all.) */
 const ROSTER_HEIGHT = CARD_H + ROSTER_CHROME
+/** Frame a place with room around its circle rather than flush to the edges. */
+const PLACE_FRAME_MARGIN = 1.7
 
 /** Member profiles' photo + phone, keyed by email (for pins + the Call button). */
 async function fetchMemberMeta(): Promise<{
@@ -432,6 +434,34 @@ export default function Whereabouts() {
       animationDuration: 0,
     })
   }, [myLive, deviceCenter, livePins])
+
+  /** Frame a saved place, fitting its RADIUS rather than picking a zoom: a 100 m
+   *  Home and a 2 km "the lake" want very different ones, and guessing gets one
+   *  of them wrong. Closes the Places sheet, since the map is what you asked to
+   *  look at. */
+  const showPlaceOnMap = useCallback((place: Place) => {
+    setPlacesOpen(false)
+    // Degrees per metre; longitude converges toward the poles, hence the cos.
+    const latSpan = (place.radius_m / 111_320) * PLACE_FRAME_MARGIN
+    // Floor the cosine: it heads to 0 at the poles, which would turn the
+    // longitude span into a near-infinite one and zoom out to the whole globe.
+    const cosLat = Math.max(0.01, Math.cos((place.lat * Math.PI) / 180))
+    const lngSpan = (place.radius_m / (111_320 * cosLat)) * PLACE_FRAME_MARGIN
+    cameraRef.current?.setCamera({
+      bounds: {
+        ne: [place.lng + lngSpan, place.lat + latSpan],
+        sw: [place.lng - lngSpan, place.lat - latSpan],
+      },
+      padding: {
+        paddingTop: sp.xl,
+        paddingLeft: sp.xl,
+        paddingRight: sp.xl,
+        // Clear the floating roster, or the place lands behind it.
+        paddingBottom: ROSTER_HEIGHT + sp.md,
+      },
+      animationDuration: 600,
+    })
+  }, [])
 
   const recenter = useCallback(() => {
     const pts = livePins.map((x) => [x.loc.lng, x.loc.lat] as [number, number])
@@ -868,6 +898,7 @@ export default function Whereabouts() {
           colors={colors}
           onClose={() => setPlacesOpen(false)}
           onChanged={() => void reloadPlaces()}
+          onShowOnMap={showPlaceOnMap}
         />
       ) : null}
 

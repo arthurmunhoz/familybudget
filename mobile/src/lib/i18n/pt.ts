@@ -65,6 +65,7 @@ export const pt: Record<keyof typeof en, string> = {
   'location.places.subtitle': 'Saiba quando alguém chega ou sai',
   'location.places.empty': 'Nenhum lugar ainda',
   'location.places.emptyBody': 'Salve Casa, Escola ou a casa da vovó e receba um aviso quando alguém chegar ou sair.',
+  'location.places.showOnMap': 'Ver no mapa',
   'location.places.add': 'Adicionar lugar',
   'location.places.new': 'Novo lugar',
   'location.places.edit': 'Editar lugar',

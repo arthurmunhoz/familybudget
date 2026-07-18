@@ -67,6 +67,7 @@ export const en = {
   'location.places.subtitle': 'Get told when people come and go',
   'location.places.empty': 'No places yet',
   'location.places.emptyBody': 'Save Home, School or Grandma’s and get a nudge when someone arrives or leaves.',
+  'location.places.showOnMap': 'Show on map',
   'location.places.add': 'Add a place',
   'location.places.new': 'New place',
   'location.places.edit': 'Edit place',
