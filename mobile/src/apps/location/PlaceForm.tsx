@@ -13,7 +13,7 @@ import { MapPin, Search } from 'lucide-react-native'
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
-import { nearestPreset, radiusPresets } from '@/lib/location'
+import { formatDistance, nearestPreset, radiusPresets } from '@/lib/location'
 import { searchPlaces, type PlaceSuggestion } from '@/lib/placeSearch'
 import { createPlace, deletePlace, removePlaceWatch, updatePlace, upsertPlaceWatch } from '@/lib/places'
 import type { Place, PlaceWatch, Profile } from '@/lib/types'
@@ -80,6 +80,12 @@ export function PlaceForm({
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     place ? { lat: place.lat, lng: place.lng } : null,
   )
+  // Where "near me" means for search. Deliberately SEPARATE from `coords`:
+  // picking a result moves the pin, and if search biased off the pin then the
+  // next search would be anchored to wherever you last tapped instead of to you.
+  const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(
+    place ? { lat: place.lat, lng: place.lng } : null,
+  )
   const [locating, setLocating] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -100,15 +106,16 @@ export function PlaceForm({
     setSearching(true)
     // Debounced: one request after typing settles, not one per keystroke.
     const id = setTimeout(() => {
-      void searchPlaces(q, coords)
+      void searchPlaces(q, origin)
         .then(setResults)
         .finally(() => setSearching(false))
     }, 350)
     return () => clearTimeout(id)
-    // `coords` only biases results toward you — re-searching when the pin moves
-    // would fight the user mid-type.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query])
+    // `origin` IS a dependency on purpose: it arrives asynchronously (GPS), so a
+    // query typed before the fix lands would otherwise be stuck with the
+    // unbiased, nationwide results it was first issued with. It only ever
+    // transitions null → a fix, so this re-runs once, not on every pin change.
+  }, [query, origin])
 
   const choose = (r: PlaceSuggestion) => {
     setCoords({ lat: r.lat, lng: r.lng })
@@ -133,7 +140,11 @@ export function PlaceForm({
         const pos = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         })
-        if (active) setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        if (active) {
+          const here = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          setCoords(here)
+          setOrigin(here) // now search can rank by "closest to me"
+        }
       } catch {
         // leave coords null → Save stays disabled with a hint
       } finally {
@@ -149,7 +160,9 @@ export function PlaceForm({
     setLocating(true)
     try {
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      const here = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      setCoords(here)
+      setOrigin(here)
       setPinnedLabel(null) // back to "your current location"
     } catch {
       // keep the previously saved spot
@@ -372,6 +385,16 @@ export function PlaceForm({
                       </Txt>
                     ) : null}
                   </View>
+                  {/* How far it is from you — the list is sorted by this, so it
+                      also explains the ordering rather than leaving it a mystery. */}
+                  {r.distanceM != null ? (
+                    <Txt
+                      style={{ fontFamily: fonts.semibold, fontSize: 12, color: c.textMuted }}
+                      numberOfLines={1}
+                    >
+                      {formatDistance(r.distanceM)}
+                    </Txt>
+                  ) : null}
                 </Pressable>
               ))}
               {query.trim().length >= 3 && !searching && !results.length ? (

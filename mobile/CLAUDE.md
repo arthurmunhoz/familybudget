@@ -144,12 +144,28 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   member's preference everyone's notification. Geofences are registered for
   EVERY place (the crossing is recorded regardless; the fan-out decides who hears).
 - **Place search** — `lib/placeSearch.ts` `searchPlaces(query, near)` hits the
-  **Mapbox Geocoding API** with the existing `EXPO_PUBLIC_MAPBOX_TOKEN` (no
-  second provider/key), debounced 350 ms in `PlaceForm`, biased by the user's
-  position. Deliberately the ONLY provider-specific code, so swapping to Google
-  Places is a one-file rewrite. Caveat: it's Mapbox's *temporary* geocoding
-  endpoint and we persist the chosen coordinates — fine in practice, but
-  permanent-geocoding is a paid Mapbox entitlement if that ever needs to be airtight.
+  **Mapbox SEARCH BOX API** (`/search/searchbox/v1/forward`) with the existing
+  `EXPO_PUBLIC_MAPBOX_TOKEN` (no second provider/key), debounced 350 ms in
+  `PlaceForm`, biased by the user's position. Deliberately the ONLY
+  provider-specific code, so swapping to Google Places is a one-file rewrite.
+  - **Do NOT move this back to `geocoding/v5/mapbox.places`.** That's a
+    GEOCODER with no business listings: measured from downtown Tampa it
+    returned ZERO actual Publix stores (just streets named "Publix Road", 28 mi
+    out) and answered "LA Fitness" with "La Casa Condos". Search Box is the
+    POI/brand index and returns real storefronts. This was a shipped bug.
+  - Results are **re-sorted by true distance** client-side and each row shows
+    it. `proximity` alone is only a relevance hint — a real response for "Tampa
+    Elementary School" came back 2.0 / 12.4 / 1.1 / 11.1 mi. We fetch 10 and
+    show 6 so the sort has a real pool to pick from.
+  - The search origin in `PlaceForm` is state SEPARATE from the pin (`origin`
+    vs `coords`) and is a dependency of the debounce effect on purpose: the GPS
+    fix arrives asynchronously, so a query typed before it lands must re-run
+    once it does, or it stays stuck with unbiased nationwide results. Biasing
+    off `coords` would also anchor the next search to whatever result was last
+    tapped instead of to the user.
+  - Caveat: Search Box results are *temporary* by default and we persist the
+    chosen coordinates — fine in practice, but a permanent entitlement is a
+    paid Mapbox add-on if that ever needs to be airtight.
 - **"At Home" status** — `placeAt(places, point)` in `lib/places.ts` resolves the
   place a member is inside (smallest radius wins on overlap); the roster card and
   the member sheet prefer it over a distance or a geocoded street address.
