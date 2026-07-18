@@ -42,7 +42,15 @@ import { useWatchLive } from '@/lib/liveLocation'
 import { placeAt } from '@/lib/places'
 import type { MemberLocation, Place, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { CARD_H, CARD_W_EXPANDED, FLOAT_SHADOW, MemberAvatar, WatchingChip, timeAgo } from './locationUi'
+import {
+  BatteryGauge,
+  CARD_H,
+  CARD_W_EXPANDED,
+  FLOAT_SHADOW,
+  MemberAvatar,
+  WatchingChip,
+  timeAgo,
+} from './locationUi'
 
 /** One compact stat. The ETA tile is `primary` so it reads first. */
 function Stat({ label, value, primary }: { label: string; value: string; primary?: boolean }) {
@@ -318,7 +326,13 @@ export function MemberDetailCard({
         </>
       ) : isMe ? (
         <>
-          {live ? (
+          {/* Your own card has a full-width row going spare, so the battery is
+              drawn as an actual battery filled to the charge rather than as a
+              number with a caption. Falls back to the plain tile when the level
+              is unknown — an empty shell would read as "flat", not "no idea". */}
+          {live && live.battery != null ? (
+            <BatteryGauge level={live.battery} />
+          ) : live ? (
             <View style={{ flexDirection: 'row', gap: 6 }}>
               <Stat label={t('location.stat.battery')} value={battText} />
             </View>

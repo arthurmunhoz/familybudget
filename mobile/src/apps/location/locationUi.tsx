@@ -133,10 +133,68 @@ export function MemberAvatar({
   )
 }
 
+/** Shared level → colour, so the chip and the full gauge can't drift apart. */
+function batteryColor(level: number, c: ReturnType<typeof useTheme>['c']): string {
+  return level <= 15 ? c.expense : level <= 30 ? '#c8862a' : c.income
+}
+
+/** A real battery, laid out horizontally and filled to the actual percentage —
+ *  a 40% charge fills 40% of the shell. Used on your OWN expanded card, where
+ *  the battery gets a full-width row to itself; the compact `BatteryChip` is
+ *  still what goes on the small roster cards.
+ *
+ *  The fill is an absolutely-positioned child of an inner TRACK rather than of
+ *  the bordered shell, so its `width: '<pct>%'` measures against exactly the
+ *  space a full battery would occupy — no border or padding smuggled into the
+ *  percentage. */
+export function BatteryGauge({ level, height = 34 }: { level: number; height?: number }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const pct = Math.max(0, Math.min(100, Math.round(level)))
+  const color = batteryColor(pct, c)
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${t('location.stat.battery')} ${pct}%`}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+    >
+      <View
+        style={{
+          flex: 1,
+          height,
+          borderRadius: 9,
+          borderWidth: 2,
+          borderColor: c.border,
+          padding: 3,
+        }}
+      >
+        <View style={{ flex: 1, borderRadius: 5, overflow: 'hidden', justifyContent: 'center' }}>
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${pct}%`,
+              backgroundColor: color,
+            }}
+          />
+          {/* c.text reads over both the filled and the empty side in either theme. */}
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text, textAlign: 'center' }}>
+            {pct}%
+          </Txt>
+        </View>
+      </View>
+      {/* The terminal nub, so it reads as a battery and not a progress bar. */}
+      <View style={{ width: 3, height: Math.round(height * 0.34), borderRadius: 2, backgroundColor: c.border }} />
+    </View>
+  )
+}
+
 /** Small battery gauge + percentage; green / amber / red by level. */
 export function BatteryChip({ level }: { level: number }) {
   const { c } = useTheme()
-  const color = level <= 15 ? c.expense : level <= 30 ? '#c8862a' : c.income
+  const color = batteryColor(level, c)
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <View
