@@ -1,16 +1,18 @@
 // Whereabouts — the live family map. Owns the member-location data + a single
 // Realtime subscription, renders a Mapbox map with a pin per sharing member and
-// a bottom sheet listing everyone with their status. Tapping a pin or a row
-// opens the member detail sheet (ETA-first). A header button opens the sharing
-// controls. Native-only: the map (@rnmapbox/maps) and background location need a
-// dev build + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
+// a bottom sheet of member cards scrolled HORIZONTALLY (so the sheet's height is
+// constant regardless of household size). Tapping someone else's pin or card
+// opens the member detail sheet (ETA-first); tapping YOUR OWN card opens your
+// sharing controls — that's why there's no sharing button in the header.
+// Native-only: the map (@rnmapbox/maps) and background location need a dev build
+// + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
 import { router } from 'expo-router'
 import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
-import { MapPin, SlidersHorizontal, Crosshair, Landmark, ShieldCheck, Sparkles } from 'lucide-react-native'
+import { MapPin, Crosshair, Landmark, ShieldCheck, Sparkles } from 'lucide-react-native'
 
 import { AppHeader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
@@ -70,6 +72,90 @@ async function fetchMemberMeta(): Promise<{
     if (r.phone) phones[r.email] = r.phone
   }
   return { avatars, phones }
+}
+
+/** One member as a fixed-size card in the horizontal roster. Fixed height keeps
+ *  the sheet exactly as tall for a household of 2 as for one of 10. */
+function MemberCard({
+  name,
+  avatarPath,
+  color,
+  status,
+  hint,
+  battery,
+  isMe,
+  watched,
+  onPress,
+}: {
+  name: string
+  avatarPath?: string | null
+  color: string
+  status: string
+  /** Secondary line — used on your OWN card ("Tap to manage"). */
+  hint?: string
+  battery: number | null
+  isMe: boolean
+  /** In my active Safety Radius watch list. */
+  watched: boolean
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        {
+          width: 138,
+          height: 158,
+          backgroundColor: c.surface,
+          borderRadius: radius.lg,
+          paddingVertical: sp.md,
+          paddingHorizontal: sp.sm,
+          alignItems: 'center',
+          gap: 5,
+          borderWidth: isMe ? 1.5 : 0,
+          borderColor: c.accent,
+        },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      <MemberAvatar name={name} avatarPath={avatarPath} color={color} size={44} />
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }} numberOfLines={1}>
+        {name}
+      </Txt>
+      <Txt variant="muted" style={{ fontSize: 11, textAlign: 'center' }} numberOfLines={2}>
+        {status}
+      </Txt>
+      {hint ? (
+        <Txt style={{ fontSize: 10, color: c.accent, fontFamily: fonts.semibold }} numberOfLines={1}>
+          {hint}
+        </Txt>
+      ) : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 'auto' }}>
+        {battery != null ? <BatteryChip level={battery} /> : null}
+        {watched ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 3,
+              backgroundColor: c.accentSoft,
+              borderRadius: radius.pill,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+            }}
+          >
+            <ShieldCheck size={10} color={c.accent} />
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
+              {t('location.card.watching')}
+            </Txt>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  )
 }
 
 export default function Whereabouts() {
@@ -203,7 +289,6 @@ export default function Whereabouts() {
 
   const myLoc = myEmail ? locByEmail.get(myEmail) : undefined
   const myLive = isSharingLive(myLoc) ? myLoc : null
-  const iAmSharing = isSharingEnabled(myLoc)
 
   // Members with a plottable fix (for the map + recenter bounds).
   const livePins = useMemo(
@@ -324,14 +409,6 @@ export default function Whereabouts() {
                 accessibilityLabel={t('location.places.title')}
               >
                 <Landmark size={22} color={c.textMuted} />
-              </Pressable>
-              <Pressable
-                onPress={() => setSharingOpen(true)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={t('location.openSharing')}
-              >
-                <SlidersHorizontal size={22} color={c.textMuted} />
               </Pressable>
             </View>
           }
@@ -480,7 +557,9 @@ export default function Whereabouts() {
           </View>
         ) : null}
 
-        {/* Bottom sheet — everyone + status */}
+        {/* Bottom sheet — one card per member, scrolled HORIZONTALLY so the sheet
+            is exactly as tall for a household of 2 as for one of 10. Your own
+            card is the entry point to your sharing controls. */}
         <View
           style={{
             position: 'absolute',
@@ -490,75 +569,47 @@ export default function Whereabouts() {
             backgroundColor: c.sheet,
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
-            paddingHorizontal: sp.lg,
             paddingTop: sp.sm,
             paddingBottom: sp.xl,
-            maxHeight: 320,
             borderTopWidth: 1,
             borderColor: c.border,
           }}
         >
           <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center', marginBottom: sp.sm }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              paddingHorizontal: sp.lg,
+              marginBottom: sp.sm,
+            }}
+          >
             <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('location.everyone')}</Txt>
             <Txt variant="faint">{t('location.tapHint')}</Txt>
           </View>
-          {!iAmSharing ? (
-            <Pressable
-              onPress={() => setSharingOpen(true)}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                {
-                  marginVertical: sp.sm,
-                  backgroundColor: c.accent,
-                  borderRadius: radius.md,
-                  paddingVertical: 12,
-                  alignItems: 'center',
-                },
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <Txt style={{ fontFamily: fonts.semibold, color: '#ffffff', fontSize: 14 }}>
-                {t('location.share.toggle')}
-              </Txt>
-            </Pressable>
-          ) : null}
-          <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: sp.sm, paddingHorizontal: sp.lg }}
+          >
             {rows.map((p) => {
               const loc = locByEmail.get(p.email)
               const live = isSharingLive(loc)
+              const isMe = p.email === myEmail
               return (
-                <Pressable
+                <MemberCard
                   key={p.email}
-                  onPress={() => setSelected(p.email)}
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 11,
-                      paddingVertical: 9,
-                      borderTopWidth: 1,
-                      borderColor: c.border,
-                    },
-                    pressed && { opacity: 0.6 },
-                  ]}
-                >
-                  <MemberAvatar
-                    name={nameFor(p.email)}
-                    avatarPath={meta.avatars[p.email]}
-                    color={colors[p.email] ?? c.accent}
-                    size={38}
-                  />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
-                      {p.email === myEmail ? `${p.display_name} · ${t('location.you')}` : p.display_name}
-                    </Txt>
-                    <Txt variant="muted" numberOfLines={1} style={{ fontSize: 12 }}>
-                      {statusLine(p.email)}
-                    </Txt>
-                  </View>
-                  {live && loc.battery != null ? <BatteryChip level={loc.battery} /> : null}
-                </Pressable>
+                  name={isMe ? t('location.you') : p.display_name}
+                  avatarPath={meta.avatars[p.email]}
+                  color={colors[p.email] ?? c.accent}
+                  status={statusLine(p.email)}
+                  hint={isMe ? t('location.card.manage') : undefined}
+                  battery={live && loc.battery != null ? loc.battery : null}
+                  isMe={isMe}
+                  watched={!!watch?.watched.includes(p.email)}
+                  onPress={() => (isMe ? setSharingOpen(true) : setSelected(p.email))}
+                />
               )
             })}
           </ScrollView>
@@ -575,6 +626,7 @@ export default function Whereabouts() {
           phone={meta.phones[selectedProfile.email]}
           myLive={myLive}
           onClose={() => setSelected(null)}
+          onNudged={(text) => setToast({ emoji: '👋', text })}
         />
       ) : null}
 

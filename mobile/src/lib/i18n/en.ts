@@ -109,6 +109,10 @@ export const en = {
   'location.safety.needLocation': 'Turn on location sharing to start a safety radius.',
   'location.safety.breach': '{name} left the area',
   'location.safety.breachBody': '{dist} from the centre',
+  'location.card.manage': 'Tap to manage',
+  'location.card.watching': 'Watching',
+  'location.nudge.title': 'Nudge {name}',
+  'location.nudge.sent': 'Nudge sent to {name}',
 
   'common.loading': 'Loading…',
   'common.cancel': 'Cancel',

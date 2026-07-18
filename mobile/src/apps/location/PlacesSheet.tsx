@@ -247,15 +247,19 @@ export function PlacesSheet({
             )}
           </View>
         </View>
-      </Modal>
 
-      {editing ? (
-        <PlaceForm
-          place={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
-          onSaved={afterSave}
-        />
-      ) : null}
+        {/* Rendered INSIDE this Modal on purpose: a second Modal presented as a
+            SIBLING of an already-open one silently fails to appear on iOS (this
+            is why "Add a place" did nothing). Same pattern as NudgeSettings →
+            PresetEditor. */}
+        {editing ? (
+          <PlaceForm
+            place={editing === 'new' ? null : editing}
+            onClose={() => setEditing(null)}
+            onSaved={afterSave}
+          />
+        ) : null}
+      </Modal>
     </>
   )
 }
