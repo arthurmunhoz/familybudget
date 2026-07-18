@@ -35,9 +35,11 @@ import { MemberSheet } from './MemberSheet'
 import { SharingControls } from './SharingControls'
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? ''
-// Optional custom Mapbox Studio style (e.g. a Warm Hearth theme). Falls back to
-// the standard light/dark styles when unset.
+// Optional custom Mapbox Studio styles (e.g. a Warm Hearth theme). If only the
+// light URL is set it's used for BOTH themes; set the _DARK one too for a proper
+// Dusk map. Falls back to Mapbox's standard light/dark styles when unset.
 const MAPBOX_STYLE_URL = process.env.EXPO_PUBLIC_MAPBOX_STYLE_URL ?? ''
+const MAPBOX_STYLE_URL_DARK = process.env.EXPO_PUBLIC_MAPBOX_STYLE_URL_DARK ?? ''
 // One-time SDK auth. Safe no-op when the token is unset (the map just won't load
 // and we show a setup hint instead).
 if (MAPBOX_TOKEN) {
@@ -239,7 +241,11 @@ export default function Whereabouts() {
         {MAPBOX_TOKEN ? (
           <MapView
             style={{ flex: 1 }}
-            styleURL={MAPBOX_STYLE_URL || (dark ? Mapbox.StyleURL.Dark : Mapbox.StyleURL.Light)}
+            styleURL={
+              dark
+                ? MAPBOX_STYLE_URL_DARK || MAPBOX_STYLE_URL || Mapbox.StyleURL.Dark
+                : MAPBOX_STYLE_URL || Mapbox.StyleURL.Light
+            }
             scaleBarEnabled={false}
             compassEnabled={false}
             // Keep Mapbox's logo + attribution up top so the bottom sheet can't
