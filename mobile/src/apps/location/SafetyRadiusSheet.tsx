@@ -5,7 +5,6 @@
 // has the live member_locations feed.
 import { useMemo, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ShieldCheck } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
@@ -21,7 +20,7 @@ import {
 } from '@/lib/location'
 import { isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
-import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
+import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
 import { MemberAvatar } from './locationUi'
 
 export function SafetyRadiusSheet({
@@ -47,7 +46,6 @@ export function SafetyRadiusSheet({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const insets = useSafeAreaInsets()
   const kb = useKeyboardHeight()
 
   const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
@@ -122,9 +120,12 @@ export function SafetyRadiusSheet({
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
-            // Lift the WHOLE drawer by the keyboard height. While the keyboard is
-            // up the home-indicator inset sits behind it, so don't pad twice.
-            paddingBottom: (kb > 0 ? 0 : insets.bottom) + sp.lg,
+            // A plain gap, NOT the safe-area inset: the bottom button's curve is
+            // meant to sit down in the screen's corner, and insets.bottom (34pt)
+            // would float it well clear of it. Less again while the keyboard is
+            // up, since marginBottom below has already lifted the whole drawer
+            // (the home-indicator inset sits behind the keyboard anyway).
+            paddingBottom: kb > 0 ? sp.lg : sp.xl,
             marginBottom: kb,
             gap: sp.md,
             // Fit the content: a 1-member watch list should be a short sheet, a
@@ -209,7 +210,18 @@ export function SafetyRadiusSheet({
                 })}
               </ScrollView>
 
-              <Btn title={t('location.safety.stop')} variant="secondary" onPress={stop} loading={busy} />
+              {/* Same slot as "Start watching" below, so it gets the same curve
+                  — the sheet's bottom control shouldn't change shape with state. */}
+              <Btn
+                title={t('location.safety.stop')}
+                variant="secondary"
+                onPress={stop}
+                loading={busy}
+                style={{
+                  borderBottomLeftRadius: sheetRadius,
+                  borderBottomRightRadius: sheetRadius,
+                }}
+              />
             </>
           ) : (
             /* ── Setup: pick people + radius, centred on me ── */
@@ -337,11 +349,20 @@ export function SafetyRadiusSheet({
                 </View>
               ) : null}
 
+              {/* Bottom corners follow the iPhone's screen curve, so the sheet's
+                  final control sits down in the corner instead of cutting square
+                  across it. Same treatment as Pet Care's "Add task" and the
+                  Places footer — this one keeps its filled style, though: it's
+                  the primary commit action, not an "add another" affordance. */}
               <Btn
                 title={t('location.safety.start')}
                 onPress={start}
                 disabled={!myLive || !picked.length || !effectiveRadius}
                 loading={busy}
+                style={{
+                  borderBottomLeftRadius: sheetRadius,
+                  borderBottomRightRadius: sheetRadius,
+                }}
               />
             </>
           )}

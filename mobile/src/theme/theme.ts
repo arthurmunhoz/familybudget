@@ -1,6 +1,8 @@
 // "Warm Hearth" design tokens, ported from the PWA's index.css. Light = "Paper",
 // dark = "Dusk" (warm espresso). useTheme() respects the saved appearance
 // choice (Light/Dark, default Light) from theme-pref.
+import { Platform } from 'react-native';
+
 import { useThemePref } from './theme-pref';
 import { GLASS, glassLight, glassDark } from './glass';
 
@@ -75,6 +77,15 @@ export function useTheme(): Theme {
 // Spacing + radius scale (keeps screens consistent).
 export const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
+
+/** Radius for an edge that meets the iPhone's own screen curve — a sheet's top
+ *  corners, or the bottom corners of a button sitting at the foot of one.
+ *  iOS gives no API for the display's real radius and it varies by device
+ *  (~39pt on X/11 Pro, ~47 on 12–14, ~55 on the Pros), so this is a middle
+ *  value; under-shooting is the safe direction, since a radius larger than the
+ *  screen's visibly bulges past the curve. Android screens are square, so it
+ *  falls back to the normal large radius there. */
+export const sheetRadius = Platform.OS === 'ios' ? 40 : radius.lg;
 
 // Brand type — Fraunces (display serif) + Hanken Grotesk (UI sans). Loaded in
 // _layout via @expo-google-fonts. Falls back to system if a name is missing.
