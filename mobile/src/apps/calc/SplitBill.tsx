@@ -43,7 +43,7 @@ export function SplitBill() {
               style={[styles.segBtn, active && { backgroundColor: c.accent }]}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? '#ffffff' : c.textMuted }}>
+                <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? c.onAccent : c.textMuted }}>
                   {t(m === 'even' ? 'calc.evenly' : 'calc.byItem')}
                 </Txt>
                 {locked ? <Sparkles size={13} color={c.accent} /> : null}

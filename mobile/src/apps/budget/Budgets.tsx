@@ -490,7 +490,7 @@ function BudgetCard({
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>
+              <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>
                 {t('detail.newEntry')}
               </Txt>
             </Pressable>

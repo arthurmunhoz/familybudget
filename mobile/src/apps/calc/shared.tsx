@@ -91,7 +91,7 @@ export function PercentPicker({
               { backgroundColor: active ? c.accent : c.surface },
             ]}
           >
-            <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? '#ffffff' : c.textMuted }}>
+            <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? c.onAccent : c.textMuted }}>
               {v}%
             </Txt>
           </Pressable>
@@ -111,7 +111,7 @@ export function PercentPicker({
           styles.customInput,
           {
             backgroundColor: usingCustom ? c.accent : c.surface,
-            color: usingCustom ? '#ffffff' : c.text,
+            color: usingCustom ? c.onAccent : c.text,
           },
         ]}
       />

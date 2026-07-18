@@ -107,7 +107,7 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
         pressed && { opacity: 0.7 },
       ]}
     >
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.onAccent : c.text }}>
         {label}
       </Txt>
     </Pressable>
@@ -429,7 +429,7 @@ export function PlaceForm({
                           backgroundColor: on ? c.accent : c.surface2,
                         }}
                       >
-                        <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
+                        <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.onAccent : c.text }}>
                           {p.label}
                         </Txt>
                       </Pressable>

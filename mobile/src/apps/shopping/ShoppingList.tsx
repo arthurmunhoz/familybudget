@@ -611,7 +611,7 @@ export default function ShoppingList() {
                 { backgroundColor: c.accent, opacity: label.trim() ? 1 : 0.5 },
               ]}
             >
-              <Txt style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
+              <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
                 {t('common.add')}
               </Txt>
             </Pressable>
@@ -680,7 +680,7 @@ export default function ShoppingList() {
                     { backgroundColor: c.accent, paddingVertical: 12, opacity: editName.trim() ? 1 : 0.5 },
                   ]}
                 >
-                  <Txt style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
+                  <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
                     {t('common.save')}
                   </Txt>
                 </Pressable>
@@ -798,7 +798,7 @@ export default function ShoppingList() {
                     disabled={!storeInput.trim()}
                     style={[styles.addBtn, { backgroundColor: c.accent, opacity: storeInput.trim() ? 1 : 0.5 }]}
                   >
-                    <Txt style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
+                    <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
                       {t('common.add')}
                     </Txt>
                   </Pressable>
@@ -890,7 +890,7 @@ function Chip({
     >
       {icon}
       {label ? (
-        <Txt style={{ fontWeight: '600', fontSize: 14, color: active ? '#ffffff' : c.textMuted }}>
+        <Txt style={{ fontWeight: '600', fontSize: 14, color: active ? c.onAccent : c.textMuted }}>
           {label}
         </Txt>
       ) : null}

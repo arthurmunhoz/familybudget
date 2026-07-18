@@ -308,7 +308,7 @@ export function RoutineSheet({
                           backgroundColor: on ? c.accent : c.surface,
                         }}
                       >
-                        <Icon size={18} color={on ? '#fff' : c.textMuted} />
+                        <Icon size={18} color={on ? c.onAccent : c.textMuted} />
                       </Pressable>
                     )
                   })}

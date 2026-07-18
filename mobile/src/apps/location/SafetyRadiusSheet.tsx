@@ -282,7 +282,7 @@ export function SafetyRadiusSheet({
                           }}
                         >
                           {on ? (
-                            <Txt style={{ color: '#fff', fontSize: 13, fontFamily: fonts.semibold }}>✓</Txt>
+                            <Txt style={{ color: c.onAccent, fontSize: 13, fontFamily: fonts.semibold }}>✓</Txt>
                           ) : null}
                         </View>
                       </Pressable>
@@ -310,7 +310,7 @@ export function SafetyRadiusSheet({
                         }}
                       >
                         <Txt
-                          style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}
+                          style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.onAccent : c.text }}
                         >
                           {p.label}
                         </Txt>
@@ -327,7 +327,7 @@ export function SafetyRadiusSheet({
                     }}
                   >
                     <Txt
-                      style={{ fontFamily: fonts.semibold, fontSize: 13, color: custom ? '#fff' : c.text }}
+                      style={{ fontFamily: fonts.semibold, fontSize: 13, color: custom ? c.onAccent : c.text }}
                     >
                       {t('location.safety.custom')}
                     </Txt>
@@ -358,7 +358,7 @@ export function SafetyRadiusSheet({
                           }}
                         >
                           <Txt
-                            style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}
+                            style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.onAccent : c.text }}
                           >
                             {u.label}
                           </Txt>

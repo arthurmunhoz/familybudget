@@ -134,7 +134,7 @@ export default function Hub() {
                       justifyContent: 'center',
                     }}
                   >
-                    <Txt style={{ color: '#ffffff', fontSize: 11, fontWeight: '700' }}>
+                    <Txt style={{ color: c.onAccent, fontSize: 11, fontWeight: '700' }}>
                       {badges[app.id]}
                     </Txt>
                   </View>

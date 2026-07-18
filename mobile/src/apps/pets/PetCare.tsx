@@ -674,7 +674,7 @@ export default function PetCare() {
                             backgroundColor: urgent ? c.accent : c.surface,
                           }}
                         >
-                          <Txt style={{ fontSize: 12, fontWeight: '700', color: urgent ? '#fff' : c.textMuted }}>
+                          <Txt style={{ fontSize: 12, fontWeight: '700', color: urgent ? c.onAccent : c.textMuted }}>
                             {t('common.done')}
                           </Txt>
                         </Pressable>

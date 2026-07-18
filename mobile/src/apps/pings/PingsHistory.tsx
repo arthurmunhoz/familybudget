@@ -141,7 +141,7 @@ export default function PingsHistory({
               style={[styles.segBtn, active && { backgroundColor: c.accent }]}
               accessibilityRole="button"
             >
-              <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? '#ffffff' : c.textMuted }}>
+              <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? c.onAccent : c.textMuted }}>
                 {s.label}
               </Txt>
             </Pressable>
@@ -277,7 +277,7 @@ function HistoryRow({
             accessibilityRole="button"
             accessibilityLabel={t('pings.gotIt')}
           >
-            <ThumbsUp size={14} strokeWidth={2.5} color="#ffffff" />
+            <ThumbsUp size={14} strokeWidth={2.5} color={c.onAccent} />
             <Txt style={styles.actionTxt}>{t('pings.gotIt')}</Txt>
           </Pressable>
         )

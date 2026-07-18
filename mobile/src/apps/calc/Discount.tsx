@@ -138,7 +138,7 @@ export function Discount() {
                   backgroundColor: active ? c.accent : c.surface,
                 }}
               >
-                <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? '#ffffff' : c.textMuted }}>
+                <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? c.onAccent : c.textMuted }}>
                   {v}%
                 </Txt>
               </Pressable>
@@ -159,7 +159,7 @@ export function Discount() {
               fontSize: 14,
               fontWeight: '700',
               backgroundColor: custom !== '' ? c.accent : c.surface,
-              color: custom !== '' ? '#ffffff' : c.text,
+              color: custom !== '' ? c.onAccent : c.text,
             }}
           />
         </View>

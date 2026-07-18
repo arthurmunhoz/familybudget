@@ -366,7 +366,7 @@ export function ItemSplit() {
                       onPress={() => setTipMode(m)}
                       style={[styles.toggleBtn, active && { backgroundColor: c.accent }]}
                     >
-                      <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? '#ffffff' : c.textMuted }}>
+                      <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? c.onAccent : c.textMuted }}>
                         {m === 'percent' ? '%' : '$'}
                       </Txt>
                     </Pressable>

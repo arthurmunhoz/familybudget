@@ -157,7 +157,7 @@ export default function PetProfile({ petId }: { petId: string }) {
                 opacity: savingWeight || !newWeight.trim() ? 0.5 : 1,
               }}
             >
-              <Txt style={{ color: '#fff', fontWeight: '700' }}>{t('common.add')}</Txt>
+              <Txt style={{ color: c.onAccent, fontWeight: '700' }}>{t('common.add')}</Txt>
             </Pressable>
           </View>
           {weights.map((w) => (
