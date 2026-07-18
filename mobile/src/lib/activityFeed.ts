@@ -8,6 +8,7 @@
 // screen_view are filtered out server-side and skipped here.
 import {
   Award,
+  LayoutGrid,
   Bell,
   Bug,
   CalendarDays,
@@ -96,6 +97,7 @@ const CATALOG: Record<string, (m: Record<string, unknown>) => Rendered> = {
   'calendar.deleted': (m) => ({ icon: CalendarDays, app: 'Calendar', isError: false, detail: null, predicate: `deleted ${quote(str(m.title))}` }),
   'member.added': (m) => ({ icon: Users, app: 'Family', isError: false, detail: null, predicate: `added a member: ${quote(str(m.name) || str(m.email))}` }),
   'plan.changed': (m) => ({ icon: Award, app: 'Admin', isError: false, detail: null, predicate: `set the plan to ${str(m.plan) || 'free'}` }),
+  'apps.customized': (m) => ({ icon: LayoutGrid, app: 'Settings', isError: false, detail: null, predicate: `customized their app list (${num(m.hidden)} hidden)` }),
 }
 
 /** Turn a raw web_event into a readable line, or null to skip it as noise. */

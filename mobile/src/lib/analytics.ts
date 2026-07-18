@@ -54,6 +54,7 @@ export type EventName =
   // Family / admin
   | 'member.added'
   | 'plan.changed'
+  | 'apps.customized'
 
 /**
  * Every semantic (non-behavioral) event, in display order. The admin "Feature
@@ -91,6 +92,7 @@ export const SEMANTIC_EVENTS: EventName[] = [
   'calendar.deleted',
   'member.added',
   'plan.changed',
+  'apps.customized',
 ]
 
 interface EventInsert {

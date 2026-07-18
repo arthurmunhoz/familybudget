@@ -672,6 +672,8 @@ export const es: Record<keyof typeof en, string> = {
   'settings.appearance': 'Apariencia',
   'settings.light': 'Claro',
   'settings.dark': 'Oscuro',
+  'settings.apps': 'Tus aplicaciones',
+  'settings.appsHint': 'Desactiva lo que tu familia no usa — mantén pulsado y arrastra para reordenar la pantalla de inicio.',
   'settings.appCards': 'Tarjetas de apps',
   'settings.large': 'Grandes',
   'settings.compact': 'Compactas',

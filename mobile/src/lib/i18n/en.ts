@@ -674,6 +674,8 @@ export const en = {
   'settings.appearance': 'Appearance',
   'settings.light': 'Light',
   'settings.dark': 'Dark',
+  'settings.apps': 'Your apps',
+  'settings.appsHint': 'Turn off what your family doesn’t use — hold and drag to reorder the home screen.',
   'settings.appCards': 'App cards',
   'settings.large': 'Large',
   'settings.compact': 'Compact',

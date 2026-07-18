@@ -26,6 +26,7 @@ import { useLiveResponder } from '@/lib/liveLocation';
 import { registerGeofenceTask } from '@/lib/placesTask';
 import { PlusProvider } from '@/lib/plus';
 import { I18nProvider } from '@/hooks/useI18n';
+import { AppPrefsProvider } from '@/hooks/useAppPrefs';
 import { TilePrefProvider } from '@/hooks/useTilePref';
 import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
@@ -68,7 +69,9 @@ export default function RootLayout() {
           <I18nProvider>
             <ThemePrefProvider>
               <TilePrefProvider>
-                <Chrome />
+                <AppPrefsProvider>
+                  <Chrome />
+                </AppPrefsProvider>
               </TilePrefProvider>
             </ThemePrefProvider>
           </I18nProvider>

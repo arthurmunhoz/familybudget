@@ -1,6 +1,6 @@
 // The launcher — a grid of the family apps, mirroring the PWA hub (including
 // the live "open shopping items" badge on the Shopping tile).
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -9,6 +9,7 @@ import { Settings } from 'lucide-react-native'
 import { Card, Txt } from './ui'
 import NudgesBanner from '../apps/pings/NudgesBanner'
 import TodaySection from './TodaySection'
+import { useAppPrefs } from '../hooks/useAppPrefs'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { useAuth } from '../lib/auth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
@@ -25,7 +26,15 @@ export default function Hub() {
   const { tile } = useTilePref()
   const compact = tile === 'compact'
 
-  const apps: HubApp[] = profile?.is_admin ? [...APPS, ADMIN_APP] : APPS
+  const { hiddenApps, appOrder } = useAppPrefs()
+  // Hidden apps drop out; ordered ids come first (registry order for the rest);
+  // Admin stays pinned last and is never hidden or reordered.
+  const apps: HubApp[] = useMemo(() => {
+    const pos = new Map(appOrder.map((id, i) => [id, i]))
+    const rank = (a: HubApp) => pos.get(a.id) ?? appOrder.length + APPS.findIndex((x) => x.id === a.id)
+    const visible = APPS.filter((a) => !hiddenApps.includes(a.id)).sort((a, b) => rank(a) - rank(b))
+    return profile?.is_admin ? [...visible, ADMIN_APP] : visible
+  }, [profile?.is_admin, hiddenApps, appOrder])
 
   // Open (unchecked) shopping items → count pill on the Shopping tile. Cached
   // (renders the last value instantly) + live via the same Realtime table the
