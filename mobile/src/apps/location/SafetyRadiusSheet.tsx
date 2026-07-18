@@ -8,14 +8,15 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ShieldCheck } from 'lucide-react-native'
 
-import { Btn, Txt } from '@/components/ui'
+import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import {
+  clampRadius,
   formatDistance,
   haversineMeters,
   isSharingLive,
-  nearestPreset,
-  radiusPresets,
+  radiusUnitOptions,
+  safetyRadiusPresets,
 } from '@/lib/location'
 import { isOutside, startWatch, stopWatch, WATCH_HOURS } from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
@@ -48,24 +49,42 @@ export function SafetyRadiusSheet({
   const insets = useSafeAreaInsets()
 
   const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
-  // Radius choices in the user's own units (500 ft / ¼ mi, not "152 m").
-  const presets = useMemo(() => radiusPresets(), [])
+  // Three round choices in the user's own units, plus Custom.
+  const presets = useMemo(() => safetyRadiusPresets(), [])
+  const units = useMemo(() => radiusUnitOptions(), [])
   const [picked, setPicked] = useState<string[]>(watch?.watched ?? [])
   const [radiusM, setRadiusM] = useState(watch?.radius_m ?? presets[1]?.meters ?? 150)
-  // Keep a chip highlighted even if the saved value isn't exactly a preset.
-  const selectedRadius = nearestPreset(presets, radiusM)
+
+  // A saved radius that isn't one of the presets means it was set by hand.
+  const startedCustom = watch ? !presets.some((p) => p.meters === watch.radius_m) : false
+  const [custom, setCustom] = useState(startedCustom)
+  const [unitId, setUnitId] = useState(units[0]?.id ?? 'm')
+  const [customValue, setCustomValue] = useState(() => {
+    const u = units[0]
+    if (!startedCustom || !watch || !u) return ''
+    return String(Math.round((watch.radius_m / u.meters) * 10) / 10)
+  })
   const [busy, setBusy] = useState(false)
+
+  // Custom value → metres (clamped to the DB's 50–5000 range). null = unusable.
+  const customMeters = (() => {
+    const v = parseFloat(customValue.replace(',', '.'))
+    if (!isFinite(v) || v <= 0) return null
+    const u = units.find((x) => x.id === unitId)
+    return u ? clampRadius(v * u.meters) : null
+  })()
+  const effectiveRadius = custom ? customMeters : radiusM
 
   const toggle = (email: string) =>
     setPicked((cur) => (cur.includes(email) ? cur.filter((e) => e !== email) : [...cur, email]))
 
   const start = async () => {
-    if (!myLive || !picked.length || busy) return
+    if (!myLive || !picked.length || busy || !effectiveRadius) return
     setBusy(true)
     try {
       await startWatch({
         center: { lat: myLive.lat, lng: myLive.lng },
-        radius_m: radiusM,
+        radius_m: effectiveRadius,
         watched: picked,
       })
       onChanged()
@@ -191,13 +210,7 @@ export function SafetyRadiusSheet({
           ) : (
             /* ── Setup: pick people + radius, centred on me ── */
             <>
-              {!myLive ? (
-                <Txt variant="muted">{t('location.safety.needLocation')}</Txt>
-              ) : (
-                <Txt variant="muted" style={{ fontSize: 13 }}>
-                  {t('location.safety.center')}
-                </Txt>
-              )}
+              {!myLive ? <Txt variant="muted">{t('location.safety.needLocation')}</Txt> : null}
 
               <Txt variant="label">{t('location.safety.pickPeople')}</Txt>
               <ScrollView style={{ flexShrink: 1 }}>
@@ -252,11 +265,14 @@ export function SafetyRadiusSheet({
               <Txt variant="label">{t('location.safety.radius')}</Txt>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
                 {presets.map((p) => {
-                  const on = selectedRadius === p.meters
+                  const on = !custom && radiusM === p.meters
                   return (
                     <Pressable
                       key={p.meters}
-                      onPress={() => setRadiusM(p.meters)}
+                      onPress={() => {
+                        setCustom(false)
+                        setRadiusM(p.meters)
+                      }}
                       style={{
                         paddingVertical: 8,
                         paddingHorizontal: 14,
@@ -270,12 +286,57 @@ export function SafetyRadiusSheet({
                     </Pressable>
                   )
                 })}
+                <Pressable
+                  onPress={() => setCustom(true)}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 14,
+                    borderRadius: R.pill,
+                    backgroundColor: custom ? c.accent : c.surface,
+                  }}
+                >
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: custom ? '#fff' : c.text }}>
+                    {t('location.safety.custom')}
+                  </Txt>
+                </Pressable>
               </View>
+
+              {custom ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <Field
+                      value={customValue}
+                      onChangeText={setCustomValue}
+                      keyboardType="numeric"
+                      placeholder="0"
+                    />
+                  </View>
+                  {units.map((u) => {
+                    const on = unitId === u.id
+                    return (
+                      <Pressable
+                        key={u.id}
+                        onPress={() => setUnitId(u.id)}
+                        style={{
+                          paddingVertical: 10,
+                          paddingHorizontal: 16,
+                          borderRadius: R.pill,
+                          backgroundColor: on ? c.accent : c.surface,
+                        }}
+                      >
+                        <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? '#fff' : c.text }}>
+                          {u.label}
+                        </Txt>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+              ) : null}
 
               <Btn
                 title={t('location.safety.start')}
                 onPress={start}
-                disabled={!myLive || !picked.length}
+                disabled={!myLive || !picked.length || !effectiveRadius}
                 loading={busy}
               />
             </>
