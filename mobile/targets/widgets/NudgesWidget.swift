@@ -16,6 +16,23 @@ import AppIntents
 
 let NUDGE_ENDPOINT = "https://one-roof-app.vercel.app/api/widget-nudge"
 
+// How long "Sent · Undo" stays on screen — and, deliberately, how long the POST
+// is HELD before it leaves the device. iOS fires a widget's button intent on a
+// press-and-hold that's too short to raise the system context menu, so an
+// accidental tap here would otherwise push a nudge to the whole family with no
+// way back. A push can't be recalled once sent, so undo must PREVENT the send
+// rather than delete the row after it: the upload task is scheduled with an
+// `earliestBeginDate` this far out, and UndoNudgeIntent cancels it before it
+// ever starts. Cost of the safety net: nudges land ~5s later than they used to.
+let UNDO_SECONDS: TimeInterval = 5
+
+// The upload is actually held a little LONGER than the button is shown. WidgetKit
+// reverts to the preset list on a timeline entry dated `UNDO_SECONDS` out, and
+// that refresh isn't punctual to the millisecond — without this grace, a tap on a
+// briefly-stale Undo button would silently no-op (the task having already fired)
+// while still looking like it cancelled. Undo is never a lie this way.
+let UNDO_HOLD: TimeInterval = UNDO_SECONDS + 2.5
+
 struct NudgeMember: Codable, Identifiable {
   let email: String
   let name: String
@@ -37,7 +54,10 @@ struct NudgePreset: Codable, Identifiable {
 // `until` round-trips as epoch milliseconds (JS `Date.now()`-compatible) rather
 // than Swift's default date encoding, since both sides write this key.
 struct WidgetStatus: Codable {
-  let type: String  // "sent" | "ack"
+  // "pending" = sent-but-still-cancellable (shows the Undo button; the POST is
+  // held on-device until `until`), "sent" = confirmed/on its way, "ack" = someone
+  // acknowledged a nudge this device sent.
+  let type: String  // "pending" | "sent" | "ack"
   let emoji: String
   let label: String
   let name: String?
@@ -173,12 +193,16 @@ final class NudgeSender: NSObject, URLSessionTaskDelegate {
     return URLSession(configuration: cfg, delegate: self, delegateQueue: nil)
   }()
 
-  func send(body: [String: Any]) {
+  /// Stages the POST and schedules it to leave the device after `delay`.
+  /// Returns the staged file's path, which doubles as the task's identity for
+  /// `cancel(path:)` — nil if it couldn't be staged.
+  @discardableResult
+  func send(body: [String: Any], delay: TimeInterval = 0) -> String? {
     guard
       let url = URL(string: NUDGE_ENDPOINT),
       let data = try? JSONSerialization.data(withJSONObject: body),
       let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: APP_GROUP)
-    else { return }
+    else { return nil }
     // Background uploads must be file-based (in-memory bodies are dropped when the
     // extension is suspended). Stage the JSON in the shared container, and first
     // sweep any stragglers from earlier sends the daemon already finished (the
@@ -192,13 +216,28 @@ final class NudgeSender: NSObject, URLSessionTaskDelegate {
       }
     }
     let file = dir.appendingPathComponent("nudge-\(UUID().uuidString).json")
-    do { try data.write(to: file) } catch { return }
+    do { try data.write(to: file) } catch { return nil }
     var req = URLRequest(url: url)
     req.httpMethod = "POST"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     let task = session.uploadTask(with: req, fromFile: file)
     task.taskDescription = file.path  // so the delegate can delete it
+    // The daemon won't start the upload before this date, which is the whole
+    // undo window: until then the nudge exists only as a staged file on disk.
+    if delay > 0 { task.earliestBeginDate = Date().addingTimeInterval(delay) }
     task.resume()
+    return file.path
+  }
+
+  /// Cancel a still-held upload staged by `send`. Reconstructing the background
+  /// session by identifier reconnects to the same daemon-side session, so the
+  /// task is findable even if the extension was torn down and relaunched between
+  /// the send and the undo tap.
+  func cancel(path: String) async {
+    for task in await session.allTasks where task.taskDescription == path {
+      task.cancel()
+    }
+    try? FileManager.default.removeItem(atPath: path)
   }
 
   func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
@@ -232,17 +271,44 @@ struct SendNudgeIntent: AppIntent {
     // Instead: write the status, return immediately, and let NudgeSender's
     // background URLSession deliver the POST even after the extension suspends.
     writeStatus(
-      WidgetStatus(type: "sent", emoji: emoji, label: message, name: nil, until: Date().addingTimeInterval(3)))
-    WidgetCenter.shared.reloadTimelines(ofKind: "NudgesWidget")
+      WidgetStatus(
+        type: "pending", emoji: emoji, label: message, name: nil,
+        until: Date().addingTimeInterval(UNDO_SECONDS)))
 
     let token = widgetToken()
     if !token.isEmpty {
       let recipients = highPriority ? [] : loadRecipients()
-      NudgeSender.shared.send(body: [
-        "token": token, "kind": kind, "emoji": emoji, "message": message,
-        "recipients": recipients, "high_priority": highPriority,
-      ])
+      // Held for UNDO_SECONDS — see the constant. Remember the staged file so
+      // UndoNudgeIntent can find and cancel this exact upload.
+      let path = NudgeSender.shared.send(
+        body: [
+          "token": token, "kind": kind, "emoji": emoji, "message": message,
+          "recipients": recipients, "high_priority": highPriority,
+        ], delay: UNDO_HOLD)
+      if let path { groupDefaults()?.set(path, forKey: "pending_nudge") }
     }
+    WidgetCenter.shared.reloadTimelines(ofKind: "NudgesWidget")
+    return .result()
+  }
+}
+
+// Cancel a nudge that's still inside its undo window. Because the upload hasn't
+// left the device yet, this genuinely un-sends it — nothing was ever inserted
+// server-side, so no push goes out and no row appears in anyone's app.
+struct UndoNudgeIntent: AppIntent {
+  static var title: LocalizedStringResource { "Undo nudge" }
+
+  init() {}
+
+  func perform() async throws -> some IntentResult {
+    if let path = groupDefaults()?.string(forKey: "pending_nudge") {
+      await NudgeSender.shared.cancel(path: path)
+      groupDefaults()?.removeObject(forKey: "pending_nudge")
+    }
+    // Drop straight back to the preset list rather than flashing a "cancelled"
+    // state — the list reappearing IS the confirmation.
+    groupDefaults()?.removeObject(forKey: "widget_status")
+    WidgetCenter.shared.reloadTimelines(ofKind: "NudgesWidget")
     return .result()
   }
 }
@@ -431,6 +497,20 @@ struct NudgeConfirmationView: View {
           .font(.caption).fontWeight(.semibold)
       }
       .foregroundStyle(theme.accent)
+
+      // Only while the upload is still held on-device. Once `until` passes the
+      // timeline reverts to the list, so there's never a dead Undo on screen.
+      if status.type == "pending" {
+        Button(intent: UndoNudgeIntent()) {
+          Text("Undo")
+            .font(.caption).fontWeight(.bold)
+            .foregroundStyle(theme.text)
+            .padding(.horizontal, 14).padding(.vertical, 5)
+            .background(Capsule().fill(theme.card))
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 2)
+      }
     }
     .padding(.horizontal, 8)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
