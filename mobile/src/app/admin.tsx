@@ -53,7 +53,7 @@ const humanizeEvent = (type: string) => type.replace(/[._]/g, ' ')
 export default function Admin() {
   const { c } = useTheme()
   const { t } = useI18n()
-  const { profile } = useAuth()
+  const { profile, profileLoaded } = useAuth()
   const { isPlus, refresh: refreshPlus } = usePlus()
   const [planBusy, setPlanBusy] = useState(false)
   const [tab, setTab] = useState<Tab>('households')
@@ -190,8 +190,13 @@ export default function Admin() {
     revalidateBase()
   }
 
-  // Admins only — anyone else is bounced to the hub.
-  if (profile && !profile.is_admin) return <Redirect href="/" />
+  // Admins only — anyone else is bounced to the hub. Wait for the profile lookup
+  // to RESOLVE before deciding: `profile` is null while it's still in flight, so
+  // a `profile && !profile.is_admin` test silently renders this screen to
+  // everyone during that window. RLS keeps the data safe, but a non-admin should
+  // never see the admin UI at all.
+  if (!profileLoaded) return <Loader />
+  if (!profile?.is_admin) return <Redirect href="/" />
 
   const inputStyle = {
     backgroundColor: c.card,

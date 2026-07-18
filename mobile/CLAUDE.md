@@ -87,6 +87,20 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `today_cfg` (see `syncTodayConfig`) is the reference for "mirror the config
     the widget needs to fetch for itself," and TodayWidget's `buildToday()` for
     "live → last-good cache → app snapshot, and only if it's still the same day."
+  - **An interactive widget button fires on a press-and-hold that's too short to
+    raise the system context menu** — so any `Button(intent:)` whose action is
+    hard to take back is a hazard, and it's worse here because the tiles cover the
+    whole widget surface (there's barely any non-interactive area to long-press).
+    Nudges guards this with an **undo window**: `SendNudgeIntent` writes a
+    `"pending"` status and schedules the upload with `earliestBeginDate` =
+    `UNDO_HOLD` out, so the POST sits on-device as a staged file; `UndoNudgeIntent`
+    cancels that task (`NudgeSender.cancel(path:)`, keyed on the staged file path
+    stashed in `pending_nudge`). Undo must PREVENT the send, never delete after —
+    a push can't be recalled. The upload is held slightly LONGER than the button is
+    shown (`UNDO_HOLD > UNDO_SECONDS`) because the timeline's revert-to-list isn't
+    punctual, and a stale Undo that silently no-ops is worse than none.
+    **PetCare's `MarkTaskDoneIntent` has no such guard** — it's reversible in the
+    app, so it was left alone; revisit if that stops being true.
 - Icons: `lucide-react-native`. Images: `expo-image` + `@/lib/signedUrls`. Dates:
   `@react-native-community/datetimepicker`. Camera/photos: `expo-image-picker` +
   `expo-image-manipulator`. Files: `expo-document-picker` + `expo-file-system`
