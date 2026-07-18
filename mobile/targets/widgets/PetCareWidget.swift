@@ -64,6 +64,30 @@ func savePetCare(_ state: PetCareState) {
   }
 }
 
+// ── Done flash (same mechanism as the Nudges "Sent!" confirmation) ──────────
+// The intent writes a short-lived status; the timeline shows it now and a
+// reverted entry at `until` — iOS flips between them at that wall-clock time.
+struct PetCareStatus: Codable {
+  let title: String
+  let until: Date
+}
+
+func loadPetCareStatus() -> PetCareStatus? {
+  guard
+    let raw = groupDefaults()?.string(forKey: "petcare_status"),
+    let data = raw.data(using: .utf8),
+    let status = try? JSONDecoder().decode(PetCareStatus.self, from: data),
+    status.until > Date()
+  else { return nil }
+  return status
+}
+
+func writePetCareStatus(_ status: PetCareStatus) {
+  if let data = try? JSONEncoder().encode(status), let s = String(data: data, encoding: .utf8) {
+    groupDefaults()?.set(s, forKey: "petcare_status")
+  }
+}
+
 /// Fresh per-pet state straight from the server on the widget's own timeline.
 func fetchPetCare(day: String) async -> PetCareState? {
   let token = widgetToken()
@@ -137,14 +161,18 @@ struct MarkTaskDoneIntent: AppIntent {
 
   func perform() async throws -> some IntentResult {
     let today = isoDay(Date())
+    var doneTitle = "Done"
     if var state = loadPetCare() {
       for p in state.pets.indices {
         for t in state.pets[p].daily.indices where state.pets[p].daily[t].id == taskId {
+          doneTitle = state.pets[p].daily[t].title
           state.pets[p].daily[t].done = true
         }
       }
       savePetCare(PetCareState(day: today, pets: state.pets))
     }
+    // Flash the confirmation for a beat before settling on the next task.
+    writePetCareStatus(PetCareStatus(title: doneTitle, until: Date().addingTimeInterval(2.5)))
     WidgetCenter.shared.reloadTimelines(ofKind: "PetCareWidget")
 
     let token = widgetToken()
@@ -192,6 +220,7 @@ struct PetCareEntry: TimelineEntry {
   let date: Date
   let state: PetCareState?
   let selectedId: String?
+  var status: PetCareStatus? = nil
 }
 
 private let samplePetCare = PetCareState(
@@ -242,6 +271,15 @@ struct PetCareProvider: AppIntentTimelineProvider {
 
   func timeline(for configuration: SelectPetIntent, in context: Context) async -> Timeline<PetCareEntry> {
     let today = isoDay(Date())
+    // Mid-flash: render instantly from the just-updated local snapshot (a live
+    // fetch here would hold the confirmation behind a network round-trip); the
+    // .atEnd revert triggers a fresh timeline — and the fetch — right after.
+    if let status = loadPetCareStatus() {
+      let state = normalized(loadPetCare(), today: today)
+      let now = PetCareEntry(date: Date(), state: state, selectedId: configuration.pet?.id, status: status)
+      let reverted = PetCareEntry(date: status.until, state: state, selectedId: configuration.pet?.id)
+      return Timeline(entries: [now, reverted], policy: .atEnd)
+    }
     let live = await fetchPetCare(day: today)
     if let live { savePetCare(live) }
     let state = live ?? normalized(loadPetCare(), today: today)
@@ -324,6 +362,29 @@ struct PetPhotoBadge: View {
   }
 }
 
+/// The 2.5s "task done" confirmation — a green beat before the next task.
+struct DoneFlashTile: View {
+  let status: PetCareStatus
+
+  var body: some View {
+    VStack(spacing: 8) {
+      Image(systemName: "checkmark.circle.fill")
+        .font(.system(size: 32, weight: .semibold))
+        .foregroundStyle(.white)
+      Text(status.title)
+        .font(.system(size: 14, weight: .semibold, design: .rounded))
+        .foregroundStyle(.white)
+        .multilineTextAlignment(.center)
+        .lineLimit(2)
+        .minimumScaleFactor(0.8)
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(Color.green)
+    .clipShape(RoundedRectangle(cornerRadius: 16))
+  }
+}
+
 struct PetCareWidgetView: View {
   var entry: PetCareEntry
   @Environment(\.widgetFamily) var family
@@ -342,7 +403,9 @@ struct PetCareWidgetView: View {
             Spacer(minLength: 0)
             if overdueCount(primary) > 0 { Circle().fill(theme.expense).frame(width: 7, height: 7) }
           }
-          if let task = nextUndone(primary) {
+          if let status = entry.status {
+            DoneFlashTile(status: status)
+          } else if let task = nextUndone(primary) {
             Button(intent: MarkTaskDoneIntent(taskId: task.id)) {
               VStack(alignment: .leading, spacing: 4) {
                 Text("Next up").font(.system(size: 10, weight: .medium)).foregroundStyle(.white.opacity(0.7))
@@ -374,7 +437,9 @@ struct PetCareWidgetView: View {
         HStack(spacing: 12) {
           PetPhotoTile(pet: primary, corner: 18, theme: theme)
             .aspectRatio(1, contentMode: .fit)
-          if let task = nextUndone(primary) {
+          if let status = entry.status {
+            DoneFlashTile(status: status)
+          } else if let task = nextUndone(primary) {
             Button(intent: MarkTaskDoneIntent(taskId: task.id)) {
               VStack(alignment: .leading, spacing: 5) {
                 Text(primary.name.uppercased())
