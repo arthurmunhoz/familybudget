@@ -10,6 +10,7 @@ export const pt: Record<keyof typeof en, string> = {
   'location.you': 'Você',
   'location.live': 'Ao vivo',
   'location.mapMode.title': 'Estilo do mapa',
+  'location.mapMode.credit': '© Mapbox © OpenStreetMap',
   'location.mapMode.standard': 'Mapa',
   'location.mapMode.satellite': 'Satélite',
   'location.mapMode.terrain': 'Terreno',

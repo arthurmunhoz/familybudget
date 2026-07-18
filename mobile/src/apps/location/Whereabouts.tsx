@@ -972,7 +972,15 @@ export default function Whereabouts() {
       ) : null}
 
       {mapModeOpen ? (
-        <MapModePicker mode={mapMode} onPick={setMapMode} onClose={() => setMapModeOpen(false)} />
+        <MapModePicker
+          mode={mapMode}
+          // Preview the styles on ground you recognise: you, else whoever is
+          // live. null when nothing is known yet — the cards fall back to blanks
+          // rather than showing three pictures of the middle of Kansas.
+          center={myLive ?? deviceCenter ?? livePins[0]?.loc ?? null}
+          onPick={setMapMode}
+          onClose={() => setMapModeOpen(false)}
+        />
       ) : null}
 
       {safetyOpen ? (

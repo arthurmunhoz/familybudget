@@ -12,6 +12,7 @@ export const en = {
   'location.you': 'You',
   'location.live': 'Live',
   'location.mapMode.title': 'Map style',
+  'location.mapMode.credit': '© Mapbox © OpenStreetMap',
   'location.mapMode.standard': 'Map',
   'location.mapMode.satellite': 'Satellite',
   'location.mapMode.terrain': 'Terrain',

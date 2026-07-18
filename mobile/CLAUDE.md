@@ -176,6 +176,21 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     sharing button. `MemberDetailCard` therefore has no `isMe` branch.
 - **Map styles** (`mapMode.ts` + `MapModePicker`): Map / Satellite / Terrain,
   from the layers button under the recenter control, remembered in AsyncStorage.
+  - The picker is a row of option cards mirroring **Settings' Appearance
+    picker** (bordered tile + preview + checked label). The previews are real
+    Mapbox **static images centred on the map's own centre**, so you compare
+    styles on ground you recognise — a hand-drawn mock can show you a colour
+    scheme but can't show you what "terrain" does to your street. A real preview
+    also can't lie: in a flat city, terrain genuinely looks close to the plain
+    map, and the card says so.
+  - They're requested with `logo=false&attribution=false` because baked-in credit
+    is illegible at ~100pt wide; the picker prints "© Mapbox © OpenStreetMap"
+    under the row instead, which is what makes that flag permissible. Don't drop
+    that line.
+  - `standard` previews as plain `streets-v11` even when a custom Studio style
+    is configured: a custom style needn't be public, and a 404 tile is a worse
+    preview than a representative one. Tiles fall back to `c.surface` when
+    offline or before a fix is known.
   - `standard` still follows the theme AND `EXPO_PUBLIC_MAPBOX_STYLE_URL(_DARK)`
     — that's the house look. Satellite/terrain are imagery and look identical in
     either theme, because there's no dark version of a photo of the ground.
