@@ -69,6 +69,9 @@ func savePetCare(_ state: PetCareState) {
 // reverted entry at `until` — iOS flips between them at that wall-clock time.
 struct PetCareStatus: Codable {
   let title: String
+  /** The pet whose task was marked — only the widget instance showing this pet
+   *  plays the flash (two per-dog widgets: the other must stay put). */
+  let petId: String
   let until: Date
 }
 
@@ -162,17 +165,19 @@ struct MarkTaskDoneIntent: AppIntent {
   func perform() async throws -> some IntentResult {
     let today = isoDay(Date())
     var doneTitle = "Done"
+    var donePetId = ""
     if var state = loadPetCare() {
       for p in state.pets.indices {
         for t in state.pets[p].daily.indices where state.pets[p].daily[t].id == taskId {
           doneTitle = state.pets[p].daily[t].title
+          donePetId = state.pets[p].id
           state.pets[p].daily[t].done = true
         }
       }
       savePetCare(PetCareState(day: today, pets: state.pets))
     }
     // Flash the confirmation for a beat before settling on the next task.
-    writePetCareStatus(PetCareStatus(title: doneTitle, until: Date().addingTimeInterval(2.5)))
+    writePetCareStatus(PetCareStatus(title: doneTitle, petId: donePetId, until: Date().addingTimeInterval(2.5)))
     WidgetCenter.shared.reloadTimelines(ofKind: "PetCareWidget")
 
     let token = widgetToken()
@@ -276,9 +281,13 @@ struct PetCareProvider: AppIntentTimelineProvider {
     // .atEnd revert triggers a fresh timeline — and the fetch — right after.
     if let status = loadPetCareStatus() {
       let state = normalized(loadPetCare(), today: today)
-      let now = PetCareEntry(date: Date(), state: state, selectedId: configuration.pet?.id, status: status)
-      let reverted = PetCareEntry(date: status.until, state: state, selectedId: configuration.pet?.id)
-      return Timeline(entries: [now, reverted], policy: .atEnd)
+      // Same primary resolution as the view: the configured pet, else the first.
+      let primaryId = state?.pets.first { $0.id == configuration.pet?.id }?.id ?? state?.pets.first?.id
+      if status.petId == primaryId {
+        let now = PetCareEntry(date: Date(), state: state, selectedId: configuration.pet?.id, status: status)
+        let reverted = PetCareEntry(date: status.until, state: state, selectedId: configuration.pet?.id)
+        return Timeline(entries: [now, reverted], policy: .atEnd)
+      }
     }
     let live = await fetchPetCare(day: today)
     if let live { savePetCare(live) }

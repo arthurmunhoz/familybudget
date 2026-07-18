@@ -217,7 +217,7 @@ export function RoutineSheet({
                 paddingBottom: sp.lg,
               }}
             >
-              <Txt variant="h2">
+              <Txt variant="h2" style={{ marginLeft: sp.sm }}>
                 {t(section === 'daily' ? 'petcare.today' : 'petcare.routines')} · {pet.name}
               </Txt>
               <Pressable
