@@ -32,7 +32,10 @@ export function EvenSplit() {
           {t('calc.bill')}
         </Txt>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.xs, marginTop: sp.xs }}>
-          <Txt style={{ fontSize: 32, fontWeight: '600', color: c.textMuted }}>$</Txt>
+          {/* Match the amount's state so the symbol and number read as ONE
+              figure — a grey $ beside a near-black number looked like the
+              amount itself was greyed out. */}
+          <Txt style={{ fontSize: 32, fontWeight: '600', color: bill ? c.text : c.textFaint }}>$</Txt>
           <TextInput
             value={bill}
             onChangeText={setBill}

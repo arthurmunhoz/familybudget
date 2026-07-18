@@ -64,7 +64,8 @@ function OptionCard({
       <View style={{ flexDirection: 'row', gap: sp.sm }}>
         {/* price */}
         <View style={[styles.field, { backgroundColor: c.surface }]}>
-          <Txt style={{ color: c.textFaint, fontWeight: '700' }}>$</Txt>
+          {/* Same rule as the other calculators: the $ tracks the value's state. */}
+          <Txt style={{ color: price ? c.text : c.textFaint, fontWeight: '700' }}>$</Txt>
           <TextInput
             value={price}
             onChangeText={setPrice}
