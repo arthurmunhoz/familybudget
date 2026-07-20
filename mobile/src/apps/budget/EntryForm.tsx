@@ -37,7 +37,7 @@ import { addDaysISO, formatDay, formatMoney, shortName, todayISO } from '@/lib/f
 import { supabase } from '@/lib/supabase'
 import type { CategoryOverride, CategoryRule, CustomCategory, Entry, EntryType, Profile } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { Chip, DateField } from './shared'
+import { Chip, DatePickerModal } from './shared'
 import ManageCategoriesSheet from './ManageCategoriesSheet'
 import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
@@ -664,13 +664,20 @@ export default function EntryForm({
                     </Txt>
                   </Chip>
                 )}
-                <Chip active={dateIsOther} onPress={() => setPickOpen((o) => !o)}>
+                <Chip active={dateIsOther} onPress={() => setPickOpen(true)}>
                   <Txt style={{ fontSize: 13, fontWeight: '600', color: dateIsOther ? '#fff' : c.textMuted }}>
                     {dateIsOther ? formatDay(date) : t('entry.pickDate')}
                   </Txt>
                 </Chip>
               </View>
-              {pickOpen && <DateField value={date} onChange={setDate} />}
+              {/* The calendar opens in a modal now — the Pick chip is the
+                  trigger, so there's no intermediate field row to tap through. */}
+              <DatePickerModal
+                visible={pickOpen}
+                value={date}
+                onChange={setDate}
+                onClose={() => setPickOpen(false)}
+              />
             </View>
 
             {/* who — "First L." chips */}

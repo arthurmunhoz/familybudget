@@ -26,7 +26,7 @@ import type {
   Period,
   Profile,
 } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import SummaryChart from './SummaryChart'
 
@@ -329,7 +329,7 @@ export default function MonthDetail({
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 140, gap: sp.md }}
+        contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
       >
         <SummaryChart entries={filtered} customCats={customCats} overrides={overrides} />
 
@@ -411,8 +411,13 @@ export default function MonthDetail({
         )}
       </ScrollView>
 
-      {/* bottom action bar: scan + add */}
-      <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
+      {/* Bottom action bar — scan + add. In NORMAL FLOW (not an absolute overlay)
+          so the list ends at it instead of scrolling underneath, and the two
+          buttons' OUTER bottom corners follow the iPhone's screen curve. Inner
+          corners stay square-ish (radius.md): they're mid-screen, not at a
+          screen corner. SafeAreaView edges={['bottom']} clears the home
+          indicator. */}
+      <SafeAreaView edges={['bottom']}>
         <View style={{ flexDirection: 'row', gap: sp.md, paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
           <Pressable
             onPress={startScan}
@@ -420,7 +425,10 @@ export default function MonthDetail({
             accessibilityLabel={t('detail.scanAria')}
             style={({ pressed }) => ({
               width: 56,
-              borderRadius: radius.md,
+              borderTopLeftRadius: radius.md,
+              borderTopRightRadius: radius.md,
+              borderBottomLeftRadius: sheetRadius,
+              borderBottomRightRadius: radius.md,
               backgroundColor: c.surface,
               alignItems: 'center',
               justifyContent: 'center',
@@ -429,7 +437,11 @@ export default function MonthDetail({
           >
             {scanning ? <ActivityIndicator color={c.text} /> : <Camera size={24} color={c.text} />}
           </Pressable>
-          <Btn title={t('detail.newEntry')} onPress={() => { setEditing(null); setPrefill(undefined); setFormOpen(true) }} style={{ flex: 1 }} />
+          <Btn
+            title={t('detail.newEntry')}
+            onPress={() => { setEditing(null); setPrefill(undefined); setFormOpen(true) }}
+            style={{ flex: 1, borderBottomRightRadius: sheetRadius }}
+          />
         </View>
       </SafeAreaView>
 

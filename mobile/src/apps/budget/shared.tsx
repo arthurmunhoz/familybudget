@@ -2,13 +2,12 @@
 // a segmented control (period / income-expense toggle), and a selectable pill.
 // Mirrors the patterns used elsewhere in the RN app (pets/petUi, calc/shared).
 import { useState, type ReactNode } from 'react'
-import { Platform, Pressable, View, type ViewStyle } from 'react-native'
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker'
+import { Modal, Platform, Pressable, View, type ViewStyle } from 'react-native'
+import DateTimePicker from '@react-native-community/datetimepicker'
 import { CalendarDays, ChevronDown } from 'lucide-react-native'
 
-import { Txt } from '@/components/ui'
+import { Btn, Txt } from '@/components/ui'
+import { useI18n } from '@/hooks/useI18n'
 import { formatDay } from '@/lib/format'
 import { radius, sp, useTheme } from '@/theme/theme'
 
@@ -25,6 +24,78 @@ const fromISO = (iso: string): Date => {
 
 /** A labelled date field that opens the native date picker. Stores ISO
  *  YYYY-MM-DD strings. `value === ''` shows the placeholder. */
+/** The calendar itself, in a MODAL rather than shoved inline into the form.
+ *
+ *  iOS gets a bottom sheet with the graphical calendar and a Done button, so it
+ *  has room to breathe instead of pushing the rest of the form around — the
+ *  inline version looked cramped. Android's `display="default"` IS a native
+ *  modal dialog, so there we just mount the picker while `visible`.
+ *
+ *  Selection applies live (each calendar tap calls `onChange`), matching Pet
+ *  Care's date field; Done just dismisses. */
+export function DatePickerModal({
+  visible,
+  value,
+  onChange,
+  onClose,
+}: {
+  visible: boolean
+  value: string
+  onChange: (iso: string) => void
+  onClose: () => void
+}) {
+  const { c, dark } = useTheme()
+  const { t } = useI18n()
+
+  if (Platform.OS === 'android') {
+    return visible ? (
+      <DateTimePicker
+        mode="date"
+        display="default"
+        value={value ? fromISO(value) : new Date()}
+        onChange={(event, date) => {
+          onClose()
+          if (event.type !== 'dismissed' && date) onChange(toISO(date))
+        }}
+      />
+    ) : null
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable
+        onPress={onClose}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+      >
+        {/* Inner press-catcher so a tap on the sheet doesn't dismiss it. */}
+        <Pressable
+          onPress={() => {}}
+          style={{
+            backgroundColor: c.sheet,
+            borderTopLeftRadius: radius.lg,
+            borderTopRightRadius: radius.lg,
+            paddingHorizontal: sp.lg,
+            paddingTop: sp.md,
+            paddingBottom: sp.xl,
+            gap: sp.md,
+          }}
+        >
+          <DateTimePicker
+            mode="date"
+            display="inline"
+            value={value ? fromISO(value) : new Date()}
+            onChange={(_event, date) => {
+              if (date) onChange(toISO(date))
+            }}
+            themeVariant={dark ? 'dark' : 'light'}
+          />
+          <Btn title={t('common.done')} onPress={onClose} />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  )
+}
+
 export function DateField({
   label,
   value,
@@ -46,15 +117,8 @@ export function DateField({
    *  date PICKER, not an editable text input. */
   withPicker?: boolean
 }) {
-  const { c, dark } = useTheme()
+  const { c } = useTheme()
   const [open, setOpen] = useState(false)
-
-  function handle(event: DateTimePickerEvent, date?: Date) {
-    // Android closes on its own; iOS keeps the inline picker mounted.
-    if (Platform.OS === 'android') setOpen(false)
-    if (event.type === 'dismissed') return
-    if (date) onChange(toISO(date))
-  }
 
   const shown = displayValue ?? (value ? formatDay(value) : '')
 
@@ -62,7 +126,7 @@ export function DateField({
     <View style={[{ gap: 6, flex: 1 }, style]}>
       {label ? <Txt variant="label">{label}</Txt> : null}
       <Pressable
-        onPress={() => setOpen((o) => !o)}
+        onPress={() => setOpen(true)}
         style={{
           backgroundColor: c.card,
           borderRadius: radius.md,
@@ -83,15 +147,7 @@ export function DateField({
           <ChevronDown size={18} color={c.textMuted} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
         ) : null}
       </Pressable>
-      {open && (
-        <DateTimePicker
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          value={value ? fromISO(value) : new Date()}
-          onChange={handle}
-          themeVariant={dark ? 'dark' : 'light'}
-        />
-      )}
+      <DatePickerModal visible={open} value={value} onChange={onChange} onClose={() => setOpen(false)} />
     </View>
   )
 }
