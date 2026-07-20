@@ -270,10 +270,14 @@ export function NewItemButton({
   label,
   onPress,
   disabled,
+  loading,
 }: {
   label: string
   onPress: () => void
   disabled?: boolean
+  /** Swap the label for a spinner (e.g. while a file picker or a create call is
+   *  in flight). Also blocks taps, like `disabled`. */
+  loading?: boolean
 }) {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
@@ -283,11 +287,14 @@ export function NewItemButton({
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled}
+      disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => ({
         alignItems: 'center',
         justifyContent: 'center',
+        // Hold the label's height so swapping to the spinner doesn't reflow the
+        // row (the spinner is shorter than the 16pt text line).
+        minHeight: 16,
         marginHorizontal: sp.lg,
         marginTop: sp.sm,
         marginBottom: bottom,
@@ -303,7 +310,11 @@ export function NewItemButton({
         opacity: disabled ? 0.5 : pressed ? 0.6 : 1,
       })}
     >
-      <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
+      {loading ? (
+        <ActivityIndicator color={c.accent} />
+      ) : (
+        <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
+      )}
     </Pressable>
   )
 }

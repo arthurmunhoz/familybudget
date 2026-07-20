@@ -326,9 +326,10 @@ export default function Months({ budgetId }: { budgetId: string }) {
       {/* Bottom action in NORMAL flow — the branch above is flex:1, so this
           stays pinned to the bottom and the list ends AT it, never under it. */}
       <NewItemButton
-        label={creating ? t('months.creating') : t(`months.new${pk}` as TKey)}
+        label={t(`months.new${pk}` as TKey)}
         onPress={openCreate}
-        disabled={creating || loading}
+        loading={creating}
+        disabled={loading}
       />
 
       {/* budget options menu */}
