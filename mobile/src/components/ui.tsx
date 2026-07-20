@@ -158,6 +158,7 @@ export function Btn({
   disabled,
   loading,
   style,
+  curveBottom = false,
 }: {
   title: string
   onPress: () => void
@@ -165,10 +166,21 @@ export function Btn({
   disabled?: boolean
   loading?: boolean
   style?: ViewStyle
+  /** Screen-curve rounded bottom corners (top stays radius.md) — for a button
+   *  docked to the bottom of a sheet/screen, matching NewItemButton. */
+  curveBottom?: boolean
 }) {
   const { c } = useTheme()
   const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surface : 'transparent'
   const fg = variant === 'primary' ? c.onAccent : c.text
+  const corners = curveBottom
+    ? {
+        borderTopLeftRadius: radius.md,
+        borderTopRightRadius: radius.md,
+        borderBottomLeftRadius: CURVE_RADIUS,
+        borderBottomRightRadius: CURVE_RADIUS,
+      }
+    : { borderRadius: radius.md }
   return (
     <Pressable
       accessibilityRole="button"
@@ -177,7 +189,7 @@ export function Btn({
       style={({ pressed }) => [
         {
           backgroundColor: bg,
-          borderRadius: radius.md,
+          ...corners,
           paddingVertical: 14,
           paddingHorizontal: sp.lg,
           alignItems: 'center',

@@ -3,6 +3,7 @@
 // title, date, optional next-due, optional notes. Used for new events, edits, and
 // the "log again" re-log flow (the parent pre-fills the draft).
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
@@ -44,6 +45,7 @@ export default function EventForm({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const insets = useSafeAreaInsets()
   const set = (patch: Partial<EventDraft>) => setDraft({ ...draft, ...patch })
 
   const canSave = !!draft.title.trim() && !!draft.pet
@@ -178,12 +180,18 @@ export default function EventForm({
             />
           </ScrollView>
 
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl, gap: sp.md }}>
-            <Btn
-              title={editingEvent ? t('common.saveChanges') : t('pets.saveEvent')}
-              onPress={save}
-              disabled={!canSave}
-            />
+          {/* Delete sits ABOVE Save so the Save button stays docked at the
+              sheet's bottom in both new + edit modes — its screen-curve bottom
+              corners echo the phone's own corner. Half the inset hugs the edge
+              while clearing the home indicator, matching NewItemButton. */}
+          <View
+            style={{
+              paddingHorizontal: sp.lg,
+              paddingTop: sp.md,
+              paddingBottom: Math.max(Math.round(insets.bottom / 2), sp.xs),
+              gap: sp.md,
+            }}
+          >
             {editingEvent ? (
               <Pressable
                 onPress={() => {
@@ -196,6 +204,12 @@ export default function EventForm({
                 <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('pets.deleteEvent')}</Txt>
               </Pressable>
             ) : null}
+            <Btn
+              title={editingEvent ? t('common.saveChanges') : t('pets.saveEvent')}
+              onPress={save}
+              disabled={!canSave}
+              curveBottom
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
