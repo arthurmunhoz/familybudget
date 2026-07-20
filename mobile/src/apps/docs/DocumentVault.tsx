@@ -14,7 +14,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
 import { FileText, Lock, Pencil, Plus, X } from 'lucide-react-native'
 
-import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
+import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -335,7 +335,7 @@ export default function DocumentVault() {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.lg }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.lg }}
         >
           {groups.map((group) => (
             <View key={group.cat} style={{ gap: sp.sm }}>
@@ -366,16 +366,10 @@ export default function DocumentVault() {
         </ScrollView>
       )}
 
-      {/* bottom action bar */}
-      <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-        <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
-          <Btn
-            title={t('docs.addDoc')}
-            onPress={pickFile}
-            loading={picking}
-          />
-        </View>
-      </SafeAreaView>
+      {/* Bottom action — in NORMAL flow (not an absolute overlay), so the doc
+          list ends AT the button instead of scrolling underneath it. The branch
+          above is flex:1, so this stays pinned to the bottom in every state. */}
+      <NewItemButton label={t('docs.addDoc')} onPress={pickFile} disabled={picking} />
 
       {pending && profile && (
         <UploadSheet
