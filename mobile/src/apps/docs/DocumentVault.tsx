@@ -369,7 +369,7 @@ export default function DocumentVault() {
       {/* Bottom action — in NORMAL flow (not an absolute overlay), so the doc
           list ends AT the button instead of scrolling underneath it. The branch
           above is flex:1, so this stays pinned to the bottom in every state. */}
-      <NewItemButton label={t('docs.addDoc')} onPress={pickFile} disabled={picking} />
+      <NewItemButton label={t('docs.addDoc')} onPress={pickFile} loading={picking} />
 
       {pending && profile && (
         <UploadSheet

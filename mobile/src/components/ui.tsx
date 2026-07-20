@@ -158,6 +158,7 @@ export function Btn({
   disabled,
   loading,
   style,
+  curveBottom = false,
 }: {
   title: string
   onPress: () => void
@@ -165,10 +166,21 @@ export function Btn({
   disabled?: boolean
   loading?: boolean
   style?: ViewStyle
+  /** Screen-curve rounded bottom corners (top stays radius.md) — for a button
+   *  docked to the bottom of a sheet/screen, matching NewItemButton. */
+  curveBottom?: boolean
 }) {
   const { c } = useTheme()
   const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surface : 'transparent'
   const fg = variant === 'primary' ? c.onAccent : c.text
+  const corners = curveBottom
+    ? {
+        borderTopLeftRadius: radius.md,
+        borderTopRightRadius: radius.md,
+        borderBottomLeftRadius: CURVE_RADIUS,
+        borderBottomRightRadius: CURVE_RADIUS,
+      }
+    : { borderRadius: radius.md }
   return (
     <Pressable
       accessibilityRole="button"
@@ -177,7 +189,7 @@ export function Btn({
       style={({ pressed }) => [
         {
           backgroundColor: bg,
-          borderRadius: radius.md,
+          ...corners,
           paddingVertical: 14,
           paddingHorizontal: sp.lg,
           alignItems: 'center',
@@ -270,10 +282,14 @@ export function NewItemButton({
   label,
   onPress,
   disabled,
+  loading,
 }: {
   label: string
   onPress: () => void
   disabled?: boolean
+  /** Swap the label for a spinner (e.g. while a file picker or a create call is
+   *  in flight). Also blocks taps, like `disabled`. */
+  loading?: boolean
 }) {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
@@ -283,11 +299,14 @@ export function NewItemButton({
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled}
+      disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => ({
         alignItems: 'center',
         justifyContent: 'center',
+        // Hold the label's height so swapping to the spinner doesn't reflow the
+        // row (the spinner is shorter than the 16pt text line).
+        minHeight: 16,
         marginHorizontal: sp.lg,
         marginTop: sp.sm,
         marginBottom: bottom,
@@ -303,7 +322,11 @@ export function NewItemButton({
         opacity: disabled ? 0.5 : pressed ? 0.6 : 1,
       })}
     >
-      <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
+      {loading ? (
+        <ActivityIndicator color={c.accent} />
+      ) : (
+        <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
+      )}
     </Pressable>
   )
 }
