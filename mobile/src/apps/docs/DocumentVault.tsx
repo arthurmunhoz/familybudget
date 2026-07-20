@@ -8,7 +8,6 @@ import { Alert, Pressable, ScrollView, Switch, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
-import DocumentScanner from 'react-native-document-scanner-plugin'
 import { PDFDocument } from 'pdf-lib'
 import { File } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
@@ -36,6 +35,25 @@ import EditSheet from './EditSheet'
 
 const MAX_SIZE = 20 * 1024 * 1024 // bucket limit
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif']
+
+// The scanner is a native TurboModule whose spec calls getEnforcing() AT IMPORT,
+// which THROWS — crashing the whole route — when the native binary lacks it
+// (Expo Go, or before a native rebuild). A static top-level import therefore
+// takes the screen down on load. Requiring it lazily inside try/catch turns that
+// into a graceful `null`, so callers fall back to a plain camera capture.
+type Scanner = {
+  scanDocument: (opts: {
+    croppedImageQuality?: number
+  }) => Promise<{ scannedImages?: string[]; status: string }>
+}
+function loadScanner(): Scanner | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('react-native-document-scanner-plugin').default as Scanner
+  } catch {
+    return null
+  }
+}
 
 export default function DocumentVault() {
   const { c } = useTheme()
@@ -272,16 +290,16 @@ export default function DocumentVault() {
   // pages as the user captures. One page → a JPEG image; multiple → one PDF.
   async function scanDocument() {
     if (picking || !profile) return
+    // Native module absent (Expo Go, or before a native rebuild) — degrade to a
+    // plain camera capture so the feature still works, minus edge detection.
+    const scanner = loadScanner()
+    if (!scanner) return takePhoto()
     let images: string[]
     try {
-      const { scannedImages, status } = await DocumentScanner.scanDocument({
-        croppedImageQuality: 100,
-      })
+      const { scannedImages, status } = await scanner.scanDocument({ croppedImageQuality: 100 })
       if (status !== 'success' || !scannedImages?.length) return // user cancelled
       images = scannedImages
     } catch {
-      // Native module absent (Expo Go, or before a native rebuild) — degrade to
-      // a plain camera capture so the feature still works, minus edge detection.
       return takePhoto()
     }
     if (images.length === 1) await uploadImageUri(images[0])
