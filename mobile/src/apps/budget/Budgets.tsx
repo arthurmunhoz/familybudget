@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Camera, Check, ChevronDown, ChevronRight, Lock, X } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
+import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { track } from '@/lib/analytics'
@@ -33,7 +33,7 @@ import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { formatMoney, periodEndISO, periodLabel, todayISO } from '@/lib/format'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { NewItemButton, Segmented } from './shared'
+import { Segmented } from './shared'
 
 const PERIODS: Period[] = ['monthly', 'weekly', 'daily']
 

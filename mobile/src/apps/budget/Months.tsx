@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { ChevronRight, MoreHorizontal, Trash2, X } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
+import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
@@ -31,7 +31,7 @@ import { supabase } from '@/lib/supabase'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
-import { DateField, NewItemButton } from './shared'
+import { DateField } from './shared'
 
 // Period-specific i18n key suffix (month/week/day).
 const CAP: Record<Period, string> = { monthly: 'Month', weekly: 'Week', daily: 'Day' }
