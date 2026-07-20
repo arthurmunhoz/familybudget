@@ -1028,6 +1028,10 @@ export const en = {
 
   'docs.belongsTo': 'Belongs to',
   'docs.addDoc': 'Add document',
+  'docs.takePhoto': 'Take a photo',
+  'docs.chooseFile': 'Choose a file',
+  'docs.scanName': 'Scanned document',
+  'docs.cameraDenied': 'Camera access is off. Turn it on in Settings to take a photo.',
   'docs.editDoc': 'Edit document',
   'docs.titlePlaceholder': 'Title',
   'docs.uploading': 'Uploading…',

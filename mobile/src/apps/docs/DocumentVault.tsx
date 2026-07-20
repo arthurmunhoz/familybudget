@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, Switch, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
+import * as ImagePicker from 'expo-image-picker'
 import { File } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
@@ -204,6 +205,52 @@ export default function DocumentVault() {
     }
   }
 
+  // Capture a document with the camera. Same downscale/JPEG path as an image
+  // picked from files, then straight into the UploadSheet — the user names it
+  // there (default title comes from `name`).
+  async function takePhoto() {
+    if (picking || !profile) return
+    const perm = await ImagePicker.requestCameraPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert(t('docs.cameraDenied'))
+      return
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 })
+    if (result.canceled || !result.assets[0]) return
+    setPicking(true)
+    try {
+      const ref = await ImageManipulator.manipulate(result.assets[0].uri)
+        .resize({ width: 2048 })
+        .renderAsync()
+      const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
+      const buffer = await new File(out.uri).arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      setPending({
+        name: `${t('docs.scanName')}.jpg`,
+        uri: out.uri,
+        size: bytes.byteLength,
+        bytes,
+        mime: 'image/jpeg',
+        ext: 'jpg',
+      })
+    } catch {
+      Alert.alert(t('docs.uploadFailed'))
+    } finally {
+      setPicking(false)
+    }
+  }
+
+  // The "Add document" button offers both paths — snap a photo, or pick an
+  // existing file (image/PDF). Alert chooser matches the app's scan flows.
+  function startAdd() {
+    if (picking || !profile) return
+    Alert.alert(t('docs.addDoc'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('docs.takePhoto'), onPress: takePhoto },
+      { text: t('docs.chooseFile'), onPress: pickFile },
+    ])
+  }
+
   async function openDoc(doc: FamilyDocument) {
     if (opening) return
     setOpening(doc.id)
@@ -369,7 +416,7 @@ export default function DocumentVault() {
       {/* Bottom action — in NORMAL flow (not an absolute overlay), so the doc
           list ends AT the button instead of scrolling underneath it. The branch
           above is flex:1, so this stays pinned to the bottom in every state. */}
-      <NewItemButton label={t('docs.addDoc')} onPress={pickFile} loading={picking} />
+      <NewItemButton label={t('docs.addDoc')} onPress={startAdd} loading={picking} />
 
       {pending && profile && (
         <UploadSheet

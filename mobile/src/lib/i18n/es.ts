@@ -1026,6 +1026,10 @@ export const es: Record<keyof typeof en, string> = {
 
   'docs.belongsTo': 'Pertenece a',
   'docs.addDoc': 'Agregar documento',
+  'docs.takePhoto': 'Tomar una foto',
+  'docs.chooseFile': 'Elegir un archivo',
+  'docs.scanName': 'Documento escaneado',
+  'docs.cameraDenied': 'El acceso a la cámara está desactivado. Actívalo en Ajustes para tomar una foto.',
   'docs.editDoc': 'Editar documento',
   'docs.titlePlaceholder': 'Título',
   'docs.uploading': 'Subiendo…',

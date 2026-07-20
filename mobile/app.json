@@ -21,7 +21,7 @@
       },
       "infoPlist": {
         "NSFaceIDUsageDescription": "Face ID unlocks your private Document Vault.",
-        "NSCameraUsageDescription": "Take photos to scan receipts and bills, and add pet and profile photos.",
+        "NSCameraUsageDescription": "Take photos to scan receipts and bills, capture documents, and add pet and profile photos.",
         "NSPhotoLibraryUsageDescription": "Attach photos for receipts, pets, profiles and documents.",
         "NSCalendarsUsageDescription": "Add your One Roof events to the device calendar.",
         "ITSAppUsesNonExemptEncryption": false,
