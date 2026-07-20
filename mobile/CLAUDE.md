@@ -511,7 +511,8 @@ push, layout) must be checked by a human on a simulator/device — say so, don't
 claim it's verified. For a NATIVE dependency + config plugin (below), also run
 `npx expo config --type introspect --json` to confirm the plugin applies and the
 resulting infoPlist is right — that catches a broken plugin without a full
-prebuild (which would rewrite the checked-in `ios/`, so DON'T run prebuild here).
+prebuild (which regenerates `ios/` + needs pods; do it on a real machine, not to
+validate config — see "Regenerating native code" below).
 
 **Document scanning (Documents app)**: `react-native-document-scanner-plugin`
 (config plugin in `app.json`) wraps VisionKit's `VNDocumentCameraViewController`
@@ -531,6 +532,29 @@ rebuild to actually scan; the camera string lives in
 the `expo-image-picker` plugin's `cameraPermission` (which overrides
 `ios.infoPlist`) AND the scanner plugin's own `cameraPermission` — keep both in
 sync.
+- **AUTO-SHUTTER isn't configurable.** VisionKit auto-captures by default and
+  exposes NO public API for the capture mode — the user toggles Auto/Manual in
+  the scanner UI (VisionKit remembers it for the session). Defaulting it OFF
+  would mean swapping VisionKit for a custom (WeScan/OpenCV) scanner, or a
+  fragile private-API view-hierarchy hack — don't, without asking.
+
+## Regenerating native code (`ios/` is gitignored — CNG)
+`ios/` and `android/` are generated, not committed, so a native rebuild is
+`prebuild`. Two failures bite EVERY time on this machine — use this exact recipe:
+```
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx expo prebuild -p ios --clean
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx pod-install       # if you used --no-install
+```
+- **`--clean`** (regenerate from scratch) is REQUIRED. Prebuilding over an
+  existing `ios/` makes `@bacons/apple-targets` try to *update* the
+  `OneRoofWidgets` target and crash (`Cannot read properties of undefined
+  (reading 'removeFromProject')`). Clean makes it *create* the target instead.
+  Safe because `ios/` is gitignored — all native config is in `app.json` /
+  `app.config.js` / `targets/widgets/`.
+- **`LANG`/`LC_ALL` UTF-8** avoids a CocoaPods 1.17 + Ruby 4.0 crash
+  (`Unicode Normalization not appropriate for ASCII-8BIT`) when the shell locale
+  isn't UTF-8.
+- Then build: `npx expo run:ios`, or open `ios/OneRoof.xcworkspace` in Xcode.
 
 ## i18n Rule
 All user-facing strings (labels, titles, placeholders, button text, alerts, error messages) **must** be
