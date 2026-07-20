@@ -4,7 +4,7 @@
 // an entry or scans a receipt photo. RN port of budget/MonthDetail.tsx.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
@@ -48,6 +48,7 @@ export default function MonthDetail({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const insets = useSafeAreaInsets()
   const { profile, profiles } = useAuth()
 
   const [person, setPerson] = useState<string>('all')
@@ -415,35 +416,46 @@ export default function MonthDetail({
           so the list ends at it instead of scrolling underneath, and the two
           buttons' OUTER bottom corners follow the iPhone's screen curve. Inner
           corners stay square-ish (radius.md): they're mid-screen, not at a
-          screen corner. SafeAreaView edges={['bottom']} clears the home
-          indicator. */}
-      <SafeAreaView edges={['bottom']}>
-        <View style={{ flexDirection: 'row', gap: sp.md, paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
-          <Pressable
-            onPress={startScan}
-            disabled={scanning}
-            accessibilityLabel={t('detail.scanAria')}
-            style={({ pressed }) => ({
-              width: 56,
-              borderTopLeftRadius: radius.md,
-              borderTopRightRadius: radius.md,
-              borderBottomLeftRadius: sheetRadius,
-              borderBottomRightRadius: radius.md,
-              backgroundColor: c.surface,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: scanning ? 0.5 : pressed ? 0.85 : 1,
-            })}
-          >
-            {scanning ? <ActivityIndicator color={c.text} /> : <Camera size={24} color={c.text} />}
-          </Pressable>
-          <Btn
-            title={t('detail.newEntry')}
-            onPress={() => { setEditing(null); setPrefill(undefined); setFormOpen(true) }}
-            style={{ flex: 1, borderBottomRightRadius: sheetRadius }}
-          />
-        </View>
-      </SafeAreaView>
+          screen corner. Bottom padding is HALF the home-indicator inset (floored
+          for home-button devices), so the buttons sit down near the screen edge
+          where their curved corners line up with the screen's — the full inset
+          floated them ~34pt too high. Matches NewItemButton. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: sp.md,
+          paddingHorizontal: sp.lg,
+          paddingTop: sp.sm,
+          paddingBottom: Math.max(Math.round(insets.bottom / 2), sp.xs),
+        }}
+      >
+        <Pressable
+          onPress={startScan}
+          disabled={scanning}
+          accessibilityLabel={t('detail.scanAria')}
+          style={({ pressed }) => ({
+            width: 56,
+            borderTopLeftRadius: radius.md,
+            borderTopRightRadius: radius.md,
+            borderBottomLeftRadius: sheetRadius,
+            borderBottomRightRadius: radius.md,
+            // Accent-soft tint (not flat surface) so the camera reads as a real
+            // action next to the filled "New entry" — the two are an accent
+            // pair, one tinted, one solid, rather than one button + grey square.
+            backgroundColor: c.accentSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: scanning ? 0.5 : pressed ? 0.85 : 1,
+          })}
+        >
+          {scanning ? <ActivityIndicator color={c.accent} /> : <Camera size={24} color={c.accent} />}
+        </Pressable>
+        <Btn
+          title={t('detail.newEntry')}
+          onPress={() => { setEditing(null); setPrefill(undefined); setFormOpen(true) }}
+          style={{ flex: 1, borderBottomRightRadius: sheetRadius }}
+        />
+      </View>
 
       {formOpen && profile && (
         <EntryForm
