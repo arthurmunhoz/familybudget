@@ -8,7 +8,14 @@ import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { ChevronRight, MoreHorizontal, Trash2, X } from 'lucide-react-native'
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Trash2,
+  X,
+} from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -25,13 +32,14 @@ import {
   nextPeriodStart,
   periodLabel,
   periodLengthDays,
+  prevPeriodStart,
   todayISO,
 } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
-import { DateField } from './shared'
+import { DatePickerModal } from './shared'
 
 // Period-specific i18n key suffix (month/week/day).
 const CAP: Record<Period, string> = { monthly: 'Month', weekly: 'Week', daily: 'Day' }
@@ -48,6 +56,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [pickStart, setPickStart] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
@@ -425,13 +434,78 @@ export default function Months({ budgetId }: { budgetId: string }) {
                   <X size={22} color={c.textMuted} />
                 </Pressable>
               </View>
-              <DateField
-                label={t(`months.which${pk}` as TKey)}
-                value={pickStart}
-                displayValue={pickedStart ? periodLabel(period, pickedStart) : undefined}
-                onChange={setPickStart}
-                withPicker
-              />
+              {/* Period selector: ◀ [📅 Jul 2026] ▶. The arrows step one period
+                  and always work (no modal); the centre label opens the date
+                  picker to jump further. Base stepping on the normalized
+                  pickedStart so prev/next land on clean period boundaries. */}
+              <View style={{ gap: 6 }}>
+                <Txt variant="label">{t(`months.which${pk}` as TKey)}</Txt>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                  <Pressable
+                    onPress={() =>
+                      setPickStart(prevPeriodStart(period, pickedStart ?? currentPeriodStart(period)))
+                    }
+                    accessibilityLabel={t('months.prevPeriod')}
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: c.border,
+                      backgroundColor: c.card,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <ChevronLeft size={20} color={c.text} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setPickerOpen(true)}
+                    style={{
+                      flex: 1,
+                      height: 46,
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: pickerOpen ? c.accent : c.border,
+                      backgroundColor: c.card,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: sp.sm,
+                      paddingHorizontal: sp.md,
+                    }}
+                  >
+                    <CalendarDays size={18} color={c.textMuted} />
+                    <Txt style={{ fontWeight: '600', fontSize: 15 }} numberOfLines={1}>
+                      {pickedStart ? periodLabel(period, pickedStart) : ''}
+                    </Txt>
+                  </Pressable>
+                  <Pressable
+                    onPress={() =>
+                      setPickStart(nextPeriodStart(period, pickedStart ?? currentPeriodStart(period)))
+                    }
+                    accessibilityLabel={t('months.nextPeriod')}
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: c.border,
+                      backgroundColor: c.card,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <ChevronRight size={20} color={c.text} />
+                  </Pressable>
+                </View>
+                <DatePickerModal
+                  visible={pickerOpen}
+                  value={pickStart}
+                  onChange={setPickStart}
+                  onClose={() => setPickerOpen(false)}
+                />
+              </View>
               {hint ? (
                 <Txt
                   style={{

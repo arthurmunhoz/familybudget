@@ -894,6 +894,8 @@ export const en = {
   'months.newWeekTitle': 'New week',
   'months.newDayTitle': 'New day',
   'months.whichMonth': 'Which month? Past months work too.',
+  'months.prevPeriod': 'Previous period',
+  'months.nextPeriod': 'Next period',
   'months.whichWeek': 'Pick any day — the week starts on its Sunday.',
   'months.whichDay': 'Which day? Past days work too.',
   'months.alreadyExists': '{label} already exists.',
