@@ -6,6 +6,7 @@ import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker'
+import { CalendarDays, ChevronDown } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { formatDay } from '@/lib/format'
@@ -30,12 +31,20 @@ export function DateField({
   placeholder,
   onChange,
   style,
+  displayValue,
+  withPicker = false,
 }: {
   label?: string
   value: string
   placeholder?: string
   onChange: (iso: string) => void
   style?: ViewStyle
+  /** Override the shown text (defaults to formatDay(value)). Lets callers show a
+   *  period label like "Jul 2026" instead of a specific day. */
+  displayValue?: string
+  /** Show a leading calendar glyph + trailing chevron so the field reads as a
+   *  date PICKER, not an editable text input. */
+  withPicker?: boolean
 }) {
   const { c, dark } = useTheme()
   const [open, setOpen] = useState(false)
@@ -47,6 +56,8 @@ export function DateField({
     if (date) onChange(toISO(date))
   }
 
+  const shown = displayValue ?? (value ? formatDay(value) : '')
+
   return (
     <View style={[{ gap: 6, flex: 1 }, style]}>
       {label ? <Txt variant="label">{label}</Txt> : null}
@@ -56,16 +67,21 @@ export function DateField({
           backgroundColor: c.card,
           borderRadius: radius.md,
           borderWidth: 1,
-          borderColor: c.border,
+          borderColor: open ? c.accent : c.border,
           paddingHorizontal: sp.md,
           paddingVertical: 12,
           flexDirection: 'row',
           alignItems: 'center',
+          gap: sp.sm,
         }}
       >
-        <Txt style={{ color: value ? c.text : c.textFaint }}>
-          {value ? formatDay(value) : (placeholder ?? '')}
+        {withPicker ? <CalendarDays size={18} color={c.textMuted} /> : null}
+        <Txt style={{ flex: 1, color: shown ? c.text : c.textFaint }} numberOfLines={1}>
+          {shown || placeholder || ''}
         </Txt>
+        {withPicker ? (
+          <ChevronDown size={18} color={c.textMuted} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+        ) : null}
       </Pressable>
       {open && (
         <DateTimePicker

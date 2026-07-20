@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { ChevronRight, MoreHorizontal, Trash2, X } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
+import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
@@ -323,16 +323,15 @@ export default function Months({ budgetId }: { budgetId: string }) {
         </ScrollView>
       )}
 
-      {/* bottom action bar */}
-      <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-        <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
-          <Btn
-            title={creating ? t('months.creating') : t(`months.new${pk}` as TKey)}
-            disabled={creating || loading}
-            onPress={openCreate}
-          />
-        </View>
-      </SafeAreaView>
+      {/* bottom action bar — plain View, not a bottom SafeAreaView;
+          NewItemButton owns a trimmed bottom inset so it hugs the edge. */}
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}>
+        <NewItemButton
+          label={creating ? t('months.creating') : t(`months.new${pk}` as TKey)}
+          onPress={openCreate}
+          disabled={creating || loading}
+        />
+      </View>
 
       {/* budget options menu */}
       {menuOpen && canManage && (
@@ -427,9 +426,23 @@ export default function Months({ budgetId }: { budgetId: string }) {
                   <X size={22} color={c.textMuted} />
                 </Pressable>
               </View>
-              <DateField label={t(`months.which${pk}` as TKey)} value={pickStart} onChange={setPickStart} />
+              <DateField
+                label={t(`months.which${pk}` as TKey)}
+                value={pickStart}
+                displayValue={pickedStart ? periodLabel(period, pickedStart) : undefined}
+                onChange={setPickStart}
+                withPicker
+              />
               {hint ? (
-                <Txt style={{ fontSize: 13, color: alreadyExists ? c.expense : c.textMuted }}>{hint}</Txt>
+                <Txt
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 18,
+                    color: alreadyExists ? c.expense : c.textMuted,
+                  }}
+                >
+                  {hint}
+                </Txt>
               ) : null}
               <View style={{ flexDirection: 'row', gap: sp.md, marginTop: sp.sm }}>
                 <Btn title={t('common.cancel')} variant="secondary" onPress={() => setCreateOpen(false)} style={{ flex: 1 }} />

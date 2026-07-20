@@ -16,7 +16,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native'
-import { SafeAreaView, type Edge } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context'
 import { ChevronLeft } from 'lucide-react-native'
 import { router } from 'expo-router'
 
@@ -249,6 +249,62 @@ export function Loader() {
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <ActivityIndicator color={c.accent} />
     </View>
+  )
+}
+
+// iPhones get screen-corner-like rounding on the bottom-bar button.
+const CURVE_RADIUS = Platform.OS === 'ios' ? 40 : 12
+
+/**
+ * The dashed "＋ New …" action pinned to the bottom of a list screen — Budgets
+ * ("New budget"), Months ("New month/week/day"), Calendar ("New event"). One
+ * component so the identical gesture reads the same everywhere instead of a
+ * filled button here and a dashed one there.
+ *
+ * Drop it straight inside a bottom-anchored container (a plain `View` at
+ * `bottom: 0`, NOT a bottom `SafeAreaView`): it carries its own margins AND a
+ * trimmed bottom inset, so it hugs the screen's own curved corner instead of
+ * floating above the full home-indicator inset.
+ */
+export function NewItemButton({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string
+  onPress: () => void
+  disabled?: boolean
+}) {
+  const { c } = useTheme()
+  const insets = useSafeAreaInsets()
+  // Half the inset still clears the home indicator; the sp.xs floor covers
+  // home-button devices (inset 0) so it never sits flush on the bezel.
+  const bottom = Math.max(Math.round(insets.bottom / 2), sp.xs)
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: sp.lg,
+        marginTop: sp.sm,
+        marginBottom: bottom,
+        paddingVertical: 16,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: c.textFaint,
+        // Bottom corners follow the iPhone screen curve (normal on Android).
+        borderTopLeftRadius: radius.md,
+        borderTopRightRadius: radius.md,
+        borderBottomLeftRadius: CURVE_RADIUS,
+        borderBottomRightRadius: CURVE_RADIUS,
+        opacity: disabled ? 0.5 : pressed ? 0.6 : 1,
+      })}
+    >
+      <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
+    </Pressable>
   )
 }
 

@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, Loader, Txt } from '@/components/ui'
+import { AppHeader, Card, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -543,12 +543,11 @@ export default function Calendar() {
         </ScrollView>
       )}
 
-      {/* bottom action bar */}
-      <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-        <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: sp.sm }}>
-          <Btn title={t('calendar.addBtn')} onPress={openNew} />
-        </View>
-      </SafeAreaView>
+      {/* bottom action bar — plain View, not a bottom SafeAreaView;
+          NewItemButton owns a trimmed bottom inset so it hugs the edge. */}
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}>
+        <NewItemButton label={t('calendar.addBtn')} onPress={openNew} />
+      </View>
 
       {showForm && (
         <EventForm

@@ -14,7 +14,16 @@ import webpush from 'web-push'
 // Best-effort Expo (native) push, sent alongside web-push. Errors swallowed so
 // a push failure never breaks the request. Only well-formed Expo tokens are sent.
 async function sendExpoPush(
-  messages: { to: string; title: string; body: string; data?: Record<string, unknown>; sound?: 'default' }[],
+  messages: {
+    to: string
+    title: string
+    body: string
+    data?: Record<string, unknown>
+    sound?: 'default'
+    /** 'high' asks APNs to deliver immediately rather than batching for power —
+     *  used for high-priority nudges, which are the whole point of the flag. */
+    priority?: 'default' | 'normal' | 'high'
+  }[],
 ): Promise<number> {
   const valid = messages.filter(
     (m) => typeof m.to === 'string' && m.to.startsWith('ExponentPushToken'),
@@ -244,6 +253,7 @@ export default async function handler(req: any, res: any) {
       body: ping.message,
       data: { url: '/pings', tel },
       sound: 'default' as const,
+      ...(ping.high_priority === true ? { priority: 'high' as const } : {}),
     })),
   )
 

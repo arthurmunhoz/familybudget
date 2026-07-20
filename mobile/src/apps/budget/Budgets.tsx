@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Camera, Check, ChevronDown, ChevronRight, Lock, X } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, EmptyState, Field, Loader, Txt } from '@/components/ui'
+import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { track } from '@/lib/analytics'
@@ -36,9 +36,6 @@ import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Segmented } from './shared'
 
 const PERIODS: Period[] = ['monthly', 'weekly', 'daily']
-
-// iPhones get screen-corner-like rounding on the bottom bar button.
-const NEW_BUDGET_RADIUS = Platform.OS === 'ios' ? 40 : 12
 
 type EntryLite = Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>
 
@@ -231,37 +228,11 @@ export default function Budgets() {
       {/* bottom action bar — a minimalist full-width strip: just a hairline
           divider + centered accent label, so creating a budget (a rare action)
           stays quiet but has a big, easy tap target. */}
-      <SafeAreaView
-        edges={['bottom']}
-        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}
-      >
-        <Pressable
-          accessibilityRole="button"
-          disabled={loading}
-          onPress={startCreate}
-          style={({ pressed }) => ({
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginHorizontal: sp.lg,
-            marginTop: sp.sm,
-            paddingVertical: 16,
-            borderWidth: 1,
-            borderStyle: 'dashed',
-            borderColor: c.textFaint,
-            // Bottom corners follow the iPhone screen curve (normal on Android)
-            // — same treatment as Pet Care's "Add task" button.
-            borderTopLeftRadius: radius.md,
-            borderTopRightRadius: radius.md,
-            borderBottomLeftRadius: NEW_BUDGET_RADIUS,
-            borderBottomRightRadius: NEW_BUDGET_RADIUS,
-            opacity: loading ? 0.5 : pressed ? 0.6 : 1,
-          })}
-        >
-          <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>
-            {t('budget.new')}
-          </Txt>
-        </Pressable>
-      </SafeAreaView>
+      {/* Plain View, not a bottom SafeAreaView — NewItemButton owns a trimmed
+          bottom inset so it hugs the edge instead of floating above the full one. */}
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}>
+        <NewItemButton label={t('budget.new')} onPress={startCreate} disabled={loading} />
+      </View>
 
       {createOpen && (
         <Modal visible animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>

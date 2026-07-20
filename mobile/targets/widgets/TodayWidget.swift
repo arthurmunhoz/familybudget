@@ -382,17 +382,17 @@ struct TodayWidgetView: View {
               .lineLimit(1)
               .minimumScaleFactor(0.7)
           }
-          Spacer(minLength: 4)
+          Spacer(minLength: isSmall ? 8 : 14)
           if let temp = info.temp {
-            // In LIGHT mode the glyph + temperature washed into the widget's
-            // pale background, so they sit on a dark chip. Dark mode already
-            // separates cleanly — no chip there.
+            // Glyph stacked ABOVE the temperature. In LIGHT mode the pair
+            // washed into the widget's pale background, so they sit on a dark
+            // chip; dark mode already separates cleanly — no chip there.
             VStack(alignment: .trailing, spacing: 3) {
-              HStack(spacing: 4) {
+              VStack(spacing: 1) {
                 // Always the natural multicolour — clouds are WHITE by design,
                 // which is exactly why the chip below is dark rather than white.
                 Image(systemName: weatherSymbol(info.code ?? -1))
-                  .font(.system(size: 14))
+                  .font(.system(size: isSmall ? 14 : 16))
                   .symbolRenderingMode(.multicolor)
                 Text("\(Int(temp))\(info.unit ?? "°")")
                   .font(.system(size: isSmall ? 14 : 16, weight: .bold))
@@ -403,8 +403,8 @@ struct TodayWidgetView: View {
                   .minimumScaleFactor(0.7)
                   .fixedSize(horizontal: false, vertical: true)
               }
-              .padding(.horizontal, lightMode ? 8 : 0)
-              .padding(.vertical, lightMode ? 5 : 0)
+              .padding(.horizontal, lightMode ? 9 : 0)
+              .padding(.vertical, lightMode ? 6 : 0)
               // A white chip hid the white cloud glyphs. Light mode gets the
               // app's own warm-espresso surface instead, so every symbol reads
               // exactly as it already does in dark mode.

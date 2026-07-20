@@ -240,6 +240,9 @@ async function sendExpoPush(
     body: string
     data?: Record<string, unknown>
     sound?: 'default'
+    /** See the same field in api/send-ping.ts — immediate APNs delivery for
+     *  high-priority nudges. */
+    priority?: 'default' | 'normal' | 'high'
   }[],
 ): Promise<number> {
   const valid = messages.filter(
@@ -690,6 +693,7 @@ export default async function handler(req: any, res: any) {
       body: message,
       data: { url: '/pings', tel },
       sound: 'default' as const,
+      ...(highPriority ? { priority: 'high' as const } : {}),
     })),
   )
 
