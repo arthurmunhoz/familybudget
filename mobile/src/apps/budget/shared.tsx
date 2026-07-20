@@ -6,10 +6,12 @@ import { Platform, Pressable, View, type ViewStyle } from 'react-native'
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker'
+import { CalendarDays, ChevronDown } from 'lucide-react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Txt } from '@/components/ui'
 import { formatDay } from '@/lib/format'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 const toISO = (d: Date): string => {
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -30,12 +32,20 @@ export function DateField({
   placeholder,
   onChange,
   style,
+  displayValue,
+  withPicker = false,
 }: {
   label?: string
   value: string
   placeholder?: string
   onChange: (iso: string) => void
   style?: ViewStyle
+  /** Override the shown text (defaults to formatDay(value)). Lets callers show a
+   *  period label like "Jul 2026" instead of a specific day. */
+  displayValue?: string
+  /** Show a leading calendar glyph + trailing chevron so the field reads as a
+   *  date PICKER, not an editable text input. */
+  withPicker?: boolean
 }) {
   const { c, dark } = useTheme()
   const [open, setOpen] = useState(false)
@@ -47,6 +57,8 @@ export function DateField({
     if (date) onChange(toISO(date))
   }
 
+  const shown = displayValue ?? (value ? formatDay(value) : '')
+
   return (
     <View style={[{ gap: 6, flex: 1 }, style]}>
       {label ? <Txt variant="label">{label}</Txt> : null}
@@ -56,16 +68,21 @@ export function DateField({
           backgroundColor: c.card,
           borderRadius: radius.md,
           borderWidth: 1,
-          borderColor: c.border,
+          borderColor: open ? c.accent : c.border,
           paddingHorizontal: sp.md,
           paddingVertical: 12,
           flexDirection: 'row',
           alignItems: 'center',
+          gap: sp.sm,
         }}
       >
-        <Txt style={{ color: value ? c.text : c.textFaint }}>
-          {value ? formatDay(value) : (placeholder ?? '')}
+        {withPicker ? <CalendarDays size={18} color={c.textMuted} /> : null}
+        <Txt style={{ flex: 1, color: shown ? c.text : c.textFaint }} numberOfLines={1}>
+          {shown || placeholder || ''}
         </Txt>
+        {withPicker ? (
+          <ChevronDown size={18} color={c.textMuted} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+        ) : null}
       </Pressable>
       {open && (
         <DateTimePicker
@@ -180,6 +197,61 @@ export function Chip({
       })}
     >
       {children}
+    </Pressable>
+  )
+}
+
+// iPhones get screen-corner-like rounding on the bottom bar button.
+const CURVE_RADIUS = Platform.OS === 'ios' ? 40 : 12
+
+/**
+ * The dashed "＋ New …" action pinned to the bottom of a budget screen.
+ *
+ * Shared by Budgets ("New budget") and Months ("New month/week/day") so the two
+ * can't drift apart — Months used to be a filled primary `Btn`, which read as a
+ * different kind of action than the identical one a screen above it. Sits
+ * directly inside the bottom `SafeAreaView`; it carries its own margins.
+ */
+export function NewItemButton({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string
+  onPress: () => void
+  disabled?: boolean
+}) {
+  const { c } = useTheme()
+  const insets = useSafeAreaInsets()
+  // Sit CLOSER to the bottom edge than a full safe-area inset would allow — the
+  // screen-curve corners are meant to hug the screen's own corner. Half the
+  // inset still clears the home indicator; the sp.xs floor covers home-button
+  // devices (inset 0) so it never sits flush on the bezel.
+  const bottom = Math.max(Math.round(insets.bottom / 2), sp.xs)
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: sp.lg,
+        marginTop: sp.sm,
+        marginBottom: bottom,
+        paddingVertical: 16,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: c.textFaint,
+        // Bottom corners follow the iPhone screen curve (normal on Android).
+        borderTopLeftRadius: radius.md,
+        borderTopRightRadius: radius.md,
+        borderBottomLeftRadius: CURVE_RADIUS,
+        borderBottomRightRadius: CURVE_RADIUS,
+        opacity: disabled ? 0.5 : pressed ? 0.6 : 1,
+      })}
+    >
+      <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
     </Pressable>
   )
 }
