@@ -207,7 +207,7 @@ export default function Budgets() {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.md }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
         >
           {budgets.map((b) => {
             const info = byBudget.get(b.id)
@@ -228,11 +228,9 @@ export default function Budgets() {
       {/* bottom action bar — a minimalist full-width strip: just a hairline
           divider + centered accent label, so creating a budget (a rare action)
           stays quiet but has a big, easy tap target. */}
-      {/* Plain View, not a bottom SafeAreaView — NewItemButton owns a trimmed
-          bottom inset so it hugs the edge instead of floating above the full one. */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}>
-        <NewItemButton label={t('budget.new')} onPress={startCreate} disabled={loading} />
-      </View>
+      {/* Bottom action in NORMAL flow — the branch above is flex:1, so this
+          stays pinned to the bottom and the list ends AT it, never under it. */}
+      <NewItemButton label={t('budget.new')} onPress={startCreate} disabled={loading} />
 
       {createOpen && (
         <Modal visible animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>

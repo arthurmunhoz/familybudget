@@ -332,7 +332,7 @@ export default function Calendar() {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.md }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
           keyboardShouldPersistTaps="handled"
         >
           {/* Month / Upcoming toggle */}
@@ -543,11 +543,9 @@ export default function Calendar() {
         </ScrollView>
       )}
 
-      {/* bottom action bar — plain View, not a bottom SafeAreaView;
-          NewItemButton owns a trimmed bottom inset so it hugs the edge. */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}>
-        <NewItemButton label={t('calendar.addBtn')} onPress={openNew} />
-      </View>
+      {/* Bottom action in NORMAL flow — the branch above is flex:1, so this
+          stays pinned to the bottom and the list ends AT it, never under it. */}
+      <NewItemButton label={t('calendar.addBtn')} onPress={openNew} />
 
       {showForm && (
         <EventForm

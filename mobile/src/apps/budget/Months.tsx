@@ -308,7 +308,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: 120, gap: sp.md }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
         >
           {months.map((m) => (
             <PeriodCard
@@ -323,15 +323,13 @@ export default function Months({ budgetId }: { budgetId: string }) {
         </ScrollView>
       )}
 
-      {/* bottom action bar — plain View, not a bottom SafeAreaView;
-          NewItemButton owns a trimmed bottom inset so it hugs the edge. */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bg }}>
-        <NewItemButton
-          label={creating ? t('months.creating') : t(`months.new${pk}` as TKey)}
-          onPress={openCreate}
-          disabled={creating || loading}
-        />
-      </View>
+      {/* Bottom action in NORMAL flow — the branch above is flex:1, so this
+          stays pinned to the bottom and the list ends AT it, never under it. */}
+      <NewItemButton
+        label={creating ? t('months.creating') : t(`months.new${pk}` as TKey)}
+        onPress={openCreate}
+        disabled={creating || loading}
+      />
 
       {/* budget options menu */}
       {menuOpen && canManage && (
