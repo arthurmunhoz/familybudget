@@ -84,6 +84,19 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `sheet === card` outside the glass skin, so it's a no-op for Warm Hearth.
   - Under GLASS, `c.bg` is TRANSPARENT (that's how the wash shows). Never use it
     as a foreground/inverse colour — the toast's label did and vanished.
+- **Push presentation** `@/lib/backgroundNotifications`: a module-scope
+  `Notifications.setNotificationHandler` decides what a push looks like when it
+  lands while the app is FOREGROUNDED. **Without a handler expo-notifications
+  presents nothing** — that's a silent failure, not a default: nudges looked
+  like they'd stopped arriving because with the app open only the in-app
+  Realtime banner (plus its high-priority `Vibration`) got through. Backgrounded
+  delivery is unaffected either way, since iOS draws that from the APNs payload
+  itself, so this only reproduces with the app open. Keep the handler at module
+  scope (installed before any push lands, not on mount) and keep `SILENT_TYPES`
+  in sync with the data-only pushes (`ack`/`petcare`/`live-wake`) — those carry
+  `_contentAvailable` with no title/body, so presenting one shows an empty
+  banner. `shouldShowAlert` is DEPRECATED in expo-notifications 56; use
+  `shouldShowBanner` (heads-up) + `shouldShowList` (Notification Centre).
 - **Auth** `@/lib/auth`: `useAuth()` → `{ session, profile, profiles, loading,
   signInWithApple, signInWithGoogle, devSignIn, signOut }`. `profiles` = household
   members.

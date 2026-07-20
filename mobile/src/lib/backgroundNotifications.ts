@@ -16,6 +16,37 @@ import { captureLiveFixIfSharing } from './location'
 
 const BACKGROUND_NOTIFICATION_TASK = 'oneroof-background-notification'
 
+/** Our DATA-ONLY pushes (api/ack-ping.ts, api/widget.ts's petcare fan-out).
+ *  They carry `_contentAvailable` with no title/body and exist purely to wake
+ *  the app, so presenting one would show an empty banner. */
+const SILENT_TYPES = new Set(['ack', 'petcare', 'live-wake'])
+
+// How a push is presented when it arrives while the app is FOREGROUNDED.
+// Without a handler expo-notifications presents NOTHING — which is why nudges
+// looked like they'd stopped arriving: with the app open, only the in-app
+// Realtime banner (and its high-priority Vibration) got through, while the OS
+// notification was silently dropped. Backgrounded delivery was never affected,
+// since iOS draws that itself from the APNs payload.
+//
+// Must sit at module scope: the handler has to be installed before any
+// notification is delivered, not once a component mounts.
+//
+// `shouldShowAlert` is deprecated in expo-notifications 56 — banner (heads-up)
+// and list (Notification Centre) are separate flags now.
+Notifications.setNotificationHandler({
+  handleNotification: async (notification) => {
+    const data = notification.request.content.data as Record<string, unknown> | undefined
+    const type = typeof data?.type === 'string' ? data.type : ''
+    const silent = SILENT_TYPES.has(type)
+    return {
+      shouldShowBanner: !silent,
+      shouldShowList: !silent,
+      shouldPlaySound: !silent,
+      shouldSetBadge: false,
+    }
+  },
+})
+
 /** A live-mode wake push (someone is watching me in Whereabouts) — grab a fresh
  *  fix so their map updates even though my app was asleep. */
 function isLiveWake(data: unknown): boolean {
