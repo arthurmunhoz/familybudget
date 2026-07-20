@@ -893,6 +893,8 @@ export const pt: Record<keyof typeof en, string> = {
   'months.newWeekTitle': 'Nova semana',
   'months.newDayTitle': 'Novo dia',
   'months.whichMonth': 'Qual mês? Meses passados também funcionam.',
+  'months.prevPeriod': 'Período anterior',
+  'months.nextPeriod': 'Próximo período',
   'months.whichWeek': 'Escolha qualquer dia — a semana começa no domingo.',
   'months.whichDay': 'Qual dia? Dias passados também funcionam.',
   'months.alreadyExists': '{label} já existe.',

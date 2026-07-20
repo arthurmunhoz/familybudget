@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 import DocumentScanner from 'react-native-document-scanner-plugin'
+import { PDFDocument } from 'pdf-lib'
 import { File } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
@@ -231,24 +232,60 @@ export default function DocumentVault() {
     }
   }
 
+  // Build a single multi-page PDF from the scanned page images — each page
+  // downscaled + JPEG-compressed, then embedded (pdf-lib, pure JS). One document
+  // with N pages, rather than N separate rows.
+  async function uploadPagesAsPdf(uris: string[]) {
+    setPicking(true)
+    try {
+      const pdf = await PDFDocument.create()
+      for (const uri of uris) {
+        const ref = await ImageManipulator.manipulate(uri).resize({ width: 2048 }).renderAsync()
+        const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
+        const bytes = new Uint8Array(await new File(out.uri).arrayBuffer())
+        const img = await pdf.embedJpg(bytes)
+        const page = pdf.addPage([img.width, img.height])
+        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height })
+      }
+      const pdfBytes = await pdf.save()
+      if (pdfBytes.byteLength > MAX_SIZE) {
+        Alert.alert(t('docs.tooBig', { size: formatBytes(pdfBytes.byteLength) }))
+        return
+      }
+      setPending({
+        name: `${t('docs.scanName')}.pdf`,
+        uri: '',
+        size: pdfBytes.byteLength,
+        bytes: pdfBytes,
+        mime: 'application/pdf',
+        ext: 'pdf',
+      })
+    } catch {
+      Alert.alert(t('docs.uploadFailed'))
+    } finally {
+      setPicking(false)
+    }
+  }
+
   // Scan a document with the OS document scanner (VisionKit on iOS): live edge
-  // detection, auto-capture, and perspective-corrected crop. Returns the cropped
-  // image file path(s); we take the first.
+  // detection, auto-capture, and perspective-corrected crop, across as many
+  // pages as the user captures. One page → a JPEG image; multiple → one PDF.
   async function scanDocument() {
     if (picking || !profile) return
-    let uri: string
+    let images: string[]
     try {
       const { scannedImages, status } = await DocumentScanner.scanDocument({
         croppedImageQuality: 100,
       })
       if (status !== 'success' || !scannedImages?.length) return // user cancelled
-      uri = scannedImages[0]
+      images = scannedImages
     } catch {
       // Native module absent (Expo Go, or before a native rebuild) — degrade to
       // a plain camera capture so the feature still works, minus edge detection.
       return takePhoto()
     }
-    await uploadImageUri(uri)
+    if (images.length === 1) await uploadImageUri(images[0])
+    else await uploadPagesAsPdf(images)
   }
 
   // Fallback capture when the document scanner's native module isn't available.

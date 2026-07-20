@@ -89,6 +89,13 @@ export function nextPeriodStart(period: Period, startISO: string): string {
   return toISO(new Date(d.getFullYear(), d.getMonth() + 1, 1))
 }
 
+export function prevPeriodStart(period: Period, startISO: string): string {
+  if (period === 'daily') return addDaysISO(startISO, -1)
+  if (period === 'weekly') return addDaysISO(startISO, -7)
+  const d = parseISO(startISO)
+  return toISO(new Date(d.getFullYear(), d.getMonth() - 1, 1))
+}
+
 /** "Jun 9, 2026" from "2026-06-09" */
 export function formatDay(isoDate: string): string {
   const [y, m, d] = isoDate.split('-').map(Number)
