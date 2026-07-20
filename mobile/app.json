@@ -75,7 +75,13 @@
         "expo-image-picker",
         {
           "photosPermission": "Attach photos for receipts, pets, profiles and documents.",
-          "cameraPermission": "Take photos to scan receipts and bills, and add pet and profile photos."
+          "cameraPermission": "Take photos to scan receipts and bills, capture documents, and add pet and profile photos."
+        }
+      ],
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "Take photos to scan receipts and bills, capture documents, and add pet and profile photos."
         }
       ],
       [

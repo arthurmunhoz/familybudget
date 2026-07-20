@@ -508,7 +508,23 @@ cd mobile && npx expo export --platform ios --output-dir /tmp/x   # Metro bundle
 ```
 Both must pass before committing. Real on-device behavior (auth, camera, Face ID,
 push, layout) must be checked by a human on a simulator/device — say so, don't
-claim it's verified.
+claim it's verified. For a NATIVE dependency + config plugin (below), also run
+`npx expo config --type introspect --json` to confirm the plugin applies and the
+resulting infoPlist is right — that catches a broken plugin without a full
+prebuild (which would rewrite the checked-in `ios/`, so DON'T run prebuild here).
+
+**Document scanning (Documents app)**: `react-native-document-scanner-plugin`
+(config plugin in `app.json`) wraps VisionKit's `VNDocumentCameraViewController`
+on iOS — live edge detection, auto-capture, perspective-corrected crop.
+`DocumentVault`'s `scanDocument()` calls it, then runs the SAME downscale
+(2048px, JPEG 0.7) + `UploadSheet` handoff as a picked image. It's a NATIVE
+TurboModule (New Arch), absent in Expo Go / before a rebuild — so `scanDocument`
+falls back to a plain `expo-image-picker` camera capture (`takePhoto`) on any
+throw, and only treats `status === 'success'` as a real scan (else the user
+cancelled). Needs a native rebuild to actually scan; the camera string lives in
+the `expo-image-picker` plugin's `cameraPermission` (which overrides
+`ios.infoPlist`) AND the scanner plugin's own `cameraPermission` — keep both in
+sync.
 
 ## i18n Rule
 All user-facing strings (labels, titles, placeholders, button text, alerts, error messages) **must** be

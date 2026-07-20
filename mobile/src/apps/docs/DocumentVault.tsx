@@ -8,6 +8,7 @@ import { Alert, Pressable, ScrollView, Switch, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
+import DocumentScanner from 'react-native-document-scanner-plugin'
 import { File } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
@@ -205,23 +206,13 @@ export default function DocumentVault() {
     }
   }
 
-  // Capture a document with the camera. Same downscale/JPEG path as an image
-  // picked from files, then straight into the UploadSheet — the user names it
-  // there (default title comes from `name`).
-  async function takePhoto() {
-    if (picking || !profile) return
-    const perm = await ImagePicker.requestCameraPermissionsAsync()
-    if (!perm.granted) {
-      Alert.alert(t('docs.cameraDenied'))
-      return
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 1 })
-    if (result.canceled || !result.assets[0]) return
+  // Shared tail for a captured/scanned image: downscale (2048px long edge, JPEG)
+  // then hand off to the UploadSheet — the user names it there (default title
+  // comes from `name`). Same path a file-picked image already takes.
+  async function uploadImageUri(uri: string) {
     setPicking(true)
     try {
-      const ref = await ImageManipulator.manipulate(result.assets[0].uri)
-        .resize({ width: 2048 })
-        .renderAsync()
+      const ref = await ImageManipulator.manipulate(uri).resize({ width: 2048 }).renderAsync()
       const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
       const buffer = await new File(out.uri).arrayBuffer()
       const bytes = new Uint8Array(buffer)
@@ -240,13 +231,45 @@ export default function DocumentVault() {
     }
   }
 
-  // The "Add document" button offers both paths — snap a photo, or pick an
-  // existing file (image/PDF). Alert chooser matches the app's scan flows.
+  // Scan a document with the OS document scanner (VisionKit on iOS): live edge
+  // detection, auto-capture, and perspective-corrected crop. Returns the cropped
+  // image file path(s); we take the first.
+  async function scanDocument() {
+    if (picking || !profile) return
+    let uri: string
+    try {
+      const { scannedImages, status } = await DocumentScanner.scanDocument({
+        croppedImageQuality: 100,
+      })
+      if (status !== 'success' || !scannedImages?.length) return // user cancelled
+      uri = scannedImages[0]
+    } catch {
+      // Native module absent (Expo Go, or before a native rebuild) — degrade to
+      // a plain camera capture so the feature still works, minus edge detection.
+      return takePhoto()
+    }
+    await uploadImageUri(uri)
+  }
+
+  // Fallback capture when the document scanner's native module isn't available.
+  async function takePhoto() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert(t('docs.cameraDenied'))
+      return
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 1 })
+    if (result.canceled || !result.assets[0]) return
+    await uploadImageUri(result.assets[0].uri)
+  }
+
+  // The "Add document" button offers both paths — scan a document (auto-cropped),
+  // or pick an existing file (image/PDF). Alert chooser matches the scan flows.
   function startAdd() {
     if (picking || !profile) return
     Alert.alert(t('docs.addDoc'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('docs.takePhoto'), onPress: takePhoto },
+      { text: t('docs.scanDoc'), onPress: scanDocument },
       { text: t('docs.chooseFile'), onPress: pickFile },
     ])
   }
