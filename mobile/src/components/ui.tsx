@@ -332,11 +332,12 @@ export function NewItemButton({
       ) : (
         <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
       )}
-      {/* Straddles the top-right corner rather than sitting inside next to the
-          label — it marks the button without competing with its text, matching
-          the Plus badge on the Whereabouts header buttons. */}
+      {/* Sits on the top border near the right corner, rather than inside next
+          to the label — it marks the button without competing with its text.
+          Pulled in from the corner (right: 3) so it straddles the straight run
+          of the border instead of the 12pt corner radius. */}
       {plus ? (
-        <View style={{ position: 'absolute', top: -7, right: -7 }}>
+        <View style={{ position: 'absolute', top: -7, right: 3 }}>
           <Sparkles size={14} color={c.accent} />
         </View>
       ) : null}
