@@ -367,6 +367,18 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   header. Gotchas: **iOS caps monitored regions at 20** (`MAX_REGIONS`) and
   enforces a ~100 m radius floor. A new place pins to your CURRENT location (no
   map-drag picker yet). Push copy is English-only.
+  - **Geofence registration is PER-DEVICE, but places are household-shared — so
+    `syncGeofences()` must run globally, not on a screen.** It's mounted via
+    `useGeofenceSync()` in `_layout.tsx` (login + every foreground), mirroring
+    `useSyncNudgeWidget`. It used to be called ONLY from the Whereabouts screen,
+    which meant a place one member added was never monitored on anyone else's
+    phone until they personally opened that screen; since the crossing is
+    recorded by the MOVER's device, their arrivals were never recorded and
+    nobody was alerted. (Real report: "Home" fired for both members while two
+    later-added places had literally zero `place_events`, ever.) If you add
+    another sync trigger, keep the auth guard — signed out, `syncGeofences`
+    reads a null `member_locations` row, treats it as "not sharing", and TEARS
+    DOWN the regions.
   - **A crossing counts only when it CHANGES state**, and that decision lives in
     Postgres (`record_place_event`, migration 071), NOT in the client. Reason:
     **expo-location keeps each region's state in MEMORY**, re-seeds it to

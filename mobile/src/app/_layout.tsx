@@ -29,6 +29,7 @@ import { I18nProvider } from '@/hooks/useI18n';
 import { AppPrefsProvider } from '@/hooks/useAppPrefs';
 import { TilePrefProvider } from '@/hooks/useTilePref';
 import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
+import { useGeofenceSync } from '@/hooks/useGeofenceSync';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 import { SchemePrefProvider, useSchemePref } from '@/theme/scheme-pref';
 import { GLASS, GlassWash } from '@/theme/glass';
@@ -94,6 +95,9 @@ function Chrome() {
   const isDark = mode === 'dark';
   useSyncNudgeWidget();
   useLiveResponder();
+  // Register this device's geofences on launch/foreground, not just when the
+  // Whereabouts screen is opened — see useGeofenceSync.
+  useGeofenceSync();
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <AnalyticsBridge />
