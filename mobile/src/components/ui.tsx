@@ -330,11 +330,16 @@ export function NewItemButton({
       {loading ? (
         <ActivityIndicator color={c.accent} />
       ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {plus ? <Sparkles size={15} color={c.accent} /> : null}
-          <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
-        </View>
+        <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
       )}
+      {/* Straddles the top-right corner rather than sitting inside next to the
+          label — it marks the button without competing with its text, matching
+          the Plus badge on the Whereabouts header buttons. */}
+      {plus ? (
+        <View style={{ position: 'absolute', top: -7, right: -7 }}>
+          <Sparkles size={14} color={c.accent} />
+        </View>
+      ) : null}
     </Pressable>
   )
 }
