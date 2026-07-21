@@ -35,33 +35,27 @@ export async function fetchMyWatch(): Promise<SafetyWatch | null> {
   return new Date(row.expires_at).getTime() > Date.now() ? row : null
 }
 
-/** Thrown when a free user has already had their watch in the last 24h. The
- *  caller shows the paywall — see migration 072. */
+/** Thrown when a free user has no watching time left in the last 24h. The
+ *  caller shows the paywall — see migration 073. */
 export const WATCH_LIMIT_ERROR = 'free_plan_watch_limit'
 
-/** Minutes a free watch runs before the server ends it (mirrors the DB's
- *  free_watch_minutes(); the DB is the one that actually enforces it). */
+/** The free allowance, as a TIME BUDGET per rolling 24h — not one session.
+ *  Stopping early keeps the unused minutes, so a watch turned off after ten
+ *  seconds costs ten seconds. Mirrors the DB's free_watch_minutes(); the DB is
+ *  what actually enforces it. */
 export const FREE_WATCH_MINUTES = 30
 
-/** When I last STARTED a watch, so the sheet can tell a free user their daily
- *  one is spent BEFORE they configure a radius and get bounced. Null when
- *  they've never started one. */
-export async function fetchLastWatchStart(): Promise<string | null> {
-  const me = await myEmail()
-  if (!me) return null
-  const { data } = await supabase
-    .from('safety_watch_starts')
-    .select('at')
-    .eq('owner_email', me)
-    .order('at', { ascending: false })
-    .limit(1)
-  return (data?.[0]?.at as string) ?? null
-}
-
-/** True when a free user's 24h allowance hasn't reset yet. */
-export function watchAllowanceSpent(lastStart: string | null): boolean {
-  if (!lastStart) return false
-  return Date.now() - new Date(lastStart).getTime() < 24 * 3600 * 1000
+/** Seconds of free watching left in the rolling 24h window.
+ *
+ *  Read from the SERVER rather than computed here: the same function backs the
+ *  trigger that enforces the cap, so what we show can't disagree with what gets
+ *  applied. Falls back to the full allowance if the RPC fails — better to let
+ *  someone try (the trigger still refuses) than to block them on a network
+ *  blip. */
+export async function fetchFreeWatchRemaining(): Promise<number> {
+  const { data, error } = await supabase.rpc('free_watch_remaining_seconds')
+  if (error || typeof data !== 'number') return FREE_WATCH_MINUTES * 60
+  return data
 }
 
 /** Key for the ONE pending "your watch ended" notification. Persisted so it can

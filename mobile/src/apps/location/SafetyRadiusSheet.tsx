@@ -22,13 +22,12 @@ import {
   safetyRadiusPresets,
 } from '@/lib/location'
 import {
-  fetchLastWatchStart,
+  fetchFreeWatchRemaining,
   FREE_WATCH_MINUTES,
   isOutside,
   scheduleWatchEndedNotice,
   startWatch,
   stopWatch,
-  watchAllowanceSpent,
   WATCH_HOURS,
   WATCH_LIMIT_ERROR,
 } from '@/lib/safetyRadius'
@@ -83,22 +82,27 @@ export function SafetyRadiusSheet({
   })
   const [busy, setBusy] = useState(false)
   const { isPlus, isFree } = usePlus()
-  /** Free plan only: when their last watch started, so we can say the daily one
-   *  is spent BEFORE they configure a radius and get bounced by the server. */
-  const [lastStart, setLastStart] = useState<string | null>(null)
+  /** Free plan only: seconds of watching left in the rolling 24h, so the sheet
+   *  can say how much is left BEFORE they configure a radius — and tell them
+   *  it's gone rather than letting the server bounce them. */
+  const [remainingSecs, setRemainingSecs] = useState<number | null>(null)
   useEffect(() => {
     if (isPlus) return
     let active = true
-    void fetchLastWatchStart()
+    void fetchFreeWatchRemaining()
       .then((v) => {
-        if (active) setLastStart(v)
+        if (active) setRemainingSecs(v)
       })
       .catch(() => {})
     return () => {
       active = false
     }
   }, [isPlus])
-  const spent = isFree && watchAllowanceSpent(lastStart)
+  const spent = isFree && remainingSecs !== null && remainingSecs <= 0
+  // Round UP: 90s left should read "2 min", never "1 min" and then cut short.
+  const remainingMins = remainingSecs === null
+    ? FREE_WATCH_MINUTES
+    : Math.max(1, Math.ceil(remainingSecs / 60))
 
   // Custom value → metres (clamped to the DB's 50–5000 range). null = unusable.
   const customMeters = (() => {
@@ -131,7 +135,7 @@ export function SafetyRadiusSheet({
         await scheduleWatchEndedNotice(
           row.expires_at,
           t('location.safety.endedTitle'),
-          t('location.safety.endedBody'),
+          t('location.safety.endedBody', { mins: FREE_WATCH_MINUTES }),
         )
         // The sheet closes on start, so the countdown it shows goes with it.
         // Confirm how long they actually got, from the SERVER's expiry rather
@@ -516,7 +520,7 @@ export function SafetyRadiusSheet({
                       <Sparkles size={16} color={c.accent} />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }}>
-                          {t('location.safety.freeNote', { mins: FREE_WATCH_MINUTES })}
+                          {t('location.safety.freeRemaining', { mins: remainingMins })}
                         </Txt>
                         <Txt variant="faint" style={{ fontSize: 11 }}>
                           {t('location.safety.freeNoteBody')}

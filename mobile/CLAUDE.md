@@ -418,22 +418,29 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   Existing rows are always grandfathered; a plan change never deletes anything.
   - **Places: one per free household.** `createPlace` throws
     `free_plan_place_limit` → `PlaceForm` routes to `/paywall`.
-  - **Safety Radius: one watch per rolling 24h, clamped to 30 minutes.** Plus
-    keeps 4h and no daily limit. Rolling 24h, not a calendar day, so there's no
-    timezone question and no midnight to game. The trigger OVERWRITES
-    `expires_at` for free users — the client asks for 4h and gets 30 minutes,
-    which is why `startWatch` returns the server's row: the "your watch ended"
-    notice is scheduled against the time the server actually chose.
-  - `safety_watch_starts` exists because `stopWatch` DELETES the watch row, so
-    the table itself can't answer "have you already had today's watch". It's
-    append-only, own-rows-only, and written by the trigger.
+  - **Safety Radius: 30 MINUTES OF USE per rolling 24h** (migration 073) — a
+    time budget, not one session. Stop after ten seconds and it costs ten
+    seconds; the rest is still yours. Plus keeps 4h and no limit. Rolling 24h,
+    not a calendar day, so there's no timezone question and no midnight to game.
+    The trigger OVERWRITES `expires_at` for free users to exactly what's LEFT,
+    which is why `startWatch` returns the server's row: both the countdown and
+    the "your watch ended" notice key off the time the server actually chose.
+  - `safety_watch_usage` (was `safety_watch_starts`) is the meter, and it needs
+    real END times — `stopWatch` DELETES the watch row, so that table can't
+    answer "how much did they use". Each row is booked optimistically as a full
+    session and an **AFTER DELETE trigger corrects `ended_at` down to now()**;
+    that correction IS the refund. Plus sessions write no row at all, so a lapse
+    never inherits usage against the free budget.
+  - `free_watch_remaining_seconds()` is the ONE source of truth: the trigger
+    enforces with it and the client displays from it, so "12 min left" can never
+    disagree with what you actually get.
   - An UPDATE while a watch is still running counts as an EDIT: it neither
     consumes the allowance nor extends the clock. Without that, re-saving the
-    sheet would renew the 30 minutes forever.
+    sheet would renew the time forever.
   - The header button no longer routes non-Plus users to the paywall — they
-    have a real (short) session, so the sheet opens, states the limit, and the
-    paywall appears only once the allowance is actually spent (`spent`, from
-    `fetchLastWatchStart`), rather than after they've configured a radius.
+    have real time, so the sheet opens, says how much is left, and the paywall
+    appears only once the budget is actually exhausted (`spent`, from
+    `fetchFreeWatchRemaining`), rather than after they've configured a radius.
   - **The end of a free watch is announced.** `scheduleWatchEndedNotice` books
     an OS-level local notification for the server's expiry time — not an in-app
     timer, because the watch ends while the phone is in a pocket at the very
