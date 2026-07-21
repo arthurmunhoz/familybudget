@@ -156,6 +156,24 @@ export function PlaceForm({
   const [watchedPicked, setWatchedPicked] = useState<string[]>(watch?.watched ?? [])
   const [arrivals, setArrivals] = useState(watch?.notify_arrivals ?? true)
   const [departures, setDepartures] = useState(watch?.notify_departures ?? false)
+  // "Notify me about this place" ON with NEITHER direction picked would save a
+  // watcher row that can never fire — subscribed in the UI, silent forever. So
+  // the two are kept in lockstep: turning off the last remaining direction
+  // turns the whole subscription off, and turning the subscription on
+  // guarantees at least one direction.
+  function toggleWatch(on: boolean) {
+    setWatchOn(on)
+    if (on && !arrivals && !departures) setArrivals(true)
+  }
+  function toggleArrivals(on: boolean) {
+    setArrivals(on)
+    if (!on && !departures) setWatchOn(false)
+  }
+  function toggleDepartures(on: boolean) {
+    setDepartures(on)
+    if (!on && !arrivals) setWatchOn(false)
+  }
+
   const others = useMemo(() => profiles.filter((p) => p.email !== myEmail), [profiles, myEmail])
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     place ? { lat: place.lat, lng: place.lng } : null,
@@ -314,7 +332,9 @@ export function PlaceForm({
       else id = await createPlace(input)
       // The place is shared; the subscription is mine alone.
       if (id) {
-        if (watchOn) {
+        // Belt-and-braces on the toggle lockstep above: a subscription with
+        // neither direction is the same as no subscription, so never store one.
+        if (watchOn && (arrivals || departures)) {
           await upsertPlaceWatch(id, {
             watched: watchedPicked,
             notify_arrivals: arrivals,
@@ -585,7 +605,7 @@ export function PlaceForm({
               <ToggleRow
                 label={t('location.places.watchTitle')}
                 value={watchOn}
-                onValueChange={setWatchOn}
+                onValueChange={toggleWatch}
               />
               {watchOn ? (
                 <>
@@ -593,13 +613,13 @@ export function PlaceForm({
                   <ToggleRow
                     label={t('location.places.notifyArrivals')}
                     value={arrivals}
-                    onValueChange={setArrivals}
+                    onValueChange={toggleArrivals}
                   />
                   <Divider />
                   <ToggleRow
                     label={t('location.places.notifyDepartures')}
                     value={departures}
-                    onValueChange={setDepartures}
+                    onValueChange={toggleDepartures}
                   />
                   <Divider />
                   {/* Whose crossings I care about. None picked = everyone. */}
