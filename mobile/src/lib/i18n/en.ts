@@ -143,6 +143,11 @@ export const en = {
   'location.card.manage': 'Manage location sharing',
   'location.card.sharing': 'Sharing',
   'location.card.watching': 'Watching',
+  'location.safety.bannerTitle': 'Safety radius on',
+  'location.safety.bannerWho': 'Watching {names}',
+  'location.safety.bannerEnds': 'ends in {mins} min',
+  'location.safety.bannerEndsHours': 'ends in about {hours}h',
+  'location.safety.bannerManage': 'Manage',
   'location.nudge.title': 'Nudge {name}',
   'location.nudge.sent': 'Nudge sent to {name}',
 

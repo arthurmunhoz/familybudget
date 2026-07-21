@@ -7,6 +7,7 @@ import { router } from 'expo-router'
 import { Settings } from 'lucide-react-native'
 
 import { Card, Txt } from './ui'
+import SafetyBanner from '../apps/location/SafetyBanner'
 import NudgesBanner from '../apps/pings/NudgesBanner'
 import TodaySection from './TodaySection'
 import { useAppPrefs } from '../hooks/useAppPrefs'
@@ -104,6 +105,8 @@ export default function Hub() {
         <TodaySection />
         {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
         <NudgesBanner />
+        {/* An active safety radius — tap to manage or stop it. */}
+        <SafetyBanner />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: compact ? sp.sm : sp.md }}>
           {apps.map((app) => {
             const Icon = app.icon
