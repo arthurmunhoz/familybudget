@@ -30,6 +30,7 @@ import { AppPrefsProvider } from '@/hooks/useAppPrefs';
 import { TilePrefProvider } from '@/hooks/useTilePref';
 import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
 import { useGeofenceSync } from '@/hooks/useGeofenceSync';
+import { useSyncPushToken } from '@/hooks/useSyncPushToken';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 import { SchemePrefProvider, useSchemePref } from '@/theme/scheme-pref';
 import { GLASS, GlassWash } from '@/theme/glass';
@@ -98,6 +99,8 @@ function Chrome() {
   // Register this device's geofences on launch/foreground, not just when the
   // Whereabouts screen is opened — see useGeofenceSync.
   useGeofenceSync();
+  // Repair a stale/rotated Expo push token on launch (never prompts).
+  useSyncPushToken();
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <AnalyticsBridge />

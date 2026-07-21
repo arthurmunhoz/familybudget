@@ -84,6 +84,16 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `sheet === card` outside the glass skin, so it's a no-op for Warm Hearth.
   - Under GLASS, `c.bg` is TRANSPARENT (that's how the wash shows). Never use it
     as a foreground/inverse colour — the toast's label did and vanished.
+- **Push REGISTRATION** `@/lib/notifications`: `registerForPush()` (prompts) runs
+  ONLY from the Settings notifications toggle — that's deliberate, a permission
+  prompt shouldn't fire at launch with no context. So "no `expo_push_tokens` row"
+  almost always just means the user never enabled notifications, NOT a bug.
+  `refreshPushToken()` + `useSyncPushToken()` (mounted in `_layout.tsx`) repair a
+  STALE token on launch — rotation, reinstall, or a lost row would otherwise
+  leave someone silently unreachable with the toggle still reading "on". It bails
+  unless permission is already granted, so it never prompts. Note push has TWO
+  transports (native `expo_push_tokens` + web `push_subscriptions`); fan-outs
+  send to both, so a PWA-only user can still be reachable with 0 Expo tokens.
 - **Push presentation** `@/lib/backgroundNotifications`: a module-scope
   `Notifications.setNotificationHandler` decides what a push looks like when it
   lands while the app is FOREGROUNDED. **Without a handler expo-notifications

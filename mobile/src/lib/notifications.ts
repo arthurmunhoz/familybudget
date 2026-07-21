@@ -50,6 +50,35 @@ export async function registerForPush(): Promise<PushResult> {
   }
 }
 
+/** Re-register this device's Expo token WITHOUT ever prompting — only when OS
+ *  permission is ALREADY granted.
+ *
+ *  `registerForPush()` runs only when the user taps the Settings toggle, so
+ *  nothing ever repairs a token that went stale: Expo tokens can rotate, a
+ *  reinstall issues a new one, and a deleted row leaves the user silently
+ *  unreachable with the toggle still reading "on". Called on every launch
+ *  (useSyncPushToken) — idempotent upsert, no permission prompt, so a user who
+ *  never enabled notifications is untouched.
+ *
+ *  Note: RLS is `user_email = jwt_email()`, so if this exact token row belongs
+ *  to a DIFFERENT account (device handed over), the conflict update matches no
+ *  row and this no-ops — same as registerForPush. */
+export async function refreshPushToken(): Promise<void> {
+  try {
+    if (!Device.isDevice) return
+    const perm = await Notifications.getPermissionsAsync()
+    if (perm.status !== 'granted') return // never prompt from a background refresh
+    const id = projectId()
+    if (!id) return
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: id })
+    await supabase
+      .from('expo_push_tokens')
+      .upsert({ token: tokenData.data, device: Device.modelName ?? null })
+  } catch {
+    /* best effort — never surface a launch-time push refresh to the user */
+  }
+}
+
 export async function disablePush(): Promise<void> {
   try {
     const id = projectId()
