@@ -6,7 +6,6 @@
 // geofences, so finer-grained control would be a lie.
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location'
 import { router } from 'expo-router'
 import { LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react-native'
@@ -141,7 +140,6 @@ export function PlaceForm({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const insets = useSafeAreaInsets()
   const kb = useKeyboardHeight()
 
   const [icon, setIcon] = useState(place?.icon ?? '📍')
@@ -387,9 +385,11 @@ export function PlaceForm({
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
-            // Lift the WHOLE drawer by the keyboard height. While the keyboard is
-            // up the home-indicator inset sits behind it, so don't pad twice.
-            paddingBottom: (kb > 0 ? 0 : insets.bottom) + sp.lg,
+            // A plain gap, NOT the safe-area inset: the Save button's curved
+            // bottom is meant to sit down in the screen's corner, and
+            // insets.bottom (34pt) would float it clear of the curve. Less while
+            // the keyboard is up, since marginBottom already lifts the drawer.
+            paddingBottom: kb > 0 ? sp.lg : sp.xl,
             marginBottom: kb,
             gap: sp.md,
             maxHeight: '88%',
@@ -652,7 +652,16 @@ export function PlaceForm({
             </Section>
           </ScrollView>
 
-          <Btn title={t('common.save')} onPress={save} disabled={!coords || !name.trim()} loading={busy} />
+          {/* Curved bottom only when Save is the bottom-most control. Editing
+              adds a Delete below it, so the curve would otherwise sit mid-sheet
+              instead of meeting the screen's corner. */}
+          <Btn
+            title={t('common.save')}
+            onPress={save}
+            disabled={!coords || !name.trim()}
+            loading={busy}
+            curveBottom={!place}
+          />
           {place ? <Btn title={t('location.places.delete')} variant="ghost" onPress={remove} /> : null}
         </View>
       </View>

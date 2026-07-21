@@ -47,12 +47,12 @@ import {
   isSharingLive,
   setUseImperial,
 } from '@/lib/location'
-import { fetchPlaces, placeAt } from '@/lib/places'
+import { fetchMyPlaceWatches, fetchPlaces, placeAt } from '@/lib/places'
 import { syncGeofences } from '@/lib/placesTask'
 import { usePlus } from '@/lib/plus'
 import { requestLive } from '@/lib/liveLocation'
 import { alertBreach, circlePolygon, fetchMyWatch, isOutside } from '@/lib/safetyRadius'
-import type { MemberLocation, Place, Profile, SafetyWatch } from '@/lib/types'
+import type { MemberLocation, Place, PlaceWatch, Profile, SafetyWatch } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import {
   BatteryChip,
@@ -378,6 +378,12 @@ export default function Whereabouts() {
     'location:places',
     fetchPlaces,
   )
+
+  // Which places I subscribe to — a geofence is only worth drawing if it's
+  // actually watching for me. Someone else's subscription isn't my boundary.
+  const { data: placeWatches = {}, revalidate: reloadPlaceWatches } = useCachedQuery<
+    Record<string, PlaceWatch>
+  >('location:placeWatches', fetchMyPlaceWatches)
 
   const { data: watch = null, revalidate: reloadWatch } = useCachedQuery<SafetyWatch | null>(
     'location:watch',
@@ -749,6 +755,32 @@ export default function Whereabouts() {
               </ShapeSource>
             ) : null}
 
+            {/* Geofence rings for the places I'm WATCHING. Deliberately quieter
+                than the safety radius above — thin SOLID line in a neutral,
+                versus that one's thick dashed accent. Both can be on screen at
+                once, and the temporary "alert me if someone leaves" circle has
+                to stay the one that grabs the eye. Re-keyed on styleEpoch for
+                the same reason the safety ring is: changing map style tears
+                down every source added to it. */}
+            {places
+              .filter((pl) => placeWatches[pl.id])
+              .map((pl) => (
+                <ShapeSource
+                  key={`place-ring-${pl.id}-${styleEpoch}`}
+                  id={`place-ring-${pl.id}`}
+                  shape={circlePolygon({ lat: pl.lat, lng: pl.lng }, pl.radius_m)}
+                >
+                  <FillLayer
+                    id={`place-ring-fill-${pl.id}`}
+                    style={{ fillColor: c.textMuted, fillOpacity: 0.08 }}
+                  />
+                  <LineLayer
+                    id={`place-ring-line-${pl.id}`}
+                    style={{ lineColor: c.textMuted, lineWidth: 1.5, lineOpacity: 0.7 }}
+                  />
+                </ShapeSource>
+              ))}
+
             {/* Saved places — drawn first so member pins sit on top */}
             {places.map((pl) => (
               <MarkerView key={`place-${pl.id}`} coordinate={[pl.lng, pl.lat]} anchor={{ x: 0.5, y: 0.5 }}>
@@ -1046,7 +1078,10 @@ export default function Whereabouts() {
           myEmail={myEmail}
           colors={colors}
           onClose={() => setPlacesOpen(false)}
-          onChanged={() => void reloadPlaces()}
+          onChanged={() => {
+            void reloadPlaces()
+            void reloadPlaceWatches()
+          }}
           onShowOnMap={showPlaceOnMap}
         />
       ) : null}
