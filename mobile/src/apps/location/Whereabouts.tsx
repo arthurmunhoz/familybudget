@@ -1036,7 +1036,6 @@ export default function Whereabouts() {
           myLive={myLive}
           avatars={meta.avatars}
           onChanged={() => void reloadWatch()}
-          onToast={setToast}
           onClose={() => setSafetyOpen(false)}
         />
       ) : null}

@@ -4,12 +4,11 @@
 // Breach alerts themselves are raised by the Whereabouts screen, which already
 // has the live member_locations feed.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { ShieldCheck, Sparkles } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
-import type { ToastData } from '@/components/Toast'
 import { useI18n } from '@/hooks/useI18n'
 import { usePlus } from '@/lib/plus'
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
@@ -46,7 +45,6 @@ export function SafetyRadiusSheet({
   avatars,
   onChanged,
   onClose,
-  onToast,
 }: {
   watch: SafetyWatch | null
   profiles: Profile[]
@@ -57,8 +55,6 @@ export function SafetyRadiusSheet({
   avatars: Record<string, string | null>
   onChanged: () => void
   onClose: () => void
-  /** Confirmation shown by the parent (it owns the Toast). */
-  onToast?: (t: ToastData) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -141,7 +137,18 @@ export function SafetyRadiusSheet({
           1,
           Math.round((new Date(row.expires_at).getTime() - Date.now()) / 60_000),
         )
-        onToast?.({ emoji: '🛡️', text: t('location.safety.startedFree', { mins }) })
+        // A blocking alert, not a toast: the 30-minute cap is the one thing a
+        // free user must actually register (a watch that ends early during the
+        // event they set it up for is the bad surprise), and it doubles as the
+        // moment Plus is worth reading about. Dismissing needs a tap.
+        Alert.alert(
+          t('location.safety.startedFreeTitle', { mins }),
+          t('location.safety.startedFreeBody'),
+          [
+            { text: t('common.notNow'), style: 'cancel' },
+            { text: t('location.safety.getPlus'), onPress: () => router.push('/paywall') },
+          ],
+        )
       }
       onChanged()
       onClose()
