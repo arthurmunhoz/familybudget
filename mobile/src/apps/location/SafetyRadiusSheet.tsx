@@ -9,6 +9,7 @@ import { router } from 'expo-router'
 import { ShieldCheck, Sparkles } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
+import type { ToastData } from '@/components/Toast'
 import { useI18n } from '@/hooks/useI18n'
 import { usePlus } from '@/lib/plus'
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
@@ -46,6 +47,7 @@ export function SafetyRadiusSheet({
   avatars,
   onChanged,
   onClose,
+  onToast,
 }: {
   watch: SafetyWatch | null
   profiles: Profile[]
@@ -56,6 +58,8 @@ export function SafetyRadiusSheet({
   avatars: Record<string, string | null>
   onChanged: () => void
   onClose: () => void
+  /** Confirmation shown by the parent (it owns the Toast). */
+  onToast?: (t: ToastData) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -126,6 +130,14 @@ export function SafetyRadiusSheet({
           t('location.safety.endedTitle'),
           t('location.safety.endedBody'),
         )
+        // The sheet closes on start, so the countdown it shows goes with it.
+        // Confirm how long they actually got, from the SERVER's expiry rather
+        // than the constant, so the number can't drift from what's enforced.
+        const mins = Math.max(
+          1,
+          Math.round((new Date(row.expires_at).getTime() - Date.now()) / 60_000),
+        )
+        onToast?.({ emoji: '🛡️', text: t('location.safety.startedFree', { mins }) })
       }
       onChanged()
       onClose()
@@ -474,10 +486,40 @@ export function SafetyRadiusSheet({
                 </View>
               ) : (
                 <>
+                  {/* The free limit stated BEFORE committing, not after the
+                      sheet has closed — a faint one-liner here was too easy to
+                      miss, and being silently un-watched later is the bad
+                      outcome. Tappable, so "Plus gives you more" is an action
+                      rather than a claim. */}
                   {!isPlus ? (
-                    <Txt variant="faint" style={{ fontSize: 11, textAlign: 'center' }}>
-                      {t('location.safety.freeNote', { mins: FREE_WATCH_MINUTES })}
-                    </Txt>
+                    <Pressable
+                      onPress={() => {
+                        onClose()
+                        router.push('/paywall')
+                      }}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [
+                        {
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: sp.sm,
+                          backgroundColor: c.accentSoft,
+                          borderRadius: R.md,
+                          padding: sp.md,
+                        },
+                        pressed && { opacity: 0.75 },
+                      ]}
+                    >
+                      <Sparkles size={16} color={c.accent} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }}>
+                          {t('location.safety.freeNote', { mins: FREE_WATCH_MINUTES })}
+                        </Txt>
+                        <Txt variant="faint" style={{ fontSize: 11 }}>
+                          {t('location.safety.freeNoteBody')}
+                        </Txt>
+                      </View>
+                    </Pressable>
                   ) : null}
                   <Btn
                     title={t('location.safety.start')}

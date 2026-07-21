@@ -230,7 +230,14 @@ export default function Budgets() {
           stays quiet but has a big, easy tap target. */}
       {/* Bottom action in NORMAL flow — the branch above is flex:1, so this
           stays pinned to the bottom and the list ends AT it, never under it. */}
-      <NewItemButton label={t('budget.new')} onPress={startCreate} disabled={loading} />
+      {/* Sparkles when a free household has used its one budget — the gate is
+          visible before the tap, not a surprise paywall after it. */}
+      <NewItemButton
+        label={t('budget.new')}
+        onPress={startCreate}
+        disabled={loading}
+        plus={!canCreateBudget}
+      />
 
       {createOpen && (
         <Modal visible animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>

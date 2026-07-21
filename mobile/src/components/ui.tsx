@@ -17,7 +17,7 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context'
-import { ChevronLeft } from 'lucide-react-native'
+import { ChevronLeft, Sparkles } from 'lucide-react-native'
 import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
@@ -283,6 +283,7 @@ export function NewItemButton({
   onPress,
   disabled,
   loading,
+  plus,
 }: {
   label: string
   onPress: () => void
@@ -290,6 +291,10 @@ export function NewItemButton({
   /** Swap the label for a spinner (e.g. while a file picker or a create call is
    *  in flight). Also blocks taps, like `disabled`. */
   loading?: boolean
+  /** Mark this as a Plus-gated action with a Sparkles glyph, so people can see
+   *  it costs money BEFORE tapping and landing on the paywall. The button stays
+   *  enabled — tapping is what opens the upsell. */
+  plus?: boolean
 }) {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
@@ -325,7 +330,10 @@ export function NewItemButton({
       {loading ? (
         <ActivityIndicator color={c.accent} />
       ) : (
-        <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {plus ? <Sparkles size={15} color={c.accent} /> : null}
+          <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
+        </View>
       )}
     </Pressable>
   )
