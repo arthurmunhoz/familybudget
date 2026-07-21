@@ -366,6 +366,19 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
 - **"At Home" status** — `placeAt(places, point)` in `lib/places.ts` resolves the
   place a member is inside (smallest radius wins on overlap); the roster card and
   the member sheet prefer it over a distance or a geocoded street address.
+- **Watched places get a RING on the map**, drawn with the same `circlePolygon`
+  the safety radius uses (Mapbox circle radii are in PIXELS, so a real
+  geographic polygon is the only thing accurate at every zoom).
+  - Only places **I subscribe to** are drawn. A ring says "this boundary is
+    armed for me" — drawing unwatched places would promise alerts that never
+    fire, and drawing another member's subscription would show a boundary that
+    isn't mine.
+  - Styled deliberately QUIETER than the safety radius: thin solid neutral vs
+    that one's thick dashed accent, and drawn under the place labels. Both can
+    be on screen at once and the temporary "tell me if someone leaves" circle
+    has to win the eye.
+  - Re-key each ring on `styleEpoch` — changing map style tears down every
+    source added to it (same trap as the safety ring).
 - **Places & geofences (Phase 2)** — migration 067 (`places` + `place_events`),
   `src/lib/places.ts` (CRUD + `recordPlaceEvent`) and `src/lib/placesTask.ts` (the
   module-scope geofence TASK + `syncGeofences`). Each member's device monitors the
