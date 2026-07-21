@@ -82,7 +82,7 @@ export function SafetyRadiusSheet({
     return String(Math.round((watch.radius_m / u.meters) * 10) / 10)
   })
   const [busy, setBusy] = useState(false)
-  const { isPlus } = usePlus()
+  const { isPlus, isFree } = usePlus()
   /** Free plan only: when their last watch started, so we can say the daily one
    *  is spent BEFORE they configure a radius and get bounced by the server. */
   const [lastStart, setLastStart] = useState<string | null>(null)
@@ -98,7 +98,7 @@ export function SafetyRadiusSheet({
       active = false
     }
   }, [isPlus])
-  const spent = !isPlus && watchAllowanceSpent(lastStart)
+  const spent = isFree && watchAllowanceSpent(lastStart)
 
   // Custom value → metres (clamped to the DB's 50–5000 range). null = unusable.
   const customMeters = (() => {
@@ -124,7 +124,10 @@ export function SafetyRadiusSheet({
       // A free watch is ended BY THE SERVER after 30 minutes, so say so at the
       // moment it happens — and say why. Being quietly un-watched at the event
       // you set this up for is the one outcome worth a notification.
-      if (row && !isPlus) {
+      // isFree, not !isPlus: a paying user who starts a watch before the
+      // entitlement resolves would otherwise get a "your free watch ended"
+      // notice scheduled for a cap that doesn't apply to them.
+      if (row && isFree) {
         await scheduleWatchEndedNotice(
           row.expires_at,
           t('location.safety.endedTitle'),
@@ -491,7 +494,7 @@ export function SafetyRadiusSheet({
                       miss, and being silently un-watched later is the bad
                       outcome. Tappable, so "Plus gives you more" is an action
                       rather than a claim. */}
-                  {!isPlus ? (
+                  {isFree ? (
                     <Pressable
                       onPress={() => {
                         onClose()

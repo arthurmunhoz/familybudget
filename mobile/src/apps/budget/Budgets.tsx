@@ -51,7 +51,7 @@ interface MonthStat {
 export default function Budgets() {
   const { c } = useTheme()
   const { t } = useI18n()
-  const { isPlus } = usePlus()
+  const { isPlus, isFree } = usePlus()
 
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
@@ -157,9 +157,14 @@ export default function Budgets() {
     syncBudgetWidget(items)
   }, [loading, budgets, byBudget, statsById])
 
-  // Free households may keep only one budget; Plus is unlimited. The button
-  // gates before opening the sheet; the DB trigger is the real backstop.
-  const canCreateBudget = isPlus || budgets.length < 1
+  // Free households may keep only one budget; Plus is unlimited. Keyed on
+  // isFree, NOT !isPlus: the entitlement resolves asynchronously, so `!isPlus`
+  // is briefly true for a PAYING user — which would badge the button and, worse,
+  // push them to the paywall on tap. While the plan is still unknown we stay
+  // permissive; the DB trigger is the real limit and create() already routes to
+  // the paywall on free_plan_budget_limit, so a free user still lands right.
+  const overFreeLimit = isFree && budgets.length >= 1
+  const canCreateBudget = !overFreeLimit
 
   function startCreate() {
     if (!canCreateBudget) {
@@ -236,7 +241,7 @@ export default function Budgets() {
         label={t('budget.new')}
         onPress={startCreate}
         disabled={loading}
-        plus={!canCreateBudget}
+        plus={overFreeLimit}
       />
 
       {createOpen && (

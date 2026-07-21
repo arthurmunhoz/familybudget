@@ -302,7 +302,7 @@ export default function Whereabouts() {
   const { c, dark } = useTheme()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
-  const { isPlus } = usePlus()
+  const { isFree } = usePlus()
   const myEmail = profile?.email ?? null
 
   const cameraRef = useRef<Camera>(null)
@@ -682,7 +682,7 @@ export default function Whereabouts() {
               <HeaderButton
                 label={t('location.safety.title')}
                 active={!!watch}
-                badge={!isPlus}
+                badge={isFree}
                 icon={(col) => <ShieldCheck size={19} color={col} />}
                 // Free users open the sheet too — they get one 30-minute watch a
                 // day, so bouncing them straight to the paywall would sell a

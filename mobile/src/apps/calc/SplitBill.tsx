@@ -16,11 +16,14 @@ import { ItemSplit } from './ItemSplit'
 export function SplitBill() {
   const { c } = useTheme()
   const { t } = useI18n()
-  const { isPlus } = usePlus()
+  const { isFree } = usePlus()
   const [mode, setMode] = useState<'even' | 'item'>('even')
 
   function select(m: 'even' | 'item') {
-    if (m === 'item' && !isPlus) {
+    // isFree, not !isPlus — must match the `locked` badge below, or a paying
+    // user sees an unlocked tab that still refuses to open while the
+    // entitlement is resolving.
+    if (m === 'item' && isFree) {
       Alert.alert(t('calc.plusByItem'), undefined, [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('settings.getPlus'), onPress: () => router.push('/paywall') },
@@ -35,7 +38,7 @@ export function SplitBill() {
       <View style={[styles.segment, { backgroundColor: c.surface }]}>
         {(['even', 'item'] as const).map((m) => {
           const active = mode === m
-          const locked = m === 'item' && !isPlus
+          const locked = m === 'item' && isFree
           return (
             <Pressable
               key={m}

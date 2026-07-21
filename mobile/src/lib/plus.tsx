@@ -26,6 +26,12 @@ import { configurePurchases, hasPlus, purchasesReady, PLUS_ENTITLEMENT } from '.
 interface PlusState {
   /** Active Plus entitlement for this household. */
   isPlus: boolean
+  /** Entitlement is KNOWN and it isn't Plus. Use this — never a bare `!isPlus`
+   *  — for anything that upsells: Sparkles badges, lock glyphs, "free plan"
+   *  notes. `isPlus` starts false and only flips true once the plan RPC and
+   *  RevenueCat answer, so `!isPlus` is briefly true for PAYING users and
+   *  flashes upsells at them. */
+  isFree: boolean
   /** The current RevenueCat offering (plans to show on the paywall), or null. */
   offering: PurchasesOffering | null
   /** RevenueCat is configured (key present, real iOS build) — the paywall can sell. */
@@ -172,10 +178,13 @@ export function PlusProvider({ children }: { children: ReactNode }) {
     return hasPlus(customerInfo)
   }, [])
 
+  // Server plan wins; the live RevenueCat entitlement is ORed in for post-
+  // purchase immediacy — but NOT when an admin has forced Free for testing.
+  const plus = serverPlus || (hasPlus(info) && !adminFree)
+
   const value: PlusState = {
-    // Server plan wins; the live RevenueCat entitlement is ORed in for post-
-    // purchase immediacy — but NOT when an admin has forced Free for testing.
-    isPlus: serverPlus || (hasPlus(info) && !adminFree),
+    isPlus: plus,
+    isFree: !loading && !plus,
     offering,
     available: purchasesReady(),
     loading,

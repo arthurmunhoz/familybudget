@@ -177,7 +177,7 @@ function HouseholdSection() {
   const { c } = useTheme()
   const { t } = useI18n()
   const { profile } = useAuth()
-  const { isPlus } = usePlus()
+  const { isPlus, isFree } = usePlus()
   const limit = memberLimit(isPlus)
   const isOwner = profile?.role === 'owner'
   const hid = profile?.household_id ?? null
@@ -297,7 +297,7 @@ function HouseholdSection() {
             DB trigger is the real cap (migration 059); this is just the pitch. */}
         <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, paddingTop: sp.md, gap: 4 }}>
           <Txt variant="faint">{t('household.memberCount', { count: members.length, max: limit })}</Txt>
-          {isOwner && !isPlus ? (
+          {isOwner && isFree ? (
             <Pressable onPress={() => router.push('/paywall')} hitSlop={6}>
               <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
                 {t('household.upgradeForMembers', { max: MEMBER_LIMIT_PLUS })}
