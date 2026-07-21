@@ -4,3 +4,12 @@
 # frameworks) that blow past Vercel's upload file-count limit. Vercel's CLI
 # doesn't pick up mobile/.gitignore (nested), so this needs to be explicit here.
 mobile/
+
+# Agent worktrees: each one is a FULL checkout of this repo, node_modules and
+# all, so a couple of them alone came to ~87k files — nearly six times Vercel's
+# 15k cap, and the reason a deploy started failing with "files should NOT have
+# more than 15000 items". Pure local tooling state; nothing here is ever served.
+.claude/
+
+# Scratch/agent config — small, but likewise not part of the deployment.
+.agents/
