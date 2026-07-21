@@ -3,7 +3,7 @@
 //   • watching  → live status per member (Inside / Outside + distance) and Stop.
 // Breach alerts themselves are raised by the Whereabouts screen, which already
 // has the live member_locations feed.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { ShieldCheck, Sparkles } from 'lucide-react-native'
@@ -86,18 +86,15 @@ export function SafetyRadiusSheet({
    *  can say how much is left BEFORE they configure a radius — and tell them
    *  it's gone rather than letting the server bounce them. */
   const [remainingSecs, setRemainingSecs] = useState<number | null>(null)
-  useEffect(() => {
+  const loadRemaining = useCallback(() => {
     if (isPlus) return
-    let active = true
     void fetchFreeWatchRemaining()
-      .then((v) => {
-        if (active) setRemainingSecs(v)
-      })
+      .then(setRemainingSecs)
       .catch(() => {})
-    return () => {
-      active = false
-    }
   }, [isPlus])
+  useEffect(() => {
+    loadRemaining()
+  }, [loadRemaining])
   const spent = isFree && remainingSecs !== null && remainingSecs <= 0
   // Round UP: 90s left should read "2 min", never "1 min" and then cut short.
   const remainingMins = remainingSecs === null
@@ -160,12 +157,15 @@ export function SafetyRadiusSheet({
     }
   }
 
+  // Turning off does NOT close the sheet: the watch drops away and the setup
+  // view takes its place, so it can be turned straight back on — and a free
+  // user sees how much of today's allowance the stopped session left them.
   const stop = async () => {
     setBusy(true)
     await stopWatch().catch(() => {})
     onChanged()
+    loadRemaining()
     setBusy(false)
-    onClose()
   }
 
   // A free session is 30 minutes, so "Ends in about 1h" would be a lie for most
