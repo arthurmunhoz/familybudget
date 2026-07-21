@@ -141,6 +141,11 @@ export const pt: Record<keyof typeof en, string> = {
   'location.card.manage': 'Gerenciar minha localização',
   'location.card.sharing': 'Compartilhar',
   'location.card.watching': 'Vigiando',
+  'location.safety.bannerTitle': 'Raio de segurança ativo',
+  'location.safety.bannerWho': 'Vigiando {names}',
+  'location.safety.bannerEnds': 'termina em {mins} min',
+  'location.safety.bannerEndsHours': 'termina em cerca de {hours} h',
+  'location.safety.bannerManage': 'Gerenciar',
   'location.nudge.title': 'Avisar {name}',
   'location.nudge.sent': 'Aviso enviado para {name}',
 

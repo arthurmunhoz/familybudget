@@ -12,6 +12,7 @@
 // Native-only: the map (@rnmapbox/maps) and background location need a dev build
 // + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocalSearchParams } from 'expo-router'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
@@ -335,6 +336,16 @@ export default function Whereabouts() {
   const [styleEpoch, setStyleEpoch] = useState(0)
   const [placesOpen, setPlacesOpen] = useState(false)
   const [safetyOpen, setSafetyOpen] = useState(false)
+  // Arriving from the Hub's safety banner (?safety=1) opens the sheet straight
+  // away, so managing/stopping a running watch is one tap from the home screen.
+  const { safety: safetyParam } = useLocalSearchParams<{ safety?: string }>()
+  const safetyParamHandled = useRef(false)
+  useEffect(() => {
+    if (safetyParam === '1' && !safetyParamHandled.current) {
+      safetyParamHandled.current = true
+      setSafetyOpen(true)
+    }
+  }, [safetyParam])
   const [toast, setToast] = useState<ToastData | null>(null)
 
   // Where to frame the map on first load. Prefer MY position — even when I'm not
