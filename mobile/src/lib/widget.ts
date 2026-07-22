@@ -230,6 +230,50 @@ export function reloadPetCareWidget(): void {
   }
 }
 
+/** Everything the app mirrors into the App Group that belongs to the SIGNED-IN
+ *  HOUSEHOLD rather than to the device. Cleared on sign-out — otherwise the
+ *  widgets keep rendering one family's agenda, budgets and members to whoever
+ *  holds the phone next, and `widget_token` keeps authorizing nudges as the
+ *  signed-out user.
+ *
+ *  `widget_theme` is deliberately NOT in this list: it's a per-device
+ *  appearance preference, not household data, and wiping it would silently
+ *  reset the user's Light/Dark choice. */
+const HOUSEHOLD_WIDGET_KEYS = [
+  'widget_token',
+  'nudge_members',
+  'nudge_presets',
+  'widget_recipients',
+  'widget_status',
+  'pending_nudge',
+  'budgets',
+  'today',
+  'today_live',
+  'today_cfg',
+  'petcare',
+  'petcare_status',
+] as const
+
+/** Wipe the household's mirrored data + the widget send token from the App
+ *  Group, then reload every widget so they redraw empty instead of showing a
+ *  stale card. Safe no-op off iOS / without the native module.
+ *
+ *  Note: cached pet photos are written under per-pet keys
+ *  (`petcare_photo_<id>`) which can't be enumerated from here; they are
+ *  overwritten on the next sign-in. */
+export function clearWidgetData(): void {
+  const s = store()
+  if (!s) return
+  try {
+    for (const key of HOUSEHOLD_WIDGET_KEYS) s.remove(key)
+    // Let the next sign-in re-publish the Today config (we just removed it).
+    lastTodayCfg = ''
+    ExtensionStorage.reloadWidget()
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
 /** Flash a transient "{emoji} {label} · seen by {name}" on the Nudges widget
  *  for 3s, then it reverts to the list on its own (see NudgesWidget.swift's
  *  timeline — `until` is read there, nothing needs to fire again at expiry).

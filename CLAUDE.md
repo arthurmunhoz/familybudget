@@ -223,17 +223,30 @@ off the moment they ack (optimistic + Realtime).
   (no visible banner) push to the ping's SENDER, so if they're on iOS their
   Nudges home-screen widget can flash "seen by {name}" without opening the
   app. Purely additive to the existing insert-then-Realtime ack flow; failures
-  are swallowed the same way every other push here is.
+  are swallowed the same way every other push here is. The endpoint REQUIRES an
+  existing `ping_acks` row for the caller before it pushes (acks can't be
+  spoofed) — so always insert the ack first, then call it. Its `?action=live-wake`
+  branch is a separate, intentionally permissive path — don't fold checks into it.
 - Send flow: client INSERTs under RLS (household + sender stamped by defaults),
   then calls `api/send-ping` with the id; that function (service role) verifies
   the caller shares the household and pushes to the recipients (or all but the
   sender). It also attaches the sender's `tel` from `member_profiles` so the push
   carries a Call action, and marks the push `urgent` when `high_priority` is
   true. Push failures are swallowed — Realtime shows it anyway.
+  The fan-out is ONE-SHOT and sender-only: only `sender_email` may trigger it,
+  expired pings (`expires_at`) are skipped, and the function claims the ping by
+  setting `pings.pushed_at` with a conditional UPDATE (migration 082) so a replay
+  or a two-device race can never push the same ping twice. Any new caller must
+  therefore be the sender and call it once per ping. (`api/widget.ts?action=nudge`
+  is unaffected — it inserts AND pushes inline, it never calls `send-ping`.)
 - `api/suggest-ping` — Claude Haiku maps free text → `{kind, emoji, message}`
   in the user's language; reuses `ANTHROPIC_API_KEY`. No new env vars. The AI
   path never sets `high_priority` — that flag is only ever set explicitly via
-  a preset's toggle.
+  a preset's toggle. Metered by `ai_light_allowed`/`ai_light_record` (migration
+  083, service-role-only) — a per-household DAILY abuse ceiling, deliberately
+  separate from the scanners' `ai_scan_allowed` free_monthly_cap (3), and it
+  fails OPEN so metering trouble never blocks a nudge. `api/suggest-stores` uses
+  the same pair with `p_kind='stores'`.
 - Call button: `public/sw.js` adds a `call` notification action + `tel:` handler.
   iOS web-push IGNORES notification action buttons, so the in-app 📞 Call button
   in `PingsBanner` (shown when the sender has a Family phone) is the reliable

@@ -3,6 +3,19 @@
 // box. Auth: the caller must send a valid Supabase JWT (don't burn AI credits
 // for strangers). Uses a small/fast model — this is a trivial mapping task.
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@supabase/supabase-js'
+
+// Abuse ceiling only (migration 083) — NOT a product quota, and deliberately
+// separate from the scanners' ai_scan_allowed free_monthly_cap. A household
+// typing nudges all day wouldn't come close to this; it exists so a leaked JWT
+// can't run up an AI bill. Metering problems fail OPEN — a real nudge is never
+// blocked because the counter misbehaved.
+const DAILY_CAP = 200
+const HAIKU_RATE = { in: 1 / 1e6, out: 5 / 1e6 } // $/token, claude-haiku-4-5
+function estCost(usage: any): number {
+  const input = (usage?.input_tokens ?? 0) + (usage?.cache_read_input_tokens ?? 0)
+  return input * HAIKU_RATE.in + (usage?.output_tokens ?? 0) * HAIKU_RATE.out
+}
 
 const KINDS = ['help', 'omw', 'late', 'dinner', 'grab', 'love', 'custom'] as const
 
@@ -41,6 +54,8 @@ export default async function handler(req: any, res: any) {
     headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
   })
   if (!userRes.ok) return res.status(401).json({ error: 'Unauthorized' })
+  const email = (await userRes.json())?.email
+  if (!email) return res.status(401).json({ error: 'Unauthorized' })
 
   const { text } = req.body ?? {}
   if (!text || typeof text !== 'string' || !text.trim()) {
@@ -48,6 +63,35 @@ export default async function handler(req: any, res: any) {
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'AI pings are not configured.' })
+  }
+
+  // Cost metering (best-effort, fails OPEN). Resolves the caller's household
+  // server-side and checks the service-role-only ceiling before spending.
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const db = serviceKey ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } }) : null
+  let household: string | null = null
+  if (db) {
+    try {
+      const { data: caller } = await db
+        .from('allowed_users')
+        .select('household_id')
+        .eq('email', email)
+        .maybeSingle()
+      household = caller?.household_id ?? null
+      if (household) {
+        const { data: gate, error: gateErr } = await db.rpc('ai_light_allowed', {
+          p_household: household,
+          p_kind: 'nudge',
+          p_cap: DAILY_CAP,
+        })
+        // Only an EXPLICIT "no" blocks; an RPC error leaves the feature working.
+        if (!gateErr && gate && gate.allowed === false) {
+          return res.status(429).json({ error: 'AI nudges are paused for now — try a preset.' })
+        }
+      }
+    } catch {
+      /* metering must never block a legitimate nudge */
+    }
   }
 
   try {
@@ -77,6 +121,18 @@ export default async function handler(req: any, res: any) {
         format: { type: 'json_schema', schema: PING_SCHEMA },
       },
     })
+
+    if (db && household) {
+      try {
+        await db.rpc('ai_light_record', {
+          p_household: household,
+          p_kind: 'nudge',
+          p_cost: estCost(response.usage),
+        })
+      } catch {
+        /* metering write failure must not break a good response */
+      }
+    }
 
     const block = response.content.find((b) => b.type === 'text')
     if (!block || block.type !== 'text') {

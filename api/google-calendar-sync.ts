@@ -16,6 +16,15 @@
 // Env (Vercel): VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
 // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, CRON_SECRET.
 import { createClient } from '@supabase/supabase-js'
+import { timingSafeEqual } from 'node:crypto'
+
+/** Constant-time string compare for shared secrets (length is not secret). */
+function secretEquals(a: string, b: string): boolean {
+  const ab = Buffer.from(a, 'utf8')
+  const bb = Buffer.from(b, 'utf8')
+  if (ab.length !== bb.length) return false
+  return timingSafeEqual(ab, bb)
+}
 
 type Conn = {
   user_email: string
@@ -363,6 +372,13 @@ async function syncConnection(db: any, conn: Conn, clientId: string, clientSecre
 }
 
 export default async function handler(req: any, res: any) {
+  // Both real callers are covered: the app's "Sync now" button POSTs
+  // (src/lib/googleCalendar.ts + mobile/src/lib/googleCalendar.ts → authedPost),
+  // and Vercel Cron issues a GET. Everything else is rejected.
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
   const url = process.env.VITE_SUPABASE_URL
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -374,11 +390,12 @@ export default async function handler(req: any, res: any) {
   }
 
   const db = createClient(url, serviceKey, { auth: { persistSession: false } })
-  const authHeader = req.headers.authorization ?? ''
+  const authHeader = String(req.headers.authorization ?? '')
   const cronSecret = process.env.CRON_SECRET
 
   let connections: Conn[] = []
-  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+  // Unset secret still means "not the cron caller"; the compare is constant-time.
+  if (cronSecret && secretEquals(authHeader, `Bearer ${cronSecret}`)) {
     const { data } = await db.from('google_calendar_connections').select('*')
     connections = (data ?? []) as Conn[]
   } else {

@@ -166,10 +166,26 @@ export function trackScreen(path: string): void {
   scheduleFlush()
 }
 
+/** Strip credentials that libraries routinely bake into thrown messages and
+ *  stacks — a failed fetch will happily quote the whole URL, query string and
+ *  Authorization header. `web_events` is readable by the GLOBAL super-admin, so
+ *  anything landing here is effectively long-lived shared storage. */
+function redact(text: string): string {
+  return text
+    .replace(/(Bearer\s+)[\w.\-~+/]+=*/gi, '$1[redacted]')
+    .replace(/((?:access|refresh|provider|id)_token["'\s:=]+)[\w.\-~+/]+=*/gi, '$1[redacted]')
+    .replace(/((?:apikey|api_key|access_token|token)=)[^&\s"']+/gi, '$1[redacted]')
+    // Bare JWTs (header.payload.signature) that appear without a labelled key.
+    .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, '[redacted-jwt]')
+}
+
 /** Report a caught/fatal error. Flushes immediately — the app may be dying. */
 export function trackError(error: unknown, extra: Record<string, unknown> = {}): void {
   const err = error instanceof Error ? error : new Error(String(error))
-  push('error', { target: err.message.slice(0, 200), meta: { stack: err.stack?.slice(0, 2000), ...extra } })
+  push('error', {
+    target: redact(err.message).slice(0, 200),
+    meta: { stack: err.stack ? redact(err.stack).slice(0, 2000) : undefined, ...extra },
+  })
   void flush()
 }
 

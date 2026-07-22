@@ -10,6 +10,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 
 import { supabase } from './supabase'
+import { completeOAuthRedirect } from './oauthRedirect'
 
 export const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
@@ -58,27 +59,21 @@ export async function connectGoogleCalendar(): Promise<boolean> {
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
   if (result.type !== 'success') return false
 
-  const frag = result.url.includes('#') ? result.url.split('#')[1] : result.url.split('?')[1]
-  const params = new URLSearchParams(frag ?? '')
-  const access_token = params.get('access_token')
-  const refresh_token = params.get('refresh_token')
-  const provider_token = params.get('provider_token')
-  const provider_refresh_token = params.get('provider_refresh_token')
-
-  // Restore the Supabase session (the re-consent flow rotates it).
-  if (access_token && refresh_token) {
-    await supabase.auth.setSession({ access_token, refresh_token })
-  }
+  // Exchange the PKCE code (or accept legacy fragment tokens) — this also
+  // restores the Supabase session, which the re-consent flow rotates. The
+  // returned session is what carries Google's provider tokens.
+  const session = await completeOAuthRedirect(result.url)
+  const provider_token = session?.provider_token
+  const provider_refresh_token = session?.provider_refresh_token
   if (!provider_token || !provider_refresh_token) {
     // Google only hands back a refresh token on first consent / prompt=consent.
     throw new Error('no-refresh-token')
   }
 
-  const { data: userData } = await supabase.auth.getUser()
   await authedPost('/api/google-calendar-connect', {
     access_token: provider_token,
     refresh_token: provider_refresh_token,
-    google_email: userData.user?.email,
+    google_email: session?.user?.email,
   })
   await syncGoogleCalendar().catch(() => {})
   return true
@@ -97,8 +92,11 @@ export async function getGoogleConnection(): Promise<GoogleConnection | null> {
 }
 
 export async function disconnectGoogleCalendar(): Promise<void> {
-  const { data } = await supabase.auth.getUser()
-  const email = data.user?.email
+  // getSession(), never getUser(): getUser() round-trips to the Auth server and
+  // resolves `user: null` on any network hiccup, which would silently no-op the
+  // disconnect while the server keeps syncing with the stored refresh token.
+  const { data } = await supabase.auth.getSession()
+  const email = data.session?.user?.email
   if (!email) return
   // Drop this member's imported Google events, then the connection itself.
   await supabase.from('calendar_events').delete().eq('source', 'google').eq('owner_email', email)

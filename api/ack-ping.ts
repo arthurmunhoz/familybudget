@@ -113,6 +113,18 @@ export default async function handler(req: any, res: any) {
   // No-op if the sender acked their own nudge — nothing useful to tell them.
   if (ping.sender_email === callerEmail) return res.status(200).json({ ok: true, expoSent: 0 })
 
+  // The ack must actually exist. ackPing() inserts the ping_acks row (under RLS)
+  // and only then calls this endpoint, so a legitimate call always finds it —
+  // but without this check anyone in the household could spam a sender's device
+  // with "seen by" pushes for acks that never happened.
+  const { data: ack } = await db
+    .from('ping_acks')
+    .select('ping_id')
+    .eq('ping_id', ping.id)
+    .eq('user_email', callerEmail)
+    .maybeSingle()
+  if (!ack) return res.status(403).json({ error: 'No ack recorded' })
+
   const ackerName = caller.display_name || callerEmail.split('@')[0]
 
   const { data: senderTokens } = await db

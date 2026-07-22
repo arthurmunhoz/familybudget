@@ -10,6 +10,15 @@
 //   Header: Authorization: <REVENUECAT_WEBHOOK_SECRET>   (any strong random string)
 // Env (Vercel): SUPABASE_SERVICE_ROLE_KEY, VITE_SUPABASE_URL, REVENUECAT_WEBHOOK_SECRET.
 import { createClient } from '@supabase/supabase-js'
+import { timingSafeEqual } from 'node:crypto'
+
+/** Constant-time string compare for shared secrets (length is not secret). */
+function secretEquals(a: string, b: string): boolean {
+  const ab = Buffer.from(a, 'utf8')
+  const bb = Buffer.from(b, 'utf8')
+  if (ab.length !== bb.length) return false
+  return timingSafeEqual(ab, bb)
+}
 
 const PLUS_ENTITLEMENT = 'plus'
 
@@ -38,8 +47,9 @@ export default async function handler(req: any, res: any) {
   }
 
   const secret = process.env.REVENUECAT_WEBHOOK_SECRET
-  const auth = req.headers.authorization ?? ''
-  if (!secret || auth !== secret) {
+  const auth = String(req.headers.authorization ?? '')
+  // Unset secret still fails closed; the compare itself is constant-time.
+  if (!secret || !secretEquals(auth, secret)) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 

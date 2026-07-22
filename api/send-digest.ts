@@ -11,6 +11,15 @@
 //   VAPID_PRIVATE_KEY         — server-only secret, pairs with the public key
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
+import { timingSafeEqual } from 'node:crypto'
+
+/** Constant-time string compare for shared secrets (length is not secret). */
+function secretEquals(a: string, b: string): boolean {
+  const ab = Buffer.from(a, 'utf8')
+  const bb = Buffer.from(b, 'utf8')
+  if (ab.length !== bb.length) return false
+  return timingSafeEqual(ab, bb)
+}
 
 type ExpoMessage = {
   to: string
@@ -177,7 +186,8 @@ function latestPerKey(events: PetEvent[]): PetEvent[] {
 export default async function handler(req: any, res: any) {
   // Only Vercel Cron (which sends the secret) may run this.
   const secret = process.env.CRON_SECRET
-  if (!secret || req.headers.authorization !== `Bearer ${secret}`) {
+  // Unset secret still fails closed; the compare itself is constant-time.
+  if (!secret || !secretEquals(String(req.headers.authorization ?? ''), `Bearer ${secret}`)) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
