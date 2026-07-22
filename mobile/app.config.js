@@ -54,6 +54,8 @@ module.exports = ({ config }) => {
     },
     plugins: [
       ...(config.plugins ?? []),
+      // Keychain storage for the Supabase auth session (see lib/secureSessionStore.ts).
+      'expo-secure-store',
       [
         'expo-location',
         {

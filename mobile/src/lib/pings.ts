@@ -98,6 +98,8 @@ async function authToken(): Promise<string> {
 
 /** Insert a ping (RLS stamps household + sender) then fire the household push.
  *  `recipients` null = whole household; otherwise only those member emails.
+ *  A high-priority ping ALWAYS goes to everyone (recipients forced to null),
+ *  matching the web helper's contract.
  *  Push failures are swallowed — the ping is already saved and shows up live
  *  via Realtime regardless. */
 export async function sendPing(
@@ -105,17 +107,26 @@ export async function sendPing(
   emoji: string,
   message: string,
   recipients: string[] | null = null,
+  highPriority: boolean = false,
 ): Promise<void> {
   const { data, error } = await supabase
     .from('pings')
-    .insert({ kind, emoji, message, recipients })
+    .insert({
+      kind,
+      emoji,
+      message,
+      recipients: highPriority ? null : recipients,
+      high_priority: highPriority,
+    })
     .select()
     .single()
   if (error || !data) throw error ?? new Error('Could not send ping')
-  track('nudge.sent', { message, kind, recipients: recipients?.length ?? null })
+  // Log shape, not content: nudge text is user content and web_events is
+  // readable by the GLOBAL super-admin across every household.
+  track('nudge.sent', { messageLength: message.length, kind, recipients: recipients?.length ?? null })
   try {
     const token = await authToken()
-    await fetch('/api/send-ping', {
+    await fetch(`${API_BASE}/api/send-ping`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ ping_id: data.id }),
@@ -133,7 +144,7 @@ export async function sendCustomPing(
   recipients: string[] | null = null,
 ): Promise<{ emoji: string; message: string }> {
   const token = await authToken()
-  const res = await fetch('/api/suggest-ping', {
+  const res = await fetch(`${API_BASE}/api/suggest-ping`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ text }),

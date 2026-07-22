@@ -167,10 +167,19 @@ export default async function handler(req: any, res: any) {
 
   const { data: ping } = await db
     .from('pings')
-    .select('id, household_id, sender_email, kind, emoji, message, recipients, high_priority')
+    .select(
+      'id, household_id, sender_email, kind, emoji, message, recipients, high_priority, expires_at, pushed_at',
+    )
     .eq('id', ping_id)
     .single()
   if (!ping) return res.status(404).json({ error: 'Ping not found' })
+
+  // Only the nudge's own sender may trigger its fan-out. Every caller in the
+  // app does exactly this (src/lib/pings.ts + mobile/src/lib/pings.ts insert the
+  // ping and immediately post their own id; the widget in api/widget.ts pushes
+  // inline and never calls this endpoint), so this is invisible in normal use —
+  // it just stops another household member from re-firing someone else's nudge.
+  if (ping.sender_email !== callerEmail) return res.status(403).json({ error: 'Forbidden' })
 
   // The caller must be a member of the ping's household.
   const { data: caller } = await db
@@ -180,6 +189,25 @@ export default async function handler(req: any, res: any) {
     .single()
   if (!caller || caller.household_id !== ping.household_id) {
     return res.status(403).json({ error: 'Forbidden' })
+  }
+
+  // An expired nudge is already gone from every banner — never push it.
+  if (ping.expires_at && new Date(ping.expires_at).getTime() <= Date.now()) {
+    return res.status(200).json({ ok: true, skipped: 'expired' })
+  }
+
+  // One fan-out per nudge. `pushed_at` is claimed with a conditional UPDATE, so
+  // a replay (or two devices racing) can't push the same ping twice: whoever
+  // loses the update gets no row back and returns without sending.
+  if (ping.pushed_at) return res.status(200).json({ ok: true, skipped: 'already_pushed' })
+  const { data: claimed } = await db
+    .from('pings')
+    .update({ pushed_at: new Date().toISOString() })
+    .eq('id', ping.id)
+    .is('pushed_at', null)
+    .select('id')
+  if (!claimed || claimed.length === 0) {
+    return res.status(200).json({ ok: true, skipped: 'already_pushed' })
   }
 
   const { data: sender } = await db

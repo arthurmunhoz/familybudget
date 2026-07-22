@@ -18,6 +18,9 @@ import { makeRedirectUri } from 'expo-auth-session'
 import type { Session } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
+import { completeOAuthRedirect } from './oauthRedirect'
+import { disablePush } from './notifications'
+import { clearWidgetData } from './widget'
 import { clearCache } from '@/hooks/useCachedQuery'
 import type { Profile } from './types'
 
@@ -220,14 +223,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.url) throw new Error('No OAuth URL returned')
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
     if (result.type !== 'success') return
-    // Supabase returns tokens in the URL fragment (#) or query (?).
-    const frag = result.url.includes('#') ? result.url.split('#')[1] : result.url.split('?')[1]
-    const params = new URLSearchParams(frag ?? '')
-    const access_token = params.get('access_token')
-    const refresh_token = params.get('refresh_token')
-    if (access_token && refresh_token) {
-      await supabase.auth.setSession({ access_token, refresh_token })
-    }
+    // PKCE hands back `?code=`, which completeOAuthRedirect exchanges for the
+    // session (it still understands the legacy fragment tokens too).
+    await completeOAuthRedirect(result.url)
   }, [])
 
   const devSignIn = useCallback(async () => {
@@ -238,7 +236,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null }
   }, [])
 
+  // Signing out has to strip this DEVICE of everything that still authorizes it
+  // for the household, not just end the session. Left behind, each of these
+  // keeps working for whoever holds the phone next:
+  //   • the widget token — a non-expiring bearer credential the home-screen
+  //     widgets use to send nudges and read the agenda/pets/budgets;
+  //   • the App Group mirror — member names, presets, budgets, today's agenda;
+  //   • the Expo push registration — nudge text and digests keep arriving.
+  // All three are best-effort and run BEFORE signOut(), while the JWT still
+  // authorizes the server-side deletes. A failure must never block sign-out.
   const signOut = useCallback(async () => {
+    try {
+      await supabase.rpc('revoke_widget_token')
+    } catch {
+      /* best effort — the local token is cleared below regardless */
+    }
+    try {
+      await disablePush()
+    } catch {
+      /* best effort */
+    }
+    clearWidgetData()
     clearCache()
     await supabase.auth.signOut()
   }, [])

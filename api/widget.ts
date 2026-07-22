@@ -300,7 +300,9 @@ export default async function handler(req: any, res: any) {
   const senderEmail: string = wt.user_email
   const household: string = wt.household_id
 
-  void db.from('widget_tokens').update({ last_used_at: new Date().toISOString() }).eq('token', token)
+  // supabase-js query builders are lazy thenables — `void builder` never issues
+  // the request, so this has to be awaited to actually stamp last_used_at.
+  await db.from('widget_tokens').update({ last_used_at: new Date().toISOString() }).eq('token', token)
 
   // ── budget ────────────────────────────────────────────────────────────────
   // Fresh current-period stats + latest entries for ONE budget, so the Budget
@@ -608,13 +610,51 @@ export default async function handler(req: any, res: any) {
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY
   const { kind, emoji, message, recipients, high_priority } = req.body ?? {}
   if (!kind || !message) return res.status(400).json({ error: 'Missing fields' })
+
+  // Bounds on everything the widget sends. The caps are far above anything a
+  // real nudge uses (presets are a few words, the AI box is capped at ~6 words),
+  // so nothing legitimate is truncated or rejected — they exist so a stolen
+  // widget token can't push megabyte payloads to a household's phones. All
+  // failures are 400s, never a 500 from the insert.
+  const MAX_KIND = 64
+  const MAX_EMOJI = 16
+  const MAX_MESSAGE = 500
+  const MAX_RECIPIENTS = 50
+  if (typeof kind !== 'string' || kind.length > MAX_KIND) {
+    return res.status(400).json({ error: 'Invalid kind' })
+  }
+  if (typeof message !== 'string' || message.length > MAX_MESSAGE) {
+    return res.status(400).json({ error: 'Invalid message' })
+  }
+  if (emoji != null && (typeof emoji !== 'string' || emoji.length > MAX_EMOJI)) {
+    return res.status(400).json({ error: 'Invalid emoji' })
+  }
+  if (recipients != null && !Array.isArray(recipients)) {
+    return res.status(400).json({ error: 'Invalid recipients' })
+  }
+  if (Array.isArray(recipients) && recipients.length > MAX_RECIPIENTS) {
+    return res.status(400).json({ error: 'Too many recipients' })
+  }
   const highPriority = high_priority === true
 
   // High-priority nudges always go to everyone (parity with the app).
-  const targetList: string[] | null =
+  let targetList: string[] | null =
     highPriority || !Array.isArray(recipients) || recipients.length === 0
       ? null
       : recipients.filter((r: unknown) => typeof r === 'string')
+
+  // Keep only real members of the token's household — the service role bypasses
+  // RLS, so this is the tenancy boundary for a targeted nudge. Fails OPEN (the
+  // list is left as sent) if the member lookup returns nothing, so a transient
+  // DB hiccup can't silently drop a legitimate nudge's recipients.
+  if (targetList && targetList.length) {
+    const { data: memberRows } = await db
+      .from('allowed_users')
+      .select('email')
+      .eq('household_id', household)
+    const members = (memberRows ?? []).map((m: any) => m.email as string)
+    if (members.length) targetList = targetList.filter((r) => members.includes(r))
+  }
 
   const { data: ping, error: insErr } = await db
     .from('pings')
