@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { Camera, Check, ChevronDown } from 'lucide-react-native'
 
-import { AppHeader, Btn, Loader, Txt } from '@/components/ui'
+import { AppHeader, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
@@ -26,7 +26,7 @@ import type {
   Period,
   Profile,
 } from '@/lib/types'
-import { radius, sheetRadius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import SummaryChart from './SummaryChart'
 
@@ -429,6 +429,12 @@ export default function MonthDetail({
           paddingBottom: Math.max(Math.round(insets.bottom / 2), sp.xs),
         }}
       >
+        {/* Both are OUTLINE actions in the dashed idiom every other app's
+            "add new" button uses (NewItemButton — Documents, Calendar, periods,
+            budgets). Adding an entry is the same kind of act, so it gets the
+            same treatment instead of a filled bar of its own. The camera keeps
+            pace: paired with an outline button, a tinted fill would have made
+            the secondary action the loudest thing on the screen. */}
         <Pressable
           onPress={startScan}
           disabled={scanning}
@@ -439,22 +445,38 @@ export default function MonthDetail({
             borderTopRightRadius: radius.md,
             borderBottomLeftRadius: sheetRadius,
             borderBottomRightRadius: radius.md,
-            // Accent-soft tint (not flat surface) so the camera reads as a real
-            // action next to the filled "New entry" — the two are an accent
-            // pair, one tinted, one solid, rather than one button + grey square.
-            backgroundColor: c.accentSoft,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: c.textFaint,
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: scanning ? 0.5 : pressed ? 0.85 : 1,
+            opacity: scanning ? 0.5 : pressed ? 0.6 : 1,
           })}
         >
           {scanning ? <ActivityIndicator color={c.accent} /> : <Camera size={24} color={c.accent} />}
         </Pressable>
-        <Btn
-          title={t('detail.newEntry')}
+        <Pressable
+          accessibilityRole="button"
           onPress={() => { setEditing(null); setPrefill(undefined); setFormOpen(true) }}
-          style={{ flex: 1, borderBottomRightRadius: sheetRadius }}
-        />
+          style={({ pressed }) => ({
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 16,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: c.textFaint,
+            borderTopLeftRadius: radius.md,
+            borderTopRightRadius: radius.md,
+            borderBottomLeftRadius: radius.md,
+            borderBottomRightRadius: sheetRadius,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>
+            {t('detail.newEntry')}
+          </Txt>
+        </Pressable>
       </View>
 
       {formOpen && profile && (
