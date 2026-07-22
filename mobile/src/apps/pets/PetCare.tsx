@@ -1,6 +1,7 @@
-// Pet Care — routine-first redesign (replaces the old carousel + month
-// calendar). Top: pet chips (photo/emoji + name; red dot = something overdue;
-// "+" adds a pet). Then, for the selected pet:
+// Pet Care — routine-first redesign (replaces the old month calendar). Top: a
+// coverflow pet selector matching the Family roster (round photos, the centred
+// one full size; name + overdue dot underneath; "+" in the header adds a pet).
+// Then, for the selected pet:
 //   • Today — the daily checklist (morning walk, breakfast, dinner…) in the
 //     configured order, resetting each day and showing WHO did each item — so
 //     nobody double-feeds the dog.
@@ -12,7 +13,15 @@
 // also feeds the Pet Care home-screen widget: a fresh App Group snapshot +
 // a best-effort ?action=petcare-notify so OTHER members' widgets reload ASAP.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Animated, AppState, Pressable, ScrollView, View } from 'react-native'
+import {
+  Alert,
+  Animated,
+  AppState,
+  Pressable,
+  ScrollView,
+  View,
+  useWindowDimensions,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Image } from 'expo-image'
@@ -41,6 +50,12 @@ import { RoutineSheet } from './RoutineSheet'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 const HISTORY_PREVIEW = 5
+
+/** Pet selector — a coverflow of round photos, mirroring the Family roster
+ *  (see `apps/family/Family.tsx`): rendered size vs. the horizontal slot each
+ *  one occupies, which is narrower so neighbours overlap. */
+const PET_AV = 76
+const PET_SLOT = 64
 
 /** Local HH:MM for a timestamptz — when a task was checked off. */
 function doneTime(iso: string): string {
@@ -116,6 +131,7 @@ function notifyPetCareChange(): void {
 
 export default function PetCare() {
   const { c } = useTheme()
+  const { width } = useWindowDimensions()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
   const today = todayISO()
@@ -134,13 +150,19 @@ export default function PetCare() {
   const [overlay, setOverlay] = useState<Record<string, boolean>>({})
   const [toast, setToast] = useState<ToastData | null>(null)
 
-  // Pet chips start big and shrink as the list scrolls up (JS-driven — these
-  // interpolations feed layout props, which the native driver can't animate).
+  // The selector starts big and shrinks as the list scrolls up (JS-driven —
+  // these feed layout props, which the native driver can't animate). Safe to
+  // animate a height here: the strip sits ABOVE the vertical ScrollView, so
+  // resizing it can't disturb that scroll's content offset.
   const scrollY = useRef(new Animated.Value(0)).current
-  const chipAvatar = scrollY.interpolate({ inputRange: [0, 80], outputRange: [52, 22], extrapolate: 'clamp' })
-  const chipInitial = scrollY.interpolate({ inputRange: [0, 80], outputRange: [21, 10], extrapolate: 'clamp' })
-  const chipFont = scrollY.interpolate({ inputRange: [0, 80], outputRange: [18, 13], extrapolate: 'clamp' })
-  const chipPadV = scrollY.interpolate({ inputRange: [0, 80], outputRange: [12, 7], extrapolate: 'clamp' })
+  const strip = { inputRange: [0, 80], extrapolate: 'clamp' as const }
+  const stripH = scrollY.interpolate({ ...strip, outputRange: [PET_AV + 6, PET_AV * 0.46 + 6] })
+  const stripShrink = scrollY.interpolate({ ...strip, outputRange: [1, 0.46] })
+  const stripLabel = scrollY.interpolate({ ...strip, outputRange: [16, 13] })
+  // Horizontal offset of the coverflow — drives which photo is centred, at
+  // full size and full opacity, with its neighbours scaled down and faded.
+  const scrollX = useRef(new Animated.Value(0)).current
+  const petsRef = useRef<ScrollView>(null)
 
   const {
     data: { pets, tasks, done, events, petPhotoUrls } = EMPTY_DATA,
@@ -222,6 +244,15 @@ export default function PetCare() {
   }, [petsSorted, selectedPet])
 
   const pet = selectedPet ? (petById[selectedPet] ?? null) : null
+
+  // Keep the coverflow centred on the selected pet. Adding or renaming a pet
+  // reorders the list, which would otherwise leave the name under the strip
+  // describing a photo that's no longer in the middle. After a swipe this
+  // lands on the offset snapping already chose, so it's a no-op.
+  useEffect(() => {
+    const i = petsSorted.findIndex((p) => p.id === selectedPet)
+    if (i >= 0) petsRef.current?.scrollTo({ x: i * PET_SLOT, animated: false })
+  }, [petsSorted, selectedPet])
   const checklist = useMemo(
     () => (pet ? dailyChecklist(tasks, done, pet.id, selectedDay) : []),
     [tasks, done, pet, selectedDay],
@@ -355,7 +386,19 @@ export default function PetCare() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader title={t('pets.title')} />
+        <AppHeader
+          title={t('pets.title')}
+          right={
+            <Pressable
+              onPress={() => setShowPetForm(true)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('pets.addPet')}
+            >
+              <Plus size={22} color={c.text} />
+            </Pressable>
+          }
+        />
       </View>
 
       {loading ? (
@@ -371,98 +414,125 @@ export default function PetCare() {
         </>
       ) : (
         <>
-          {/* pet chips — fixed above the list; big on load, shrink on scroll.
-              Tapping the SELECTED pet's chip again opens its profile. */}
+          {/* Pet selector — the Family roster's coverflow: the centred photo
+              is full size and opaque, its neighbours scale down and fade out,
+              and the name sits under the row. Tapping the centred pet opens
+              its profile; tapping a neighbour brings it to the centre. */}
           <View style={{ paddingBottom: sp.sm }}>
-            <ScrollView
+            <Animated.ScrollView
+              ref={petsRef}
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: sp.sm, paddingHorizontal: sp.lg }}
+              snapToInterval={PET_SLOT}
+              decelerationRate="fast"
+              style={{ height: stripH }}
+              contentContainerStyle={{
+                paddingHorizontal: (width - PET_SLOT) / 2, // any pet can reach the centre
+                alignItems: 'center',
+              }}
+              onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+                useNativeDriver: false,
+              })}
+              scrollEventThrottle={16}
+              onMomentumScrollEnd={(e) => {
+                const i = Math.round(e.nativeEvent.contentOffset.x / PET_SLOT)
+                const next = petsSorted[i]
+                if (!next || next.id === selectedPet) return
+                setSelectedPet(next.id)
+                setSelectedDay(todayISO())
+              }}
             >
-              {petsSorted.map((p) => {
-                const on = p.id === selectedPet
+              {petsSorted.map((p, i) => {
+                const at = (n: number) => (i + n) * PET_SLOT
+                const span = [at(-2), at(-1), at(0), at(1), at(2)]
+                const scale = scrollX.interpolate({
+                  inputRange: span,
+                  outputRange: [0.5, 0.62, 1, 0.62, 0.5],
+                  extrapolate: 'clamp',
+                })
+                const opacity = scrollX.interpolate({
+                  inputRange: span,
+                  outputRange: [0.22, 0.5, 1, 0.5, 0.22],
+                  extrapolate: 'clamp',
+                })
+                // Pull neighbours slightly toward the centred photo for overlap.
+                const tx = scrollX.interpolate({
+                  inputRange: [at(-1), at(0), at(1)],
+                  outputRange: [12, 0, -12],
+                  extrapolate: 'clamp',
+                })
+                const centred = p.id === selectedPet
                 return (
-                  <Pressable
+                  <View
                     key={p.id}
-                    onPress={() => {
-                      if (on) {
-                        router.push(`/pets/${p.id}`)
-                      } else {
-                        setSelectedPet(p.id)
-                        setSelectedDay(todayISO())
-                      }
-                    }}
+                    style={{ width: PET_SLOT, alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Animated.View
                       style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingHorizontal: 12,
-                        paddingVertical: chipPadV,
-                        borderRadius: radius.pill,
-                        backgroundColor: on ? c.accent : c.surface,
+                        opacity,
+                        zIndex: centred ? petsSorted.length : 0,
+                        transform: [
+                          { translateX: tx },
+                          // The coverflow's own scale times the shrink the
+                          // vertical scroll applies to the whole strip.
+                          { scale: Animated.multiply(scale, stripShrink) },
+                        ],
                       }}
                     >
-                      {petPhotoUrls[p.id] ? (
-                        <Animated.View
-                          style={{ width: chipAvatar, height: chipAvatar, borderRadius: 26, overflow: 'hidden' }}
-                        >
-                          <Image source={{ uri: petPhotoUrls[p.id] }} style={{ width: '100%', height: '100%' }} />
-                        </Animated.View>
-                      ) : (
-                        <Animated.View
-                          style={{
-                            width: chipAvatar,
-                            height: chipAvatar,
-                            borderRadius: 26,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: on ? 'rgba(255,255,255,0.28)' : c.accentSoft,
-                          }}
-                        >
-                          <Animated.Text
-                            style={{ fontSize: chipInitial, fontWeight: '700', color: on ? '#fff' : c.accent }}
-                          >
-                            {(p.name.trim().charAt(0) || '?').toUpperCase()}
-                          </Animated.Text>
-                        </Animated.View>
-                      )}
-                      <Animated.Text
-                        style={{ fontWeight: '700', fontSize: chipFont, color: on ? '#fff' : c.textMuted }}
+                      <Pressable
+                        onPress={() => {
+                          if (centred) router.push(`/pets/${p.id}`)
+                          else petsRef.current?.scrollTo({ x: i * PET_SLOT, animated: true })
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={p.name}
+                        style={{
+                          width: PET_AV,
+                          height: PET_AV,
+                          borderRadius: PET_AV / 2,
+                          backgroundColor: c.surface,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                        }}
                       >
-                        {p.name}
-                      </Animated.Text>
-                      {(overduePets[p.id] ?? 0) > 0 ? (
-                        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: on ? '#fff' : c.expense }} />
-                      ) : null}
+                        {petPhotoUrls[p.id] ? (
+                          <Image
+                            source={{ uri: petPhotoUrls[p.id] }}
+                            style={{ width: '100%', height: '100%' }}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <Txt style={{ fontSize: PET_AV * 0.42 }}>{p.emoji || '🐾'}</Txt>
+                        )}
+                      </Pressable>
                     </Animated.View>
-                  </Pressable>
+                  </View>
                 )
               })}
-              <Pressable
-                onPress={() => setShowPetForm(true)}
-                accessibilityLabel={t('pets.addPet')}
-                style={{ justifyContent: 'center' }}
+            </Animated.ScrollView>
+
+            {/* The selected pet's name under the row — plus the overdue dot,
+                which no longer has a chip to sit in. */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                paddingTop: 4,
+              }}
+            >
+              {(overduePets[selectedPet ?? ''] ?? 0) > 0 ? (
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.expense }} />
+              ) : null}
+              <Animated.Text
+                numberOfLines={1}
+                style={{ fontWeight: '700', fontSize: stripLabel, color: c.text }}
               >
-                {/* avatar-sized placeholder — reads as "a photo goes here" */}
-                <Animated.View
-                  style={{
-                    width: chipAvatar,
-                    height: chipAvatar,
-                    borderRadius: 26,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1.5,
-                    borderStyle: 'dashed',
-                    borderColor: c.textFaint,
-                    backgroundColor: c.surface,
-                  }}
-                >
-                  <Plus size={18} color={c.textMuted} />
-                </Animated.View>
-              </Pressable>
-            </ScrollView>
+                {pet?.name ?? ''}
+              </Animated.Text>
+            </View>
           </View>
 
         <Animated.ScrollView
