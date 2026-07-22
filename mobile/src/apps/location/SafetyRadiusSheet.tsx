@@ -308,7 +308,7 @@ export function SafetyRadiusSheet({
                   — the sheet's bottom control shouldn't change shape with state. */}
               <Btn
                 title={t('location.safety.stop')}
-                variant="secondary"
+                variant="danger"
                 onPress={stop}
                 loading={busy}
                 style={{

@@ -21,6 +21,7 @@ import { ChevronLeft, Sparkles } from 'lucide-react-native'
 import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
+import { pickOn } from '../theme/contrast'
 import { KEYBOARD_DONE_ID } from './keyboardDoneId'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
@@ -162,7 +163,13 @@ export function Btn({
 }: {
   title: string
   onPress: () => void
-  variant?: 'primary' | 'secondary' | 'ghost'
+  /** `danger` = a destructive/stop action, filled RED. Deliberately a fill and
+   *  not the app's usual red-label-on-plain (Disconnect, Delete account): that
+   *  measures 3.3:1 in light mode, under AA for this 16pt label. A fill with
+   *  pickOn() lands at 4.7–5.8:1 in both shipping modes, the same way the
+   *  primary button derives c.onAccent. The label colour has to live here —
+   *  callers can restyle the box via `style`, but not the text. */
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   disabled?: boolean
   loading?: boolean
   style?: ViewStyle
@@ -171,8 +178,16 @@ export function Btn({
   curveBottom?: boolean
 }) {
   const { c } = useTheme()
-  const bg = variant === 'primary' ? c.accent : variant === 'secondary' ? c.surface : 'transparent'
-  const fg = variant === 'primary' ? c.onAccent : c.text
+  const bg =
+    variant === 'primary'
+      ? c.accent
+      : variant === 'danger'
+        ? c.expense
+        : variant === 'secondary'
+          ? c.surface
+          : 'transparent'
+  const fg =
+    variant === 'primary' ? c.onAccent : variant === 'danger' ? pickOn(c.expense) : c.text
   const corners = curveBottom
     ? {
         borderTopLeftRadius: radius.md,
