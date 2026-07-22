@@ -3,6 +3,7 @@
 // and a pill button used for pet/type selection.
 import { useState } from 'react'
 import { Modal, Platform, Pressable, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import {
   Bath,
@@ -22,7 +23,7 @@ import {
 import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { formatDay } from '@/lib/format'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import type { PetEventType, PetTaskIcon } from '@/lib/types'
 
 export const TYPE_ICON: Record<PetEventType, LucideIcon> = {
@@ -106,6 +107,7 @@ export function DateField({
 }) {
   const { c, dark } = useTheme()
   const { t } = useI18n()
+  const insets = useSafeAreaInsets()
   const [open, setOpen] = useState(false)
 
   return (
@@ -178,7 +180,10 @@ export function DateField({
                 borderTopRightRadius: radius.lg,
                 paddingHorizontal: sp.lg,
                 paddingTop: sp.md,
-                paddingBottom: sp.xl,
+                // Half the inset hugs the bottom edge while clearing the home
+                // indicator, so Done's curve echoes the phone's own corner
+                // (same treatment as the pet EventForm's Save).
+                paddingBottom: Math.max(Math.round(insets.bottom / 2), sp.xs),
                 gap: sp.md,
               }}
             >
@@ -191,7 +196,14 @@ export function DateField({
                 }}
                 themeVariant={dark ? 'dark' : 'light'}
               />
-              <Btn title={t('common.done')} onPress={() => setOpen(false)} />
+              <Btn
+                title={t('common.done')}
+                onPress={() => setOpen(false)}
+                style={{
+                  borderBottomLeftRadius: sheetRadius,
+                  borderBottomRightRadius: sheetRadius,
+                }}
+              />
             </Pressable>
           </Pressable>
         </Modal>

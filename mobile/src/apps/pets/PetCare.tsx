@@ -19,6 +19,7 @@ import { Image } from 'expo-image'
 import { Check, ChevronLeft, ChevronRight, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
+import { Toast, type ToastData } from '@/components/Toast'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
@@ -131,6 +132,7 @@ export default function PetCare() {
   const [draft, setDraft] = useState<EventDraft>(emptyDraft)
   // Optimistic overlay for checklist taps, cleared when fresh data lands.
   const [overlay, setOverlay] = useState<Record<string, boolean>>({})
+  const [toast, setToast] = useState<ToastData | null>(null)
 
   // Pet chips start big and shrink as the list scrolls up (JS-driven — these
   // interpolations feed layout props, which the native driver can't animate).
@@ -769,13 +771,16 @@ export default function PetCare() {
         </>
       )}
 
+      <Toast data={toast} />
+
       {showPetForm ? (
         <PetForm
           pet={null}
           onClose={() => setShowPetForm(false)}
-          onSaved={() => {
+          onSaved={(name) => {
             setShowPetForm(false)
             load()
+            if (name) setToast({ emoji: '🐾', text: t('pets.savedToast', { name }) })
           }}
         />
       ) : null}

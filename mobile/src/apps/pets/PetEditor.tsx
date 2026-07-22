@@ -30,7 +30,8 @@ export function PetEditor({
   onSaved,
 }: {
   pet: Pet | null
-  onSaved: () => void
+  /** Called after a successful save, with the saved pet's name for a toast. */
+  onSaved: (name?: string) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -140,7 +141,7 @@ export function PetEditor({
     if (oldPhoto && oldPhoto !== (photoPath || null)) {
       await supabase.storage.from('documents').remove([oldPhoto])
     }
-    onSaved()
+    onSaved(fields.name)
   }
 
   return (

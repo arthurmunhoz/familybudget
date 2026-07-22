@@ -9,6 +9,7 @@ import { router } from 'expo-router'
 import { Scale, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Loader, Screen, Txt } from '@/components/ui'
+import { Toast, type ToastData } from '@/components/Toast'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { formatDay, todayISO } from '@/lib/format'
@@ -23,6 +24,7 @@ export default function PetProfile({ petId }: { petId: string }) {
   const { c } = useTheme()
   const { t } = useI18n()
 
+  const [toast, setToast] = useState<ToastData | null>(null)
   const [newWeight, setNewWeight] = useState('')
   const [savingWeight, setSavingWeight] = useState(false)
 
@@ -110,10 +112,17 @@ export default function PetProfile({ petId }: { petId: string }) {
   }
 
   return (
-    <Screen scroll header={<AppHeader title={pet.name} onBack={goBack} />}>
+    <View style={{ flex: 1 }}>
+      <Screen scroll header={<AppHeader title={pet.name} onBack={goBack} />}>
       <View style={{ gap: sp.xl, paddingTop: sp.sm }}>
         {/* editable fields */}
-        <PetEditor pet={pet} onSaved={load} />
+        <PetEditor
+          pet={pet}
+          onSaved={(name) => {
+            load()
+            setToast({ emoji: '🐾', text: t('pets.savedToast', { name: name ?? pet.name }) })
+          }}
+        />
 
         {/* weight log — quick to update at a vet visit */}
         <View style={{ gap: sp.sm }}>
@@ -236,6 +245,8 @@ export default function PetProfile({ petId }: { petId: string }) {
           <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('pets.deletePet')}</Txt>
         </Pressable>
       </View>
-    </Screen>
+      </Screen>
+      <Toast data={toast} />
+    </View>
   )
 }

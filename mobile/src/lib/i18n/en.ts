@@ -446,6 +446,7 @@ export const en = {
   'pets.namePlaceholder': 'Name',
   'pets.petEmoji': 'Pet emoji',
   'pets.saveFailed': 'Could not save the event — please try again.',
+  'pets.savedToast': '{name} saved',
   'pets.addPetFailed': 'Could not add the pet — please try again.',
   'pets.deleteConfirm': 'Delete “{title}” for {pet}?',
   'pets.type.vet': 'Vet',

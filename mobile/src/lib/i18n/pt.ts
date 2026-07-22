@@ -444,6 +444,7 @@ export const pt: Record<keyof typeof en, string> = {
   'pets.namePlaceholder': 'Nome',
   'pets.petEmoji': 'Emoji do pet',
   'pets.saveFailed': 'Não foi possível salvar o registro — tente novamente.',
+  'pets.savedToast': '{name} salvo',
   'pets.addPetFailed': 'Não foi possível adicionar o pet — tente novamente.',
   'pets.deleteConfirm': 'Excluir “{title}” de {pet}?',
   'pets.type.vet': 'Veterinário',

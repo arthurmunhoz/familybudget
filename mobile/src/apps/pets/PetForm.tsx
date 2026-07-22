@@ -17,7 +17,7 @@ export default function PetForm({
 }: {
   pet: Pet | null
   onClose: () => void
-  onSaved: () => void
+  onSaved: (name?: string) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
