@@ -56,6 +56,21 @@ const emptyDraft: EventDraft = {
   notes: '',
 }
 
+type Data = {
+  pets: Pet[]
+  tasks: PetCareTask[]
+  done: PetTaskDone[]
+  events: PetEvent[]
+  petPhotoUrls: Record<string, string>
+}
+
+/** Fallback while the query is still undefined. MODULE scope on purpose: as an
+ *  inline `= { ... }` default it was rebuilt every render, so `done` arrived
+ *  with a fresh identity each time and the effect below re-fired forever
+ *  ("Maximum update depth exceeded"). Every memo keyed on this data was also
+ *  recomputing on every render for the same reason. */
+const EMPTY_DATA: Data = { pets: [], tasks: [], done: [], events: [], petPhotoUrls: {} }
+
 // Which photo_path each pet's widget thumbnail was mirrored from — module-level
 // so re-mounts don't re-download unchanged photos.
 const mirroredPhotos: Record<string, string> = {}
@@ -125,21 +140,8 @@ export default function PetCare() {
   const chipFont = scrollY.interpolate({ inputRange: [0, 80], outputRange: [18, 13], extrapolate: 'clamp' })
   const chipPadV = scrollY.interpolate({ inputRange: [0, 80], outputRange: [12, 7], extrapolate: 'clamp' })
 
-  type Data = {
-    pets: Pet[]
-    tasks: PetCareTask[]
-    done: PetTaskDone[]
-    events: PetEvent[]
-    petPhotoUrls: Record<string, string>
-  }
   const {
-    data: { pets, tasks, done, events, petPhotoUrls } = {
-      pets: [],
-      tasks: [],
-      done: [],
-      events: [],
-      petPhotoUrls: {},
-    },
+    data: { pets, tasks, done, events, petPhotoUrls } = EMPTY_DATA,
     loading,
     revalidate: load,
   } = useCachedQuery<Data>('pets', async () => {
@@ -172,7 +174,10 @@ export default function PetCare() {
 
   // Fresh data replaces the optimistic overlay; so does browsing to another day.
   useEffect(() => {
-    setOverlay({})
+    // Return prev when already empty so React bails out of the re-render — a
+    // fresh `{}` is always a new reference and would keep the cycle alive on
+    // its own if any dependency ever churns again.
+    setOverlay((prev) => (Object.keys(prev).length ? {} : prev))
   }, [done, selectedDay])
 
   // useCachedQuery fetches on MOUNT only, so two real-world paths went stale:

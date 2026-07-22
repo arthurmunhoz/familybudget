@@ -89,6 +89,15 @@ if (MAPBOX_TOKEN) {
   Mapbox.setAccessToken(MAPBOX_TOKEN).catch(() => {})
 }
 
+/** Stable empty fallbacks. As inline `= []` / `= {}` defaults these were rebuilt
+ *  every render while the query was still undefined, so effects keyed on them
+ *  re-fired each time — `[places]` re-ran syncGeofences (a Supabase round-trip)
+ *  on every render. Same defect that made Pet Care loop; harmless here only
+ *  because none of these effects write state. */
+const NO_LOCS: MemberLocation[] = []
+const NO_PLACES: Place[] = []
+const NO_PLACE_WATCHES: Record<string, PlaceWatch> = {}
+
 const DRIVING_SPEED_MS = 3.5 // ~12.6 km/h — above walking pace → "Driving"
 const INITIAL_ZOOM = 13 // frame the user + their neighborhood on first open (not too tight)
 const FOCUS_ZOOM = 15 // closer, for when you've picked one person to look at
@@ -370,18 +379,18 @@ export default function Whereabouts() {
     }
   }, [])
 
-  const { data: locs = [], revalidate } = useCachedQuery<MemberLocation[]>(
+  const { data: locs = NO_LOCS, revalidate } = useCachedQuery<MemberLocation[]>(
     'location:members',
     fetchMemberLocations,
   )
-  const { data: places = [], revalidate: reloadPlaces } = useCachedQuery<Place[]>(
+  const { data: places = NO_PLACES, revalidate: reloadPlaces } = useCachedQuery<Place[]>(
     'location:places',
     fetchPlaces,
   )
 
   // Which places I subscribe to — a geofence is only worth drawing if it's
   // actually watching for me. Someone else's subscription isn't my boundary.
-  const { data: placeWatches = {}, revalidate: reloadPlaceWatches } = useCachedQuery<
+  const { data: placeWatches = NO_PLACE_WATCHES, revalidate: reloadPlaceWatches } = useCachedQuery<
     Record<string, PlaceWatch>
   >('location:placeWatches', fetchMyPlaceWatches)
 
