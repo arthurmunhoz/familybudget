@@ -26,6 +26,12 @@ module.exports = ({ config }) => {
           'One Roof shows where your household is and shares your location with them.',
         NSLocationAlwaysAndWhenInUseUsageDescription:
           'One Roof keeps your location up to date for your household — even in the background — so they can see where you are and get there.',
+        // The legacy iOS-10 key. expo-location's plugin fills it with the
+        // placeholder "Allow $(PRODUCT_NAME) to access your location", which is
+        // exactly the kind of generic string App Review flags — say the same
+        // thing the modern key says.
+        NSLocationAlwaysUsageDescription:
+          'One Roof keeps your location up to date for your household — even in the background — so they can see where you are and get there.',
         UIBackgroundModes: bgModes.includes('location') ? bgModes : [...bgModes, 'location'],
         // Lets Linking.canOpenURL reach the Google Maps / Waze apps for one-tap navigate.
         LSApplicationQueriesSchemes: Array.from(

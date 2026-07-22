@@ -2,7 +2,7 @@
   "expo": {
     "name": "One Roof",
     "slug": "one-roof",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "oneroof",
@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.oneroof.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "appleTeamId": "R87YC3Q5W2",
       "supportsTablet": true,
       "usesAppleSignIn": true,
