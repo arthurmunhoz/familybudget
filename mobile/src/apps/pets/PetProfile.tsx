@@ -19,17 +19,10 @@ import type { Pet, PetEvent, PetWeight } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { TYPE_ICON } from './petUi'
 import { PetEditor } from './PetEditor'
+import { PetHero, usePetIdentity } from './petIdentity'
 
 export default function PetProfile({ petId }: { petId: string }) {
   const { c } = useTheme()
-  const { t } = useI18n()
-
-  const [toast, setToast] = useState<ToastData | null>(null)
-  // Drives the pet photo's collapse as the page scrolls. Native-driven: the
-  // hero only transforms, so no JS runs per frame.
-  const scrollY = useRef(new Animated.Value(0)).current
-  const [newWeight, setNewWeight] = useState('')
-  const [savingWeight, setSavingWeight] = useState(false)
 
   const {
     data: { pet, events, weights } = { pet: null, events: [], weights: [] },
@@ -58,6 +51,43 @@ export default function PetProfile({ petId }: { petId: string }) {
       }
     },
   )
+
+  if (loading || !pet) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
+        <Loader />
+      </SafeAreaView>
+    )
+  }
+
+  // Keyed on the pet so the editor's identity state (name, photo) is seeded
+  // from a pet that's actually loaded — a hook can't initialise from null and
+  // then catch up.
+  return <PetDetails key={pet.id} pet={pet} events={events} weights={weights} reload={load} />
+}
+
+function PetDetails({
+  pet,
+  events,
+  weights,
+  reload: load,
+}: {
+  pet: Pet
+  events: PetEvent[]
+  weights: PetWeight[]
+  reload: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+
+  const [toast, setToast] = useState<ToastData | null>(null)
+  const [newWeight, setNewWeight] = useState('')
+  const [savingWeight, setSavingWeight] = useState(false)
+  const identity = usePetIdentity(pet)
+  // Drives the pinned photo's collapse as the page scrolls. It animates a
+  // size, so no native driver — safe because the hero sits OUTSIDE the scroll
+  // view, where resizing it can't disturb the content offset.
+  const scrollY = useRef(new Animated.Value(0)).current
 
   async function addWeight() {
     const value = Number(newWeight.replace(',', '.'))
@@ -106,28 +136,29 @@ export default function PetProfile({ petId }: { petId: string }) {
     ])
   }
 
-  if (loading || !pet) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
-        <Loader />
-      </SafeAreaView>
-    )
-  }
-
   return (
     <View style={{ flex: 1 }}>
       <Screen
         scroll
-        header={<AppHeader title={pet.name} onBack={goBack} />}
+        header={
+          <>
+            <AppHeader title={pet.name} onBack={goBack} />
+            {/* The photo is PINNED here, above the scroll view, and shrinks as
+                the content moves under it. */}
+            <View style={{ paddingBottom: sp.sm }}>
+              <PetHero identity={identity} scrollY={scrollY} />
+            </View>
+          </>
+        }
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
+          useNativeDriver: false,
         })}
       >
       <View style={{ gap: sp.xl, paddingTop: sp.sm }}>
         {/* editable fields */}
         <PetEditor
           pet={pet}
-          scrollY={scrollY}
+          identity={identity}
           onSaved={(name) => {
             load()
             setToast({ emoji: '🐾', text: t('pets.savedToast', { name: name ?? pet.name }) })

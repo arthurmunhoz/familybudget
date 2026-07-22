@@ -9,6 +9,7 @@ import { useI18n } from '@/hooks/useI18n'
 import type { Pet } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { PetEditor } from './PetEditor'
+import { PetHero, usePetIdentity } from './petIdentity'
 
 export default function PetForm({
   pet,
@@ -21,6 +22,8 @@ export default function PetForm({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  // The sheet's photo just sits at the top of the scroll — nothing to pin to.
+  const identity = usePetIdentity(pet)
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -54,7 +57,10 @@ export default function PetForm({
             contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl }}
             keyboardShouldPersistTaps="handled"
           >
-            <PetEditor pet={pet} onSaved={onSaved} />
+            <View style={{ marginBottom: sp.sm }}>
+              <PetHero identity={identity} />
+            </View>
+            <PetEditor pet={pet} identity={identity} onSaved={onSaved} />
           </ScrollView>
         </View>
       </View>

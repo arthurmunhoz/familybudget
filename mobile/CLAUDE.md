@@ -84,6 +84,19 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `sheet === card` outside the glass skin, so it's a no-op for Warm Hearth.
   - Under GLASS, `c.bg` is TRANSPARENT (that's how the wash shows). Never use it
     as a foreground/inverse colour — the toast's label did and vanished.
+- **Collapsing headers: shrink something OUTSIDE the scroll view, never inside
+  it.** `Screen` takes an `onScroll` (its scroller is an `Animated.ScrollView`,
+  so a native-driven `Animated.event` attaches) and a `header`, which renders
+  ABOVE the scroll area — that's where a shrinking element belongs. Animating
+  the size of a box that's part of the scroll CONTENT changes `contentSize`
+  mid-gesture, iOS clamps `contentOffset` to the new size, that feeds straight
+  back into the driving `Animated.Value`, and the scroll locks up with the
+  animation frozen half-way (real bug: the pet photo on `PetProfile`). Inside
+  the content the only safe collapse is a `transform` (no layout, and it can run
+  on the native driver); in the header slot a real height/width animation is
+  fine, at the cost of `useNativeDriver: false`. `apps/pets/petIdentity.tsx` is
+  the reference — note the state the header and the form share has to be lifted
+  into a controller the HOST owns, since the two can't be siblings.
 - **Push REGISTRATION** `@/lib/notifications`: `registerForPush()` (prompts) runs
   ONLY from the Settings notifications toggle — that's deliberate, a permission
   prompt shouldn't fire at launch with no context. So "no `expo_push_tokens` row"
