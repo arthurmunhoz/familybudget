@@ -10,7 +10,8 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 
 ## Stack
 - **Expo SDK 56 + expo-router** (file routes in `src/app/`), TypeScript, React 19.
-- **Supabase** via `@/lib/supabase` (AsyncStorage session + url-polyfill). RLS is
+- **Supabase** via `@/lib/supabase` (Keychain session via
+  `@/lib/secureSessionStore` + url-polyfill, `flowType: 'pkce'`). RLS is
   the security boundary — NEVER filter `household_id` client-side for security;
   column defaults stamp `household_id`/`created_by`/`sender_email`/etc. on insert.
 - **Private budgets (migration 058)**: a budget is `visibility='household'` by
@@ -696,3 +697,14 @@ already there.
   `supabase.auth.getSession()` (see Coding standards above).
 - Don't define a component function inside another component's render body —
   hoist it to module scope (see Coding standards above).
+- **Don't statically `import` a native module that might not be in the running
+  binary.** Expo modules call `requireNativeModule(...)` at module scope, which
+  THROWS on an older build — and the throw propagates up the whole import chain,
+  so it doesn't merely disable that feature, it can take down the entire app.
+  Use a guarded `require` inside try/catch that resolves to `null` when absent,
+  and degrade gracefully. Two files already do this for exactly this reason:
+  `lib/secureSessionStore.ts` (expo-secure-store → falls back to AsyncStorage)
+  and `DocumentVault`'s `loadScanner()` (document scanner → falls back to the
+  plain camera). This has bitten twice; adding a native dep needs a rebuild
+  (`npx expo prebuild -p ios --clean`) and every already-installed build keeps
+  running the old binary until then.
