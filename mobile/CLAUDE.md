@@ -59,6 +59,16 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     ONE blob tinted with the scheme's hue or the glass dies — the effect comes
     from variation behind a translucent card, and flat grey gives it nothing to
     read through.
+    **`WASH_INTENSITY` (in `glass.tsx`) is the one dial for how loud the wash
+    reads** — blob opacities in `SCHEMES` are authored at full strength and
+    scaled by it, so each scheme keeps its relative weighting and there's a
+    single number to turn. It's below 1 because at full strength the background
+    competed with the content: these screens carry a lot of information and a
+    saturated wash behind all of it read as busy rather than warm. Light is cut
+    hardest (saturated colour on pale paper); dark only lightly, since its blobs
+    are already near-black on near-black and the same cut would flatten it to
+    grey. Tune THIS, not the per-scheme opacities. Calming it also *raises* text
+    contrast — cards are translucent white, so a paler page makes them paler too.
     Rules for a new accent: it must not read as the expense red (`#E4554A`) or
     the income green (`#1F9E68`) — the original `#E2683F` failed the first,
     painting primary buttons and negative amounts nearly alike. A neutral wash

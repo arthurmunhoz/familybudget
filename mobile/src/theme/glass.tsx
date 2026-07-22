@@ -260,9 +260,27 @@ const BLOB_POS = [
   { top: H - BLOB * 0.6, left: W * 0.1 },
 ]
 
+/**
+ * One dial on how loudly the wash reads. Blob opacities in SCHEMES are authored
+ * at full strength; this scales all of them, so the relative weighting each
+ * scheme was tuned with is preserved and there's a single number to turn.
+ *
+ * Why below 1: at full strength the background competed with the content. These
+ * screens carry a lot of information (a budget period, a day's agenda, a
+ * checklist), and a saturated wash behind all of it read as busy rather than
+ * warm. Dialled back, the colour still tints the page — the app stays
+ * recognisably itself — but it sits behind the content instead of alongside it.
+ *
+ * Light is cut hardest: its blobs are saturated colour on pale paper. Dark's are
+ * already near-black on near-black, so the same cut would flatten it to grey and
+ * kill the glass entirely.
+ */
+const WASH_INTENSITY = { light: 0.42, dark: 0.75 }
+
 export function GlassWash({ dark, scheme }: { dark: boolean; scheme: SchemeId }) {
   const s = SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME]
   const w = dark ? s.washDark : s.wash
+  const intensity = dark ? WASH_INTENSITY.dark : WASH_INTENSITY.light
   return (
     <View
       pointerEvents="none"
@@ -279,7 +297,7 @@ export function GlassWash({ dark, scheme }: { dark: boolean; scheme: SchemeId })
             height: BLOB,
             borderRadius: BLOB / 2,
             backgroundColor: b.color,
-            opacity: b.o,
+            opacity: b.o * intensity,
           }}
         />
       ))}
