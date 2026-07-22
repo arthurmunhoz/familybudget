@@ -1,10 +1,10 @@
 // Document Vault — the module's main screen (RN port of the PWA DocumentVault).
 // Documents grouped by category, each row showing a title + a category type
 // icon. Tapping a row opens the file via a signed URL in the in-app browser;
-// the chevron opens the details sheet (rename / recategorise / delete). The bottom
+// the pencil opens the details sheet (rename / recategorise / delete). The bottom
 // bar picks a file (images + PDF only) → shows the UploadSheet.
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, Switch, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
@@ -14,7 +14,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
-import { ChevronRight, FileText, Lock } from 'lucide-react-native'
+import { ChevronRight, FileText, Lock, Pencil } from 'lucide-react-native'
 
 import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -572,12 +572,42 @@ function DocRow({
           </Txt>
         </View>
       </Pressable>
-      {/* One trailing affordance, not three. Delete moved into the details
-          sheet (rare + irreversible, wrong thing to have one tap from a list),
-          and with it gone the pencil and a chevron would both just open the
-          same sheet — so the chevron does that job alone. Row body still opens
-          the document itself. */}
-      <Pressable onPress={onEdit} hitSlop={8} accessibilityLabel={t('common.editName', { name: doc.title })}>
+      {/* Two trailing controls that must not read as one: the pencil is a real
+          BUTTON (bordered, raised off the card) going to the details sheet; the
+          chevron is the flat affordance for the row's own tap. Giving the
+          pencil a box is what separates them — as two bare glyphs side by side
+          they looked like a single control. */}
+      <Pressable
+        onPress={onEdit}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.editName', { name: doc.title })}
+        style={({ pressed }) => [
+          {
+            width: 34,
+            height: 34,
+            borderRadius: radius.md,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: c.border,
+            backgroundColor: c.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            // Lifts it off the card so it reads as pressable rather than
+            // decorative — the "floating" the chevron deliberately lacks.
+            shadowColor: '#000',
+            shadowOpacity: 0.12,
+            shadowRadius: 3,
+            shadowOffset: { width: 0, height: 1 },
+            elevation: 2,
+          },
+          pressed && { opacity: 0.6 },
+        ]}
+      >
+        <Pencil size={16} color={c.text} />
+      </Pressable>
+      {/* Opens the document, same as the row body — a chevron that did nothing
+          when tapped would be a lie about what it points at. */}
+      <Pressable onPress={onOpen} hitSlop={8} accessibilityLabel={t('common.openName', { name: doc.title })}>
         <ChevronRight size={20} color={c.textFaint} />
       </Pressable>
     </View>

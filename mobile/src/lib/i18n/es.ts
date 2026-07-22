@@ -1011,6 +1011,7 @@ export const es: Record<keyof typeof en, string> = {
   'chart.unlabeled': 'Sin etiqueta',
 
   'common.all': 'Todos',
+  'common.openName': 'Abrir {name}',
   'common.editName': 'Editar {name}',
 
   'docCat.ids': 'Identificaciones',

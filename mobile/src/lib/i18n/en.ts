@@ -1012,6 +1012,7 @@ export const en = {
   'chart.unlabeled': 'Unlabeled',
 
   'common.all': 'All',
+  'common.openName': 'Open {name}',
   'common.editName': 'Edit {name}',
 
   'docCat.ids': 'IDs',

@@ -1011,6 +1011,7 @@ export const pt: Record<keyof typeof en, string> = {
   'chart.unlabeled': 'Sem rótulo',
 
   'common.all': 'Todos',
+  'common.openName': 'Abrir {name}',
   'common.editName': 'Editar {name}',
 
   'docCat.ids': 'Identidades',
