@@ -25,8 +25,8 @@ export default function PetProfile({ petId }: { petId: string }) {
   const { t } = useI18n()
 
   const [toast, setToast] = useState<ToastData | null>(null)
-  // Drives the pet photo's collapse as the page scrolls (JS-driven — it
-  // animates a height, which the native driver can't do).
+  // Drives the pet photo's collapse as the page scrolls. Native-driven: the
+  // hero only transforms, so no JS runs per frame.
   const scrollY = useRef(new Animated.Value(0)).current
   const [newWeight, setNewWeight] = useState('')
   const [savingWeight, setSavingWeight] = useState(false)
@@ -120,7 +120,7 @@ export default function PetProfile({ petId }: { petId: string }) {
         scroll
         header={<AppHeader title={pet.name} onBack={goBack} />}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: false,
+          useNativeDriver: true,
         })}
       >
       <View style={{ gap: sp.xl, paddingTop: sp.sm }}>

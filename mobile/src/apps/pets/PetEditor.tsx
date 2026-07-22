@@ -65,14 +65,18 @@ export function PetEditor({
   const [saving, setSaving] = useState(false)
   const [speciesOpen, setSpeciesOpen] = useState(false)
 
-  // Collapse the hero on scroll when the host drives one; otherwise it's a
-  // constant at full size (Animated accepts a plain number just fine).
-  const heroSize = scrollY
-    ? scrollY.interpolate({ inputRange: [0, 120], outputRange: [HERO_MAX, HERO_MIN], extrapolate: 'clamp' })
-    : HERO_MAX
-  const heroGlyph = scrollY
-    ? scrollY.interpolate({ inputRange: [0, 120], outputRange: [60, 38], extrapolate: 'clamp' })
-    : 60
+  // Collapse the hero on scroll when the host drives one; otherwise it stays
+  // at full size. SCALE, never height. Animating the hero's height would shrink the scroll
+  // view's contentSize mid-gesture, iOS clamps contentOffset to the new size,
+  // that feeds straight back into scrollY — and the scroll locks up. A
+  // transform changes no layout, so it also runs on the native driver.
+  const heroScale = scrollY
+    ? scrollY.interpolate({
+        inputRange: [0, 120],
+        outputRange: [1, HERO_MIN / HERO_MAX],
+        extrapolate: 'clamp',
+      })
+    : 1
 
   // Sign the existing photo for preview.
   useEffect(() => {
@@ -169,10 +173,15 @@ export function PetEditor({
     <View style={{ gap: sp.md }}>
       {/* Hero: the pet's photo with its actions floating ON it (pencil = add or
           change, ✕ = remove) rather than as a row of text buttons underneath.
-          The wrapper is the one that carries the animated size — the circle
-          clips its image, so buttons parented to IT would be clipped too. */}
+          The wrapper carries the scale — the circle clips its image, so buttons
+          parented to IT would be clipped too. */}
       <Animated.View
-        style={{ height: heroSize, width: heroSize, alignSelf: 'center' }}
+        style={{
+          height: HERO_MAX,
+          width: HERO_MAX,
+          alignSelf: 'center',
+          transform: [{ scale: heroScale }],
+        }}
       >
         <View
           style={{
@@ -192,7 +201,7 @@ export function PetEditor({
               contentFit="cover"
             />
           ) : (
-            <Animated.Text style={{ fontSize: heroGlyph }}>{emoji || '🐾'}</Animated.Text>
+            <Txt style={{ fontSize: 60 }}>{emoji || '🐾'}</Txt>
           )}
         </View>
 
