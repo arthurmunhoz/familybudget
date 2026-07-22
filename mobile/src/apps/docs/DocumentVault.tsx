@@ -1,7 +1,7 @@
 // Document Vault — the module's main screen (RN port of the PWA DocumentVault).
 // Documents grouped by category, each row showing a title + a category type
 // icon. Tapping a row opens the file via a signed URL in the in-app browser;
-// the pencil edits the row; the X deletes (with an Alert confirm). The bottom
+// the chevron opens the details sheet (rename / recategorise / delete). The bottom
 // bar picks a file (images + PDF only) → shows the UploadSheet.
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, Switch, View } from 'react-native'
@@ -14,7 +14,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
-import { FileText, Lock, Pencil, Plus, X } from 'lucide-react-native'
+import { ChevronRight, FileText, Lock } from 'lucide-react-native'
 
 import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -352,6 +352,7 @@ export default function DocumentVault() {
           await supabase.storage.from('documents').remove([doc.file_path])
           await supabase.from('documents').delete().eq('id', doc.id)
           track('doc.deleted', { title: doc.title, category: doc.category })
+          setEditing(null)   // the sheet is open on the row we just removed
           load()
         },
       },
@@ -483,7 +484,6 @@ export default function DocumentVault() {
                   opening={opening === doc.id}
                   onOpen={() => openDoc(doc)}
                   onEdit={() => setEditing(doc)}
-                  onDelete={() => removeDoc(doc)}
                 />
               ))}
             </View>
@@ -520,6 +520,7 @@ export default function DocumentVault() {
             setEditing(null)
             load()
           }}
+          onDelete={() => removeDoc(editing)}
         />
       )}
     </SafeAreaView>
@@ -532,7 +533,6 @@ function DocRow({
   opening,
   onOpen,
   onEdit,
-  onDelete,
 }: {
   doc: FamilyDocument
   /** Owner's first name, shown in the subtitle only in the "Everyone" view. */
@@ -540,7 +540,6 @@ function DocRow({
   opening: boolean
   onOpen: () => void
   onEdit: () => void
-  onDelete: () => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -573,11 +572,13 @@ function DocRow({
           </Txt>
         </View>
       </Pressable>
+      {/* One trailing affordance, not three. Delete moved into the details
+          sheet (rare + irreversible, wrong thing to have one tap from a list),
+          and with it gone the pencil and a chevron would both just open the
+          same sheet — so the chevron does that job alone. Row body still opens
+          the document itself. */}
       <Pressable onPress={onEdit} hitSlop={8} accessibilityLabel={t('common.editName', { name: doc.title })}>
-        <Pencil size={18} color={c.textFaint} />
-      </Pressable>
-      <Pressable onPress={onDelete} hitSlop={8} accessibilityLabel={t('common.deleteName', { name: doc.title })}>
-        <X size={18} color={c.textFaint} />
+        <ChevronRight size={20} color={c.textFaint} />
       </Pressable>
     </View>
   )

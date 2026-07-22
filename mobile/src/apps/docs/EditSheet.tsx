@@ -17,11 +17,15 @@ export default function EditSheet({
   profiles,
   onClose,
   onSaved,
+  onDelete,
 }: {
   doc: FamilyDocument
   profiles: Profile[]
   onClose: () => void
   onSaved: () => void
+  /** Deleting moved OFF the list row and in here — it's rare and irreversible,
+   *  so it belongs behind a deliberate step rather than one tap from a list. */
+  onDelete: () => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -73,7 +77,9 @@ export default function EditSheet({
               justifyContent: 'space-between',
               paddingHorizontal: sp.lg,
               paddingTop: sp.lg,
-              paddingBottom: sp.sm,
+              // Room under the heading so the document's name isn't crowded
+              // against it — that name is the thing being edited.
+              paddingBottom: sp.lg,
             }}
           >
             <Txt variant="h2">{t('docs.editDoc')}</Txt>
@@ -87,7 +93,14 @@ export default function EditSheet({
             contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
             keyboardShouldPersistTaps="handled"
           >
-            <Field value={title} onChangeText={setTitle} placeholder={t('docs.titlePlaceholder')} />
+            <Field
+              value={title}
+              onChangeText={setTitle}
+              placeholder={t('docs.titlePlaceholder')}
+              // The document's name is the subject of this sheet — give it more
+              // weight than the chips below it.
+              style={{ fontSize: 18 }}
+            />
 
             <ChipRow>
               {CATEGORIES.map((cat) => (
@@ -107,6 +120,23 @@ export default function EditSheet({
                 </Chip>
               ))}
             </ChipRow>
+
+            {/* Destructive action at the END of the content, not beside Save —
+                it stays reachable without competing with the primary button,
+                and Save remains the sole footer control so its curve can meet
+                the screen's corner. Red label matches Delete account /
+                Disconnect elsewhere in the app. */}
+            <Pressable
+              onPress={onDelete}
+              disabled={saving}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                { alignSelf: 'center', paddingVertical: sp.sm, paddingHorizontal: sp.lg },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('common.delete')}</Txt>
+            </Pressable>
           </ScrollView>
 
           <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl }}>
@@ -115,6 +145,7 @@ export default function EditSheet({
               onPress={save}
               disabled={!title.trim()}
               loading={saving}
+              curveBottom
             />
           </View>
         </View>
