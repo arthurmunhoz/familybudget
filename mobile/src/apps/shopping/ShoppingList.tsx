@@ -42,7 +42,7 @@ import { supabase } from '@/lib/supabase'
 import { STORE_CATALOG, STORE_COLORS, type StoreCatalogEntry } from '@/lib/stores'
 import { fetchStoreSuggestions, type SuggestedStore } from '@/lib/storeSuggest'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import StoreLogo from './StoreLogo'
 import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
@@ -544,7 +544,14 @@ export default function ShoppingList() {
         <View
           style={[
             styles.addBar,
-            { backgroundColor: c.bg, paddingBottom: (keyboardUp ? 0 : insets.bottom) + sp.md },
+            {
+              backgroundColor: c.bg,
+              // Hug the bottom edge: HALF the safe-area inset (floored), the
+              // same trim NewItemButton uses, so the row's curved outer corners
+              // sit near the screen's own corner instead of floating above the
+              // full home-indicator gap. Keyboard up, the keyboard IS the edge.
+              paddingBottom: keyboardUp ? sp.md : Math.max(Math.round(insets.bottom / 2), sp.xs),
+            },
           ]}
         >
           <ScrollView
@@ -951,16 +958,26 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   inputRow: { flexDirection: 'row', gap: sp.sm, marginTop: sp.sm },
+  // The row sits at the foot of the screen, so its OUTER bottom corners follow
+  // the iPhone's own curve (sheetRadius; square on Android). Only the outer
+  // ones — the two facing each other across the gap stay at radius.md, since
+  // they don't meet a screen edge and curving them would read as two lozenges.
   input: {
     flex: 1,
-    borderRadius: radius.md,
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
+    borderBottomLeftRadius: sheetRadius,
+    borderBottomRightRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: sp.lg,
     paddingVertical: 14,
     fontSize: 16,
   },
   addBtn: {
-    borderRadius: radius.md,
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
+    borderBottomLeftRadius: radius.md,
+    borderBottomRightRadius: sheetRadius,
     paddingHorizontal: sp.xl,
     alignItems: 'center',
     justifyContent: 'center',
