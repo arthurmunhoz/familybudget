@@ -2,8 +2,8 @@
 // a pet card, so the fields are editable in place (via the shared PetEditor):
 // no separate "edit" step. Below the editor: that pet's event history
 // (read-only) and a delete-pet action.
-import { useState } from 'react'
-import { Alert, Pressable, TextInput, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { Alert, Animated, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Scale, Trash2 } from 'lucide-react-native'
@@ -25,6 +25,9 @@ export default function PetProfile({ petId }: { petId: string }) {
   const { t } = useI18n()
 
   const [toast, setToast] = useState<ToastData | null>(null)
+  // Drives the pet photo's collapse as the page scrolls (JS-driven — it
+  // animates a height, which the native driver can't do).
+  const scrollY = useRef(new Animated.Value(0)).current
   const [newWeight, setNewWeight] = useState('')
   const [savingWeight, setSavingWeight] = useState(false)
 
@@ -113,19 +116,30 @@ export default function PetProfile({ petId }: { petId: string }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen scroll header={<AppHeader title={pet.name} onBack={goBack} />}>
+      <Screen
+        scroll
+        header={<AppHeader title={pet.name} onBack={goBack} />}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
+      >
       <View style={{ gap: sp.xl, paddingTop: sp.sm }}>
         {/* editable fields */}
         <PetEditor
           pet={pet}
+          scrollY={scrollY}
           onSaved={(name) => {
             load()
             setToast({ emoji: '🐾', text: t('pets.savedToast', { name: name ?? pet.name }) })
           }}
         />
 
+        {/* Everything below the editor is its own record of the pet, not part
+            of the form — a rule keeps Save from looking attached to it. */}
+        <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+
         {/* weight log — quick to update at a vet visit */}
-        <View style={{ gap: sp.sm }}>
+        <View style={{ gap: sp.sm, marginTop: -sp.sm }}>
           <Txt
             style={{
               fontSize: 12,

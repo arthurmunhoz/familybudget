@@ -459,6 +459,7 @@ export const pt: Record<keyof typeof en, string> = {
   'pets.deletePetConfirm': 'Excluir {name} e todos os seus registros? Isso não pode ser desfeito.',
   'pets.deletePetFailed': 'Não foi possível excluir o pet — tente novamente.',
   'pets.species': 'Espécie',
+  'pets.speciesPlaceholder': 'Escolha uma espécie',
   'pets.species.dog': 'Cachorro',
   'pets.species.cat': 'Gato',
   'pets.species.bird': 'Ave',

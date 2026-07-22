@@ -16,6 +16,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native'
+import type { ScrollViewProps } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context'
 import { ChevronLeft, Sparkles } from 'lucide-react-native'
 import { router } from 'expo-router'
@@ -51,6 +52,7 @@ export function Screen({
   edges = ['top', 'left', 'right'],
   header,
   scrollRef,
+  onScroll,
 }: {
   children: ReactNode
   scroll?: boolean
@@ -63,6 +65,9 @@ export function Screen({
   /** Optional ref to the inner ScrollView (only when `scroll`) — for
    *  programmatic scroll-to, e.g. deep-linking to a section. */
   scrollRef?: Ref<ScrollView>
+  /** Scroll handler for the inner ScrollView (only when `scroll`) — e.g. an
+   *  `Animated.event` driving a collapsing header. */
+  onScroll?: ScrollViewProps['onScroll']
 }) {
   const { c } = useTheme()
   const inner = pad ? { paddingHorizontal: sp.lg } : undefined
@@ -79,6 +84,8 @@ export function Screen({
             style={{ flex: 1 }}
             contentContainerStyle={[{ paddingBottom: sp.xxl }, inner]}
             keyboardShouldPersistTaps="handled"
+            onScroll={onScroll}
+            scrollEventThrottle={16}
           >
             {children}
           </ScrollView>

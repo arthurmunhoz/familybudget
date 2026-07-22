@@ -461,6 +461,7 @@ export const en = {
   'pets.deletePetConfirm': 'Delete {name} and all of their events? This can’t be undone.',
   'pets.deletePetFailed': 'Could not delete the pet — please try again.',
   'pets.species': 'Species',
+  'pets.speciesPlaceholder': 'Choose a species',
   'pets.species.dog': 'Dog',
   'pets.species.cat': 'Cat',
   'pets.species.bird': 'Bird',
