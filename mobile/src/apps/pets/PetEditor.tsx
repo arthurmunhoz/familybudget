@@ -22,6 +22,9 @@ import { radius, sp, useTheme } from '@/theme/theme'
 import { SPECIES, speciesEmoji } from './petMeta'
 import { DateField } from './petUi'
 
+/** One height for the emoji + name row, so the two boxes line up. */
+const PET_FIELD_H = 48
+
 export function PetEditor({
   pet,
   onSaved,
@@ -203,16 +206,30 @@ export function PetEditor({
         </View>
       </View>
 
-      {/* emoji + name */}
+      {/* emoji + name — Field sizes itself from its font, and the emoji runs at
+          22pt against the name's 16pt, so left to themselves the two boxes don't
+          match. Both get one explicit height instead (also a clean 48pt target). */}
       <View style={{ flexDirection: 'row', gap: sp.md }}>
         <Field
           value={emoji}
           onChangeText={setEmoji}
           accessibilityLabel={t('pets.petEmoji')}
-          style={{ width: 64, textAlign: 'center', fontSize: 22 }}
+          style={{
+            width: 64,
+            height: PET_FIELD_H,
+            paddingVertical: 0,
+            textAlign: 'center',
+            textAlignVertical: 'center',
+            fontSize: 22,
+          }}
         />
         <View style={{ flex: 1 }}>
-          <Field value={name} onChangeText={setName} placeholder={t('pets.namePlaceholder')} />
+          <Field
+            value={name}
+            onChangeText={setName}
+            placeholder={t('pets.namePlaceholder')}
+            style={{ height: PET_FIELD_H, paddingVertical: 0, textAlignVertical: 'center' }}
+          />
         </View>
       </View>
 
