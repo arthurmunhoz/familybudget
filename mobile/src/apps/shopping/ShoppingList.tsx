@@ -513,9 +513,13 @@ export default function ShoppingList() {
           renderItem={renderItem}
           renderSectionHeader={renderSectionHeader}
           stickySectionHeadersEnabled={false}
+          // flex:1 so the list fills the space ABOVE the add bar (which is now
+          // in normal flow) — the old `paddingBottom: 220 + inset` was a guess
+          // at the overlay's height and hid rows whenever the bar was taller.
+          style={{ flex: 1 }}
           contentContainerStyle={{
             paddingHorizontal: sp.lg,
-            paddingBottom: 220 + insets.bottom,
+            paddingBottom: sp.md,
           }}
           ItemSeparatorComponent={() => <View style={{ height: sp.sm }} />}
           SectionSeparatorComponent={() => <View style={{ height: sp.xs }} />}
@@ -900,7 +904,9 @@ function Chip({
 
 const styles = StyleSheet.create({
   countPill: { borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 4 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingBottom: 120 },
+  // No paddingBottom offset: the add bar is in normal flow now, so this centres
+  // in the space that's actually left rather than compensating for an overlay.
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   row: {
     flexDirection: 'row',
@@ -925,7 +931,14 @@ const styles = StyleSheet.create({
     paddingBottom: sp.sm,
   },
   clearBtn: { alignSelf: 'center', paddingVertical: sp.lg },
-  addBarWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  // NORMAL flow, not an absolute overlay: the bottom of the screen is reserved
+  // for the stores + add field, so the list ends AT the bar instead of sliding
+  // under it. (It used to be `position: 'absolute'` over the list, relying on
+  // the bar's own background to hide what passed beneath — but that background
+  // is `c.bg`, which the glass skin makes TRANSPARENT, so the list showed right
+  // through it.) KeyboardAvoidingView still lifts it above the keyboard: its
+  // padding grows, and the flex:1 list shrinks to match.
+  addBarWrap: {},
   addBar: { paddingHorizontal: sp.lg, paddingTop: sp.sm },
   chips: { gap: sp.sm, paddingBottom: sp.sm, alignItems: 'center' },
   chip: {
