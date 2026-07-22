@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Animated,
   ScrollView,
   StyleSheet,
   Text,
@@ -66,7 +67,8 @@ export function Screen({
    *  programmatic scroll-to, e.g. deep-linking to a section. */
   scrollRef?: Ref<ScrollView>
   /** Scroll handler for the inner ScrollView (only when `scroll`) — e.g. an
-   *  `Animated.event` driving a collapsing header. */
+   *  `Animated.event` driving a collapsing header. The scroller is an
+   *  `Animated.ScrollView`, so a NATIVE-driven event attaches here. */
   onScroll?: ScrollViewProps['onScroll']
 }) {
   const { c } = useTheme()
@@ -79,7 +81,7 @@ export function Screen({
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
         >
-          <ScrollView
+          <Animated.ScrollView
             ref={scrollRef}
             style={{ flex: 1 }}
             contentContainerStyle={[{ paddingBottom: sp.xxl }, inner]}
@@ -88,7 +90,7 @@ export function Screen({
             scrollEventThrottle={16}
           >
             {children}
-          </ScrollView>
+          </Animated.ScrollView>
         </KeyboardAvoidingView>
       ) : (
         <View style={[{ flex: 1 }, inner]}>{children}</View>
