@@ -450,8 +450,16 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     a crossing only counts when `isOutside` differs from the remembered state.
     That's what keeps a stationary member quiet, and it's also why starting a
     watch on people already inside announces nothing — their state matches from
-    the first evaluation. Someone already OUTSIDE at start does alert, which is
-    correct: they are outside your radius.
+    the first evaluation.
+  - **The first look at a member is NOT a crossing** (`seenRef`, per member —
+    fixes arrive one at a time, so "first" is per person, not per watch). The
+    remembered state starts empty on mount, so without this every visit to
+    Whereabouts re-fired the notification for anyone standing outside the
+    radius. Someone already outside still gets a BANNER, which is the honest
+    way to state a situation: it's on screen and it doesn't buzz the phone. A
+    notification is reserved for something that just happened. `seenRef` clears
+    with the watch (keyed on `created_at`, so an edit to a running watch keeps
+    its state and a genuinely new watch starts over).
   - One row per member, replaced on each crossing rather than stacked: "left" is
     stale the moment they're back, and showing both would say two contradictory
     things at once. It does NOT auto-clear — dismissing is the watcher's call.

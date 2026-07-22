@@ -490,10 +490,25 @@ export default function Whereabouts() {
   // the live member_locations feed. Alerts once per crossing: a member must come
   // back inside before they can trigger another alert (no re-alert spam).
   const breachedRef = useRef<Set<string>>(new Set())
+  // The FIRST time a watch sees a given member is not a crossing — it's just
+  // finding out where they already are. Without this, every visit to this
+  // screen re-fired the notification for anyone standing outside, because the
+  // remembered state starts empty on mount. Their situation still gets a
+  // banner; what it doesn't get is another alert saying they just left.
+  const seenRef = useRef<Set<string>>(new Set())
+  const watchRef = useRef<string | null>(null)
   useEffect(() => {
     if (!activeWatch) {
       breachedRef.current = new Set()
+      seenRef.current = new Set()
+      watchRef.current = null
       return
+    }
+    // A NEW watch (not an edit to the running one) starts over.
+    if (watchRef.current !== activeWatch.created_at) {
+      watchRef.current = activeWatch.created_at
+      breachedRef.current = new Set()
+      seenRef.current = new Set()
     }
     const centre = { lat: activeWatch.center_lat, lng: activeWatch.center_lng }
     for (const email of activeWatch.watched) {
@@ -501,19 +516,29 @@ export default function Whereabouts() {
       if (!isSharingLive(loc)) continue
       const out = isOutside(activeWatch, { lat: loc.lat, lng: loc.lng })
       const was = breachedRef.current.has(email)
-      if (out === was) continue // no crossing since we last looked
+      // Per member, not per watch: fixes land one at a time, so someone whose
+      // location only arrives a minute in is still being seen for the first
+      // time, however long the watch has been running.
+      const first = !seenRef.current.has(email)
+      seenRef.current.add(email)
+      if (!first && out === was) continue // no crossing since we last looked
+
+      if (out) breachedRef.current.add(email)
+      else breachedRef.current.delete(email)
+      if (first && !out) continue // inside, as expected — nothing to say
 
       // BOTH directions are announced. Leaving is the alarming one, but coming
       // back is the answer to it — being told someone left and never told they
       // returned is the worse half of the story.
       const kind = out ? 'left' : 'entered'
-      if (out) breachedRef.current.add(email)
-      else breachedRef.current.delete(email)
       const title = out
         ? t('location.safety.breach', { name: nameFor(email) })
         : t('location.safety.entered', { name: nameFor(email) })
       const dist = formatDistance(haversineMeters(centre, { lat: loc.lat, lng: loc.lng }))
-      void alertBreach(title, t('location.safety.breachBody', { dist }))
+      // A notification is for something that just HAPPENED. Already being
+      // outside when the watch first looks is a state, and the banner is the
+      // right way to say it — it's on screen, and it doesn't buzz the phone.
+      if (!first) void alertBreach(title, t('location.safety.breachBody', { dist }))
       // These STAY on screen until dismissed — a toast that faded after three
       // seconds was the one alert in this app you couldn't afford to miss. One
       // row per member, replaced on each crossing: "left" is stale the moment
