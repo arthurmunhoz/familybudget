@@ -200,15 +200,36 @@ struct PetEntity: AppEntity {
   static var defaultQuery = PetQuery()
 }
 
+/// Pets for the "Edit Widget" picker.
+///
+/// The App Group snapshot is written only by the app's Pet Care SCREEN and by
+/// this widget's own timeline — so it can be missing or empty exactly when iOS
+/// runs the picker (fresh install, or the screen never opened on this device).
+/// That left the picker blank, and — worse — made `entities(for:)` fail to
+/// resolve an ALREADY-SAVED choice, so iOS dropped the selection and the widget
+/// silently fell back to the first pet: "changing the pet doesn't stick".
+///
+/// The widget has its own token and can fetch for itself, so never depend on
+/// another screen having run. Cache the result so the picker pays this once.
+func petsForPicker() async -> [PetCarePetW] {
+  let cached = loadPetCare()?.pets ?? []
+  if !cached.isEmpty { return cached }
+  if let live = await fetchPetCare(day: isoDay(Date())) {
+    savePetCare(live)
+    return live.pets
+  }
+  return []
+}
+
 struct PetQuery: EntityQuery {
   func entities(for identifiers: [String]) async throws -> [PetEntity] {
-    (loadPetCare()?.pets ?? []).filter { identifiers.contains($0.id) }.map { PetEntity(id: $0.id, name: $0.name) }
+    await petsForPicker().filter { identifiers.contains($0.id) }.map { PetEntity(id: $0.id, name: $0.name) }
   }
   func suggestedEntities() async throws -> [PetEntity] {
-    (loadPetCare()?.pets ?? []).map { PetEntity(id: $0.id, name: $0.name) }
+    await petsForPicker().map { PetEntity(id: $0.id, name: $0.name) }
   }
   func defaultResult() async -> PetEntity? {
-    (loadPetCare()?.pets ?? []).first.map { PetEntity(id: $0.id, name: $0.name) }
+    await petsForPicker().first.map { PetEntity(id: $0.id, name: $0.name) }
   }
 }
 

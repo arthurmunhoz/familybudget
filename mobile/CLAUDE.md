@@ -153,6 +153,16 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `today_cfg` (see `syncTodayConfig`) is the reference for "mirror the config
     the widget needs to fetch for itself," and TodayWidget's `buildToday()` for
     "live → last-good cache → app snapshot, and only if it's still the same day."
+  - **A configurable widget's `EntityQuery` must not depend on the App Group
+    alone.** PetCare's picker read `loadPetCare()?.pets`, but that snapshot is
+    written only by the Pet Care SCREEN and this widget's own timeline — so it
+    can be empty exactly when iOS runs the picker. Two symptoms, and the second
+    is the nasty one: the picker shows no pets, AND `entities(for:)` can't
+    resolve an ALREADY-SAVED choice, so iOS drops the selection and the widget
+    falls back to the first pet ("changing the pet doesn't stick"). Fix:
+    `petsForPicker()` falls back to a live fetch and caches it. Nudges doesn't
+    hit this only because `useSyncNudgeWidget` syncs its presets globally on
+    login — if you add a configurable widget, do one or the other, never neither.
   - **A widget must colour itself from `appTheme()`, never from SwiftUI's
     semantic colours.** `.primary`/`.secondary`/`.fill.tertiary`/`Color.green`/
     `Color.accentColor` all follow the DEVICE's light/dark setting, but the app's
