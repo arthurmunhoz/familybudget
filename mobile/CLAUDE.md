@@ -373,10 +373,10 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     armed for me" — drawing unwatched places would promise alerts that never
     fire, and drawing another member's subscription would show a boundary that
     isn't mine.
-  - Styled deliberately QUIETER than the safety radius: thin solid neutral vs
-    that one's thick dashed accent, and drawn under the place labels. Both can
-    be on screen at once and the temporary "tell me if someone leaves" circle
-    has to win the eye.
+  - Same styling as the safety radius (dashed accent) — an armed boundary looks
+    the same wherever it came from. Drawn under the place labels.
+  - Shown only while the subscription EXISTS: turning "notify me about this
+    place" off removes the watcher row, and the ring goes with it.
   - Re-key each ring on `styleEpoch` — changing map style tears down every
     source added to it (same trap as the safety ring).
 - **Places & geofences (Phase 2)** — migration 067 (`places` + `place_events`),

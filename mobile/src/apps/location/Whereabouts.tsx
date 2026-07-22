@@ -390,6 +390,24 @@ export default function Whereabouts() {
     fetchMyWatch,
   )
 
+  // A watch ends on a WALL CLOCK. fetchMyWatch filters expired rows, but only
+  // when something refetches — so a watch that lapsed while the map sat open
+  // kept its circle drawn, the header pulsing, cards reading "Watching" and
+  // live mode being requested every 20s. Tick while one is running so every
+  // consumer drops it the moment it's over, whether it ended on its own or was
+  // stopped. Everything below uses `activeWatch`, never the raw row.
+  const [nowTs, setNowTs] = useState(() => Date.now())
+  useEffect(() => {
+    if (!watch) return
+    const id = setInterval(() => setNowTs(Date.now()), 15_000)
+    return () => clearInterval(id)
+  }, [watch])
+  const activeWatch = watch && new Date(watch.expires_at).getTime() > nowTs ? watch : null
+  // Once it has lapsed, clear the cached row too so it doesn't linger in state.
+  useEffect(() => {
+    if (watch && !activeWatch) void reloadWatch()
+  }, [watch, activeWatch, reloadWatch])
+
   // Keep the OS geofence registration in step with the saved places (and with
   // whether I'm sharing at all — syncGeofences tears them down if I'm not).
   useEffect(() => {
@@ -399,14 +417,14 @@ export default function Whereabouts() {
   // While a safety watch runs, keep the watched members in live mode so their
   // positions are fresh enough for a boundary alert to mean something.
   useEffect(() => {
-    if (!watch?.watched.length) return
+    if (!activeWatch?.watched.length) return
     const ping = () => {
-      for (const email of watch.watched) void requestLive(email)
+      for (const email of activeWatch.watched) void requestLive(email)
     }
     ping()
     const id = setInterval(ping, 20_000)
     return () => clearInterval(id)
-  }, [watch])
+  }, [activeWatch])
 
   // Miles vs km follows the device's measurement system.
   useEffect(() => {
@@ -464,15 +482,15 @@ export default function Whereabouts() {
   // back inside before they can trigger another alert (no re-alert spam).
   const breachedRef = useRef<Set<string>>(new Set())
   useEffect(() => {
-    if (!watch) {
+    if (!activeWatch) {
       breachedRef.current = new Set()
       return
     }
-    const centre = { lat: watch.center_lat, lng: watch.center_lng }
-    for (const email of watch.watched) {
+    const centre = { lat: activeWatch.center_lat, lng: activeWatch.center_lng }
+    for (const email of activeWatch.watched) {
       const loc = locByEmail.get(email)
       if (!isSharingLive(loc)) continue
-      const out = isOutside(watch, { lat: loc.lat, lng: loc.lng })
+      const out = isOutside(activeWatch, { lat: loc.lat, lng: loc.lng })
       const was = breachedRef.current.has(email)
       if (out === was) continue // no crossing since we last looked
 
@@ -496,7 +514,7 @@ export default function Whereabouts() {
         { email, kind, title, dist },
       ])
     }
-  }, [watch, locByEmail, nameFor, t])
+  }, [activeWatch, locByEmail, nameFor, t])
 
   const myLoc = myEmail ? locByEmail.get(myEmail) : undefined
   const myLive = isSharingLive(myLoc) ? myLoc : null
@@ -687,7 +705,7 @@ export default function Whereabouts() {
                   tap goes to the paywall, and the button fills while a watch runs. */}
               <HeaderButton
                 label={t('location.safety.title')}
-                active={!!watch}
+                active={!!activeWatch}
                 badge={isFree}
                 icon={(col) => <ShieldCheck size={19} color={col} />}
                 // Free users open the sheet too — they get one 30-minute watch a
@@ -738,13 +756,13 @@ export default function Whereabouts() {
             />
             {/* Safety radius circle — a real geographic polygon, so it stays
                 accurate at every zoom (Mapbox circle radii are in pixels). */}
-            {watch ? (
+            {activeWatch ? (
               <ShapeSource
                 key={`safety-${styleEpoch}`}
                 id="safety-radius"
                 shape={circlePolygon(
-                  { lat: watch.center_lat, lng: watch.center_lng },
-                  watch.radius_m,
+                  { lat: activeWatch.center_lat, lng: activeWatch.center_lng },
+                  activeWatch.radius_m,
                 )}
               >
                 <FillLayer id="safety-radius-fill" style={{ fillColor: c.accent, fillOpacity: 0.12 }} />
@@ -755,13 +773,12 @@ export default function Whereabouts() {
               </ShapeSource>
             ) : null}
 
-            {/* Geofence rings for the places I'm WATCHING. Deliberately quieter
-                than the safety radius above — thin SOLID line in a neutral,
-                versus that one's thick dashed accent. Both can be on screen at
-                once, and the temporary "alert me if someone leaves" circle has
-                to stay the one that grabs the eye. Re-keyed on styleEpoch for
-                the same reason the safety ring is: changing map style tears
-                down every source added to it. */}
+            {/* Geofence rings for the places I'm WATCHING — same styling as the
+                safety radius, so an armed boundary looks like an armed boundary
+                wherever it came from. Shown ONLY while a subscription exists:
+                turning "notify me" off deletes the watcher row and the ring goes
+                with it. Re-keyed on styleEpoch for the same reason the safety
+                ring is: changing map style tears down every source added to it. */}
             {places
               .filter((pl) => placeWatches[pl.id])
               .map((pl) => (
@@ -772,11 +789,11 @@ export default function Whereabouts() {
                 >
                   <FillLayer
                     id={`place-ring-fill-${pl.id}`}
-                    style={{ fillColor: c.textMuted, fillOpacity: 0.08 }}
+                    style={{ fillColor: c.accent, fillOpacity: 0.12 }}
                   />
                   <LineLayer
                     id={`place-ring-line-${pl.id}`}
-                    style={{ lineColor: c.textMuted, lineWidth: 1.5, lineOpacity: 0.7 }}
+                    style={{ lineColor: c.accent, lineWidth: 2, lineDasharray: [2, 2] }}
                   />
                 </ShapeSource>
               ))}
@@ -1003,7 +1020,7 @@ export default function Whereabouts() {
                     phone={meta.phones[p.email]}
                     myLive={myLive}
                     places={places}
-                    watched={!!watch?.watched.includes(p.email)}
+                    watched={!!activeWatch?.watched.includes(p.email)}
                     onCollapse={() => setSelected(null)}
                     onNavigate={() =>
                       isSharingLive(loc) && setNavFor({ profile: p, to: { lat: loc.lat, lng: loc.lng } })
@@ -1021,7 +1038,7 @@ export default function Whereabouts() {
                   color={colors[p.email] ?? c.accent}
                   status={statusLine(p.email)}
                   battery={live && loc.battery != null ? loc.battery : null}
-                  watched={!!watch?.watched.includes(p.email)}
+                  watched={!!activeWatch?.watched.includes(p.email)}
                   onPress={() => select(p.email)}
                   onSettings={isMe ? () => setSharingOpen(true) : undefined}
                   sharing={
@@ -1060,7 +1077,7 @@ export default function Whereabouts() {
 
       {safetyOpen ? (
         <SafetyRadiusSheet
-          watch={watch}
+          watch={activeWatch}
           profiles={profiles}
           colors={colors}
           locByEmail={locByEmail}
