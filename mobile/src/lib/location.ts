@@ -211,10 +211,10 @@ export async function captureAndUpload(): Promise<Fix | null> {
   return fix
 }
 
-/** For the silent live-wake push (see backgroundNotifications.ts): if I'm
- *  currently sharing, grab one high-accuracy fix now and upload it. No-op if I'm
- *  not sharing or permission is off. Used to refresh a watched member whose app
- *  was asleep in the background. */
+/** For a live-wake that lands while the app is FOREGROUNDED: one quick
+ *  high-accuracy fix. The foreground path needs nothing more — useLiveResponder
+ *  sees the live request via Realtime and takes over the streaming. The
+ *  BACKGROUND wake path is locationTask.respondToLiveWake (ramp + burst). */
 export async function captureLiveFixIfSharing(): Promise<void> {
   const mine = await fetchMyLocation()
   if (!isSharingEnabled(mine)) return
@@ -230,6 +230,37 @@ export async function captureLiveFixIfSharing(): Promise<void> {
     })
   } catch {
     // best-effort — a missed wake is caught by the next heartbeat's push
+  }
+}
+
+/** Background live burst (see locationTask.respondToLiveWake): a silent push
+ *  buys ~30s of background runtime, so instead of one snapshot we stream
+ *  high-accuracy fixes for the window — the watcher's map moves immediately
+ *  while the ramped background task warms up. No-op if not sharing. */
+export async function runLiveBurst(durationMs: number): Promise<void> {
+  if (durationMs <= 0) return
+  const mine = await fetchMyLocation()
+  if (!isSharingEnabled(mine)) return
+  const perm = await Location.getForegroundPermissionsAsync()
+  if (!perm.granted) return
+  let sub: Location.LocationSubscription | null = null
+  try {
+    sub = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.High, timeInterval: 4000, distanceInterval: 5 },
+      (pos) => {
+        void upsertMyPosition({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy ?? null,
+          speed: pos.coords.speed ?? null,
+        })
+      },
+    )
+    await new Promise((resolve) => setTimeout(resolve, durationMs))
+  } catch {
+    // best-effort — the ramped task keeps streaming after the wake window
+  } finally {
+    sub?.remove()
   }
 }
 

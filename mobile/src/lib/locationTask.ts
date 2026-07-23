@@ -14,10 +14,151 @@
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 import * as Battery from 'expo-battery'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import { ensureForegroundPermission, fetchMyLocation, upsertMyFix } from './location'
+import {
+  ensureForegroundPermission,
+  fetchMyLocation,
+  isSharingEnabled,
+  runLiveBurst,
+  upsertMyFix,
+} from './location'
+import { fetchMyLiveWindowMs } from './liveLocation'
 
 export const LOCATION_TASK = 'oneroof-location-updates'
+
+// --- Live (ramped) mode -----------------------------------------------------
+// While someone is watching me in Whereabouts, the ALREADY-RUNNING background
+// task is reconfigured to stream (high accuracy, 10 m, no deferral, no
+// auto-pause) instead of the battery-saver cadence. Re-calling
+// startLocationUpdatesAsync with new options reconfigures the task in place.
+// The crucial property: once ramped, the stream sustains itself through the
+// location background mode — it no longer depends on silent-push delivery, so
+// ONE delivered wake is enough for the whole watching session. State lives in
+// AsyncStorage (a background wake is a fresh JS process; module state is gone).
+const LIVE_UNTIL_KEY = 'oneroof-live-until'
+const BG_LABELS_KEY = 'oneroof-bg-location-labels'
+const LIVE_RECHECK_LEEWAY_MS = 10_000 // re-check the DB this close to expiry
+const LIVE_TICK_MS = 15_000 // ramped keep-alive check (JS timers run: ramped updates keep the process alive)
+const LIVE_BURST_MS = 20_000 // how much of the ~30s wake window the burst uses
+
+type FgLabels = { title: string; body: string }
+
+async function storedLabels(): Promise<FgLabels | null> {
+  try {
+    const raw = await AsyncStorage.getItem(BG_LABELS_KEY)
+    return raw ? (JSON.parse(raw) as FgLabels) : null
+  } catch {
+    return null
+  }
+}
+
+/** Task options for the two cadences. Android's foreground-service labels are
+ *  persisted at start time (localized by the caller) so a background restart
+ *  can reuse them; omitted if somehow missing (iOS never uses them). */
+function taskOptions(mode: 'saver' | 'live', labels: FgLabels | null): Location.LocationTaskOptions {
+  const base: Location.LocationTaskOptions =
+    mode === 'live'
+      ? {
+          accuracy: Location.Accuracy.High,
+          distanceInterval: 10,
+          deferredUpdatesInterval: 0,
+          pausesUpdatesAutomatically: false,
+          activityType: Location.ActivityType.Other,
+          showsBackgroundLocationIndicator: false,
+        }
+      : {
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 60, // meters between updates
+          deferredUpdatesInterval: 60_000, // ms — batch to save battery
+          pausesUpdatesAutomatically: true,
+          activityType: Location.ActivityType.Other,
+          showsBackgroundLocationIndicator: false,
+        }
+  return labels
+    ? {
+        ...base,
+        foregroundService: {
+          notificationTitle: labels.title,
+          notificationBody: labels.body,
+          notificationColor: '#c2603f',
+        },
+      }
+    : base
+}
+
+let liveTick: ReturnType<typeof setInterval> | null = null
+
+function startLiveTick(): void {
+  if (liveTick) return
+  liveTick = setInterval(() => void manageLiveRamp(), LIVE_TICK_MS)
+}
+
+function stopLiveTick(): void {
+  if (liveTick) {
+    clearInterval(liveTick)
+    liveTick = null
+  }
+}
+
+/** Ramp up for `untilMs`. No-op when background updates aren't running (e.g.
+ *  Always permission denied) — the wake burst still covers that case. */
+async function rampBackgroundUpdates(untilMs: number): Promise<void> {
+  const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
+  if (!running) return
+  await AsyncStorage.setItem(LIVE_UNTIL_KEY, String(untilMs))
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, taskOptions('live', await storedLabels()))
+  startLiveTick()
+}
+
+/** Step back down to the battery-saver cadence. */
+async function relaxBackgroundUpdates(): Promise<void> {
+  stopLiveTick()
+  await AsyncStorage.removeItem(LIVE_UNTIL_KEY).catch(() => {})
+  const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
+  if (!running) return
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, taskOptions('saver', await storedLabels()))
+}
+
+/** Extend ramped mode from the DB while a watcher's heartbeat keeps the
+ *  request row alive; relax once it lapses. Called on a timer while ramped AND
+ *  on every delivered fix (which also resurrects the timer after the OS
+ *  relaunched the process — module state doesn't survive that). */
+async function manageLiveRamp(): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(LIVE_UNTIL_KEY)
+    if (!raw) {
+      stopLiveTick()
+      return
+    }
+    startLiveTick()
+    const until = Number(raw)
+    if (Date.now() < until - LIVE_RECHECK_LEEWAY_MS) return
+    const dbUntil = await fetchMyLiveWindowMs()
+    if (dbUntil > Date.now()) await AsyncStorage.setItem(LIVE_UNTIL_KEY, String(dbUntil))
+    else await relaxBackgroundUpdates()
+  } catch {
+    // best-effort — the next fix or tick retries
+  }
+}
+
+/** The BACKGROUND live-wake path (silent push, app asleep — see
+ *  backgroundNotifications.ts): ramp the background task for the live window,
+ *  then spend the wake's ~30s runtime streaming a high-accuracy burst so the
+ *  watcher's map moves immediately. No-op if not sharing or nobody is actually
+ *  watching (a stale/duplicate push). */
+export async function respondToLiveWake(): Promise<void> {
+  try {
+    const mine = await fetchMyLocation()
+    if (!isSharingEnabled(mine)) return
+    const until = await fetchMyLiveWindowMs()
+    if (until <= Date.now()) return
+    await rampBackgroundUpdates(until)
+    await runLiveBurst(Math.min(LIVE_BURST_MS, until - Date.now()))
+  } catch {
+    // best-effort — the watcher's next stale-check heartbeat re-fires the wake
+  }
+}
 
 async function readBattery(): Promise<number | null> {
   try {
@@ -53,6 +194,7 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
       speed: loc.coords.speed ?? null,
       battery: await readBattery(),
     })
+    await manageLiveRamp()
   } catch {
     // best-effort — a dropped background fix is caught up by the next one
   }
@@ -78,29 +220,19 @@ export async function ensureBackgroundPermission(): Promise<boolean> {
 /** Start delivering background fixes. `labels` feed the Android foreground-service
  *  notification (localized by the caller — this module has no i18n). Safe to call
  *  when already running. */
-export async function startBackgroundUpdates(labels: {
-  title: string
-  body: string
-}): Promise<void> {
+export async function startBackgroundUpdates(labels: FgLabels): Promise<void> {
+  // Persist the (localized) labels so a background ramp/relax restart can
+  // rebuild the Android foreground-service notification without a caller.
+  await AsyncStorage.setItem(BG_LABELS_KEY, JSON.stringify(labels)).catch(() => {})
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
   if (already) return
-  await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
-    distanceInterval: 60, // meters between updates
-    deferredUpdatesInterval: 60_000, // ms — batch to save battery
-    pausesUpdatesAutomatically: true,
-    activityType: Location.ActivityType.Other,
-    showsBackgroundLocationIndicator: false,
-    foregroundService: {
-      notificationTitle: labels.title,
-      notificationBody: labels.body,
-      notificationColor: '#c2603f',
-    },
-  })
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, taskOptions('saver', labels))
 }
 
 /** Stop background delivery (called when the user turns sharing off/pauses). */
 export async function stopBackgroundUpdates(): Promise<void> {
+  stopLiveTick()
+  await AsyncStorage.removeItem(LIVE_UNTIL_KEY).catch(() => {})
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
   if (already) await Location.stopLocationUpdatesAsync(LOCATION_TASK)
 }

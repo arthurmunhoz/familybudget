@@ -330,13 +330,32 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   moves near real-time, then relaxes when the request expires. Being watched
   never turns sharing on. The MemberSheet ETA/address refetch on a coarse ~100 m
   grid so live updates don't spam the Directions API.
-  - **Background wake**: each live request also fires a SILENT push
-    (`api/ack-ping.ts` `?action=live-wake` → `backgroundNotifications.ts` →
-    `captureLiveFixIfSharing`) so a watched member whose app is asleep still
-    refreshes. Needs the Vercel API DEPLOYED + expo push tokens (migration 039).
-    iOS throttles silent pushes, so background freshness is best-effort (periodic
-    bursts, not continuous); continuous smoothness still needs the target app
-    foreground (the `useLiveResponder` watch).
+  - **Background wake → RAMPED live mode**: a live request fires a SILENT push
+    (`api/ack-ping.ts` `?action=live-wake`) ONLY when the target's
+    `member_locations` row is stale (>30 s) or has null coords — iOS budgets
+    silent pushes to a handful per hour, and pushing on every 20 s heartbeat
+    trains the OS to drop them, including the one that matters (real bug: a
+    watched member at the gym barely moved on the map while Find My streamed).
+    Needs the Vercel API DEPLOYED + expo push tokens (migration 039). On the
+    target, `backgroundNotifications.ts` routes a BACKGROUND wake to
+    `locationTask.respondToLiveWake()`, which (1) RAMPS the already-running
+    background task to streaming options (High accuracy, 10 m, no deferral,
+    `pausesUpdatesAutomatically: false`) by re-calling
+    `startLocationUpdatesAsync` — once ramped, the stream sustains itself
+    through the location background mode, so ONE delivered push covers the
+    whole watching session — and (2) spends the wake's ~30 s runtime on a
+    high-accuracy `runLiveBurst` so the watcher's map moves immediately while
+    the ramp warms up. Ramp state lives in AsyncStorage (`oneroof-live-until`;
+    Android FGS labels under `oneroof-bg-location-labels`), is extended from
+    `location_live_requests` by a 15 s tick (JS timers run — ramped updates
+    keep the process alive) plus a check on every delivered fix (which also
+    resurrects the tick after a process relaunch), and relaxes back to the
+    battery-saver options when the window lapses. A FOREGROUND wake still takes
+    just one quick fix (`captureLiveFixIfSharing`) — `useLiveResponder` handles
+    the streaming there. A force-quit app can't be woken at all (iOS policy).
+    Member pins GLIDE between fixes (`GlidingMarker`: 800 ms ease-out lerp,
+    snaps on the first fix and >2 km jumps) instead of teleporting; places keep
+    plain `MarkerView`.
 - **Watching a place is PER-USER** (migration 070, `place_watchers`). Places are
   shared household furniture, but creating/sharing one subscribes NOBODY —
   each member opts in per place and picks whose crossings they want

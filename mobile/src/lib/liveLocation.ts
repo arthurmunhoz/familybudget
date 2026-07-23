@@ -9,20 +9,29 @@
 //                 high-accuracy watchPositionAsync burst that self-terminates
 //                 when the live window lapses.
 //
-// Reality check: this only fires while the target's app is running (foreground,
-// or backgrounded with location permission + an active Realtime socket). A
-// force-quit / OS-suspended app won't ramp up until it's active again — a silent
-// push to wake it is the follow-up (see WHEREABOUTS-SETUP.md). Being watched
-// never turns sharing ON; it only tightens cadence for someone already sharing.
+// Reality check: the hooks here only run while the target's app is in the
+// foreground. A suspended app is reached via the silent live-wake push instead
+// (fired below, gated on staleness) → locationTask.respondToLiveWake ramps the
+// background location task for the live window, so ONE delivered push sustains
+// streaming without the app on screen. A force-quit app can't be woken at all
+// (iOS policy). Being watched never turns sharing ON; it only tightens cadence
+// for someone already sharing.
 import { useEffect, useRef, useState } from 'react'
 import * as Location from 'expo-location'
 
 import { supabase } from './supabase'
 import { fetchMyLocation, isSharingEnabled, upsertMyPosition } from './location'
 import { useAuth } from './auth'
+import type { MemberLocation } from './types'
 
 const LIVE_WINDOW_S = 45 // one heartbeat keeps the target live this long
 const HEARTBEAT_MS = 20_000 // watcher re-requests this often while watching
+// Only fire the silent wake push when the target's feed is actually stale.
+// iOS gives silent pushes a tight budget (a handful per hour); pushing on every
+// 20s heartbeat trains the OS to drop them — including the one that matters. A
+// fresh row means the target is already streaming (ramped background task or
+// foreground responder), so no wake is needed.
+const WAKE_IF_STALE_MS = 30_000
 
 async function myEmail(): Promise<string | null> {
   const { data } = await supabase.auth.getSession()
@@ -53,6 +62,15 @@ export async function requestLive(target: string): Promise<void> {
   // Best-effort: the foreground path works without it (and it needs the API
   // deployed). Served by api/ack-ping.ts (?action=live-wake).
   try {
+    const { data } = await supabase
+      .from('member_locations')
+      .select('*')
+      .eq('user_email', target)
+      .maybeSingle()
+    const loc = (data as MemberLocation) ?? null
+    if (!loc || !isSharingEnabled(loc)) return // waking can't help someone not sharing
+    const ageMs = loc.updated_at ? Date.now() - new Date(loc.updated_at).getTime() : Infinity
+    if (loc.lat != null && ageMs < WAKE_IF_STALE_MS) return // already fresh — save the push budget
     const token = await authToken()
     if (token && API_BASE) {
       await fetch(`${API_BASE}/api/ack-ping`, {
@@ -64,6 +82,24 @@ export async function requestLive(target: string): Promise<void> {
   } catch {
     // best-effort push only
   }
+}
+
+/** Target: the latest unexpired live-request expiry aimed at ME, as epoch ms
+ *  (0 when nobody is watching). The background task uses this to extend ramped
+ *  mode while a watcher's heartbeat keeps the request row alive, and to relax
+ *  once it lapses (locationTask.ts). */
+export async function fetchMyLiveWindowMs(): Promise<number> {
+  const me = await myEmail()
+  if (!me) return 0
+  const { data } = await supabase
+    .from('location_live_requests')
+    .select('expires_at')
+    .eq('target_email', me)
+    .gt('expires_at', new Date().toISOString())
+    .order('expires_at', { ascending: false })
+    .limit(1)
+  const latest = (data ?? [])[0] as { expires_at: string } | undefined
+  return latest ? new Date(latest.expires_at).getTime() : 0
 }
 
 /** Watcher: cancel the live request for `target` (on closing the detail). */

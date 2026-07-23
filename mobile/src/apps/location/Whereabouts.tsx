@@ -70,6 +70,7 @@ import {
 } from './locationUi'
 import { MapModePicker } from './MapModePicker'
 import { resolveStyleURL, useStoredMapMode } from './mapMode'
+import { GlidingMarker } from './GlidingMarker'
 import { MemberDetailCard } from './MemberDetailCard'
 import { NavPicker } from './NavPicker'
 import { NudgePicker } from './NudgePicker'
@@ -857,7 +858,7 @@ export default function Whereabouts() {
               </MarkerView>
             ))}
             {livePins.map(({ p, loc }) => (
-              <MarkerView key={p.email} coordinate={[loc.lng, loc.lat]} anchor={{ x: 0.5, y: 0.5 }}>
+              <GlidingMarker key={p.email} coordinate={[loc.lng, loc.lat]} anchor={{ x: 0.5, y: 0.5 }}>
                 <Pressable onPress={() => select(p.email)} accessibilityRole="button">
                   <View
                     style={
@@ -874,7 +875,7 @@ export default function Whereabouts() {
                     />
                   </View>
                 </Pressable>
-              </MarkerView>
+              </GlidingMarker>
             ))}
           </MapView>
         ) : (

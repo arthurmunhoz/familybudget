@@ -13,6 +13,7 @@ import * as TaskManager from 'expo-task-manager'
 
 import { reloadPetCareWidget, writeAckStatus } from './widget'
 import { captureLiveFixIfSharing } from './location'
+import { respondToLiveWake } from './locationTask'
 
 const BACKGROUND_NOTIFICATION_TASK = 'oneroof-background-notification'
 
@@ -83,7 +84,10 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
   const payload = (data as { notification?: { request?: { content?: { data?: unknown } } } })
     ?.notification?.request?.content?.data
   handleAckPayload(payload)
-  if (isLiveWake(payload)) await captureLiveFixIfSharing()
+  // Background wake: ramp the location task + stream a burst (not just one
+  // fix) — the foreground listener below keeps the cheap single fix, since
+  // there useLiveResponder picks up the streaming via Realtime.
+  if (isLiveWake(payload)) await respondToLiveWake()
 })
 
 let registered = false
