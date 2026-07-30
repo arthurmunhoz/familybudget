@@ -34,6 +34,7 @@ import { getSignedUrls } from '../../lib/signedUrls'
 import { supabase } from '../../lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '../../lib/types'
 import PetForm from './PetForm'
+import PetRoutines from './PetRoutines'
 import { ageInMonths, speciesEmoji } from './petMeta'
 import { PET_PALETTE, petColorMap } from './petColors'
 
@@ -128,6 +129,9 @@ export default function PetCare() {
       setSelectedPet(petsSorted[0].id)
     }
   }, [petsSorted, selectedPet])
+
+  // The selected pet's row, for the routine sections below the carousel.
+  const selectedPetObj = selectedPet ? (petById[selectedPet] ?? null) : null
 
   // Month grid: events grouped by their date within the visible month.
   const monthStart = `${view.y}-${pad(view.m)}-01`
@@ -401,6 +405,11 @@ export default function PetCare() {
               <span className="text-sm font-semibold">{t('pets.addPet')}</span>
             </button>
           </div>
+
+          {/* Routine-first sections for the SELECTED pet (migration 069) —
+              daily checklist, interval routines, weight log. Above the calendar,
+              which stays because the web has it and iOS dropped it. */}
+          {selectedPetObj && <PetRoutines key={selectedPetObj.id} pet={selectedPetObj} />}
 
           {/* calendar of ALL pets' events */}
           <section className="mb-4 rounded-2xl bg-(--card) p-3">

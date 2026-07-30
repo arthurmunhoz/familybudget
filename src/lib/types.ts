@@ -58,7 +58,6 @@ export interface CategoryRule {
   category: string
 }
 
-/** A household-defined budget category (entries store its uuid in `category`). */
 /** A household's override of one BUILT-IN preset (migration 056). name/icon are
  *  nullable so a household can change just the icon and keep the localized name. */
 export interface CategoryOverride {
@@ -67,6 +66,7 @@ export interface CategoryOverride {
   icon: string | null
 }
 
+/** A household-defined budget category (entries store its uuid in `category`). */
 export interface CustomCategory {
   id: string
   name: string
@@ -121,6 +121,40 @@ export interface PetEvent {
   notes: string | null
   event_date: string
   next_due: string | null
+  added_by: string
+  created_at: string
+}
+
+export type PetTaskIcon = 'bowl' | 'walk' | 'treat' | 'pill' | 'bath' | 'nails' | 'teeth' | 'paw'
+
+/** One item of a pet's configurable routine (migration 069). 'daily' = resets
+ *  each day, ordered by sort_order; 'interval' = due every interval_days from
+ *  the latest completion. */
+export interface PetCareTask {
+  id: string
+  pet_id: string
+  kind: 'daily' | 'interval'
+  title: string
+  icon: PetTaskIcon
+  interval_days: number | null
+  sort_order: number
+  created_at: string
+}
+
+/** A completion of a task on a day; unique per (task, day). */
+export interface PetTaskDone {
+  id: string
+  task_id: string
+  done_on: string
+  done_by: string
+  created_at: string
+}
+
+export interface PetWeight {
+  id: string
+  pet_id: string
+  weight: number
+  measured_on: string
   added_by: string
   created_at: string
 }
