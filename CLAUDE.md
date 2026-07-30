@@ -534,7 +534,20 @@ here too:
   there. Rewrites match in order, so the `/(.*)` → index.html catch-all stays
   last. **`vercel.json` can hold no comments** — Vercel's schema rejects unknown
   keys (even `_comment`), which is why this warning lives here instead.
-- Deploys are MANUAL: `npx vercel deploy --prod --yes`. Pushing to GitHub
+- Deploys are MANUAL: `npx vercel deploy --prod --yes`.
+- **A `VITE_*` var added with `vercel env add` defaults to type "Sensitive" on
+  this project, and Vercel does NOT expose sensitive vars to the build** — so
+  Vite silently inlines `undefined` and the feature ships dark. Add public
+  client-side vars with `--no-sensitive` (`VITE_MAPBOX_TOKEN` is one: a Mapbox
+  `pk.` token is public by design and ships in the JS anyway). Check with
+  `vercel env pull` — sensitive ones read back as `[SENSITIVE]`.
+- **To verify a `VITE_*` var actually made it into a build, grep the RIGHT
+  chunk.** Vite code-splits, so a token used only by a lazy route is NOT in
+  `assets/index-*.js` — `VITE_MAPBOX_TOKEN` lands in `assets/location-*.js`
+  (its own `lib/location.ts` chunk), not in the main bundle nor even in
+  `Whereabouts-*.js`. Get the real filenames from
+  `npx vercel inspect --logs <deployment-url>`. Grepping the wrong chunk looks
+  exactly like "the env var didn't work". Pushing to GitHub
   does NOT deploy. Production domain: one-roof-app.vercel.app.
 - Commit messages: plain, descriptive, no Co-Authored-By/AI trailers.
 - This repo pushes with a repo-local git identity + SSH key (already

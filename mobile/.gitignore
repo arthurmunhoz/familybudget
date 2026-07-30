@@ -50,3 +50,4 @@ targets/**/generated.entitlements
 
 # Supabase CLI scratch (created when the MCP links the project)
 supabase/.temp/
+.vercel
