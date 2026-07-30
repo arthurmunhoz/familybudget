@@ -6,9 +6,23 @@
 // RN port source: mobile/src/components/TodaySection.tsx.
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pill, Scissors, Stethoscope, Syringe, FileText, type LucideIcon } from 'lucide-react'
+import {
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  FileText,
+  Pill,
+  Scissors,
+  Stethoscope,
+  Syringe,
+  Thermometer,
+  ThermometerSnowflake,
+  Wind,
+  type LucideIcon,
+} from 'lucide-react'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
+import type { TKey } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
 import { todayISO } from '../lib/format'
 import {
@@ -20,7 +34,26 @@ import {
 } from '../lib/calendar'
 import { overdueEvents } from '../lib/petCare'
 import type { CalendarEvent, PetEvent, PetEventType } from '../lib/types'
-import { useHomeWeather, weatherIcon } from '../lib/weather'
+import { useHomeWeather, weatherIcon, type WeatherAlertKind } from '../lib/weather'
+
+// Weather advisory presentation — same six kinds and the same priority order as
+// the iOS Today card (see lib/weather.ts fetchDayAlert).
+const ALERT_ICON: Record<WeatherAlertKind, LucideIcon> = {
+  thunder: CloudLightning,
+  snow: CloudSnow,
+  heat: Thermometer,
+  cold: ThermometerSnowflake,
+  wind: Wind,
+  rain: CloudRain,
+}
+const ALERT_KEY: Record<WeatherAlertKind, TKey> = {
+  thunder: 'home.weatherThunder',
+  snow: 'home.weatherSnow',
+  heat: 'home.weatherHeat',
+  cold: 'home.weatherCold',
+  wind: 'home.weatherWind',
+  rain: 'home.weatherRain',
+}
 
 const LOCALE: Record<string, string> = { en: 'en-US', es: 'es', pt: 'pt-BR' }
 const MAX_ROWS = 5
@@ -42,7 +75,7 @@ export default function TodaySection({ onSetCity }: { onSetCity: () => void }) {
   const today = todayISO()
 
   const unit = lang === 'en' ? 'fahrenheit' : 'celsius'
-  const { location, weather } = useHomeWeather(unit)
+  const { location, weather, alert } = useHomeWeather(unit)
 
   type TodayData = { events: CalendarEvent[]; petEvents: PetEvent[]; pets: PetLite[] }
   const { data = { events: [], petEvents: [], pets: [] } } = useCachedQuery<TodayData>(
@@ -123,6 +156,18 @@ export default function TodaySection({ onSetCity }: { onSetCity: () => void }) {
           )}
         </button>
       </div>
+
+      {/* Today's weather advisory (thunder / snow / heat / cold / wind / rain).
+          One line, only when the day actually warrants it. */}
+      {alert && (
+        <p className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-(--accent-soft) px-3 py-2 text-xs font-semibold text-(--accent)">
+          {(() => {
+            const AIcon = ALERT_ICON[alert]
+            return <AIcon size={14} strokeWidth={2.5} aria-hidden="true" className="shrink-0" />
+          })()}
+          {t(ALERT_KEY[alert])}
+        </p>
+      )}
 
       {/* agenda */}
       {totalItems === 0 ? (

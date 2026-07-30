@@ -713,5 +713,13 @@ export const pt: Record<keyof typeof en, string> = {
   'location.arrived': '{name} chegou em {place}',
   'location.left': '{name} saiu de {place}',
   'location.aPlace': 'um lugar',
+  'home.weatherThunder': 'Previsão de tempestades hoje.',
+  'home.weatherSnow': 'Previsão de neve forte hoje.',
+  'home.weatherHeat': 'Calor extremo hoje — beba água.',
+  'home.weatherCold': 'Vai congelar hoje — se agasalhe.',
+  'home.weatherWind': 'Dia de muito vento.',
+  'home.weatherRain': 'Chuva provável hoje — leve guarda-chuva.',
+  'family.myName': 'Seu nome',
+  'family.myNameHint': 'É assim que sua família te vê no app.',
 }
 

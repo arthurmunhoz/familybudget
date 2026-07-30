@@ -77,6 +77,55 @@ export async function geocodeCity(name: string): Promise<HomeLocation | null> {
   }
 }
 
+export type WeatherAlertKind = 'thunder' | 'snow' | 'heat' | 'cold' | 'wind' | 'rain'
+
+/** Inspect TODAY's forecast and return the single most-notable alert, or null.
+ *  Priority: thunderstorm > heavy snow > extreme heat > extreme cold > wind >
+ *  rain. Thresholds are evaluated in the requested unit; wind uses km/h gusts.
+ *  Copied from mobile/src/lib/weather.ts — keep the thresholds identical so the
+ *  two apps never disagree about whether today needs an umbrella. */
+export async function fetchDayAlert(
+  lat: number,
+  lon: number,
+  unit: TempUnit = 'fahrenheit',
+): Promise<WeatherAlertKind | null> {
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&daily=weather_code,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max,wind_gusts_10m_max` +
+      `&temperature_unit=${unit}&wind_speed_unit=kmh&timezone=auto&forecast_days=1`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const json = (await res.json()) as {
+      daily?: {
+        weather_code?: number[]
+        apparent_temperature_max?: number[]
+        apparent_temperature_min?: number[]
+        precipitation_probability_max?: number[]
+        wind_gusts_10m_max?: number[]
+      }
+    }
+    const d = json.daily
+    if (!d) return null
+    const code = d.weather_code?.[0] ?? 0
+    const tHi = d.apparent_temperature_max?.[0]
+    const tLo = d.apparent_temperature_min?.[0]
+    const pop = d.precipitation_probability_max?.[0] ?? 0
+    const gust = d.wind_gusts_10m_max?.[0] ?? 0 // km/h
+    const hot = unit === 'celsius' ? 37 : 99
+    const cold = unit === 'celsius' ? 0 : 32
+    if (code >= 95) return 'thunder'
+    if (code === 75 || code === 77 || code === 86) return 'snow' // heavy snow / grains / heavy showers
+    if (tHi != null && tHi >= hot) return 'heat'
+    if (tLo != null && tLo <= cold) return 'cold'
+    if (gust >= 55) return 'wind' // ~34 mph gusts
+    if (pop >= 60) return 'rain'
+    return null
+  } catch {
+    return null
+  }
+}
+
 /** Current temperature + condition code for a coordinate. */
 export async function fetchCurrentWeather(
   lat: number,
@@ -120,18 +169,31 @@ export function weatherIcon(code: number): LucideIcon {
 export function useHomeWeather(unit: TempUnit) {
   const [location, setLocation] = useState<HomeLocation | null>(null)
   const [weather, setWeather] = useState<CurrentWeather | null>(null)
+  const [alert, setAlert] = useState<WeatherAlertKind | null>(null)
   const [ready, setReady] = useState(false)
 
   const reload = useCallback(async () => {
     const loc = loadHomeLocation()
     setLocation(loc)
     setReady(true)
-    setWeather(loc ? await fetchCurrentWeather(loc.lat, loc.lon, unit) : null)
+    if (!loc) {
+      setWeather(null)
+      setAlert(null)
+      return
+    }
+    // Two requests, but they're independent — don't make the temperature wait on
+    // the daily forecast.
+    const [cur, day] = await Promise.all([
+      fetchCurrentWeather(loc.lat, loc.lon, unit),
+      fetchDayAlert(loc.lat, loc.lon, unit),
+    ])
+    setWeather(cur)
+    setAlert(day)
   }, [unit])
 
   useEffect(() => {
     void reload()
   }, [reload])
 
-  return { location, weather, ready, reload }
+  return { location, weather, alert, ready, reload }
 }

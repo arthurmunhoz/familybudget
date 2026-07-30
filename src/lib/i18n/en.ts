@@ -723,5 +723,13 @@ export const en = {
   'location.arrived': '{name} arrived at {place}',
   'location.left': '{name} left {place}',
   'location.aPlace': 'a place',
+  'home.weatherThunder': 'Thunderstorms expected today.',
+  'home.weatherSnow': 'Heavy snow expected today.',
+  'home.weatherHeat': 'Extreme heat today — stay hydrated.',
+  'home.weatherCold': 'Freezing today — bundle up.',
+  'home.weatherWind': 'Windy day ahead.',
+  'home.weatherRain': 'Rain likely today — grab an umbrella.',
+  'family.myName': 'Your name',
+  'family.myNameHint': 'How your family sees you in the app.',
 } as const
 

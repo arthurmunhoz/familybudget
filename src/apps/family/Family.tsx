@@ -189,7 +189,7 @@ function MemberCard({
 export default function Family() {
   const back = useBack()
   const { t } = useI18n()
-  const { profile, profiles } = useAuth()
+  const { profile, profiles, refreshProfile } = useAuth()
   const today = todayISO()
 
   // Which member's card is expanded (accordion — one open at a time).
@@ -234,6 +234,7 @@ export default function Family() {
   function openEdit() {
     const mine = profile ? byEmail[profile.email] : undefined
     setForm({
+      display_name: profile?.display_name ?? '',
       avatar_path: mine?.avatar_path ?? '',
       birthday: mine?.birthday ?? '',
       phone: mine?.phone ?? '',
@@ -307,6 +308,16 @@ export default function Family() {
       },
       { onConflict: 'email' },
     )
+    // display_name lives on allowed_users, which members cannot write directly
+    // (admin-only RLS, migration 007) — it goes through set_display_name (057).
+    // Done after the profile upsert so a name failure can't lose the rest.
+    const dn = (form.display_name ?? '').trim()
+    if (!error && dn && dn !== profile.display_name) {
+      const { error: nameErr } = await supabase.rpc('set_display_name', { p_name: dn })
+      // refreshProfile re-reads the MEMBERS list too, which is what Family and
+      // Nudges render — without it the old name lingers everywhere.
+      if (!nameErr) await refreshProfile()
+    }
     setSaving(false)
     if (error) {
       alert(t('family.saveFailed'))
@@ -441,7 +452,23 @@ export default function Family() {
 
             {/* scrollable fields */}
             <div className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-2">
+              {/* Your display name. Kept first because it's the one field the
+                  whole family sees, and until now the web had no way to fix it. */}
               <label className="block text-xs font-semibold text-(--text-faint)">
+                {t('family.myName')}
+                <input
+                  value={form.display_name ?? ''}
+                  onChange={(e) => set('display_name', e.target.value)}
+                  maxLength={40}
+                  autoCapitalize="words"
+                  className="mt-1 h-12 w-full min-w-0 rounded-xl bg-(--surface) px-3 text-(--text) outline-none focus:ring-2 focus:ring-(--accent)"
+                />
+                <span className="mt-1 block font-normal text-(--text-faint)">
+                  {t('family.myNameHint')}
+                </span>
+              </label>
+
+              <label className="mt-3 block text-xs font-semibold text-(--text-faint)">
                 {t('family.birthday')}
               <input
                 type="date"
