@@ -1,13 +1,53 @@
 {
+  "id": "/",
   "name": "One Roof",
   "short_name": "One Roof",
   "description": "Everything your family runs on — budget, shopping, pets, and documents under one roof",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "lifestyle", "utilities"],
   "background_color": "#fbf6f0",
   "theme_color": "#fbf6f0",
   "icons": [
-    { "src": "/roof-icon-180.png", "sizes": "180x180", "type": "image/png" },
-    { "src": "/roof-icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/roof-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/roof-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/roof-icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/roof-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Money",
+      "url": "/budget",
+      "icons": [{ "src": "/roof-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Shopping list",
+      "url": "/shopping",
+      "icons": [{ "src": "/roof-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Nudges",
+      "url": "/pings",
+      "icons": [{ "src": "/roof-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Calendar",
+      "url": "/calendar",
+      "icons": [{ "src": "/roof-icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

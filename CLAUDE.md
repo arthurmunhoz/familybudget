@@ -44,6 +44,25 @@ this doc is the contract for every agent that follows you.
   hashed `/assets/*` are cache-first (content-fingerprinted, safe forever),
   cross-origin (Supabase) is never touched, and on `localhost` the fetch handler
   is a no-op so dev/HMR is unaffected. Bump `CACHE` in `sw.js` to hard-reset.
+  - **The manifest and the icons are served CACHE-FIRST by `sw.js`**, so any
+    change to either only reaches already-installed users when you bump `CACHE`.
+    Currently `one-roof-shell-v4`.
+  - **Android is now the PWA's primary audience** (iOS users have the App Store
+    build; there's no Play Store listing yet). So: icons ship in `any` AND
+    `maskable` purposes at 192 + 512 (Android crops to the launcher's shape and
+    would clip a full-bleed glyph), the push `badge` is a separate MONOCHROME
+    transparent glyph (`roof-badge-96.png` — Android draws the badge as a
+    silhouette from the alpha channel), and the manifest carries `id`/`scope`/
+    `orientation`/`categories`/`shortcuts`.
+  - **`BG` in `src/hooks/useTheme.tsx` must track `--bg` in `index.css`** — it's
+    written into the `theme-color` meta, which Android paints the standalone
+    status bar with. It sat on the pre-"Warm Hearth" cold greys for a while and
+    read as a seam above the page.
+  - Install: `src/lib/install.ts` + `components/InstallPrompt.tsx` (Hub). Chrome
+    fires `beforeinstallprompt` ONCE and before React mounts, so
+    `watchInstallPrompt()` is called at module scope from `main.tsx` and the event
+    is stashed for the card to `.prompt()` from a real gesture. iOS Safari never
+    fires it → that branch shows Share → "Add to Home Screen" instead.
 
 ## File map
 
@@ -66,7 +85,8 @@ src/
   main.tsx                 BrowserRouter + AuthProvider + ThemeProvider
   App.tsx                  Route table; every app screen is lazy()-loaded
   index.css                Theme tokens + global CSS (READ THE COMMENTS)
-  pages/                   Hub-level screens: Hub (launcher), Login, Admin
+  pages/                   Hub-level screens: Hub (launcher), Login, Onboarding
+                           (create/join a household), Admin
   apps/<id>/               One folder per family app:
     budget/                Budgets (home: per-budget dashboard cards — current
                            period balance/bars + "New entry" → /month/:id?add=1
@@ -76,8 +96,11 @@ src/
                            with category chips + an "All" grid that can create
                            household custom_categories (migration 042; entries
                            store the uuid as text — always resolve icons/names
-                           via categoryById(id, customCats)). A "month" = one
-                           budget period (month/week/day per budgets.period).
+                           via categoryById(id, customCats, catOverrides)) and a
+                           "Manage categories" link → ManageCategoriesSheet
+                           (edit/delete customs + rename/re-icon the built-ins
+                           via category_overrides). A "month" = one budget
+                           period (month/week/day per budgets.period).
     shopping/              ShoppingList (Realtime-synced) + optional per-store
                            sections (StoreLogo, lib/stores.ts catalog)
     pets/                  PetCare (events + next-due reminders)
@@ -89,11 +112,13 @@ src/
                            scan, Better deal unit-price, Discount) — no DB
   components/              Shared: Backdrop, Drawer, AnalyticsTracker,
                            ErrorBoundary, VaultGate, NotificationsToggle,
-                           PingsBanner, NotificationsNudge
+                           PingsBanner, NotificationsNudge, HouseholdSection
+                           (members + owner invite code), InstallPrompt
   hooks/                   useAuth, useBack, useTheme, useI18n, useHousehold,
                            useAppPrefs, useScrollLock
   lib/                     apps.ts (hub registry), types.ts, format.ts,
                            categories.ts, analytics.ts, biometric.ts,
+                           install.ts (add-to-home-screen),
                            push.ts (web-push opt-in), pings.ts (household
                            pings), i18n/ (en|es|pt dicts), image.ts,
                            signedUrls.ts, supabase.ts
@@ -142,12 +167,28 @@ one.
   `rotate_join_code()`, `remove_member(email)`. All are `security definer`,
   guarded on `jwt_email()` + a "not already in a household" check — clients call
   the RPCs, never write `allowed_users`/`households`/`household_join_codes`
-  directly (admin-only RLS is unchanged). Client onboarding UI is iOS-first
-  (PWA parity in the backlog).
+  directly (admin-only RLS is unchanged). Both clients now have the UI: on the
+  web it's `src/pages/Onboarding.tsx` (gated in `App.tsx`) +
+  `src/components/HouseholdSection.tsx` in the Drawer.
 
-**Auth/profile**: `useAuth()` gives `profile` (self) and `profiles` (members
+**Auth/profile**: `useAuth()` gives `profile` (self), `profiles` (members
 of OWN household only — already filtered; admins can query `allowed_users`
-directly for cross-household needs, see `Admin.tsx`).
+directly for cross-household needs, see `Admin.tsx`), `profileLoaded`, and
+`refreshProfile()`.
+- `profile.role` is the household-scoped `'owner' | 'member'` — gate invite/
+  remove-member affordances on it, NEVER on `is_admin`.
+- **A signed-in user with `profileLoaded && !profile` has no household yet** →
+  `App.tsx` renders `<Onboarding/>`. That's the NORMAL path for a new signup
+  (open signup), not an error; it replaced an old "Not authorized / add them to
+  allowed_users in Supabase" dead end. Check `profileLoaded` and not just
+  `!profile`: the session changes before the new lookup resolves, so acting on
+  `!profile` alone flashes onboarding at a returning user.
+- `refreshProfile()` re-reads the members list too — call it after onboarding
+  and after a rename (`set_display_name`), since `profiles` carries the display
+  names that Family and Nudges render.
+- Only the OWNER sees the invite code; `get_join_code()` returns null for
+  everyone else, so it's safe to call unconditionally (that's what
+  `HouseholdSection` does, folding it into one cached query).
 
 **Back navigation**: back buttons must POP history, not push. Always
 `const back = useBack()` then `back('/fallback-parent')`. Never
@@ -361,6 +402,10 @@ complete. To get in:
   `VITE_DEV_PASSWORD` from `.env.local` — a seeded test household (Alex & Sam
   Rivera with sample budget/pets/docs/family data). Click it, or the Supabase
   session may already persist; then navigate to the route you changed.
+- The dev account is `role='owner'` of that household (but NOT `is_admin` — see
+  the note on /admin below), so owner-only UI like the invite code is testable.
+  It is NOT, however, householdless, so the Onboarding screen can't be reached by
+  signing in; force the `App.tsx` gate temporarily to look at it.
 - New `.env.local` vars require a dev-server restart to load.
 - ALWAYS verify behind-auth UI this way before claiming it works. Do NOT build
   throwaway mock-harness components for it (the old approach — no longer needed).

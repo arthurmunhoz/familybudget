@@ -7,6 +7,7 @@ import { useAuth } from './hooks/useAuth'
 import { isConfigured } from './lib/supabase'
 import Login from './pages/Login'
 import Hub from './pages/Hub'
+import Onboarding from './pages/Onboarding'
 
 // Hub apps are lazy-loaded so the bundle stays light as the family adds more.
 const Budgets = lazy(() => import('./apps/budget/Budgets'))
@@ -24,7 +25,7 @@ const Admin = lazy(() => import('./pages/Admin'))
 const AdminHousehold = lazy(() => import('./pages/AdminHousehold'))
 
 export default function App() {
-  const { session, profile, loading, signOut } = useAuth()
+  const { session, profile, loading, profileLoaded } = useAuth()
 
   if (!isConfigured) {
     return (
@@ -49,23 +50,19 @@ export default function App() {
 
   if (!session) return <Login />
 
-  if (!profile) {
+  // Signed in, but the profile lookup for THIS session hasn't landed yet —
+  // don't let a stale empty result flash the onboarding screen at a returning user.
+  if (!profileLoaded) {
     return (
       <Centered>
-        <h1 className="text-xl font-bold text-(--text)">Not authorized</h1>
-        <p className="mt-2 text-(--text-muted)">
-          {session.user.email} is not in the allowed users list. Add it to the{' '}
-          <code>allowed_users</code> table in Supabase.
-        </p>
-        <button
-          onClick={signOut}
-          className="mt-6 rounded-xl bg-(--surface) px-5 py-3 font-medium text-(--text)"
-        >
-          Sign out
-        </button>
+        <p className="animate-pulse text-(--text-muted)">Loading…</p>
       </Centered>
     )
   }
+
+  // Signed in with no household yet → self-serve onboarding (create or join).
+  // Open signup, so this is the normal path for a brand-new user, not an error.
+  if (!profile) return <Onboarding />
 
   return (
     <ErrorBoundary>

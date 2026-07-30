@@ -1,19 +1,28 @@
-import { useEffect, useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Settings2, X } from 'lucide-react'
 import { useI18n } from '../../hooks/useI18n'
 import { useScrollLock } from '../../hooks/useScrollLock'
 import {
-  CATEGORIES,
+  builtinCategories,
   categoryById,
   isBuiltinCategory,
   normalizeLabel,
+  overriddenName,
   suggestCategory,
   type Category,
 } from '../../lib/categories'
 import { addDaysISO, formatDay, formatMoney, shortName, todayISO } from '../../lib/format'
 import type { TKey } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
-import type { CategoryRule, CustomCategory, Entry, EntryType, Profile } from '../../lib/types'
+import type {
+  CategoryOverride,
+  CategoryRule,
+  CustomCategory,
+  Entry,
+  EntryType,
+  Profile,
+} from '../../lib/types'
+import ManageCategoriesSheet from './ManageCategoriesSheet'
 
 export interface EntryPrefill {
   label?: string
@@ -35,6 +44,8 @@ interface Props {
   subcategorySuggestions: Record<string, string[]>
   /** Household-defined categories (shown alongside the built-ins) */
   customCategories: CustomCategory[]
+  /** Household's renames/re-icons of the BUILT-IN presets (migration 056) */
+  catOverrides: CategoryOverride[]
   /** Household's most-used expense category ids, most-used first */
   topCategories: string[]
   /** Called after a new custom category is saved, so the parent can refetch */
@@ -59,6 +70,7 @@ export default function EntryForm({
   rules,
   subcategorySuggestions,
   customCategories,
+  catOverrides,
   topCategories,
   onCategoryCreated,
   entry,
@@ -103,7 +115,17 @@ export default function EntryForm({
 
   // Category picker: chips by default, the full grid behind "All".
   const [gridOpen, setGridOpen] = useState(false)
-  const [localCats, setLocalCats] = useState<CustomCategory[]>(customCategories)
+  const [manageOpen, setManageOpen] = useState(false)
+  // A just-created category, shown immediately without waiting for the parent's
+  // refetch. DERIVED rather than a copy of the prop that we keep in sync: the
+  // Manage sheet edits and deletes categories too, and a snapshot taken at mount
+  // would leave the open form showing the old names. Once the refetch lands the
+  // category is in `customCategories` and the optimistic copy drops out.
+  const [createdCats, setCreatedCats] = useState<CustomCategory[]>([])
+  const localCats = useMemo(() => {
+    const known = new Set(customCategories.map((c) => c.id))
+    return [...customCategories, ...createdCats.filter((c) => !known.has(c.id))]
+  }, [customCategories, createdCats])
   const [newCatOpen, setNewCatOpen] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [newCatIcon, setNewCatIcon] = useState('')
@@ -121,11 +143,13 @@ export default function EntryForm({
   const parsedAmount = parseFloat(amount.replace(',', '.'))
   const amountValid = !Number.isNaN(parsedAmount) && parsedAmount > 0
 
-  const selectedCat = categoryById(category, localCats)
+  const selectedCat = categoryById(category, localCats, catOverrides)
   const catName = (c: Category) =>
-    isBuiltinCategory(c.id) ? t(`cat.${c.id}` as TKey) : c.name
+    isBuiltinCategory(c.id)
+      ? (overriddenName(c.id, catOverrides) ?? t(`cat.${c.id}` as TKey))
+      : c.name
   const allExpenseCats: Category[] = [
-    ...CATEGORIES.filter((c) => c.id !== 'salary'),
+    ...builtinCategories(catOverrides).filter((c) => c.id !== 'salary'),
     ...localCats.map((c) => ({ id: c.id, name: c.name, icon: c.icon })),
   ]
   const knownIds = new Set(allExpenseCats.map((c) => c.id))
@@ -156,7 +180,7 @@ export default function EntryForm({
       setError(t('entry.categoryCreateFailed'))
       return
     }
-    setLocalCats((prev) => [...prev, data])
+    setCreatedCats((prev) => [...prev, data])
     setNewCatOpen(false)
     setNewCatName('')
     setNewCatIcon('')
@@ -321,7 +345,7 @@ export default function EntryForm({
                 {catName(selectedCat)}
               </span>
               {quickIds.map((id) => {
-                const c = categoryById(id, localCats)
+                const c = categoryById(id, localCats, catOverrides)
                 return (
                   <button
                     key={id}
@@ -397,6 +421,16 @@ export default function EntryForm({
                   {t('common.add')}
                 </button>
               </div>
+            )}
+
+            {gridOpen && (
+              <button
+                onClick={() => setManageOpen(true)}
+                className="mt-2 flex items-center gap-1.5 text-xs font-medium text-(--text-muted) underline decoration-dotted underline-offset-4 active:text-(--text)"
+              >
+                <Settings2 size={13} strokeWidth={2} aria-hidden="true" />
+                {t('manageCats.title')}
+              </button>
             )}
 
             {!subOpen ? (
@@ -563,6 +597,20 @@ export default function EntryForm({
           )}
         </div>
       </div>
+
+      {/* Rendered inside the form (a higher z-index sibling), so it sits above it. */}
+      {manageOpen && (
+        <ManageCategoriesSheet
+          customCats={localCats}
+          overrides={catOverrides}
+          onClose={() => setManageOpen(false)}
+          onChanged={() => {
+            // The parent owns both lists; refetching also refreshes localCats
+            // via the customCategories prop on the next render.
+            onCategoryCreated()
+          }}
+        />
+      )}
     </div>
   )
 }

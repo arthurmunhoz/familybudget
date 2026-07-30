@@ -9,7 +9,9 @@
 //   • On localhost the fetch handler is a no-op, so dev/HMR is unaffected.
 // Bump CACHE to invalidate everything on a breaking change.
 
-const CACHE = 'one-roof-shell-v3'
+// v4: the manifest + icon set are cached here cache-first, so the Android icon
+// work (maskable icons, shortcuts) only reaches installed users on a bump.
+const CACHE = 'one-roof-shell-v4'
 const SHELL = '/index.html'
 
 self.addEventListener('install', (event) => {
@@ -89,8 +91,11 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'One Roof'
   const options = {
     body: payload.body || '',
-    icon: '/roof-icon-180.png',
-    badge: '/roof-icon-180.png',
+    icon: '/roof-icon-192.png',
+    // Android renders `badge` as a monochrome silhouette from the alpha channel,
+    // so it has to be a transparent glyph — a full-colour icon here became an
+    // indistinct blob in the status bar.
+    badge: '/roof-badge-96.png',
     tag: payload.tag || 'one-roof-digest',
     data: { url: payload.url || '/', tel: payload.tel || null },
   }

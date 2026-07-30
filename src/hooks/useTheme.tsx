@@ -8,6 +8,11 @@ import {
 
 type Theme = 'light' | 'dark'
 
+/** Must track `--bg` in index.css. Android paints the standalone status bar with
+ *  this, so a stale value shows up as a seam above the page — it did: these were
+ *  left on the pre-"Warm Hearth" cold greys (#0c0a09 / #f5f5f4). */
+const BG: Record<Theme, string> = { light: '#fbf6f0', dark: '#1b1714' }
+
 const ThemeContext = createContext<{
   theme: Theme
   setTheme: (t: Theme) => void
@@ -22,9 +27,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('theme', theme)
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#0c0a09' : '#f5f5f4')
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', BG[theme])
   }, [theme])
 
   const toggle = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))

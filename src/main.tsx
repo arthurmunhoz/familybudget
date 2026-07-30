@@ -8,15 +8,18 @@ import App from './App'
 import { AuthProvider } from './hooks/useAuth'
 import { I18nProvider } from './hooks/useI18n'
 import { ThemeProvider } from './hooks/useTheme'
+import { watchInstallPrompt } from './lib/install'
 import { registerServiceWorker } from './lib/push'
 
-// Register the push-only service worker so opted-in devices can receive the
-// daily reminder digest. It has no fetch handler, so it never affects loading.
+// Register the service worker (push + offline app shell).
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     void registerServiceWorker()
   })
 }
+
+// Must run before React mounts: Chrome fires `beforeinstallprompt` once, early.
+watchInstallPrompt()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

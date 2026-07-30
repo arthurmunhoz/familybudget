@@ -21,6 +21,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import type {
   CategoryRule,
+  CategoryOverride,
   CustomCategory,
   Entry,
   Month,
@@ -64,6 +65,7 @@ export default function MonthDetail() {
     rules: CategoryRule[]
     subcatSuggestions: Record<string, string[]>
     customCats: CustomCategory[]
+    catOverrides: CategoryOverride[]
     topCategories: string[]
   }
   const EMPTY: DetailData = {
@@ -72,6 +74,7 @@ export default function MonthDetail() {
     rules: [],
     subcatSuggestions: {},
     customCats: [],
+    catOverrides: [],
     topCategories: [],
   }
   // Cached per period: detail renders instantly on return, revalidates quietly.
@@ -81,7 +84,7 @@ export default function MonthDetail() {
     revalidate,
   } = useCachedQuery<DetailData>(`monthDetail:${id ?? ''}`, async () => {
     if (!id) return EMPTY
-    const [m, e, r, subs, custom] = await Promise.all([
+    const [m, e, r, subs, custom, overrides] = await Promise.all([
       supabase.from('months').select('*, budgets(name, period)').eq('id', id).single(),
       supabase.from('entries').select('*').eq('month_id', id),
       supabase.from('category_rules').select('keyword, category'),
@@ -89,6 +92,7 @@ export default function MonthDetail() {
       // subcategory autocomplete and the entry form's most-used category chips.
       supabase.from('entries').select('type, category, subcategory'),
       supabase.from('custom_categories').select('*').order('created_at'),
+      supabase.from('category_overrides').select('base_id, name, icon'),
     ])
     const counts = new Map<string, Map<string, number>>()
     const catCounts = new Map<string, number>()
@@ -119,6 +123,7 @@ export default function MonthDetail() {
       rules: r.data ?? [],
       subcatSuggestions: map,
       customCats: custom.data ?? [],
+      catOverrides: overrides.data ?? [],
       topCategories: [...catCounts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c),
     }
   })
@@ -291,7 +296,7 @@ export default function MonthDetail() {
       </header>
 
       <div className="mt-1">
-        <SummaryChart entries={filtered} customCats={data.customCats} />
+        <SummaryChart entries={filtered} customCats={data.customCats} overrides={data.catOverrides} />
       </div>
 
       {/* Sort controls */}
@@ -337,6 +342,7 @@ export default function MonthDetail() {
         entries={sortEntries(listVisible(filtered))}
         nameOf={nameOf}
         customCats={data.customCats}
+        overrides={data.catOverrides}
         showPerson={person === 'all'}
         groupByDay={sortBy === 'date'}
         onSelect={(e) => {
@@ -452,6 +458,7 @@ export default function MonthDetail() {
           rules={rules}
           subcategorySuggestions={subcatSuggestions}
           customCategories={data.customCats}
+          catOverrides={data.catOverrides}
           topCategories={data.topCategories}
           onCategoryCreated={revalidate}
           entry={editing}
@@ -475,6 +482,7 @@ function EntryColumn({
   entries,
   nameOf,
   customCats,
+  overrides,
   showPerson,
   groupByDay = false,
   compact = false,
@@ -484,6 +492,7 @@ function EntryColumn({
   entries: Entry[]
   nameOf: (email: string) => string
   customCats: CustomCategory[]
+  overrides: CategoryOverride[]
   showPerson: boolean
   groupByDay?: boolean
   compact?: boolean
@@ -523,6 +532,7 @@ function EntryColumn({
                   entry={e}
                   nameOf={nameOf}
                   customCats={customCats}
+                  overrides={overrides}
                   showPerson={showPerson}
                   showDate={false}
                   compact={compact}
@@ -545,6 +555,7 @@ function EntryColumn({
           entry={e}
           nameOf={nameOf}
           customCats={customCats}
+          overrides={overrides}
           showPerson={showPerson}
           showDate
           compact={compact}
@@ -560,6 +571,7 @@ function EntryRow({
   entry: e,
   nameOf,
   customCats,
+  overrides,
   showPerson,
   showDate,
   compact,
@@ -569,6 +581,7 @@ function EntryRow({
   entry: Entry
   nameOf: (email: string) => string
   customCats: CustomCategory[]
+  overrides: CategoryOverride[]
   showPerson: boolean
   showDate: boolean
   compact: boolean
@@ -587,7 +600,7 @@ function EntryRow({
     setDx(0)
   }
 
-  const cat = categoryById(e.category, customCats)
+  const cat = categoryById(e.category, customCats, overrides)
   const isIncome = e.type === 'income'
   const secondary = [
     e.subcategory,

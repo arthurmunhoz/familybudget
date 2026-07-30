@@ -94,7 +94,7 @@ export default function AdminHousehold() {
       supabase.from('households').select('*').eq('id', id).single(),
       supabase
         .from('allowed_users')
-        .select('email, display_name, household_id, is_admin')
+        .select('email, display_name, household_id, is_admin, role')
         .eq('household_id', id)
         .order('display_name'),
       supabase.rpc('admin_user_activity', { days: 30 }),

@@ -5,6 +5,10 @@ export interface Profile {
   display_name: string
   household_id: string
   is_admin: boolean
+  /** Household-scoped role (migration 051). NOT the same thing as `is_admin`,
+   *  which is a GLOBAL super-admin flag — never conflate the two. Owners can
+   *  read/rotate the invite code and remove members. */
+  role: 'owner' | 'member'
 }
 
 export interface Household {
@@ -55,6 +59,14 @@ export interface CategoryRule {
 }
 
 /** A household-defined budget category (entries store its uuid in `category`). */
+/** A household's override of one BUILT-IN preset (migration 056). name/icon are
+ *  nullable so a household can change just the icon and keep the localized name. */
+export interface CategoryOverride {
+  base_id: string
+  name: string | null
+  icon: string | null
+}
+
 export interface CustomCategory {
   id: string
   name: string

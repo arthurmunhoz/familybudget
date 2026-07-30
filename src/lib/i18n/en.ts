@@ -586,5 +586,72 @@ export const en = {
   'docs.openFailed': 'Could not open the document — please try again.',
   'docs.editSaveFailed': 'Could not save the changes — please try again.',
   'docs.deleteConfirm': 'Delete “{title}”? This can’t be undone.',
+
+  // Self-serve onboarding — a signed-in user with no household yet.
+  'onboarding.title': "Let's get you set up",
+  'onboarding.subtitle': 'Create a household or join one you were invited to.',
+  'onboarding.createTitle': 'Create a household',
+  'onboarding.createDesc': 'Start fresh, then invite your family with a code.',
+  'onboarding.namePlaceholder': 'Household name',
+  'onboarding.createBtn': 'Create household',
+  'onboarding.joinTitle': 'Join a household',
+  'onboarding.joinDesc': 'Enter the code from someone already in the household.',
+  'onboarding.codePlaceholder': 'Household code',
+  'onboarding.joinBtn': 'Join household',
+  'onboarding.errNameRequired': 'Please enter a household name.',
+  'onboarding.errCodeRequired': 'Please enter a household code.',
+  'onboarding.errInvalidCode': "That code isn't valid. Double-check it and try again.",
+  'onboarding.errAlready': "You're already in a household.",
+  'onboarding.errTooMany': 'Too many attempts. Please try again in a few minutes.',
+  'onboarding.errGeneric': 'Something went wrong. Please try again.',
+  'onboarding.errFull': 'This household is already full. Ask an owner for room or a different code.',
+  'onboarding.nameTitle': 'What should we call you?',
+  'onboarding.nameDesc': 'This is how your family will see you in the app.',
+  'onboarding.yourNamePlaceholder': 'e.g. Sarah, AJ, Mary Ann',
+  'onboarding.continue': 'Continue',
+  'onboarding.appearAs': "You'll appear as",
+  'onboarding.changeName': 'Change',
+  'onboarding.errYourNameRequired': 'Please enter your name.',
+
+  // Household section in the settings drawer (members + invite code).
+  'household.title': 'Household',
+  'household.memberCount': '{count} of {max} members',
+  'household.owner': 'Owner',
+  'household.inviteCode': 'Invite code',
+  'household.inviteHint': 'Share this code so family can join your household.',
+  'household.share': 'Share code',
+  'household.copy': 'Copy code',
+  'household.copied': 'Copied',
+  'household.rotate': 'Reset code',
+  'household.rotateConfirm':
+    'Reset the invite code? The current code stops working immediately, and anyone you still want to invite will need the new one.',
+  'household.rotateError': 'Could not reset the code. Please try again.',
+  'household.shareMessage':
+    'Join our household on One Roof! Open {url}, sign in, tap “Join a household,” and enter this code: {code}',
+  'household.removeMember': 'Remove member',
+  'household.removeConfirm':
+    'Remove {name} from the household? They’ll lose access to everything shared here.',
+  'household.removeError': 'Could not remove this member. Please try again.',
+  'household.notOwnerHint': 'Only the household owner can invite or remove members.',
+
+  // Manage categories (budget entry form → category picker).
+  'manageCats.title': 'Manage categories',
+  'manageCats.defaults': 'Default categories',
+  'manageCats.yours': 'Your categories',
+  'manageCats.reset': 'Reset to default',
+  'manageCats.add': 'Add category',
+  'manageCats.namePlaceholder': 'Category name',
+  'manageCats.empty': 'You haven’t created any categories yet.',
+  'manageCats.deleteHint': 'Deleting a category moves its entries to “Other”.',
+  'manageCats.deleteConfirm': 'Delete “{name}”? Its entries will be moved to “Other”.',
+  'manageCats.deleteError': 'Couldn’t delete the category. Please try again.',
+  'manageCats.saveError': 'Couldn’t save the category. Please try again.',
+
+  // Add-to-home-screen prompt.
+  'install.title': 'Install One Roof',
+  'install.body': 'Add it to your home screen — full screen, and it opens like an app.',
+  'install.btn': 'Install',
+  'install.iosBody': 'Tap the Share button, then “Add to Home Screen”.',
+  'install.dismiss': 'Not now',
 } as const
 

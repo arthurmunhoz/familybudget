@@ -5,14 +5,16 @@ import { categoryById } from '../../lib/categories'
 import { formatMoney, todayISO } from '../../lib/format'
 import { useI18n } from '../../hooks/useI18n'
 import { useTheme } from '../../hooks/useTheme'
-import type { CustomCategory, Entry } from '../../lib/types'
+import type { CategoryOverride, CustomCategory, Entry } from '../../lib/types'
 
 export default function SummaryChart({
   entries,
   customCats = [],
+  overrides = [],
 }: {
   entries: Entry[]
   customCats?: CustomCategory[]
+  overrides?: CategoryOverride[]
 }) {
   const { t } = useI18n()
   const { theme } = useTheme()
@@ -167,7 +169,7 @@ export default function SummaryChart({
       {categories.length > 0 && (
         <div className="mt-4 space-y-2">
           {categories.map(([catId, amount]) => {
-            const cat = categoryById(catId, customCats)
+            const cat = categoryById(catId, customCats, overrides)
             const subs = [...(bySub.get(catId)?.entries() ?? [])].sort(
               (a, b) => b[1] - a[1],
             )

@@ -58,7 +58,7 @@ export default function Admin() {
       // households list + last-active view, same as they're excluded from usage
       // analytics (migration 023).
       supabase.from('households').select('*').eq('is_internal', false).order('created_at'),
-      supabase.from('allowed_users').select('email, display_name, household_id, is_admin'),
+      supabase.from('allowed_users').select('email, display_name, household_id, is_admin, role'),
       supabase.rpc('admin_household_activity'),
     ])
     return {

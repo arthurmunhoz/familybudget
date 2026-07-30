@@ -3,6 +3,7 @@ import { BellOff, LayoutGrid, Menu } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Backdrop from '../components/Backdrop'
 import Drawer from '../components/Drawer'
+import InstallPrompt from '../components/InstallPrompt'
 import PingsBanner from '../components/PingsBanner'
 import TodaySection from '../components/TodaySection'
 import { useAppPrefs } from '../hooks/useAppPrefs'
@@ -148,6 +149,8 @@ export default function Hub() {
       />
 
       <PingsBanner />
+
+      <InstallPrompt />
 
       {tiles.length === 0 ? (
         <div className="mt-16 flex flex-col items-center text-center text-(--text-muted)">

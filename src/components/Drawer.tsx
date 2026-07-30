@@ -6,6 +6,7 @@ import { notifyHouseholdChanged, useHousehold } from '../hooks/useHousehold'
 import { useI18n } from '../hooks/useI18n'
 import { useScrollLock } from '../hooks/useScrollLock'
 import { useTheme } from '../hooks/useTheme'
+import HouseholdSection from './HouseholdSection'
 import NotificationsToggle from './NotificationsToggle'
 import { APPS } from '../lib/apps'
 import { LANGUAGES, type TKey } from '../lib/i18n'
@@ -221,6 +222,8 @@ export default function Drawer({
             {session?.user.email}
           </div>
         </div>
+
+        <HouseholdSection />
 
         <div className="mt-6">
           <span className="text-sm text-(--text-muted)">{t('drawer.language')}</span>
