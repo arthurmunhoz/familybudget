@@ -182,6 +182,52 @@ export interface FamilyDocument {
   created_at: string
 }
 
+/** A household member's latest position (migration 065). Sharing is OPT-IN and
+ *  coordinates are nulled on stop/pause, so a row can exist purely to say
+ *  `sharing: false`. */
+export interface MemberLocation {
+  user_email: string
+  household_id: string
+  lat: number | null
+  lng: number | null
+  /** Horizontal accuracy in meters, if reported. */
+  accuracy: number | null
+  /** Ground speed in m/s, if reported. */
+  speed: number | null
+  /** Battery level 0–100, if reported. */
+  battery: number | null
+  sharing: boolean
+  /** ISO timestamp; while in the future, this member has paused sharing. */
+  paused_until: string | null
+  updated_at: string
+}
+
+/** A saved household place (migration 067). On iOS it's monitored as a native
+ *  geofence; the web can only evaluate it while a page is open (see location.ts). */
+export interface Place {
+  id: string
+  household_id: string
+  name: string
+  icon: string
+  lat: number
+  lng: number
+  radius_m: number
+  created_by: string
+  created_at: string
+}
+
+/** A member crossing a place's geofence (migration 067) — drives the activity
+ *  feed. Rows are written by the MOVER's device, which in practice means the
+ *  iOS app; see the web caveats in location.ts. */
+export interface PlaceEvent {
+  id: string
+  household_id: string
+  place_id: string
+  user_email: string
+  type: 'arrive' | 'leave'
+  at: string
+}
+
 export interface MemberProfile {
   email: string
   household_id: string

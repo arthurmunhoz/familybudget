@@ -15,6 +15,7 @@ import {
   FolderLock,
   CalendarDays,
   Users,
+  MapPin,
   Calculator,
   Wrench,
 } from 'lucide-react'
@@ -34,6 +35,13 @@ export const APPS: HubApp[] = [
     icon: Bell,
     route: '/pings',
     description: 'A quick nudge to the family',
+  },
+  {
+    id: 'location',
+    name: 'Whereabouts',
+    icon: MapPin,
+    route: '/location',
+    description: 'See where everyone is',
   },
   {
     id: 'calendar',

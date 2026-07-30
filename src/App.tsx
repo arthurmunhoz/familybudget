@@ -21,6 +21,7 @@ const PetProfile = lazy(() => import('./apps/pets/PetProfile'))
 const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
 const Family = lazy(() => import('./apps/family/Family'))
 const Calculator = lazy(() => import('./apps/calc/Calculator'))
+const Whereabouts = lazy(() => import('./apps/location/Whereabouts'))
 const Admin = lazy(() => import('./pages/Admin'))
 const AdminHousehold = lazy(() => import('./pages/AdminHousehold'))
 
@@ -96,6 +97,7 @@ export default function App() {
           <Route path="/dates" element={<Navigate to="/calendar" replace />} />
           <Route path="/family" element={<Family />} />
           <Route path="/calc" element={<Calculator />} />
+          <Route path="/location" element={<Whereabouts />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/household/:id" element={<AdminHousehold />} />
           <Route path="*" element={<Navigate to="/" replace />} />
