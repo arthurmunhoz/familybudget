@@ -103,13 +103,22 @@ src/
                            period (month/week/day per budgets.period).
     shopping/              ShoppingList (Realtime-synced) + optional per-store
                            sections (StoreLogo, lib/stores.ts catalog)
-    pets/                  PetCare (events + next-due reminders)
+    pets/                  PetCare (routine-first: PetRoutines daily checklist +
+                           interval routines + weight log via migration 069's
+                           pet_care_tasks/pet_task_done/pet_weights, edited in
+                           RoutineSheet; then the event calendar + next-due
+                           reminders). Routine math lives in lib/petCare.ts and
+                           MUST stay in sync with mobile/src/lib/petCare.ts —
+                           both clients compute due dates from it.
     docs/                  DocumentVault (storage uploads, signed URLs;
                            opt-in Face ID lock via VaultGate + biometric.ts)
     calendar/              Calendar (month + Upcoming; calendar_events; dates + Google sync)
     family/                Family (per-member profiles + avatars)
     calc/                  Calculator (Split a bill evenly/by-item via photo
                            scan, Better deal unit-price, Discount) — no DB
+    location/              Whereabouts (family map): FamilyMap (lazy Mapbox GL)
+                           + Whereabouts (roster/places/activity). Foreground
+                           sharing only — see lib/location.ts's header
   components/              Shared: Backdrop, Drawer, AnalyticsTracker,
                            ErrorBoundary, VaultGate, NotificationsToggle,
                            PingsBanner, NotificationsNudge, HouseholdSection
@@ -383,6 +392,31 @@ token each load = a new URL = a forced re-download). Resize photos before upload
 with `fileToResizedBase64` (avatars/pets 512px, backdrop 1800px, doc images
 2048px) and pass `cacheControl: '604800'` to `.upload()` — paths are
 content-addressed (uuid per upload) so long caching is safe.
+
+**Whereabouts (`/location`)** — the web half of the iOS family map, at reduced
+capability. `src/lib/location.ts`'s header comment is the contract; the rules
+that matter before you touch it:
+- **Reading** positions / places / the activity feed is full parity (Supabase +
+  Realtime). **Sharing your own position is FOREGROUND ONLY** —
+  `navigator.geolocation` dies with a backgrounded tab and no PWA has a
+  background-location API. The watch is torn down on unmount and the screen says
+  so; don't "improve" this into an implied always-on tracker.
+- **NEVER insert `place_events` from the web.** Migration 071 routes every insert
+  through `record_place_event()` (state-transition dedupe against re-announced
+  geofence enters), and a browser can't observe a crossing anyway. Crossings come
+  from members' phones; the web reads them. Same reason place pins carry **no
+  radius ring**: on iOS a ring means "armed for me", so one here would promise
+  alerts that never fire.
+- The map needs `VITE_MAPBOX_TOKEN`. Without it the screen renders the roster
+  instead — that path is the one verified in CI-less preview runs, and it's what
+  production shows until the var is set. `mapbox-gl` is **lazy-imported** so it
+  stays in its own ~502 kB-gzip chunk; keep it that way.
+- **Don't call `map.setStyle()` while the first style is still loading** — it
+  throws inside mapbox's `_reloadImports` (`Cannot read properties of undefined
+  (reading 'applyProjectionUpdate')`) and leaves a mounted map with NO TILES,
+  which looks like a token problem and isn't. `FamilyMap` guards with a
+  `styleRef` + `isStyleLoaded()`/`once('style.load')`.
+- Mapbox logo + OSM attribution stay visible: ODbL, not just ToS.
 
 **Money/date helpers**: use `src/lib/format.ts` (`formatMoney`, `formatDay`,
 `todayISO`, period helpers). Dates are ISO `YYYY-MM-DD` strings end-to-end;

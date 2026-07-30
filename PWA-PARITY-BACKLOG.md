@@ -7,22 +7,127 @@ be ported back to the web app "some other time."
 The iOS implementation is the source of truth for each item — port its behavior,
 adapting RN patterns to the web (Tailwind + the PWA's existing components).
 
-**Status (2026-07-29):** items 1–8 (budget card v2, Today section + weather,
-free-plan limits, Nudges sent-banner CTAs, Family accordion, Pet Care per-pet
-redesign, Nudges editable presets + high-priority flag, Discount calculator
-redesign) were ported 2026-07-07. **Items 10 and 11 are now DONE too** (self-serve
-onboarding + owner invite code; Manage categories incl. built-in overrides) — see
-each section below for what shipped. **Item 9 is deliberately NOT done** — read
-its note before "finishing" it.
+**Status (2026-07-29, second pass).** Items 1–8 landed 2026-07-07. Items 10 and
+11 (self-serve onboarding + owner invite code; Manage categories) landed
+2026-07-29, along with **Pet Care routines** and a **web Whereabouts** — see
+"Landed on the web" below. Item 9 is deliberately ON HOLD; read its note.
 
-Android is now the PWA's main audience (no Play Store listing yet), so
-Android-specific PWA quality is tracked in "Android/PWA platform work" at the
-bottom rather than as a parity gap.
+**How this list is now organised.** The previous "caught up" framing was wrong
+and cost a re-derivation, so the remaining gap is written down explicitly, split
+by whether the web *can* do it:
 
-The iOS app is still far ahead on things that are **native-only by nature** and
-are NOT parity gaps: Whereabouts (Mapbox + background location), Home-Screen
-widgets, Apple/Google IAP + the paywall, Face ID via `expo-local-authentication`,
-the VisionKit document scanner, and Apple Calendar sync. Don't add these here.
+| Tier | Meaning |
+|---|---|
+| **A — portable** | Plain DB + UI. Should be ported; nothing blocks it. |
+| **B — degraded** | Possible, but weaker on the web. Port with the limit stated IN THE UI. |
+| **C — impossible** | Needs an OS capability or a purchase path the web lacks. Not a gap; don't file it as one. |
+
+A quick way to re-measure the gap at any time (i18n keys are a good proxy for
+feature surface, since both apps must translate every string):
+
+```
+python3 - <<'EOF'
+import re
+kv=lambda p: set(re.findall(r"^\s*'([\w.]+)':", open(p).read(), re.M))
+m,w = kv('mobile/src/lib/i18n/en.ts'), kv('src/lib/i18n/en.ts')
+from collections import Counter
+print(len(m-w), 'iOS keys missing from the PWA')
+for n,c in Counter(k.split('.')[0] for k in m-w).most_common(): print(f'{n:14} {c}')
+EOF
+```
+At the time of writing that reports **372 missing keys**, of which ~235 are
+tier C (`location.*` extras, `settings.*` native, `paywall.*`, `admin.*`).
+
+---
+
+# Landed on the web (2026-07-29)
+
+- **Self-serve onboarding + owner invite code** — item 10 below.
+- **Manage categories** (custom + built-in overrides) — item 11 below.
+- **Pet Care routines** (migration 069): daily checklist with day-browsing and
+  who-ticked-it, interval routines with due state, weight log, per-group routine
+  editor with species-template seeding. `src/lib/petCare.ts` now carries the same
+  routine math as `mobile/src/lib/petCare.ts` — **keep the two in sync**, they
+  decide due dates and must not disagree.
+  - These sit ABOVE the existing calendar + reminders instead of replacing them.
+    iOS dropped its calendar in the redesign; the web kept it deliberately.
+- **Whereabouts** (`/location`, `src/apps/location/`) — tier B, see below.
+- **Weather advisory** on the Hub's Today card (`fetchDayAlert`, thresholds
+  copied verbatim from iOS).
+- **Family → "Your name"** via the `set_display_name` RPC (057).
+
+# Tier A — portable, still outstanding
+
+Ordered by how much a household would notice.
+
+1. **Nudges history** (`pings.tabPast`, `filterAll/Received/Sent`, `today`,
+   `yesterday`, `empty`): iOS has a Past-nudges tab with All/Received/Sent
+   filters. The web only has the composer + live banner, so a nudge you missed is
+   simply gone. Pure query over `pings` + `ping_acks`.
+2. **Period options in Months** (`months.periodOptions`, `prevPeriod`,
+   `nextPeriod`, `deletePeriod`, `renameFailed`): rename a budget, delete a
+   period, and step between periods. The web can only create.
+3. **Shopping store management** (`shopping.editStore`, `deleteStore`, `color`)
+   and **suggested stores** (`shopping.suggested`, served by the existing
+   `api/suggest-stores` — metered by `ai_light_allowed`, no new endpoint needed).
+4. **Documents: owner + type fields** (`docs.owner`, `docs.type`) — iOS shows and
+   filters on both.
+5. **Family extras** (9 keys): blood donor/recipient matrix (`donateTo`,
+   `receiveFrom`, `universalDonor`, `universalRecipient`) and men's/women's shoe
+   conversion (`shoeMen`, `shoeWomen`, `convertApprox`).
+6. **Calculator** (`calc.perUnit`, `calc.unitNote`): the Better-deal unit label.
+7. **Small copy alignment**: `pets.savedToast`, `pets.speciesPlaceholder`,
+   `manageCats.deleteTitle`/`deleteBody` (iOS splits the confirm into title+body;
+   the web uses one `confirm()` string), `common.done`/`notNow`/`openName`.
+
+# Tier B — degraded on the web (state the limit in the UI)
+
+- **Whereabouts** — SHIPPED at this tier. What the browser gives us and what it
+  can't is documented at the top of `src/lib/location.ts`; the short version:
+  - Reading positions / places / activity feed: full parity.
+  - Sharing MY position: **foreground only.** `navigator.geolocation` stops when
+    the tab is backgrounded and no PWA has a background-location API.
+  - **Geofence crossings and Safety-Radius alerts are impossible** (tier C
+    within a tier-B feature): both need the OS to wake the app at a boundary.
+    `place_events` are therefore READ-ONLY on the web — never insert them here;
+    migration 071 routes every insert through `record_place_event()` for
+    state-transition dedupe, and a browser can't observe the crossing anyway.
+    Place pins get no radius ring for the same reason: on iOS a ring means "armed
+    for me", so drawing one would promise alerts that never fire.
+  - The map needs **`VITE_MAPBOX_TOKEN`** in Vercel (not set as of this writing,
+    so production shows the map-less roster — which is the useful half). Reusing
+    the iOS `pk.` token works technically but moves web tile loads onto the same
+    Mapbox bill; that's Arthur's call.
+  - Map tiles are **unverified by any agent run**: `api.mapbox.com` is
+    unreachable from the preview sandbox (open-meteo answers 200 there, so it
+    isn't a blanket egress block). Needs one real-browser check.
+- **Document scanning**: iOS uses VisionKit (edge detection, auto-crop,
+  multi-page → one PDF). The web can get *part* of the way with
+  `<input type="file" accept="image/*" capture="environment">` plus `pdf-lib`
+  (pure JS, already a dependency on the iOS side) for the multi-page PDF. No edge
+  detection or perspective correction — don't call it "scanning" in the UI.
+
+# Tier C — not gaps; do NOT file these as parity work
+
+- **Whereabouts internals** (~139 `location.*` keys): background location, live
+  mode + silent-push wake, geofencing, Safety Radius, Mapbox Search Box place
+  picker, map-style picker. All need native capabilities.
+- **Home-Screen widgets** (Nudges / Today / Budget / PetCare) and everything in
+  `mobile/targets/widgets/`.
+- **Paywall + subscriptions** (`paywall.*`, `settings.manageSubscription`, ~30+
+  keys): Plus is sold through Apple IAP; **there is no web checkout.** This is
+  also why item 9 is on hold and why **`budget.*` private-budget management
+  (22 keys) is only half-portable** — the DB trigger blocks a free household from
+  making a budget private, so porting the management UI would ship an unusable
+  screen. Viewing is already correct: RLS hides other people's private budgets,
+  so the web simply doesn't show them (no crash, no leak).
+- **Apple Calendar sync** (`calendar.apple*`): EventKit, on-device.
+- **Face ID** via `expo-local-authentication` — the web has WebAuthn instead,
+  which is what `lib/biometric.ts` already uses.
+- **`settings.*` natives**: colour schemes / glass skin, "Manage in iOS
+  Settings", widget instructions, native push registration.
+- **`admin.*` (34 keys)**: the iOS admin panel is ahead, but only Arthur uses it
+  and the web admin screens work. Low value.
 
 ---
 
