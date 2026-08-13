@@ -1,9 +1,9 @@
 // The launcher — a grid of the family apps, mirroring the PWA hub (including
 // the live "open shopping items" badge on the Shopping tile).
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { Settings } from 'lucide-react-native'
 
 import { Card, Txt } from './ui'
@@ -64,15 +64,29 @@ export default function Hub() {
 
   // Household name for the header (mirrors the PWA hub). Cached so it renders the
   // last value instantly on return and doesn't flash the "One Roof" fallback.
-  const { data: householdName } = useCachedQuery<string | null>('hub:householdName', async () => {
-    if (!profile?.household_id) return null
-    const { data } = await supabase
-      .from('households')
-      .select('name')
-      .eq('id', profile.household_id)
-      .maybeSingle()
-    return (data as { name?: string } | null)?.name ?? null
-  })
+  const { data: householdName, revalidate: reloadName } = useCachedQuery<string | null>(
+    'hub:householdName',
+    async () => {
+      if (!profile?.household_id) return null
+      const { data } = await supabase
+        .from('households')
+        .select('name')
+        .eq('id', profile.household_id)
+        .maybeSingle()
+      return (data as { name?: string } | null)?.name ?? null
+    },
+  )
+
+  // The Hub never unmounts — every app is PUSHED on top of it — so these two
+  // only ever fetched once per app launch. The badge has Realtime to lean on,
+  // but the household name went stale after a rename in Settings until the next
+  // cold start. Refetch on focus, like TodaySection does just below.
+  useFocusEffect(
+    useCallback(() => {
+      void reloadName()
+      void reloadShopping()
+    }, [reloadName, reloadShopping]),
+  )
 
   const badges: Record<string, number> = { shopping: shoppingCount }
 

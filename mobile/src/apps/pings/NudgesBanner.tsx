@@ -17,6 +17,7 @@ import { Phone, ThumbsUp, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
+import { useRevalidateOnForeground } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/format'
@@ -96,6 +97,13 @@ export default function NudgesBanner() {
       if (loadTimer.current) clearTimeout(loadTimer.current)
     }
   }, [load, scheduleLoad])
+
+  // A nudge that arrived (or expired, or was acked) while the app was suspended
+  // isn't in the Realtime stream when it resumes — this banner sits on the Hub,
+  // the screen most likely to be the one left open, so it was the most visible
+  // version of that: tapping the push opened the app to a banner that didn't
+  // list the nudge you'd just been told about.
+  useRevalidateOnForeground(scheduleLoad)
 
   // Load this device's dismissed-sent set for the signed-in user.
   useEffect(() => {

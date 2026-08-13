@@ -10,7 +10,7 @@ import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 // memberLimit mirrors the DB trigger (migration 059): free 4, Plus 12.
 import { memberLimit } from '@/lib/plus'
-import { useCachedQuery } from '@/hooks/useCachedQuery'
+import { invalidateCache, useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { track } from '@/lib/analytics'
 import { buildFeed, type EventRow } from '@/lib/activityFeed'
@@ -194,6 +194,11 @@ export default function AdminHousehold() {
               Alert.alert(t('admin.deleteError'))
               return
             }
+            // Drop this household's own cache entry AND the list's, so the row
+            // is gone the instant we land back on /admin rather than lingering
+            // for the length of that screen's focus refetch.
+            invalidateCache(`admin:household:${household.id}`)
+            invalidateCache('admin:base')
             router.back()
           },
         },

@@ -16,7 +16,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Animated,
-  AppState,
   Pressable,
   ScrollView,
   View,
@@ -32,6 +31,7 @@ import { Toast, type ToastData } from '@/components/Toast'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { useToday } from '@/hooks/useToday'
 import { track } from '@/lib/analytics'
 import { addDaysISO, formatDay, shortName, todayISO } from '@/lib/format'
 import { dailyChecklist, routineStatus } from '@/lib/petCare'
@@ -134,7 +134,10 @@ export default function PetCare() {
   const { width } = useWindowDimensions()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
-  const today = todayISO()
+  // Advances on foreground / at midnight — a render-time date would leave the
+  // whole checklist scoring "done today" and "due" against the day the app was
+  // last looked at. See useToday.
+  const today = useToday()
 
   const [selectedPet, setSelectedPet] = useState<string | null>(null)
   // Which day the Today card shows — today by default, chevrons browse the past.
@@ -204,21 +207,28 @@ export default function PetCare() {
     setOverlay((prev) => (Object.keys(prev).length ? {} : prev))
   }, [done, selectedDay])
 
-  // useCachedQuery fetches on MOUNT only, so two real-world paths went stale:
-  // returning to this (still-mounted) screen, and — the widget repro — marking
-  // a task from the Home Screen while the app sits backgrounded ON Pet Care.
-  // Focus doesn't fire for background→foreground, so both hooks are needed.
+  // useCachedQuery fetches on MOUNT only, so returning to this (still-mounted)
+  // screen showed stale data. The other half of this — marking a task from the
+  // Home Screen widget while the app sits backgrounded ON Pet Care — used to
+  // need its own AppState listener here, because focus does NOT fire for
+  // background→foreground; useCachedQuery now does that for every screen, so
+  // adding one back would just fetch twice.
   useFocusEffect(
     useCallback(() => {
       void load()
     }, [load]),
   )
+
+  // Keep the Today card on today when the date rolls over under an open app —
+  // but only if that's what it was showing. Browsing back to an earlier day is
+  // deliberate and must not be yanked forward.
+  const prevToday = useRef(today)
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void load()
-    })
-    return () => sub.remove()
-  }, [load])
+    if (prevToday.current === today) return
+    const was = prevToday.current
+    prevToday.current = today
+    setSelectedDay((d) => (d === was ? today : d))
+  }, [today])
 
   // Mirror pet photos into the App Group for the widget (only when changed).
   useEffect(() => {

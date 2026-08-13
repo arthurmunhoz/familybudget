@@ -14,8 +14,9 @@ import { AppHeader, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { useToday } from '@/hooks/useToday'
 import { categoryById } from '@/lib/categories'
-import { formatDay, formatDayHeading, formatMoney, periodEndISO, periodTitle, todayISO } from '@/lib/format'
+import { formatDay, formatDayHeading, formatMoney, periodEndISO, periodTitle } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type {
   CategoryOverride,
@@ -156,7 +157,9 @@ export default function MonthDetail({
     [entries, person],
   )
 
-  const today = todayISO()
+  // Splits entries into already-spent and still-to-come — see useToday for why
+  // this can't be a plain render-time date.
+  const today = useToday()
   const futureCount = useMemo(
     () => filtered.filter((e) => e.entry_date > today).length,
     [filtered, today],

@@ -19,10 +19,10 @@ import {
 
 import { Card, Txt } from './ui'
 import { CityPickerSheet } from './CityPickerSheet'
-import { useCachedQuery } from '../hooks/useCachedQuery'
+import { useCachedQuery, useRevalidateOnForeground } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
+import { useToday } from '../hooks/useToday'
 import { supabase } from '../lib/supabase'
-import { todayISO } from '../lib/format'
 import {
   KIND_EMOJI,
   compareOccurrences,
@@ -111,7 +111,11 @@ export default function TodaySection() {
   const { c } = useTheme()
   const { t, lang } = useI18n()
   const locale = LOCALE[lang] ?? 'en-US'
-  const today = todayISO()
+  // Not `todayISO()`: this card is on the Hub, the screen most likely to be the
+  // one the app was left on, and a plain render-time date froze on whatever day
+  // that was — the heading still read "Sunday, Aug 10" two days later, over the
+  // 10th's agenda. useToday advances on foreground and at midnight.
+  const today = useToday()
 
   const unit = lang === 'en' ? 'fahrenheit' : 'celsius'
   const {
@@ -150,6 +154,11 @@ export default function TodaySection() {
       void revalidate()
     }, [reloadWeather, revalidate]),
   )
+
+  // The agenda is a useCachedQuery and refreshes itself on foreground; the
+  // forecast comes from useHomeWeather, which caches by hand and has no such
+  // hook, so reopening the app showed the temperature it fetched last session.
+  useRevalidateOnForeground(reloadWeather)
 
   const petById = useMemo(
     () => Object.fromEntries(data.pets.map((p) => [p.id, p])) as Record<string, PetLite>,

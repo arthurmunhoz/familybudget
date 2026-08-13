@@ -3,11 +3,11 @@
 // to-date balance, opens one on tap, and creates a new period via a sheet that
 // suggests the current/next period and copies recurring entries forward. The
 // header menu renames or deletes the budget. RN port of budget/Months.tsx.
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import {
   CalendarDays,
   ChevronLeft,
@@ -19,6 +19,7 @@ import {
 
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
+import { useToday } from '@/hooks/useToday'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
@@ -33,7 +34,6 @@ import {
   periodLabel,
   periodLengthDays,
   prevPeriodStart,
-  todayISO,
 } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
@@ -86,8 +86,20 @@ export default function Months({ budgetId }: { budgetId: string }) {
     },
   )
 
+  // Refetch on focus: MonthDetail is pushed on top of this screen and adds,
+  // edits and deletes entries, which is exactly what the per-period balances
+  // here are computed from. useCachedQuery only fetches on mount and this
+  // screen never unmounts underneath it, so coming back showed pre-edit totals.
+  // Same pattern as Budgets.
+  useFocusEffect(
+    useCallback(() => {
+      void load()
+    }, [load]),
+  )
+
   const period = budget?.period ?? 'monthly'
   const pk = CAP[period]
+  const today = useToday()
 
   // A private budget can be SEEN by the people it's shared with, but renaming
   // and deleting it stay with the owner (migration 058's budgets_update/delete).
@@ -99,9 +111,10 @@ export default function Months({ budgetId }: { budgetId: string }) {
   // household that never had an owner) lets whoever makes it private claim it.
   const isOwner = !budget || !budget.owner_email || budget.owner_email === profile?.email
 
-  // To-date balance per period; future-dated entries don't count yet.
+  // To-date balance per period; future-dated entries don't count yet. `today`
+  // comes from useToday so that cut-off moves with the calendar instead of
+  // freezing on the day the screen happened to first render.
   const balances = useMemo(() => {
-    const today = todayISO()
     const map = new Map<string, number>()
     for (const e of entries) {
       if (e.entry_date > today) continue
@@ -109,7 +122,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
       map.set(e.month_id, (map.get(e.month_id) ?? 0) + delta)
     }
     return map
-  }, [entries])
+  }, [entries, today])
 
   // Suggested default: the current calendar period if missing, else the one
   // right after the latest existing period.

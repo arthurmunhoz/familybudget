@@ -2,9 +2,9 @@
 // PWA's Admin page. Reuses the same admin-guarded RPCs (admin_household_activity,
 // admin_app_usage/time, admin_recent_errors) — RLS + the security-definer guards
 // keep this cross-household data admin-only.
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, Switch, TextInput, View } from 'react-native'
-import { Redirect, router } from 'expo-router'
+import { Redirect, router, useFocusEffect } from 'expo-router'
 import { Activity, BarChart3, Bug, ChevronRight, Home, LayoutGrid, Plus, X, type LucideIcon } from 'lucide-react-native'
 
 import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
@@ -144,11 +144,27 @@ export default function Admin() {
   // Cross-household recent activity (admin_recent_events, migration 061). Cache
   // the RAW rows — the in-memory cache JSON-compares, and FeedItem carries icon
   // components that don't serialize; interpret them into a feed on each render.
-  const { data: recentEvents = [] } = useCachedQuery<EventRow[]>('admin:activity', async () => {
-    const { data } = await supabase.rpc('admin_recent_events', { lim: 60 })
-    return (data ?? []) as EventRow[]
-  })
+  const { data: recentEvents = [], revalidate: revalidateActivity } = useCachedQuery<EventRow[]>(
+    'admin:activity',
+    async () => {
+      const { data } = await supabase.rpc('admin_recent_events', { lim: 60 })
+      return (data ?? []) as EventRow[]
+    },
+  )
   const activityFeed = buildFeed(recentEvents)
+
+  // Refetch whenever this screen comes back into focus. useCachedQuery fetches
+  // on MOUNT, and expo-router keeps this screen mounted underneath the household
+  // detail screen pushed on top of it — so deleting a household there (or adding
+  // a member, or comping a plan) left this list showing the stale cached rows
+  // forever, including the household that no longer exists. Same pattern as
+  // Budgets/TodaySection.
+  useFocusEffect(
+    useCallback(() => {
+      void revalidateBase()
+      void revalidateActivity()
+    }, [revalidateBase, revalidateActivity]),
+  )
 
   const visibleHouseholds = useMemo(() => {
     const q = search.trim().toLowerCase()

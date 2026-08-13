@@ -16,7 +16,7 @@ import { Settings } from 'lucide-react-native'
 import { AppHeader, Screen } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
 import { useAuth } from '@/lib/auth'
-import { useCachedQuery } from '@/hooks/useCachedQuery'
+import { useCachedQuery, useRevalidateOnForeground } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { ackPing, fetchPingPresets } from '@/lib/pings'
 import { supabase } from '@/lib/supabase'
@@ -113,6 +113,12 @@ export default function NudgesScreen() {
       if (loadTimer.current) clearTimeout(loadTimer.current)
     }
   }, [load, scheduleLoad])
+
+  // The Realtime socket doesn't survive being suspended, and nothing replays
+  // what it missed — so nudges sent while the app was away never appeared in
+  // the history until it was killed and relaunched. (`presets` is a
+  // useCachedQuery and refreshes on its own.)
+  useRevalidateOnForeground(scheduleLoad)
 
   // Nudges widget sync (send token + members + presets) now happens globally
   // on login, not here — see useSyncNudgeWidget, mounted in _layout.tsx.

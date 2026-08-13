@@ -134,6 +134,36 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 - **Auth** `@/lib/auth`: `useAuth()` → `{ session, profile, profiles, loading,
   signInWithApple, signInWithGoogle, devSignIn, signOut }`. `profiles` = household
   members.
+- **Data fetching** `@/hooks/useCachedQuery`: stale-while-revalidate over an
+  in-memory cache — returns the last value instantly, refetches in the
+  background, re-renders only if the data actually changed. One query object per
+  screen (one cache key); call the returned `revalidate()` after a mutation.
+  **Three things go stale here and each has its own fix — know which you need:**
+  - **Reopening the app.** iOS SUSPENDS the app instead of killing it, so
+    reopening it days later re-renders the same tree: nothing re-mounts, focus
+    doesn't fire, and a Realtime socket that died while suspended never replays
+    what it missed. `useCachedQuery` now refetches on a real background→active
+    transition itself, so every screen built on it is covered — do NOT add a
+    second `AppState` listener next to one (that just fetches twice). A screen
+    holding its own optimistic/Realtime state instead of a cached query
+    (ShoppingList, Nudges, NudgesBanner) subscribes with
+    `useRevalidateOnForeground(load)`. (`inactive` is deliberately not a
+    trigger: Control Centre, the notification shade and permission dialogs all
+    fire it without ever backgrounding.)
+  - **Returning to a screen a pushed child mutated.** expo-router keeps the
+    parent MOUNTED underneath, so mount-only fetching never re-runs:
+    `useFocusEffect(useCallback(() => { void load() }, [load]))`. This is what
+    left a deleted household on the admin list, pre-edit totals on Months, and a
+    renamed household still reading the old name on the Hub.
+  - **The DATE moving under a mounted screen.** `const today = todayISO()` in a
+    render body is frozen until something else re-renders — and a refetch
+    deliberately doesn't when the rows are unchanged, which is exactly the case
+    that goes wrong. Use `useToday()` (`@/hooks/useToday`) for any date that
+    drives what's displayed; it advances on foreground and at midnight.
+  - `invalidateCache(prefix)` drops keys another screen owns, so a delete
+    doesn't flash the removed row while that screen's focus refetch lands.
+  - This file has therefore DIVERGED from the PWA's `useCachedQuery` (it isn't a
+    verbatim port any more) — the extra behaviour is native-only by nature.
 - **i18n** `@/hooks/useI18n`: `useI18n()` → `{ t, lang, setLang }`. Dicts in
   `@/lib/i18n` (en/es/pt) are the PWA dicts copied verbatim — add keys to all 3.
 - **Pure logic copied from the PWA** lives in `@/lib/` (types, format, calendar,

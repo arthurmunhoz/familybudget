@@ -28,7 +28,7 @@ import { Check, ChevronLeft, Pencil, Plus, ShoppingCart, Store, Trash2, X } from
 import { AppHeader, Loader, Txt } from '@/components/ui'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
-import { readCache, writeCache } from '@/hooks/useCachedQuery'
+import { readCache, useRevalidateOnForeground, writeCache } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import {
   enqueueOp,
@@ -223,6 +223,13 @@ export default function ShoppingList() {
       if (loadTimer.current) clearTimeout(loadTimer.current)
     }
   }, [load, scheduleLoad])
+
+  // Realtime can't cover a reopened app: iOS suspends the process, the socket
+  // dies with it, and nothing replays the changes made while it was away — so
+  // the list rendered whatever it last saw, however many days ago. This screen
+  // holds its own optimistic state rather than a useCachedQuery (which does
+  // this internally), so it subscribes to the foreground event directly.
+  useRevalidateOnForeground(scheduleLoad)
 
   function selectStore(id: string | null) {
     setActiveStoreId(id)

@@ -18,7 +18,8 @@ import { AppHeader, Card, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
-import { daysBetweenISO, todayISO } from '@/lib/format'
+import { useToday } from '@/hooks/useToday'
+import { daysBetweenISO } from '@/lib/format'
 import {
   compareOccurrences,
   eventColor,
@@ -66,7 +67,10 @@ export default function Calendar() {
   const { t, lang } = useI18n()
   const { profile, profiles } = useAuth()
   const locale = LOCALES[lang] ?? 'en'
-  const today = todayISO()
+  // Drives the "today" ring in the grid and the cut-off for Upcoming — both
+  // silently wrong if the date is captured once at render and the app then
+  // sits open (or suspended) across midnight. See useToday.
+  const today = useToday()
   const memberEmails = useMemo(() => profiles.map((p) => p.email), [profiles])
   const ownerName = (email: string) =>
     profiles.find((p) => p.email === email)?.display_name ?? email

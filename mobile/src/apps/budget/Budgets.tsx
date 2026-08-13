@@ -24,13 +24,14 @@ import { Camera, Check, ChevronDown, ChevronRight, Lock, X } from 'lucide-react-
 import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { useToday } from '@/hooks/useToday'
 import { track } from '@/lib/analytics'
 import { usePlus } from '@/lib/plus'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import { syncBudgetWidget, type BudgetWidgetItem } from '@/lib/widget'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
-import { formatMoney, periodEndISO, periodLabel, todayISO } from '@/lib/format'
+import { formatMoney, periodEndISO, periodLabel } from '@/lib/format'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Segmented } from './shared'
@@ -81,6 +82,11 @@ export default function Budgets() {
     }
   })
   const { budgets, months, entries } = data
+  // Decides which period is "current" and splits entries into spent-so-far vs
+  // still-coming. A date read once at render froze that split on whatever day
+  // the app was last used, so a period that had since ended still showed as the
+  // current one. See useToday.
+  const today = useToday()
 
   // Refetch whenever this screen comes back into focus. useCachedQuery only
   // fetches on MOUNT, and expo-router keeps the previous screen mounted while a
@@ -95,7 +101,6 @@ export default function Budgets() {
   // Per-month stats (for whichever period a card previews) + each budget's own
   // periods (newest-first) and the default one to show (current, else latest).
   const { statsById, byBudget } = useMemo(() => {
-    const today = todayISO()
     const byMonth = new Map<string, EntryLite[]>()
     for (const e of entries) {
       const list = byMonth.get(e.month_id)
@@ -135,7 +140,7 @@ export default function Budgets() {
       byBudget.set(b.id, { months: own, defaultId: defaultId ?? own[0]?.id ?? null })
     }
     return { statsById, byBudget }
-  }, [budgets, months, entries])
+  }, [budgets, months, entries, today])
 
   // Feed the Home-Screen budget widget: each budget's current-period summary.
   useEffect(() => {
