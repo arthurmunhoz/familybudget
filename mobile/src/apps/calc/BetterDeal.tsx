@@ -15,7 +15,6 @@ import { useI18n } from '@/hooks/useI18n'
 import { radius, sp, useTheme } from '@/theme/theme'
 
 import { formatPerUnit, num } from './shared'
-import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 const UNITS = ['kg', 'g', 'lb', 'oz', 'L', 'mL', 'each']
 
@@ -68,7 +67,7 @@ function OptionCard({
           {/* Same rule as the other calculators: the $ tracks the value's state. */}
           <Txt style={{ color: price ? c.text : c.textFaint, fontWeight: '700' }}>$</Txt>
           <TextInput
-            inputAccessoryViewID={KEYBOARD_DONE_ID}
+            inputAccessoryViewButtonLabel={t('common.done')}
             value={price}
             onChangeText={setPrice}
             keyboardType="decimal-pad"
@@ -80,7 +79,7 @@ function OptionCard({
         {/* amount, with the shared unit shown as a suffix (it's a label) */}
         <View style={[styles.field, { backgroundColor: c.surface }]}>
           <TextInput
-            inputAccessoryViewID={KEYBOARD_DONE_ID}
+            inputAccessoryViewButtonLabel={t('common.done')}
             value={qty}
             onChangeText={setQty}
             keyboardType="decimal-pad"

@@ -395,6 +395,7 @@ export const en = {
   'shopping.clearChecked': 'Clear checked',
   'shopping.addPlaceholder': 'Add an item…',
   'shopping.addFailed': 'Could not add the item — please try again.',
+  'shopping.itemAdded': 'Added to the list',
   'shopping.anywhere': 'Anywhere',
   'shopping.stores': 'Stores',
   'shopping.manageStores': 'Manage stores',

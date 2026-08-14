@@ -11,7 +11,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -44,12 +43,15 @@ import { fetchStoreSuggestions, type SuggestedStore } from '@/lib/storeSuggest'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
 import { radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import StoreLogo from './StoreLogo'
-import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 // RN has no crypto.randomUUID on all engines — a temp id only needs to be unique
 // within this session (it's replaced by the server row on the next refetch).
 let tmpCounter = 0
 const tempId = () => `tmp-${Date.now()}-${tmpCounter++}`
+
+/** How long the Add button holds its green "added" state. Long enough to read
+ *  as a confirmation, short enough to be back to normal before the next item. */
+const CONFIRM_MS = 1000
 
 interface Section {
   id: string
@@ -76,6 +78,22 @@ export default function ShoppingList() {
   )
   const [label, setLabel] = useState('')
   const [loading, setLoading] = useState(() => readCache(LOCAL_ITEMS) === undefined)
+
+  // Confirming an add. Both of these exist because the list is ALPHABETICAL
+  // within each store, so a new item doesn't appear at the end where you're
+  // looking — it slides into the middle, often off screen, and adding felt like
+  // nothing happened. `justAdded` flashes the button green; `pendingScrollId`
+  // is the row to bring into view.
+  const [justAdded, setJustAdded] = useState(false)
+  // A ref, not state: nothing renders from it, and the effect that consumes it
+  // already re-runs on every `sections` change (which an add always causes).
+  // Holding it in state would only buy an extra render per add.
+  const pendingScrollId = useRef<string | null>(null)
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const listRef = useRef<SectionList<ShoppingItem, Section>>(null)
+  useEffect(() => () => {
+    if (addedTimer.current) clearTimeout(addedTimer.current)
+  }, [])
 
   // Every update writes through to the in-memory cache AND the durable store, so
   // the next mount restores it and the list stays readable with no connection.
@@ -131,17 +149,15 @@ export default function ShoppingList() {
   const [storeInput, setStoreInput] = useState('')
   const [customColor, setCustomColor] = useState<string | null>(null)
 
-  // While the keyboard is up, drop the add bar's safe-area bottom padding (the
-  // keyboard replaces the home-indicator gap) so the bar sits flush on it.
-  const [keyboardUp, setKeyboardUp] = useState(false)
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardWillShow', () => setKeyboardUp(true))
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardUp(false))
-    return () => {
-      show.remove()
-      hide.remove()
-    }
-  }, [])
+  // The add bar's bottom padding is a CONSTANT, and deliberately so. It used to
+  // shrink from the safe-area trim to sp.md while the keyboard was up, driven by
+  // keyboardWillShow/Hide listeners — a 5pt change that cost a full re-render of
+  // this screen in the middle of the KeyboardAvoidingView's own padding
+  // animation. That re-render gave `renderItem` a new identity, so every row in
+  // the SectionList re-rendered too, and the whole add bar (store chips included)
+  // visibly stuttered on its way up. The keyboard's own frame already covers the
+  // home-indicator area, so keeping the trim costs 5pt of gap and nothing else.
+  const addBarPaddingBottom = Math.max(Math.round(insets.bottom / 2), sp.xs)
 
   // Editing an existing store (rename / recolor / delete) inside the sheet.
   const [editingStore, setEditingStore] = useState<ShoppingStore | null>(null)
@@ -262,6 +278,12 @@ export default function ShoppingList() {
     setItems((list) => [...list, optimistic])
     void enqueueOp({ k: 'item.add', tempId: id, label: trimmed, store_id: activeStoreId, added_by: profile.email })
     track('shopping.added', { item: trimmed })
+    // Confirm it landed: flash the button, then scroll the row into view (the
+    // effect below, once `sections` has been rebuilt with it).
+    pendingScrollId.current = id
+    setJustAdded(true)
+    if (addedTimer.current) clearTimeout(addedTimer.current)
+    addedTimer.current = setTimeout(() => setJustAdded(false), CONFIRM_MS)
     scheduleLoad()
   }
 
@@ -411,6 +433,28 @@ export default function ShoppingList() {
     return out
   }, [items, stores, t])
 
+  // Bring a just-added row into view. Runs off `sections` rather than straight
+  // from add(), because at add() time the list hasn't been rebuilt yet and the
+  // row has no position to scroll to.
+  useEffect(() => {
+    const id = pendingScrollId.current
+    if (!id) return
+    const sectionIndex = sections.findIndex((s) => s.data.some((i) => i.id === id))
+    // Not in the list yet — leave the ref set so the next rebuild tries again.
+    if (sectionIndex < 0) return
+    const pos = sections[sectionIndex].data.findIndex((i) => i.id === id)
+    pendingScrollId.current = null
+    listRef.current?.scrollToLocation({
+      sectionIndex,
+      // +1, NOT the item's own index: scrollToLocation flattens sections into
+      // one cell list in which each section's header is itemIndex 0, so passing
+      // the raw index lands one row short (and 0 scrolls to the header).
+      itemIndex: pos + 1,
+      viewPosition: 0.5,
+      animated: true,
+    })
+  }, [sections])
+
   const showHeaders = stores.length > 0
   const doneCount = items.filter((i) => i.checked).length
   const openCount = items.length - doneCount
@@ -515,9 +559,19 @@ export default function ShoppingList() {
         </View>
       ) : (
         <SectionList
+          ref={listRef}
           sections={sections}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          // REQUIRED by the scroll-to-added-item above: without getItemLayout,
+          // scrollToIndex throws an invariant for any row past the last one
+          // measured, and this handler is what turns that into a graceful
+          // approximate scroll instead of a red screen.
+          onScrollToIndexFailed={(info) => {
+            listRef.current
+              ?.getScrollResponder()
+              ?.scrollTo({ y: info.averageItemLength * info.index, animated: true })
+          }}
           renderSectionHeader={renderSectionHeader}
           stickySectionHeadersEnabled={false}
           // flex:1 so the list fills the space ABOVE the add bar (which is now
@@ -568,8 +622,8 @@ export default function ShoppingList() {
               // Hug the bottom edge: HALF the safe-area inset (floored), the
               // same trim NewItemButton uses, so the row's curved outer corners
               // sit near the screen's own corner instead of floating above the
-              // full home-indicator gap. Keyboard up, the keyboard IS the edge.
-              paddingBottom: keyboardUp ? sp.md : Math.max(Math.round(insets.bottom / 2), sp.xs),
+              // full home-indicator gap. Constant — see addBarPaddingBottom.
+              paddingBottom: addBarPaddingBottom,
             },
           ]}
         >
@@ -619,7 +673,7 @@ export default function ShoppingList() {
 
           <View style={styles.inputRow}>
             <TextInput
-              inputAccessoryViewID={KEYBOARD_DONE_ID}
+              inputAccessoryViewButtonLabel={t('common.done')}
               value={label}
               onChangeText={setLabel}
               onSubmitEditing={add}
@@ -636,14 +690,34 @@ export default function ShoppingList() {
             <Pressable
               onPress={add}
               disabled={!label.trim()}
+              accessibilityLabel={justAdded ? t('shopping.itemAdded') : t('common.add')}
               style={[
                 styles.addBtn,
-                { backgroundColor: c.accent, opacity: label.trim() ? 1 : 0.5 },
+                {
+                  backgroundColor: justAdded ? c.income : c.accent,
+                  // While confirming, stay at full strength: add() has just
+                  // cleared the field, so the usual empty-field dimming would
+                  // fade the confirmation the instant it appears.
+                  opacity: justAdded || label.trim() ? 1 : 0.5,
+                },
               ]}
             >
-              <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
+              {/* The label stays in flow and only goes invisible, with the check
+                  drawn over it — so the button keeps the width of the word "Add"
+                  in whatever language it's in, and swapping to the check can't
+                  resize the text field beside it. */}
+              <Txt
+                style={{ color: c.onAccent, fontWeight: '700', fontSize: 16, opacity: justAdded ? 0 : 1 }}
+              >
                 {t('common.add')}
               </Txt>
+              {justAdded ? (
+                <View style={[StyleSheet.absoluteFill, styles.addBtnCheck]}>
+                  {/* White on the income green, matching the row checkboxes —
+                      c.onAccent is for the ACCENT fill, which this isn't. */}
+                  <Check size={20} strokeWidth={3} color="#ffffff" />
+                </View>
+              ) : null}
             </Pressable>
           </View>
         </View>
@@ -690,7 +764,7 @@ export default function ShoppingList() {
                     size={40}
                   />
                   <TextInput
-                    inputAccessoryViewID={KEYBOARD_DONE_ID}
+                    inputAccessoryViewButtonLabel={t('common.done')}
                     value={editName}
                     onChangeText={setEditName}
                     placeholder={t('shopping.storeName')}
@@ -818,7 +892,7 @@ export default function ShoppingList() {
                 <ColorDots value={customColor} onChange={setCustomColor} c={c} compact />
                 <View style={styles.inputRow}>
                   <TextInput
-                    inputAccessoryViewID={KEYBOARD_DONE_ID}
+                    inputAccessoryViewButtonLabel={t('common.done')}
                     value={storeInput}
                     onChangeText={setStoreInput}
                     onSubmitEditing={addCustomStore}
@@ -1005,6 +1079,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  addBtnCheck: { alignItems: 'center', justifyContent: 'center' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: {
     borderTopLeftRadius: radius.lg,

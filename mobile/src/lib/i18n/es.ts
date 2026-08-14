@@ -393,6 +393,7 @@ export const es: Record<keyof typeof en, string> = {
   'shopping.clearChecked': 'Quitar marcados',
   'shopping.addPlaceholder': 'Agregar un artículo…',
   'shopping.addFailed': 'No se pudo agregar el artículo — inténtalo de nuevo.',
+  'shopping.itemAdded': 'Agregado a la lista',
   'shopping.anywhere': 'Cualquier tienda',
   'shopping.stores': 'Tiendas',
   'shopping.manageStores': 'Administrar tiendas',

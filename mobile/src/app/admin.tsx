@@ -19,7 +19,6 @@ import { formatDuration, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
-import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 interface AppStat {
   name: string
@@ -354,7 +353,7 @@ export default function Admin() {
             </View>
             <View style={{ flexDirection: 'row', gap: sp.sm }}>
               <TextInput
-                inputAccessoryViewID={KEYBOARD_DONE_ID}
+                inputAccessoryViewButtonLabel={t('common.done')}
                 value={newHousehold}
                 onChangeText={setNewHousehold}
                 onSubmitEditing={createHousehold}
@@ -382,7 +381,7 @@ export default function Admin() {
           {/* search */}
           <View style={{ justifyContent: 'center' }}>
             <TextInput
-              inputAccessoryViewID={KEYBOARD_DONE_ID}
+              inputAccessoryViewButtonLabel={t('common.done')}
               value={search}
               onChangeText={setSearch}
               placeholder={t('admin.searchHouseholds')}

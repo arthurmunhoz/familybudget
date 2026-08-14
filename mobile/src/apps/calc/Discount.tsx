@@ -11,7 +11,6 @@ import { formatMoney } from '@/lib/format'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 import { num } from './shared'
-import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 const CHIPS = [10, 15, 20, 50]
 
@@ -60,7 +59,7 @@ export function Discount() {
         >
           <Txt style={{ fontSize: 18, color: price ? c.text : c.textFaint }}>$</Txt>
           <TextInput
-            inputAccessoryViewID={KEYBOARD_DONE_ID}
+            inputAccessoryViewButtonLabel={t('common.done')}
             value={price}
             onChangeText={setPrice}
             keyboardType="decimal-pad"
@@ -145,7 +144,7 @@ export function Discount() {
             )
           })}
           <TextInput
-            inputAccessoryViewID={KEYBOARD_DONE_ID}
+            inputAccessoryViewButtonLabel={t('common.done')}
             value={custom}
             onChangeText={onCustom}
             keyboardType="decimal-pad"

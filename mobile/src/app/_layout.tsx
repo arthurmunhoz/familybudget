@@ -34,7 +34,6 @@ import { useSyncPushToken } from '@/hooks/useSyncPushToken';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 import { SchemePrefProvider, useSchemePref } from '@/theme/scheme-pref';
 import { GLASS, GlassWash } from '@/theme/glass';
-import { KeyboardDoneBar } from '@/components/KeyboardDone';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -118,8 +117,6 @@ function Chrome() {
           <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         </Stack>
       </View>
-      {/* Mounted once; every TextInput referencing KEYBOARD_DONE_ID gets it. */}
-      <KeyboardDoneBar />
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>
   );

@@ -164,6 +164,34 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     doesn't flash the removed row while that screen's focus refetch lands.
   - This file has therefore DIVERGED from the PWA's `useCachedQuery` (it isn't a
     verbatim port any more) — the extra behaviour is native-only by nature.
+- **Dismissing the keyboard**: iOS gives no global gesture for it, so each
+  keyboard needs a way out. Two mechanisms, and the rule is which one applies:
+  - **Number pads** (`number-pad`/`decimal-pad`/`phone-pad`) have NO return key,
+    so they get a native "Done" toolbar via
+    `inputAccessoryViewButtonLabel={t('common.done')}`. `Field` sets this
+    already; raw `<TextInput>`s on a numeric keyboard must set it themselves.
+    RN ignores the prop on keyboards that do have a return key, so it's safe
+    unconditionally.
+  - **Everything else** dismisses with the return key — except where
+    `blurOnSubmit={false}` deliberately keeps the keyboard up for repeated
+    entry (the Shopping add field). Those need
+    `keyboardDismissMode="on-drag"` on the surrounding scroller. Prefer
+    `on-drag` over `interactive` whenever a `KeyboardAvoidingView` lifts the
+    content: interactive needs the scroll area to extend UNDER the keyboard,
+    and KAV guarantees it doesn't.
+  - **Do NOT reach for `<InputAccessoryView>`.** A shared one mounted at the app
+    root is the obvious design and it CANNOT work: under the New Architecture
+    `RCTInputAccessoryComponentView` binds to its TextInput in
+    `didMoveToWindow` — a one-shot search of the window for a matching
+    `inputAccessoryViewID` — which at the app root runs at launch, when no such
+    input is mounted yet, and never runs again. It also binds to only the FIRST
+    match, so one shared id could never serve a form with several fields.
+    Mounting one per screen would trade a dead feature for a fragile one. This
+    shipped broken from 2026-07-18 to 2026-08-14 and read as a styling bug.
+    Its second-order damage is the part to remember: setting
+    `inputAccessoryViewID` makes RN skip the native number-pad toolbar
+    (`setDefaultInputAccessoryView` returns early when the id is set), so the
+    dead code was *removing* the Done button iOS would otherwise have drawn.
 - **i18n** `@/hooks/useI18n`: `useI18n()` → `{ t, lang, setLang }`. Dicts in
   `@/lib/i18n` (en/es/pt) are the PWA dicts copied verbatim — add keys to all 3.
 - **Pure logic copied from the PWA** lives in `@/lib/` (types, format, calendar,

@@ -39,7 +39,6 @@ import type { CategoryOverride, CategoryRule, CustomCategory, Entry, EntryType, 
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Chip, DatePickerModal } from './shared'
 import ManageCategoriesSheet from './ManageCategoriesSheet'
-import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 export interface EntryPrefill {
   label?: string
@@ -375,7 +374,7 @@ export default function EntryForm({
                 $
               </Txt>
               <TextInput
-                inputAccessoryViewID={KEYBOARD_DONE_ID}
+                inputAccessoryViewButtonLabel={t('common.done')}
                 value={amount}
                 onChangeText={(v) => setAmount(v.replace(/[^0-9.,]/g, ''))}
                 keyboardType="decimal-pad"
@@ -523,7 +522,7 @@ export default function EntryForm({
                 {gridOpen && newCatOpen && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
                     <TextInput
-                      inputAccessoryViewID={KEYBOARD_DONE_ID}
+                      inputAccessoryViewButtonLabel={t('common.done')}
                       value={newCatIcon}
                       onChangeText={setNewCatIcon}
                       placeholder="🏷️"
@@ -541,7 +540,7 @@ export default function EntryForm({
                       }}
                     />
                     <TextInput
-                      inputAccessoryViewID={KEYBOARD_DONE_ID}
+                      inputAccessoryViewButtonLabel={t('common.done')}
                       value={newCatName}
                       onChangeText={setNewCatName}
                       placeholder={t('entry.newCategoryPlaceholder')}

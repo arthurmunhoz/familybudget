@@ -10,7 +10,6 @@ import { useI18n } from '@/hooks/useI18n'
 import { createPingPreset, presetText, updatePingPreset } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
-import { KEYBOARD_DONE_ID } from '@/components/keyboardDoneId'
 
 export function PresetEditor({
   preset,
@@ -69,7 +68,7 @@ export function PresetEditor({
             <View style={{ gap: 6 }}>
               <Txt variant="label">{t('pings.presetEmoji')}</Txt>
               <TextInput
-                inputAccessoryViewID={KEYBOARD_DONE_ID}
+                inputAccessoryViewButtonLabel={t('common.done')}
                 value={emoji}
                 onChangeText={setEmoji}
                 maxLength={4}
@@ -87,7 +86,7 @@ export function PresetEditor({
             <View style={{ flex: 1, gap: 6 }}>
               <Txt variant="label">{t('pings.presetLabel')}</Txt>
               <TextInput
-                inputAccessoryViewID={KEYBOARD_DONE_ID}
+                inputAccessoryViewButtonLabel={t('common.done')}
                 value={label}
                 onChangeText={setLabel}
                 placeholder={t('pings.presetLabelPlaceholder')}

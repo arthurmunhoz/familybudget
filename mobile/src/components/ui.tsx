@@ -24,7 +24,7 @@ import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 import { pickOn } from '../theme/contrast'
-import { KEYBOARD_DONE_ID } from './keyboardDoneId'
+import { useI18n } from '../hooks/useI18n'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
 
@@ -238,12 +238,24 @@ export function Field({
   ...rest
 }: TextInputProps & { label?: string }) {
   const { c } = useTheme()
+  const { t } = useI18n()
   return (
     <View style={{ gap: 6 }}>
       {label ? <Txt variant="label">{label}</Txt> : null}
       <TextInput
-        // Every Field gets the keyboard "Done" bar; a caller can still override.
-        inputAccessoryViewID={KEYBOARD_DONE_ID}
+        // Puts a "Done" toolbar above the NUMBER PADS (number/decimal/phone) —
+        // the keyboards with no return key to dismiss with. RN builds the
+        // toolbar natively from this label; it ignores the prop on keyboards
+        // that already have a return key, so it's safe to set unconditionally.
+        //
+        // This REPLACED a custom <InputAccessoryView> mounted once at the app
+        // root, which never rendered: under the New Architecture the accessory
+        // binds to its TextInput in didMoveToWindow, a one-shot lookup that ran
+        // at launch when no matching input existed yet. Worse, setting
+        // `inputAccessoryViewID` makes RN skip this native toolbar, so the old
+        // code actively removed the Done button it was trying to add. Don't
+        // reintroduce inputAccessoryViewID here — see mobile/CLAUDE.md.
+        inputAccessoryViewButtonLabel={t('common.done')}
         placeholderTextColor={c.textFaint}
         style={[
           {
