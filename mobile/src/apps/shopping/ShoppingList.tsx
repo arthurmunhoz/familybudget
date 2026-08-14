@@ -531,6 +531,18 @@ export default function ShoppingList() {
           ItemSeparatorComponent={() => <View style={{ height: sp.sm }} />}
           SectionSeparatorComponent={() => <View style={{ height: sp.xs }} />}
           keyboardShouldPersistTaps="handled"
+          // Swipe the list to put the keyboard away. The other two ways out
+          // both stop working on a FULL list: there's no blank area left to tap
+          // (this list grows to fill the screen), and the return key adds the
+          // item without dismissing — `blurOnSubmit={false}` below, which is
+          // deliberate so you can rattle off several items in a row.
+          // `on-drag` and not `interactive`: interactive needs the scroll area
+          // to extend UNDER the keyboard so you can drag it down, and the
+          // KeyboardAvoidingView here does the opposite — it lifts the add bar
+          // and shrinks the list to sit entirely above it, leaving nothing to
+          // grab. Scrolling loses nothing, since whatever you'd typed stays in
+          // the field.
+          keyboardDismissMode="on-drag"
           ListFooterComponent={
             doneCount > 0 ? (
               <Pressable onPress={clearChecked} style={styles.clearBtn}>
@@ -716,6 +728,10 @@ export default function ShoppingList() {
                   style={{ maxHeight: 420 }}
                   contentContainerStyle={{ paddingBottom: sp.md }}
                   keyboardShouldPersistTaps="handled"
+                  // Same as the main list: this sheet has its own text field
+                  // (the custom-store name) and, in a sheet, even less spare
+                  // room to tap.
+                  keyboardDismissMode="on-drag"
                 >
                   {stores.length > 0 ? (
                     <>
