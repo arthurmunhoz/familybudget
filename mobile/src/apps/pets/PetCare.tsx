@@ -33,8 +33,8 @@ import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useToday } from '@/hooks/useToday'
 import { track } from '@/lib/analytics'
-import { addDaysISO, formatDay, shortName, todayISO } from '@/lib/format'
-import { dailyChecklist, routineStatus } from '@/lib/petCare'
+import { addDaysISO, daysBetweenISO, formatDay, shortName, todayISO } from '@/lib/format'
+import { dailyChecklist, overdueEvents, reminderEvents, routineStatus } from '@/lib/petCare'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetEvent, PetTaskDone } from '@/lib/types'
@@ -274,14 +274,32 @@ export default function PetCare() {
   const petTasks = useMemo(() => (pet ? tasks.filter((tk) => tk.pet_id === pet.id) : []), [tasks, pet])
   const history = useMemo(() => (pet ? events.filter((e) => e.pet_id === pet.id) : []), [events, pet])
 
-  /** Overdue count per pet — drives the red dot on the chips. */
+  /** This pet's events that carry a next-due date, soonest first. `events` is
+   *  fetched newest-first, which is what latestPerKey (inside reminderEvents)
+   *  needs to pick the current occurrence of each recurring treatment. */
+  const dueEvents = useMemo(
+    () => (pet ? reminderEvents(events.filter((e) => e.pet_id === pet.id)) : []),
+    [events, pet],
+  )
+
+  /** Overdue count per pet — drives the red dot on the chips. Counts overdue
+   *  EVENT reminders as well as routines: this screen only ever shows one pet,
+   *  so without it a heartworm dose due on a pet you don't have selected is
+   *  announced on the Hub and then invisible the moment you open Pet Care. */
   const overduePets = useMemo(() => {
     const map: Record<string, number> = {}
     for (const p of pets) {
-      map[p.id] = routineStatus(tasks, done, p.id, today).filter((r) => r.dueIn <= 0 && r.lastDone !== null).length
+      const routinesDue = routineStatus(tasks, done, p.id, today).filter(
+        (r) => r.dueIn <= 0 && r.lastDone !== null,
+      ).length
+      const remindersDue = overdueEvents(
+        events.filter((e) => e.pet_id === p.id),
+        today,
+      ).length
+      map[p.id] = routinesDue + remindersDue
     }
     return map
-  }, [pets, tasks, done, today])
+  }, [pets, tasks, done, events, today])
 
   // Feed the home-screen widget an up-to-date snapshot on every data change.
   useEffect(() => {
@@ -356,6 +374,32 @@ export default function PetCare() {
   function openNewEvent() {
     setEditingEvent(null)
     setDraft({ ...emptyDraft, pet: selectedPet ?? pets[0]?.id ?? '', date: todayISO() })
+    setShowEventForm(true)
+  }
+
+  /** "I did this again", from a due reminder. Opens the event sheet as a NEW
+   *  entry copying the original (pet / type / title / notes) but dated today,
+   *  with the next due rolled forward by the SAME interval the original used —
+   *  so the common case is one tap plus Save, and an unusual gap is still
+   *  editable before saving.
+   *
+   *  Nothing has to clear the old reminder: reminderEvents only ever considers
+   *  the LATEST event per (pet, type, title), so saving this one retires the
+   *  previous due date on its own and the old entry stays in history as the log
+   *  it is. The flip side of that key: the title is what the series is matched
+   *  on, so editing it in the sheet before saving starts a SEPARATE series and
+   *  leaves the original reminder still overdue. */
+  function logAgain(ev: PetEvent) {
+    setEditingEvent(null)
+    const interval = ev.next_due ? daysBetweenISO(ev.event_date, ev.next_due) : 0
+    setDraft({
+      pet: ev.pet_id,
+      type: ev.type,
+      title: ev.title,
+      date: today,
+      nextDue: interval > 0 ? addDaysISO(today, interval) : '',
+      notes: ev.notes ?? '',
+    })
     setShowEventForm(true)
   }
 
@@ -770,6 +814,95 @@ export default function PetCare() {
                   })
                 )}
               </Card>
+
+              {/* Coming up — the events carrying a next-due date. Until this
+                  existed a due date was announced on the Hub and then had
+                  nowhere to be acted on: Pet Care showed the event in History
+                  with its date and no hint it was due, so the only way to
+                  clear it was to hand-copy the event into a new one. Hidden
+                  when the pet has no reminders at all — an empty card here
+                  would just push the routines up the screen for nothing. */}
+              {dueEvents.length > 0 ? (
+                <Card style={{ gap: 2 }}>
+                  <Txt
+                    variant="label"
+                    style={{
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                      marginLeft: sp.xs,
+                      marginBottom: sp.sm,
+                    }}
+                  >
+                    {t('pets.comingUp')}
+                  </Txt>
+                  {dueEvents.map((e, i) => {
+                    const Icon = TYPE_ICON[e.type]
+                    const dueIn = daysBetweenISO(today, e.next_due!)
+                    const { text, color } = dueText(dueIn)
+                    // Only offer "Done" once it's actually due — re-logging a
+                    // treatment early would roll the next due date forward from
+                    // today and quietly shorten the interval.
+                    const due = dueIn <= 0
+                    return (
+                      <View
+                        key={e.id}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: sp.md,
+                          paddingVertical: 8,
+                          borderTopWidth: i === 0 ? 0 : 1,
+                          borderTopColor: c.border,
+                        }}
+                      >
+                        <Icon size={16} color={due ? color : c.textMuted} />
+                        <Pressable
+                          onPress={() => openEditEvent(e)}
+                          style={{ flex: 1, minWidth: 0 }}
+                          accessibilityLabel={e.title}
+                        >
+                          <Txt style={{ fontWeight: '500', fontSize: 14 }} numberOfLines={1}>
+                            {e.title}
+                          </Txt>
+                          {/* Due rows say so HERE, because the right-hand slot
+                              is taken by the Done button for exactly those —
+                              putting the state in the badge would mean the one
+                              case that matters ("overdue 6d") is the one case
+                              that doesn't show it. */}
+                          <Txt
+                            variant="faint"
+                            style={due ? { fontSize: 11, color, fontWeight: '700' } : { fontSize: 11 }}
+                          >
+                            {due ? text : `${t('pets.next')} ${formatDay(e.next_due!)}`}
+                          </Txt>
+                        </Pressable>
+                        {due ? (
+                          <Pressable
+                            onPress={() => logAgain(e)}
+                            hitSlop={8}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: radius.pill,
+                              backgroundColor: c.accent,
+                            }}
+                          >
+                            <Check size={13} strokeWidth={3} color={c.onAccent} />
+                            <Txt style={{ fontSize: 12, fontWeight: '700', color: c.onAccent }}>
+                              {t('pets.markDone')}
+                            </Txt>
+                          </Pressable>
+                        ) : (
+                          <Txt style={{ fontSize: 12, fontWeight: '700', color }}>{text}</Txt>
+                        )}
+                      </View>
+                    )
+                  })}
+                </Card>
+              ) : null}
 
               {/* History — the log-event action lives HERE (it only ever adds
                   history entries), not in a global bottom bar. */}
