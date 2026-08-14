@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -53,6 +54,18 @@ const tempId = () => `tmp-${Date.now()}-${tmpCounter++}`
  *  as a confirmation, short enough to be back to normal before the next item. */
 const CONFIRM_MS = 1000
 
+/** The new row's attention pulse: 3 beats of a tint washing in and out. */
+const PULSE_IN = 220
+const PULSE_OUT = 420
+const PULSE_BEATS = 3
+
+/** How long a deleted row takes to slide out. The row stays in `items` for this
+ *  long so it has something to animate; the state removal is on a timer, NOT on
+ *  the animation's completion callback — a row that unmounts mid-flight (a
+ *  refetch, leaving the screen) would never fire it, and the delete would be
+ *  visually undone. */
+const EXIT_MS = 200
+
 interface Section {
   id: string
   title: string
@@ -89,11 +102,65 @@ export default function ShoppingList() {
   // already re-runs on every `sections` change (which an add always causes).
   // Holding it in state would only buy an extra render per add.
   const pendingScrollId = useRef<string | null>(null)
-  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Which row is pulsing, tracked by LABEL rather than id — the id is the catch
+  // here. A new row carries a temp `tmp-…` id that the refetch a few hundred ms
+  // later swaps for the server's uuid, so an id-keyed highlight would drop
+  // halfway through the animation (and only when online, which is a horrible
+  // thing to debug). The label survives that swap untouched.
+  const [pulseLabel, setPulseLabel] = useState<string | null>(null)
+  // The pulse's Animated.Value lives HERE, not in the row, for the same id-swap
+  // reason: rows are keyed by id, so that swap unmounts and remounts the row
+  // mid-pulse. A value owned by the row would restart from nothing each time
+  // (and could be left frozen at full tint when the label finally clears);
+  // owned by the screen, the animation is simply unaffected by the remount.
+  const pulseAnim = useRef(new Animated.Value(0)).current
+  const pulseLoop = useRef<Animated.CompositeAnimation | null>(null)
+  // Rows mid-delete: kept in `items` so they have something to animate out.
+  const [exitingIds, setExitingIds] = useState<Set<string>>(() => new Set())
+  const timers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const listRef = useRef<SectionList<ShoppingItem, Section>>(null)
-  useEffect(() => () => {
-    if (addedTimer.current) clearTimeout(addedTimer.current)
+  // One place to both remember and clean up every animation timer, so leaving
+  // the screen mid-animation can't fire a setState into an unmounted tree. Each
+  // one drops itself on the way out, so a long shopping session doesn't collect
+  // a timer id per tap.
+  const later = useCallback((fn: () => void, ms: number) => {
+    const id = setTimeout(() => {
+      timers.current.delete(id)
+      fn()
+    }, ms)
+    timers.current.add(id)
   }, [])
+  useEffect(
+    () => () => {
+      for (const id of timers.current) clearTimeout(id)
+      timers.current.clear()
+      pulseLoop.current?.stop()
+    },
+    [],
+  )
+
+  /** Pulse the row for `text` and clear the highlight when the beats are done.
+   *  Ending on the animation's own callback rather than a timer is what keeps
+   *  the tint from being yanked off screen mid-fade. */
+  const pulseRow = useCallback(
+    (text: string) => {
+      pulseLoop.current?.stop()
+      pulseAnim.setValue(0)
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1, duration: PULSE_IN, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0, duration: PULSE_OUT, useNativeDriver: true }),
+        ]),
+        { iterations: PULSE_BEATS },
+      )
+      pulseLoop.current = loop
+      setPulseLabel(text)
+      // Also runs when a second add stops this one early — the guard keeps that
+      // from clearing the NEW label the caller has already set.
+      loop.start(() => setPulseLabel((cur) => (cur === text ? null : cur)))
+    },
+    [pulseAnim],
+  )
 
   // Every update writes through to the in-memory cache AND the durable store, so
   // the next mount restores it and the list stays readable with no connection.
@@ -278,12 +345,14 @@ export default function ShoppingList() {
     setItems((list) => [...list, optimistic])
     void enqueueOp({ k: 'item.add', tempId: id, label: trimmed, store_id: activeStoreId, added_by: profile.email })
     track('shopping.added', { item: trimmed })
-    // Confirm it landed: flash the button, then scroll the row into view (the
-    // effect below, once `sections` has been rebuilt with it).
+    // Confirm it landed three ways: flash the button, scroll the row into view
+    // (the effect below, once `sections` has been rebuilt with it), and pulse
+    // the row itself — it sorts alphabetically into the middle of the list, so
+    // arriving there without a marker still leaves you hunting for it.
     pendingScrollId.current = id
     setJustAdded(true)
-    if (addedTimer.current) clearTimeout(addedTimer.current)
-    addedTimer.current = setTimeout(() => setJustAdded(false), CONFIRM_MS)
+    later(() => setJustAdded(false), CONFIRM_MS)
+    pulseRow(trimmed)
     scheduleLoad()
   }
 
@@ -302,11 +371,27 @@ export default function ShoppingList() {
   }
 
   function remove(item: ShoppingItem) {
+    // Guard on the REF, not on exitingIds: two taps in the same frame would both
+    // read the same stale state and enqueue the delete twice.
+    if (pendingRemovals.current.has(item.id)) return
     pendingRemovals.current.add(item.id)
-    setItems((list) => list.filter((i) => i.id !== item.id))
+    // The delete is queued immediately — it's durable and offline-safe from
+    // here, whatever the animation does. Only the row's disappearance waits.
     void enqueueOp({ k: 'item.remove', id: item.id })
     track('shopping.removed', { item: item.label })
-    scheduleLoad()
+    setExitingIds((prev) => new Set(prev).add(item.id))
+    later(() => {
+      setItems((list) => list.filter((i) => i.id !== item.id))
+      setExitingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
+      // Deferred with the removal: a refetch landing mid-animation would drop
+      // the row on the spot (pendingRemovals hides it from every server
+      // snapshot) and cut the exit short.
+      scheduleLoad()
+    }, EXIT_MS)
   }
 
   function clearChecked() {
@@ -468,7 +553,15 @@ export default function ShoppingList() {
   )
 
   const renderItem = ({ item }: { item: ShoppingItem }) => (
-    <View style={[styles.row, { backgroundColor: c.card }, item.checked && { opacity: 0.6 }]}>
+    <ItemRowShell
+      bg={c.card}
+      dim={item.checked}
+      // Only an OPEN row pulses: a duplicate label sitting in the checked block
+      // would otherwise light up alongside the one just added.
+      pulseColor={pulseLabel === item.label && !item.checked ? c.accentSoft : null}
+      pulseOpacity={pulseAnim}
+      exiting={exitingIds.has(item.id)}
+    >
       <Pressable
         onPress={() => toggle(item)}
         style={styles.rowMain}
@@ -502,7 +595,7 @@ export default function ShoppingList() {
       >
         <X size={18} strokeWidth={2} color={c.textFaint} />
       </Pressable>
-    </View>
+    </ItemRowShell>
   )
 
   const renderSectionHeader = ({ section }: { section: Section }) => {
@@ -918,6 +1011,77 @@ export default function ShoppingList() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+  )
+}
+
+/** The item row's outer box and its two animations: the add pulse (a tint
+ *  washing in and out behind the content) and the delete exit (slides right and
+ *  fades, the direction the ✕ implies).
+ *
+ *  The pulse is deliberately NOT the shared `Pulse` from locationUi: that one
+ *  fades its child's opacity to 0.3, which on a list row reads as the row being
+ *  disabled or removed — the opposite of "look here". The tint leaves the
+ *  content at full strength and animates a colour behind it. It's absolutely
+ *  positioned so it can't affect layout, drawn before the content so it sits
+ *  behind it, and animates opacity only so it can run on the native driver
+ *  (backgroundColor can't).
+ *
+ *  Module scope, never inside ShoppingList's body: a component defined in a
+ *  render body gets a new identity every render, so React would remount it and
+ *  restart whatever was playing. */
+function ItemRowShell({
+  bg,
+  dim,
+  pulseColor,
+  pulseOpacity,
+  exiting,
+  children,
+}: {
+  bg: string
+  dim: boolean
+  pulseColor: string | null
+  pulseOpacity: Animated.Value
+  exiting: boolean
+  children: React.ReactNode
+}) {
+  // 0 = at rest, 1 = fully gone.
+  const exit = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (!exiting) return
+    Animated.timing(exit, {
+      toValue: 1,
+      duration: EXIT_MS,
+      useNativeDriver: true,
+    }).start()
+  }, [exiting, exit])
+
+  // Checked rows are already dimmed, so the exit fades from THAT down to 0
+  // rather than snapping back to full opacity to start.
+  const base = dim ? 0.6 : 1
+  return (
+    <Animated.View
+      style={[
+        styles.row,
+        {
+          backgroundColor: bg,
+          opacity: exit.interpolate({ inputRange: [0, 1], outputRange: [base, 0] }),
+          transform: [
+            { translateX: exit.interpolate({ inputRange: [0, 1], outputRange: [0, 48] }) },
+          ],
+        },
+      ]}
+    >
+      {pulseColor ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: pulseColor, borderRadius: radius.md, opacity: pulseOpacity },
+          ]}
+        />
+      ) : null}
+      {children}
+    </Animated.View>
   )
 }
 
