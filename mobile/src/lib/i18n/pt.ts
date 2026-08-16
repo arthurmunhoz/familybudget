@@ -407,7 +407,7 @@ export const pt: Record<keyof typeof en, string> = {
   'shopping.onYourList': 'Na sua lista',
   'shopping.allStores': 'Todos os mercados',
   'shopping.otherStore': 'Outro mercado…',
-  'shopping.customStore': 'Adicionar um mercado personalizado',
+  'shopping.customStore': 'Adicionar novo mercado',
   'shopping.newStore': 'Novo mercado',
   'shopping.suggested': 'Sugeridas para você',
   'shopping.editStore': 'Editar loja',
