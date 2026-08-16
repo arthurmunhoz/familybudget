@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>One Roof — one app for the whole household</title>
+<meta name="description" content="Budgets, groceries, pet care, shared calendar, nudges, and a private family map — everything a household shares, in one app. No ads, no data selling." />
+<meta property="og:title" content="One Roof — one app for the whole household" />
+<meta property="og:description" content="Budgets, groceries, pet care, shared calendar, nudges, and a private family map. No ads, no data selling." />
+<meta property="og:image" content="https://one-roof-app.vercel.app/roof-icon-512.png" />
+<link rel="icon" href="roof-icon-192.png" />
+<link rel="apple-touch-icon" href="roof-icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* Warm Hearth — same tokens as the app (Paper / Dusk) */
+  :root {
+    --bg: #fbf6f0;
+    --card: #ffffff;
+    --card-active: #f4ecdf;
+    --text: #2b2521;
+    --text-muted: #8c8076;
+    --accent: #c2603f;
+    --accent-soft: rgb(194 96 63 / 0.14);
+    --border: rgb(43 37 33 / 0.09);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1714;
+      --card: #262019;
+      --card-active: #2f2820;
+      --text: #f3ebe0;
+      --text-muted: #a89c8e;
+      --accent: #da7a5b;
+      --accent-soft: rgb(218 122 91 / 0.22);
+      --border: rgb(243 235 224 / 0.1);
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: var(--bg); scroll-behavior: smooth; }
+  body {
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  .display { font-family: 'Fraunces', Georgia, serif; font-weight: 600; letter-spacing: -0.015em; }
+
+  /* Hero */
+  header { padding: 72px 0 56px; text-align: center; }
+  .roof { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 8px 28px rgb(43 37 33 / 0.14); }
+  h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); margin: 28px 0 12px; line-height: 1.12; }
+  .tagline { font-size: clamp(1.05rem, 2.6vw, 1.25rem); color: var(--text-muted); max-width: 34em; margin: 0 auto 32px; }
+  .cta-row { display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  .appstore-badge { height: 52px; display: block; }
+  .android-link {
+    font-weight: 600; color: var(--accent); text-decoration: none;
+    padding: 13px 20px; border: 1.5px solid var(--accent); border-radius: 12px;
+  }
+  .android-link:hover { background: var(--accent-soft); }
+
+  /* Feature grid */
+  section { padding: 40px 0; }
+  h2 { font-size: clamp(1.5rem, 4vw, 2rem); margin-bottom: 8px; }
+  .section-sub { color: var(--text-muted); margin-bottom: 28px; max-width: 40em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+    padding: 22px 20px;
+  }
+  .card .emoji { font-size: 1.7rem; display: block; margin-bottom: 10px; }
+  .card h3 { font-size: 1.06rem; font-weight: 700; margin-bottom: 6px; }
+  .card p { font-size: 0.94rem; color: var(--text-muted); }
+
+  /* Privacy band */
+  .privacy {
+    background: var(--card-active); border-radius: 22px; padding: 36px 32px;
+    margin: 24px 0; text-align: center;
+  }
+  .privacy h2 { margin-bottom: 10px; }
+  .privacy p { color: var(--text-muted); max-width: 42em; margin: 0 auto; }
+  .privacy strong { color: var(--text); }
+
+  /* Android */
+  .steps { counter-reset: step; max-width: 34em; }
+  .steps li {
+    list-style: none; counter-increment: step; position: relative;
+    padding: 10px 0 10px 44px; color: var(--text-muted);
+  }
+  .steps li::before {
+    content: counter(step); position: absolute; left: 0; top: 8px;
+    width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft);
+    color: var(--accent); font-weight: 700; display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem;
+  }
+  .steps b { color: var(--text); }
+
+  footer {
+    padding: 48px 0 56px; text-align: center; color: var(--text-muted); font-size: 0.9rem;
+    border-top: 1px solid var(--border); margin-top: 40px;
+  }
+  footer a { color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <img class="roof" src="roof-icon-512.png" alt="One Roof icon" width="96" height="96" />
+  <h1 class="display">Everything your household shares.<br />One app.</h1>
+  <p class="tagline">Budgets, groceries, pet care, a shared calendar, one-tap nudges, and a private family map — built by a dad for his own family, shared with yours.</p>
+  <div class="cta-row">
+    <!-- TODO: replace # with the real App Store URL before deploying -->
+    <a href="#" aria-label="Download on the App Store">
+      <img class="appstore-badge" src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" />
+    </a>
+    <a class="android-link" href="#android">Using Android? Install free →</a>
+  </div>
+</header>
+
+<section class="wrap" id="features">
+  <h2 class="display">Eight little apps, one roof</h2>
+  <p class="section-sub">Open one app, not eight. Everyone in your household sees the same lists, the same calendar, the same map — live.</p>
+  <div class="grid">
+    <div class="card"><span class="emoji">💰</span><h3>Money</h3><p>Shared budgets with categories, monthly or weekly periods, and AI receipt scanning — snap a photo, get the entry.</p></div>
+    <div class="card"><span class="emoji">🛒</span><h3>Shopping list</h3><p>Synced live between phones, organized by store, and it works offline in the aisle.</p></div>
+    <div class="card"><span class="emoji">🐾</span><h3>Pet care</h3><p>Daily routines, med schedules, weight tracking — and "already fed" so nobody feeds the dog twice.</p></div>
+    <div class="card"><span class="emoji">📅</span><h3>Calendar</h3><p>Birthdays, renewals, and events in one shared view — syncs both ways with Google and Apple Calendar.</p></div>
+    <div class="card"><span class="emoji">📣</span><h3>Nudges</h3><p>One-tap "heading home" or "call me" pings with read receipts — and a home-screen widget so it's two seconds flat.</p></div>
+    <div class="card"><span class="emoji">📍</span><h3>Whereabouts</h3><p>A private family map: live locations, arrive/leave alerts for places you choose, and a safety radius for events.</p></div>
+    <div class="card"><span class="emoji">🗂️</span><h3>Documents</h3><p>Passports, insurance, school forms — scanned, organized, and locked behind Face ID.</p></div>
+    <div class="card"><span class="emoji">🧮</span><h3>Little helpers</h3><p>Split a bill from a photo, compare unit prices, family profiles, and more.</p></div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="privacy">
+    <h2 class="display">Your family's data is not the product</h2>
+    <p><strong>No ads. No tracking SDKs. No selling location data.</strong> One Roof exists because we use it under our own roof — your household's budgets, documents, and locations stay yours, protected per-household at the database level.</p>
+  </div>
+</div>
+
+<section class="wrap" id="android">
+  <h2 class="display">On Android? Install from your browser</h2>
+  <p class="section-sub">One Roof runs as a full app on Android — no store needed, same household, same live sync as iPhone.</p>
+  <ol class="steps">
+    <li>Open <b>one-roof-app.vercel.app</b> in Chrome</li>
+    <li>Sign in and tap <b>Install app</b> when prompted (or Menu → <b>Add to Home screen</b>)</li>
+    <li>That's it — it's on your home screen like any other app</li>
+  </ol>
+</section>
+
+<footer>
+  <div class="wrap">
+    One Roof · made with ❤️ in Tampa, FL<br />
+    <a href="https://one-roof-app.vercel.app">Open the web app</a>
+  </div>
+</footer>
+
+</body>
+</html>
