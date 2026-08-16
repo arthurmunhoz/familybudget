@@ -56,11 +56,10 @@
   .tagline { font-size: clamp(1.05rem, 2.6vw, 1.25rem); color: var(--text-muted); max-width: 34em; margin: 0 auto 32px; }
   .cta-row { display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
   .appstore-badge { height: 52px; display: block; }
-  .android-link {
-    font-weight: 600; color: var(--accent); text-decoration: none;
-    padding: 13px 20px; border: 1.5px solid var(--accent); border-radius: 12px;
+  .android-soon {
+    font-weight: 600; color: var(--text-muted);
+    padding: 13px 20px; border: 1.5px solid var(--border); border-radius: 12px;
   }
-  .android-link:hover { background: var(--accent-soft); }
 
   /* Feature grid */
   section { padding: 40px 0; }
@@ -84,20 +83,6 @@
   .privacy p { color: var(--text-muted); max-width: 42em; margin: 0 auto; }
   .privacy strong { color: var(--text); }
 
-  /* Android */
-  .steps { counter-reset: step; max-width: 34em; }
-  .steps li {
-    list-style: none; counter-increment: step; position: relative;
-    padding: 10px 0 10px 44px; color: var(--text-muted);
-  }
-  .steps li::before {
-    content: counter(step); position: absolute; left: 0; top: 8px;
-    width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft);
-    color: var(--accent); font-weight: 700; display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem;
-  }
-  .steps b { color: var(--text); }
-
   footer {
     padding: 48px 0 56px; text-align: center; color: var(--text-muted); font-size: 0.9rem;
     border-top: 1px solid var(--border); margin-top: 40px;
@@ -110,13 +95,13 @@
 <header class="wrap">
   <img class="roof" src="roof-icon-512.png" alt="One Roof icon" width="96" height="96" />
   <h1 class="display">Everything your household shares.<br />One app.</h1>
-  <p class="tagline">Budgets, groceries, pet care, a shared calendar, one-tap nudges, and a private family map — built by a dad for his own family, shared with yours.</p>
+  <p class="tagline">Budgets, groceries, pet care, a shared calendar, one-tap nudges, and a private family map. It started as a notebook and a pen on our kitchen counter — now it's the one app my wife, our two dogs, and I run the house on.</p>
   <div class="cta-row">
     <!-- TODO: replace # with the real App Store URL before deploying -->
     <a href="#" aria-label="Download on the App Store">
       <img class="appstore-badge" src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" />
     </a>
-    <a class="android-link" href="#android">Using Android? Install free →</a>
+    <span class="android-soon">Android coming soon</span>
   </div>
 </header>
 
@@ -142,20 +127,14 @@
   </div>
 </div>
 
-<section class="wrap" id="android">
-  <h2 class="display">On Android? Install from your browser</h2>
-  <p class="section-sub">One Roof runs as a full app on Android — no store needed, same household, same live sync as iPhone.</p>
-  <ol class="steps">
-    <li>Open <b>one-roof-app.vercel.app</b> in Chrome</li>
-    <li>Sign in and tap <b>Install app</b> when prompted (or Menu → <b>Add to Home screen</b>)</li>
-    <li>That's it — it's on your home screen like any other app</li>
-  </ol>
+<section class="wrap" id="story">
+  <h2 class="display">Why we built it</h2>
+  <p class="section-sub">A shared notebook on the kitchen counter for groceries. Vet emails and bank receipts as the dogs' medical records. "Did you feed the dogs today?" — twice a day, every day. A savings goal that never survived the month. One Roof replaced all of it — built by a mobile developer for his own household first, and shared once it actually stuck.</p>
 </section>
 
 <footer>
   <div class="wrap">
-    One Roof · made with ❤️ in Tampa, FL<br />
-    <a href="https://one-roof-app.vercel.app">Open the web app</a>
+    One Roof · made with ❤️ in Tampa, FL — for iPhone today, Android soon
   </div>
 </footer>
 

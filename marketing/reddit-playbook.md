@@ -13,10 +13,11 @@ karma minimums. Before mentioning One Roof at all:
 1. Pick a normal username (not `OneRoofApp` — a "brand account" gets treated as
    a spammer; you're a person who built a thing).
 2. Spend 10 min/day commenting genuinely in subs you actually care about
-   (r/tampa, r/expo, r/reactnative, parenting/pets subs) until you have
-   ~100+ comment karma.
-3. Add a one-line profile bio: "Dad in Tampa. Built One Roof, a family app."
-   That's your disclosure anchor.
+   (r/tampa, r/expo, r/reactnative, dog subs) until you have ~100+ comment
+   karma.
+3. Profile bio (done 2026-08-16): married mobile dev in Tampa with two dogs,
+   built One Roof. That's the disclosure anchor — keep it truthful; no
+   invented "dad" persona anywhere.
 
 ## Where the questions live
 
@@ -47,24 +48,42 @@ r/SideProject, r/indiehackers, r/reactnative, r/expo, r/Supabase, r/apple
 
 ## Reply templates (adapt every time — never paste verbatim)
 
+All grounded in the REAL story: no kids — wife + two dogs (one with allergies);
+decade as a mobile dev; the app grew out of a paper notebook on the kitchen
+counter. iOS only — never link or mention the PWA; Android is "coming soon".
+
 **Grocery list ask:**
-> We had the same problem — one of us always had the old list. I actually ended
-> up building an app for my own family for this (so, full disclosure, I'm the
-> dev): shared list that syncs live, works offline in the aisle, groups by
-> store. It's called One Roof [link]. Free for this. Happy to answer questions —
-> and if it's not your thing, AnyList and Bring are solid too.
+> Our system used to be a notebook and a pen on the kitchen counter — worked
+> great until you were at the store and the notebook wasn't. I'm a mobile dev
+> and ended up building an app for my own household (full disclosure, so I'm
+> the maker): shared list that syncs live between our phones, works offline in
+> the aisle, groups by store. It's called One Roof [link], iOS only for now.
+> If you're not on iPhone, AnyList and Bring are solid too.
 
 **Life360 alternative ask:**
-> I built a family app partly because of exactly this (disclosure: I'm the dev).
-> The map part does live location, arrive/leave alerts for places you pick, no
-> ads and no tracking SDKs — the business model is a paid tier, not your data.
-> iPhone + Android. [link] That said, if you just want location and nothing
-> else, Find My is free and stays on-device.
+> Disclosure up front: I built a family app partly because of this. My wife
+> shares her location so I know when she leaves work and when to expect her
+> home, and she can ask for help with one tap — that was the whole point, not
+> surveillance. No ads, no tracking SDKs; the business model is a paid tier,
+> not your data. It's called One Roof [link], iOS only right now. If you just
+> want location and nothing else, Apple's Find My is free and stays on-device.
 
 **Family organizer / Cozi ask:**
-> Maker here (disclosure), so grain of salt: I built One Roof for my own family
-> — shared budget, grocery list, calendar that syncs with Google/Apple, pet
-> care routines, and a family map, one app. [link] Free tier covers most of it.
+> Maker here (disclosure), so grain of salt: after years of a notebook for
+> groceries, vet emails as our dogs' medical records, and a savings goal that
+> never survived the month, I built One Roof for my own household — shared
+> budget, grocery list, calendar that syncs with Google/Apple, pet care
+> routines, and a family map in one app. [link] iOS only for now. Free tier
+> covers most of it.
+
+**Pet care ask ("who fed the dog", vaccine/med tracking) — the most authentic
+angle we have, use it:**
+> One of our dogs has allergies, so between meds, food rules, and vet visits
+> we lived out of email receipts and my wife's memory — plus the daily "did
+> you feed the dogs?" double-feeding roulette. I'm a developer and ended up
+> building the tracker we needed into our family app (disclosure: mine):
+> shared daily routine checklist so feeding is marked once for both of us,
+> med schedules, weight log, vaccine due dates. One Roof [link], iOS only.
 
 Rules of thumb:
 - Always disclose in the first sentence, casually.
@@ -76,10 +95,10 @@ Rules of thumb:
 
 One per sub, ever — r/SideProject first (most forgiving), r/reactnative or
 r/expo with a technical angle ("what I learned shipping widgets + geofencing
-with Expo"), r/daddit with the story angle ("I'm a dad who got tired of five
-apps and a group chat"). Lead with the story and a screenshot, put the link in
-a comment if the sub prefers that. Answer every comment for the first 24h —
-the algorithm rewards it.
+with Expo"), a dog sub with the true story angle ("our allergic dog's medical
+records were vet emails and bank receipts, so I built a tracker"). Lead with
+the story and a screenshot, put the link in a comment if the sub prefers that.
+Answer every comment for the first 24h — the algorithm rewards it.
 
 ## Don't
 
@@ -87,4 +106,7 @@ the algorithm rewards it.
 - Don't post the same text in multiple subs on the same day.
 - Don't argue with a skeptic; thank them and move on (threads are read by 100×
   more people than comment in them).
-- Don't link the Vercel PWA to iPhone users — always the App Store link.
+- Don't share the PWA link with ANYONE — the public story is iOS App Store +
+  "Android coming soon". (The PWA quietly serves existing Android users only.)
+- Don't claim to be a parent or invent personas — the wife-and-two-dogs story
+  is the real one and it's better anyway.
