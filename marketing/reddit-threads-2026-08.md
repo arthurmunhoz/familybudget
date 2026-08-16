@@ -21,32 +21,27 @@ third link-dropper. Story reply, no link.
 
 Draft:
 
-> No kids here — two working adults and two dogs, one with allergies that
-> generates a lot of vet appointments — but we had our own version of this:
-> a paper notebook on the kitchen counter for groceries, the dogs' exam and
-> vaccine history scattered across vet emails and bank receipts, and no
-> single place where both of our schedules lived.
+> No kids here, but two working adults and two dogs (one with allergies, so
+> lots of vet visits). Our version of this was a paper notebook on the
+> kitchen counter for groceries, the dogs vaccine history spread across vet
+> emails, and no single place with both of our schedules.
 >
-> What stuck for us:
+> What actually stuck for us was putting everything in one place. The
+> notebook always failed right when we needed it - we'd be at the store
+> asking each other "did you bring the page?", and some weeks nothing was
+> even written down. Same thing with the dogs, "when is the next vaccine
+> due?" meant digging through old emails.
 >
-> 1. **One place instead of five.** The notebook failed at exactly the
-> moment we needed it: standing in the store wondering if either of us had
-> ripped out the page and brought it — and some weeks nothing had even been
-> written down. Same shape with the dogs: "when's the next vaccine due?"
-> meant digging through old vet emails. Collapsing groceries, the dogs'
-> care, the calendar, and money into one spot turned five habits into one.
+> The other thing: nobody in our house was going to maintain a task app.
+> What worked was making the small stuff one tap. My wife can tell me she's
+> heading home or ask for help from a widget without opening anything, and
+> she can see I saw it, so no "did you see my text?" follow up.
 >
-> 2. **Make the ask cheaper than the nag.** Nobody in our house was going to
-> maintain a task app. What worked was making the smallest interactions
-> one tap: my wife can ask for help or check in from a widget without even
-> opening the app, and read receipts mean no "did you see my text?"
-> follow-up. The calendar then only has to carry actual events.
->
-> Full disclosure: I'm a mobile developer and eventually got annoyed enough
-> to build our own app for all of this, so I have an obvious "one place"
-> bias. But the principle matters more than the tool, and it's the one this
-> thread keeps repeating: single source of truth, adding anything takes
-> under five seconds, and if it's not in there, it isn't happening.
+> Full disclosure, I'm a mobile developer and I ended up building our own
+> app for all of this, so I'm biased towards "one place". But honestly the
+> principle matters more than the tool, and it's the same one this thread
+> keeps repeating: one source of truth, adding stuff has to take seconds,
+> and if it's not in there, it's not happening.
 
 ## 2. r/ProductivityApps — "Looking for the best app to manage a household together"
 https://www.reddit.com/r/ProductivityApps/comments/1v2j2l8/
@@ -63,28 +58,28 @@ candor is what makes the rest credible.
 
 Draft:
 
-> Honest take on the Notion route since you're considering it: it can
-> technically hold everything on your list, but "technically" is the trap —
-> a workspace only works if BOTH people maintain it, and in any household
-> there's a less-enthusiastic partner. Whatever you pick, that person is the
-> whole ballgame.
+> Honest take on Notion since you're considering it: it can technically hold
+> everything on your list, but it only works if both people actually
+> maintain it. In every couple there's one person that's less into apps, and
+> that person decides if the system survives. Whatever you pick, pick for
+> them.
 >
-> We lived the messy version of your list for years: a paper notebook on the
-> kitchen counter for groceries, work schedules nobody else could see, and
-> expense trackers we each used separately — we knew what was spent, but
-> there was no shared view, no incomes, and every month the slate wiped, so
-> we could never see what we'd actually saved. After a decade building
-> mobile apps for other people I ended up building our own: shared
-> shopping list that syncs between phones and works offline in the store, a
-> shared calendar that syncs two-way with Google and Apple Calendar, shared
-> budgets so we finally know what we spend and save, and documents behind
-> Face ID. It's called One Roof (disclosure: mine; not linking per sub
-> rules).
+> We lived the messy version of your list for years. Paper notebook on the
+> kitchen counter for groceries, work schedules the other one couldn't see,
+> and we each tracked expenses in separate apps - so we knew what we spent,
+> but there was no shared view, no incomes, and every month it reset, so we
+> never knew what we actually saved. I've been a mobile dev for about 10
+> years and ended up building our own app for all of it: shared shopping
+> list that syncs between our phones (and works offline in the store), a
+> calendar that syncs both ways with Google and Apple, shared budgets so we
+> finally see what we spend and save, and documents behind Face ID. It's
+> called One Roof. Disclosure, it's my app, and I'm not linking it because
+> of the sub rules.
 >
-> Two honest caveats against your list: it's iOS-only today (Android coming),
-> and it deliberately does NOT do general task management with assignees or
-> notes — so if those two are must-haves it won't fit yet, and TickTick plus
-> a shared calendar might serve you better.
+> Two honest caveats for your list though: it's iOS only right now (Android
+> coming), and it doesn't do task management with assignees or notes, that's
+> on purpose. So if those two are must haves it won't fit yet, and TickTick
+> plus a shared calendar might serve you better.
 
 ## 3. r/ProductivityApps — "Apps for organising household"
 21d old · 21 comments. Same sub, same rules. Second karma-building spot —

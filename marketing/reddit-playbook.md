@@ -53,37 +53,40 @@ decade as a mobile dev; the app grew out of a paper notebook on the kitchen
 counter. iOS only — never link or mention the PWA; Android is "coming soon".
 
 **Grocery list ask:**
-> Our system used to be a notebook and a pen on the kitchen counter — worked
-> great until you were at the store and the notebook wasn't. I'm a mobile dev
-> and ended up building an app for my own household (full disclosure, so I'm
-> the maker): shared list that syncs live between our phones, works offline in
-> the aisle, groups by store. It's called One Roof [link], iOS only for now.
-> If you're not on iPhone, AnyList and Bring are solid too.
+> Our system was literally a notebook and a pen on the kitchen counter. It
+> worked until you're at the store asking each other "did you bring the
+> page?". I'm a mobile dev and ended up building an app for my own household
+> (disclosure, I'm the maker) - shared list that syncs between our phones,
+> works offline in the store, and groups by store. It's called One Roof
+> [link], iOS only for now. If you're not on iPhone, AnyList and Bring are
+> solid too.
 
 **Life360 alternative ask:**
-> Disclosure up front: I built a family app partly because of this. My wife
-> shares her location so I know when she leaves work and when to expect her
-> home, and she can ask for help with one tap — that was the whole point, not
-> surveillance. No ads, no tracking SDKs; the business model is a paid tier,
-> not your data. It's called One Roof [link], iOS only right now. If you just
-> want location and nothing else, Apple's Find My is free and stays on-device.
+> Disclosure first: I built a family app partly because of this. My wife
+> shares her location, so when she leaves work or her classes I know she's
+> heading home, and she can ask for help with one tap from a widget. That
+> was the whole point for us, knowing when to expect each other, not
+> watching each other. No ads, no tracking SDKs, the business model is a
+> paid tier and not your data. It's called One Roof [link], iOS only right
+> now. And if you only want location and nothing else, Apple's Find My is
+> free and stays on device.
 
 **Family organizer / Cozi ask:**
-> Maker here (disclosure), so grain of salt: after years of a notebook for
-> groceries, vet emails as our dogs' medical records, and a savings goal that
-> never survived the month, I built One Roof for my own household — shared
-> budget, grocery list, calendar that syncs with Google/Apple, pet care
-> routines, and a family map in one app. [link] iOS only for now. Free tier
-> covers most of it.
+> Maker here, so grain of salt: after years of a notebook for groceries, vet
+> emails as our dogs medical records, and expense apps that reset every
+> month, I built One Roof for my own household. Shared budget, grocery list,
+> calendar that syncs with Google/Apple, pet routines and a family map, all
+> in one app. [link] iOS only for now, free tier covers most of it.
 
 **Pet care ask ("who fed the dog", vaccine/med tracking) — the most authentic
 angle we have, use it:**
-> One of our dogs has allergies, so between meds, food rules, and vet visits
-> we lived out of email receipts and my wife's memory — plus the daily "did
-> you feed the dogs?" double-feeding roulette. I'm a developer and ended up
-> building the tracker we needed into our family app (disclosure: mine):
-> shared daily routine checklist so feeding is marked once for both of us,
-> med schedules, weight log, vaccine due dates. One Roof [link], iOS only.
+> One of our dogs has allergies, so between meds and vet visits we were
+> living out of old emails trying to remember what was given, when, and when
+> the next one was due. Plus the classic "did you feed the dogs today?",
+> twice a day, every day. I'm a developer and ended up building the tracker
+> we needed into our family app (disclosure, it's mine): shared daily
+> checklist so feeding gets marked once for both of us, med schedules,
+> weight log, vaccine due dates. It's called One Roof [link], iOS only.
 
 Rules of thumb:
 - Always disclose in the first sentence, casually.
