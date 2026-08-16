@@ -890,7 +890,7 @@ export default function ShoppingList() {
                     autoFocus
                     placeholder={t('shopping.storeName')}
                     placeholderTextColor={c.textFaint}
-                    style={[styles.input, { flex: 1, backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
+                    style={[styles.panelInput, { flex: 1, backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
                   />
                 </View>
 
@@ -901,8 +901,8 @@ export default function ShoppingList() {
                   onPress={addCustomStore}
                   disabled={!storeInput.trim()}
                   style={[
-                    styles.addBtn,
-                    { backgroundColor: c.accent, paddingVertical: 12, opacity: storeInput.trim() ? 1 : 0.5 },
+                    styles.panelBtn,
+                    { backgroundColor: c.accent, opacity: storeInput.trim() ? 1 : 0.5 },
                   ]}
                 >
                   <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
@@ -934,7 +934,7 @@ export default function ShoppingList() {
                     onChangeText={setEditName}
                     placeholder={t('shopping.storeName')}
                     placeholderTextColor={c.textFaint}
-                    style={[styles.input, { flex: 1, backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
+                    style={[styles.panelInput, { flex: 1, backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
                   />
                 </View>
 
@@ -945,8 +945,8 @@ export default function ShoppingList() {
                   onPress={saveStoreEdit}
                   disabled={!editName.trim()}
                   style={[
-                    styles.addBtn,
-                    { backgroundColor: c.accent, paddingVertical: 12, opacity: editName.trim() ? 1 : 0.5 },
+                    styles.panelBtn,
+                    { backgroundColor: c.accent, opacity: editName.trim() ? 1 : 0.5 },
                   ]}
                 >
                   <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
@@ -1312,6 +1312,26 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.md,
     borderBottomRightRadius: sheetRadius,
     paddingHorizontal: sp.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The same field and button INSIDE the store sheet's panels. `input`/`addBtn`
+  // above each carry a screen-curve radius (sheetRadius, ~40) on the one corner
+  // that meets the display's own rounded corner down in the add bar. Nothing in
+  // a sheet meets a screen edge, so reusing them there just produced one
+  // oversized corner per control — the field bulging at the bottom-left, the
+  // button at the bottom-right.
+  panelInput: {
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: sp.lg,
+    paddingVertical: 14,
+    fontSize: 16,
+  },
+  panelBtn: {
+    borderRadius: radius.md,
+    paddingHorizontal: sp.xl,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
