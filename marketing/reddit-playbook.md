@@ -20,14 +20,21 @@ karma minimums. Before mentioning One Roof at all:
 
 ## Where the questions live
 
-Search these regularly (Reddit search + Google `site:reddit.com`, sorted by new):
+Two search surfaces, different syntax:
+- **Reddit's own search** (sorted by new): plain keywords, NO quotes — quoted
+  phrases return nothing. e.g. `grocery list app share`, `life360 alternative`.
+- **Google `site:reddit.com`**: quotes work fine there and it's usually the
+  better search. e.g. `site:reddit.com "app to share grocery list"`.
 
-- "app to share grocery list with wife/husband/family"
-- "Life360 alternative" / "family locator that doesn't sell data"
-- "family organizer app" / "Cozi alternative"
-- "shared budget app for couples" / "Honeydue alternative"
-- "pet care app multiple people" / "who fed the dog app"
-- "app for family calendar"
+Topics to sweep regularly:
+
+- app to share grocery list with wife/husband/family
+- Life360 alternative / family locator that doesn't sell data
+- family organizer app / Cozi alternative (Cozi cut its free tier — active
+  migration chatter)
+- shared budget app for couples / Honeydue alternative
+- pet care app multiple people / who fed the dog app
+- app for family calendar
 
 Subreddits where these come up: r/Parenting, r/Mommit, r/daddit, r/organization,
 r/androidapps, r/iosapps, r/AskParents, r/Pets, r/dogs, r/personalfinance
