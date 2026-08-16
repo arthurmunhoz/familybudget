@@ -23,6 +23,34 @@ invent features, stats, or anecdotes.
   - Documents: trips needed doc numbers/due dates buried in screenshots/emails.
   - Calculator: dinner splits, outlet discounts, grocery price math.
 
+## Interview answers (Arthur, 2026-08-16) — the ONLY source for narrative
+
+- **Trigger for building the app:** no single last-straw — everything
+  together: checking whether they'd ripped out the notebook page and brought
+  it to the store; asking the other to dig through email for a vet visit date
+  or a vaccine about to be due.
+- **How the notebook failed:** they'd have to ask each other "did you take
+  the note, or is it at home?"; items scratched down manually; sometimes the
+  page was just empty.
+- **The dogs:** nothing ever actually went wrong (no missed vaccine) — the
+  pain was the BURDEN: checking emails and old messages to know what medicine
+  was given, when, and when the next dose/vaccine was due. Don't dramatize
+  it into a near-miss.
+- **Money, before:** they used third-party apps to track expenses
+  INDIVIDUALLY — they knew what was spent, but couldn't add incomes, edit
+  categories, or keep multiple months; when a month ended, it was settled
+  and gone. Now: a running record across months, savings per month, and they
+  can look back. Currently in their THIRD month of tracking everything, with
+  AI receipt scanning making it "so much easier."
+- **Nudges/Whereabouts:** no dramatic story — it's everyday life. Wife
+  leaves for classes/work/work events; Arthur knows when she leaves work and
+  when to expect her home. Nudges = one tap on the iPhone home-screen widget
+  to say she's coming home or ask for help.
+- **Daily use today:** yes, daily. Shopping list is the most used (checking
+  off and adding every day); Money is next (third month of full tracking);
+  plus shared calendars, nudges, pet routines, and documents kept current
+  (car registration, driver's license renewals).
+
 ## Verified claims — safe to say
 
 - Shared shopping list: live sync between phones, per-store sections, WORKS

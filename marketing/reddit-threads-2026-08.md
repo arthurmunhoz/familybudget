@@ -29,10 +29,12 @@ Draft:
 >
 > What stuck for us:
 >
-> 1. **One place instead of five.** [PLACEHOLDER — Arthur: what actually
-> made the notebook/scattered setup fail for you two? Fill with the real
-> moment before posting.] Collapsing groceries, the dogs' care, the
-> calendar, and money into one spot turned five habits into one.
+> 1. **One place instead of five.** The notebook failed at exactly the
+> moment we needed it: standing in the store wondering if either of us had
+> ripped out the page and brought it — and some weeks nothing had even been
+> written down. Same shape with the dogs: "when's the next vaccine due?"
+> meant digging through old vet emails. Collapsing groceries, the dogs'
+> care, the calendar, and money into one spot turned five habits into one.
 >
 > 2. **Make the ask cheaper than the nag.** Nobody in our house was going to
 > maintain a task app. What worked was making the smallest interactions
@@ -67,10 +69,12 @@ Draft:
 > there's a less-enthusiastic partner. Whatever you pick, that person is the
 > whole ballgame.
 >
-> We lived the messy version of your list for years (a paper notebook on the
-> kitchen counter for groceries, work schedules nobody else could see, a
-> monthly savings goal we could never actually verify), and after a decade
-> building mobile apps for other people I ended up building our own: shared
+> We lived the messy version of your list for years: a paper notebook on the
+> kitchen counter for groceries, work schedules nobody else could see, and
+> expense trackers we each used separately — we knew what was spent, but
+> there was no shared view, no incomes, and every month the slate wiped, so
+> we could never see what we'd actually saved. After a decade building
+> mobile apps for other people I ended up building our own: shared
 > shopping list that syncs between phones and works offline in the store, a
 > shared calendar that syncs two-way with Google and Apple Calendar, shared
 > budgets so we finally know what we spend and save, and documents behind
