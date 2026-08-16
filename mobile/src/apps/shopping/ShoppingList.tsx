@@ -215,6 +215,8 @@ export default function ShoppingList() {
   const [picking, setPicking] = useState(false)
   const [storeInput, setStoreInput] = useState('')
   const [customColor, setCustomColor] = useState<string | null>(null)
+  // The store sheet's "new custom store" panel (see the third branch in its body).
+  const [customOpen, setCustomOpen] = useState(false)
 
   // The add bar's bottom padding is a CONSTANT, and deliberately so. It used to
   // shrink from the safe-area trim to sp.md while the keyboard was up, driven by
@@ -417,6 +419,23 @@ export default function ShoppingList() {
     }
   }
 
+  /** Close the store sheet AND drop whichever sub-panel was open, so reopening
+   *  it lands on the list instead of back inside a half-filled form. */
+  const closeStoreSheet = useCallback(() => {
+    setPicking(false)
+    setCustomOpen(false)
+    setEditingStore(null)
+    setStoreInput('')
+    setCustomColor(null)
+  }, [])
+
+  /** Back out of the new-store panel to the list, discarding the draft. */
+  function closeCustom() {
+    setCustomOpen(false)
+    setStoreInput('')
+    setCustomColor(null)
+  }
+
   /** Shared add path: dedupe by slug/name, optimistic insert, queue, select. */
   function addStore(name: string, slug: string | null, color: string | null) {
     const existing = stores.find(
@@ -425,7 +444,7 @@ export default function ShoppingList() {
     )
     if (existing) {
       selectStore(existing.id)
-      setPicking(false)
+      closeStoreSheet()
       return
     }
     const store = newStore(name, slug, color)
@@ -433,7 +452,7 @@ export default function ShoppingList() {
     setStores((prev) => [...prev, store])
     void enqueueOp({ k: 'store.add', tempId: store.id, name, slug, color })
     selectStore(store.id)
-    setPicking(false)
+    closeStoreSheet()
     scheduleLoad()
   }
 
@@ -443,9 +462,9 @@ export default function ShoppingList() {
   function addCustomStore() {
     const name = storeInput.trim()
     if (!name) return
-    setStoreInput('')
+    // addStore closes the sheet on success, and closeStoreSheet clears the
+    // draft name and colour — no need to reset them here.
     addStore(name, null, customColor)
-    setCustomColor(null)
   }
 
   function openEditStore(store: ShoppingStore) {
@@ -548,8 +567,15 @@ export default function ShoppingList() {
     (e) => !stores.some((s) => s.slug === e.slug),
   ).sort((a, b) => a.name.localeCompare(b.name))
   // AI suggestions not already on the list (matched by name).
-  const suggestedToAdd = (suggestions ?? []).filter(
-    (sg) => !stores.some((s) => s.name.trim().toLowerCase() === sg.name.trim().toLowerCase()),
+  const suggestedToAdd = (suggestions ?? [])
+    .filter((sg) => !stores.some((s) => s.name.trim().toLowerCase() === sg.name.trim().toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  // A–Z for the picker sheet only. `stores` itself keeps its creation order,
+  // which is what the chip row and the list's own store sections are built
+  // from — sorting it here would silently reorder the shopping list too.
+  const storesAZ = useMemo(
+    () => [...stores].sort((a, b) => a.name.localeCompare(b.name)),
+    [stores],
   )
 
   const renderItem = ({ item }: { item: ShoppingItem }) => (
@@ -817,12 +843,12 @@ export default function ShoppingList() {
       </KeyboardAvoidingView>
 
       {/* Store picker sheet */}
-      <Modal visible={picking} transparent animationType="slide" onRequestClose={() => setPicking(false)}>
+      <Modal visible={picking} transparent animationType="slide" onRequestClose={() => closeStoreSheet()}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
         >
-        <Pressable style={styles.backdrop} onPress={() => setPicking(false)}>
+        <Pressable style={styles.backdrop} onPress={() => closeStoreSheet()}>
           <Pressable
             style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: insets.bottom + sp.md }]}
             onPress={(e) => e.stopPropagation()}
@@ -830,14 +856,63 @@ export default function ShoppingList() {
             <View style={styles.sheetHead}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
                 <Store size={20} strokeWidth={2} color={c.text} />
-                <Txt variant="h2">{t('shopping.stores')}</Txt>
+                <Txt variant="h2">
+                  {customOpen ? t('shopping.newStore') : t('shopping.stores')}
+                </Txt>
               </View>
-              <Pressable onPress={() => setPicking(false)} hitSlop={10} accessibilityLabel={t('common.close')}>
+              <Pressable onPress={() => closeStoreSheet()} hitSlop={10} accessibilityLabel={t('common.close')}>
                 <X size={20} strokeWidth={2} color={c.textMuted} />
               </Pressable>
             </View>
 
-            {editingStore ? (
+            {customOpen ? (
+              /* ── New custom store: the same focused panel shape as editing
+                    one, so both ways of getting a store take you to the same
+                    place instead of one being a row at the bottom of a list. ── */
+              <View style={{ gap: sp.md, paddingBottom: sp.md }}>
+                <Pressable
+                  onPress={closeCustom}
+                  hitSlop={8}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' }}
+                >
+                  <ChevronLeft size={18} color={c.textMuted} />
+                  <Txt variant="muted">{t('shopping.stores')}</Txt>
+                </Pressable>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                  {/* Live preview, same as editing: the monogram picks up the
+                      name and colour as they're typed. */}
+                  <StoreLogo slug={null} name={storeInput || '?'} color={customColor} size={40} />
+                  <TextInput
+                    inputAccessoryViewButtonLabel={t('common.done')}
+                    value={storeInput}
+                    onChangeText={setStoreInput}
+                    onSubmitEditing={addCustomStore}
+                    returnKeyType="done"
+                    autoFocus
+                    placeholder={t('shopping.storeName')}
+                    placeholderTextColor={c.textFaint}
+                    style={[styles.input, { flex: 1, backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
+                  />
+                </View>
+
+                <Txt variant="label">{t('shopping.color')}</Txt>
+                <ColorDots value={customColor} onChange={setCustomColor} c={c} />
+
+                <Pressable
+                  onPress={addCustomStore}
+                  disabled={!storeInput.trim()}
+                  style={[
+                    styles.addBtn,
+                    { backgroundColor: c.accent, paddingVertical: 12, opacity: storeInput.trim() ? 1 : 0.5 },
+                  ]}
+                >
+                  <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
+                    {t('common.add')}
+                  </Txt>
+                </Pressable>
+              </View>
+            ) : editingStore ? (
               /* ── Edit a store: rename, recolor, delete ── */
               <View style={{ gap: sp.md, paddingBottom: sp.md }}>
                 <Pressable
@@ -906,12 +981,12 @@ export default function ShoppingList() {
                         {t('shopping.onYourList').toUpperCase()}
                       </Txt>
                       <View style={styles.grid}>
-                        {stores.map((s) => (
+                        {storesAZ.map((s) => (
                           <View key={s.id} style={[styles.storeTile, { backgroundColor: c.surface }]}>
                             <Pressable
                               onPress={() => {
                                 selectStore(s.id)
-                                setPicking(false)
+                                closeStoreSheet()
                               }}
                               style={styles.storeTileMain}
                             >
@@ -981,29 +1056,29 @@ export default function ShoppingList() {
                   </View>
                 </ScrollView>
 
-                {/* custom store: name + optional color */}
-                <ColorDots value={customColor} onChange={setCustomColor} c={c} compact />
-                <View style={styles.inputRow}>
-                  <TextInput
-                    inputAccessoryViewButtonLabel={t('common.done')}
-                    value={storeInput}
-                    onChangeText={setStoreInput}
-                    onSubmitEditing={addCustomStore}
-                    returnKeyType="done"
-                    placeholder={t('shopping.otherStore')}
-                    placeholderTextColor={c.textFaint}
-                    style={[styles.input, { backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
-                  />
-                  <Pressable
-                    onPress={addCustomStore}
-                    disabled={!storeInput.trim()}
-                    style={[styles.addBtn, { backgroundColor: c.accent, opacity: storeInput.trim() ? 1 : 0.5 }]}
-                  >
-                    <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
-                      {t('common.add')}
-                    </Txt>
-                  </Pressable>
-                </View>
+                {/* Custom store: a button, not a live name field. Sitting open
+                    at the foot of the sheet it read as one more row of the
+                    catalogue above it rather than a separate action, and it
+                    put a keyboard over the list you were still browsing. */}
+                <Pressable
+                  onPress={() => setCustomOpen(true)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    marginTop: sp.sm,
+                    paddingVertical: 12,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderColor: c.border,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Plus size={16} strokeWidth={2.5} color={c.accent} />
+                  <Txt style={{ color: c.accent, fontWeight: '700' }}>{t('shopping.customStore')}</Txt>
+                </Pressable>
               </>
             )}
           </Pressable>
@@ -1253,9 +1328,12 @@ const styles = StyleSheet.create({
   },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: sp.md },
   groupLabel: { textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: sp.sm, marginTop: sp.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
+  // One store per row, not a two-column wrap: names are the thing you scan
+  // here, and in two columns they truncate and read in a Z rather than
+  // straight down an alphabetical list.
+  grid: { gap: sp.sm },
   storeTile: {
-    width: '48%',
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.sm,

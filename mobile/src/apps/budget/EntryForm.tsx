@@ -452,7 +452,7 @@ export default function EntryForm({
                     )
                   })}
                   <Pressable
-                    onPress={() => setGridOpen((o) => !o)}
+                    onPress={() => setGridOpen(true)}
                     style={({ pressed }) => ({
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -466,140 +466,14 @@ export default function EntryForm({
                       opacity: pressed ? 0.7 : 1,
                     })}
                   >
+                    {/* Always ▾, never a ▴ toggle: this opens a sheet now, and a
+                        caret that flips would promise the grid collapses back
+                        into the form. */}
                     <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.textMuted }}>
-                      {t('common.all')} {gridOpen ? '▴' : '▾'}
+                      {t('common.all')} ▾
                     </Txt>
                   </Pressable>
                 </View>
-
-                {/* the full grid, plus the "new custom category" tile */}
-                {gridOpen && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                    {allExpenseCats.map((cat) => {
-                      const active = category === cat.id
-                      return (
-                        <Pressable
-                          key={cat.id}
-                          onPress={() => pickCategory(cat.id)}
-                          style={{
-                            width: '22%',
-                            alignItems: 'center',
-                            paddingVertical: 8,
-                            borderRadius: radius.md,
-                            backgroundColor: active ? c.accentSoft : c.surface,
-                            borderWidth: 2,
-                            borderColor: active ? c.accent : 'transparent',
-                          }}
-                        >
-                          <Txt style={{ fontSize: 20 }}>{cat.icon}</Txt>
-                          <Txt style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }} numberOfLines={1}>
-                            {catName(cat)}
-                          </Txt>
-                        </Pressable>
-                      )
-                    })}
-                    <Pressable
-                      onPress={() => setNewCatOpen((o) => !o)}
-                      style={{
-                        width: '22%',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingVertical: 8,
-                        borderRadius: radius.md,
-                        borderWidth: 1,
-                        borderStyle: 'dashed',
-                        borderColor: c.textFaint,
-                      }}
-                    >
-                      <Plus size={20} color={c.textMuted} />
-                      <Txt style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }}>
-                        {t('entry.newCategory')}
-                      </Txt>
-                    </Pressable>
-                  </View>
-                )}
-
-                {gridOpen && newCatOpen && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                    <TextInput
-                      inputAccessoryViewButtonLabel={t('common.done')}
-                      value={newCatIcon}
-                      onChangeText={setNewCatIcon}
-                      placeholder="🏷️"
-                      placeholderTextColor={c.textFaint}
-                      maxLength={4}
-                      accessibilityLabel={t('entry.newCategoryIcon')}
-                      style={{
-                        width: 56,
-                        textAlign: 'center',
-                        backgroundColor: c.surface,
-                        borderRadius: radius.md,
-                        paddingVertical: 12,
-                        fontSize: 16,
-                        color: c.text,
-                      }}
-                    />
-                    <TextInput
-                      inputAccessoryViewButtonLabel={t('common.done')}
-                      value={newCatName}
-                      onChangeText={setNewCatName}
-                      placeholder={t('entry.newCategoryPlaceholder')}
-                      placeholderTextColor={c.textFaint}
-                      maxLength={40}
-                      autoFocus
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        backgroundColor: c.surface,
-                        borderRadius: radius.md,
-                        paddingHorizontal: sp.md,
-                        paddingVertical: 12,
-                        fontSize: 16,
-                        color: c.text,
-                      }}
-                    />
-                    <Pressable
-                      onPress={createCategory}
-                      disabled={creatingCat || !newCatName.trim()}
-                      style={({ pressed }) => ({
-                        backgroundColor: c.accent,
-                        borderRadius: radius.md,
-                        paddingHorizontal: sp.lg,
-                        paddingVertical: 12,
-                        opacity: creatingCat || !newCatName.trim() ? 0.5 : pressed ? 0.85 : 1,
-                      })}
-                    >
-                      <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>
-                        {t('common.add')}
-                      </Txt>
-                    </Pressable>
-                  </View>
-                )}
-
-                {/* manage (edit / delete) the household's custom categories */}
-                {gridOpen ? (
-                  <Pressable
-                    onPress={() => setManageOpen(true)}
-                    style={({ pressed }) => ({
-                      alignSelf: 'flex-start',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingHorizontal: sp.md,
-                      paddingVertical: sp.sm,
-                      borderRadius: radius.md,
-                      borderWidth: 1,
-                      borderColor: c.border,
-                      backgroundColor: c.surface,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    <SlidersHorizontal size={15} color={c.accent} />
-                    <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
-                      {t('manageCats.title')}
-                    </Txt>
-                  </Pressable>
-                ) : null}
 
                 {/* subcategory — its own labeled field section (optional) */}
                 <Field
@@ -736,14 +610,184 @@ export default function EntryForm({
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
-      {manageOpen ? (
-        <ManageCategoriesSheet
-          categories={localCats}
-          overrides={localOverrides}
-          onChanged={refreshCats}
-          onClose={() => setManageOpen(false)}
-        />
-      ) : null}
+      {/* Category picker — a sheet, not an inline grid. Expanded in place it
+          pushed the rest of the form (subcategory, date, who, save) down past
+          the fold, so choosing a category meant scrolling to find the grid and
+          scrolling back to finish. NESTED inside this Modal rather than a
+          sibling of it: on iOS a second Modal rendered alongside an open one
+          silently fails to present. */}
+      <Modal visible={gridOpen} transparent animationType="slide" onRequestClose={() => setGridOpen(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          onPress={() => setGridOpen(false)}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              maxHeight: '85%',
+              backgroundColor: c.sheet,
+              borderTopLeftRadius: radius.lg,
+              borderTopRightRadius: radius.lg,
+              paddingHorizontal: sp.lg,
+              paddingTop: sp.lg,
+              paddingBottom: sp.xl,
+              gap: sp.md,
+            }}
+          >
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+            >
+              <Txt variant="h2">{t('entry.category')}</Txt>
+              <Pressable
+                onPress={() => setGridOpen(false)}
+                hitSlop={10}
+                accessibilityLabel={t('common.close')}
+              >
+                <X size={20} color={c.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+                {allExpenseCats.map((cat) => {
+                  const active = category === cat.id
+                  return (
+                    <Pressable
+                      key={cat.id}
+                      onPress={() => pickCategory(cat.id)}
+                      style={{
+                        width: '22%',
+                        alignItems: 'center',
+                        paddingVertical: 8,
+                        borderRadius: radius.md,
+                        backgroundColor: active ? c.accentSoft : c.surface,
+                        borderWidth: 2,
+                        borderColor: active ? c.accent : 'transparent',
+                      }}
+                    >
+                      <Txt style={{ fontSize: 20 }}>{cat.icon}</Txt>
+                      <Txt style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }} numberOfLines={1}>
+                        {catName(cat)}
+                      </Txt>
+                    </Pressable>
+                  )
+                })}
+                <Pressable
+                  onPress={() => setNewCatOpen((o) => !o)}
+                  style={{
+                    width: '22%',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 8,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderStyle: 'dashed',
+                    borderColor: c.textFaint,
+                  }}
+                >
+                  <Plus size={20} color={c.textMuted} />
+                  <Txt style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }}>
+                    {t('entry.newCategory')}
+                  </Txt>
+                </Pressable>
+              </View>
+
+              {newCatOpen ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginTop: sp.md }}>
+                  <TextInput
+                    inputAccessoryViewButtonLabel={t('common.done')}
+                    value={newCatIcon}
+                    onChangeText={setNewCatIcon}
+                    placeholder="🏷️"
+                    placeholderTextColor={c.textFaint}
+                    maxLength={4}
+                    accessibilityLabel={t('entry.newCategoryIcon')}
+                    style={{
+                      width: 56,
+                      textAlign: 'center',
+                      backgroundColor: c.surface,
+                      borderRadius: radius.md,
+                      paddingVertical: 12,
+                      fontSize: 16,
+                      color: c.text,
+                    }}
+                  />
+                  <TextInput
+                    inputAccessoryViewButtonLabel={t('common.done')}
+                    value={newCatName}
+                    onChangeText={setNewCatName}
+                    placeholder={t('entry.newCategoryPlaceholder')}
+                    placeholderTextColor={c.textFaint}
+                    maxLength={40}
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      backgroundColor: c.surface,
+                      borderRadius: radius.md,
+                      paddingHorizontal: sp.md,
+                      paddingVertical: 12,
+                      fontSize: 16,
+                      color: c.text,
+                    }}
+                  />
+                  <Pressable
+                    onPress={createCategory}
+                    disabled={creatingCat || !newCatName.trim()}
+                    style={({ pressed }) => ({
+                      backgroundColor: c.accent,
+                      borderRadius: radius.md,
+                      paddingHorizontal: sp.lg,
+                      paddingVertical: 12,
+                      opacity: creatingCat || !newCatName.trim() ? 0.5 : pressed ? 0.85 : 1,
+                    })}
+                  >
+                    <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>
+                      {t('common.add')}
+                    </Txt>
+                  </Pressable>
+                </View>
+              ) : null}
+            </ScrollView>
+
+            {/* manage (edit / delete) the household's custom categories */}
+            <Pressable
+              onPress={() => setManageOpen(true)}
+              style={({ pressed }) => ({
+                alignSelf: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: sp.md,
+                paddingVertical: sp.sm,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: c.border,
+                backgroundColor: c.surface,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <SlidersHorizontal size={15} color={c.accent} />
+              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
+                {t('manageCats.title')}
+              </Txt>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+
+        {/* Inside this Modal, not beside it: "Manage categories" is only
+            reachable from here now, and ManageCategoriesSheet is itself a
+            Modal — rendered as a sibling of an already-open one it would
+            silently fail to present and the button would look dead. */}
+        {manageOpen ? (
+          <ManageCategoriesSheet
+            categories={localCats}
+            overrides={localOverrides}
+            onChanged={refreshCats}
+            onClose={() => setManageOpen(false)}
+          />
+        ) : null}
+      </Modal>
     </Modal>
   )
 }
