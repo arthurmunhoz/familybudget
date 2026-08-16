@@ -101,6 +101,76 @@ Questions or ideas? one.roof.family.organizer@gmail.com
 
 ---
 
+## What's New (v1.3) — 4000 char max; paste into the new version's "What's New"
+
+A polish-and-reliability release: no new marquee feature, so the notes lead with
+the fix people actually felt (stale data on reopen) rather than manufacturing a
+headline. Everything else on the listing — name, subtitle, keywords,
+description, promotional text, App Privacy, review notes — is UNCHANGED from
+v1.2 and does not need re-submitting.
+
+### English
+
+```
+This one's about the things you feel every day.
+
+• Up to date the moment you open it. One Roof now refreshes when you come back to it, so you never open the app to yesterday's list, budget, or agenda.
+• Adding to the shopping list finally feels like something happened — the button confirms it, the list scrolls to your new item, and it pulses so you can spot it among the rest. Removing an item animates out too.
+• Put the keyboard away with a swipe, anywhere in the app.
+• Stores, tidied up: pick from a clean A–Z list, and add your own from a proper New store screen.
+• Money: choosing a category now opens in its own panel instead of pushing the rest of the form off screen.
+• Pet Care: when a treatment comes due, one tap logs it again with the next date already worked out for you — no retyping the same event every month.
+• A tidier home screen, with the compact app tiles as standard so the whole house fits at a glance.
+• New to One Roof and still on your own? The home screen now points you to your invite code.
+
+Questions or ideas? one.roof.family.organizer@gmail.com
+```
+
+### Español
+
+```
+Esta versión se trata de los detalles del día a día.
+
+• Al día en cuanto la abres. One Roof ahora se actualiza cuando vuelves a la app, así nunca ves la lista, el presupuesto o la agenda de ayer.
+• Agregar a la lista de compras por fin se siente: el botón lo confirma, la lista se desplaza hasta el nuevo artículo y este destella para que lo encuentres. Al eliminar, también hay animación.
+• Guarda el teclado con un deslizamiento, en cualquier parte de la app.
+• Tiendas ordenadas: elige de una lista de la A a la Z y agrega la tuya desde una pantalla propia.
+• Dinero: elegir una categoría ahora se abre en su propio panel, sin empujar el resto del formulario fuera de la pantalla.
+• Mascotas: cuando toca un tratamiento, un toque vuelve a registrarlo con la próxima fecha ya calculada. Se acabó reescribir el mismo evento cada mes.
+• Una pantalla de inicio más ordenada, con los iconos compactos por defecto para ver toda la casa de un vistazo.
+• ¿Todavía estás solo en tu hogar? La pantalla de inicio ahora te muestra dónde está tu código de invitación.
+
+¿Preguntas o ideas? one.roof.family.organizer@gmail.com
+```
+
+### Português
+
+```
+Esta versão é sobre as coisas que você sente todo dia.
+
+• Atualizado assim que você abre. O One Roof agora se atualiza quando você volta para o app, então você nunca vê a lista, o orçamento ou a agenda de ontem.
+• Adicionar à lista de compras enfim dá retorno: o botão confirma, a lista rola até o item novo e ele pisca para você achar no meio dos outros. Remover também tem animação.
+• Feche o teclado com um deslizar, em qualquer tela do app.
+• Mercados organizados: escolha em uma lista de A a Z e adicione o seu por uma tela própria.
+• Dinheiro: escolher uma categoria agora abre em um painel próprio, sem empurrar o resto do formulário para fora da tela.
+• Pets: quando um cuidado vence, um toque registra de novo com a próxima data já calculada — sem redigitar o mesmo evento todo mês.
+• Uma tela inicial mais organizada, com os ícones compactos por padrão para ver a casa inteira de uma vez.
+• Ainda sozinho na sua casa? A tela inicial agora mostra onde está o seu código de convite.
+
+Dúvidas ou ideias? one.roof.family.organizer@gmail.com
+```
+
+### What does NOT change for v1.3
+- **Promotional text** — keep v1.2's Whereabouts line. It targets people seeing
+  the listing for the first time, and this release adds no new marquee feature.
+- **App Privacy** — no new data collected and no new permissions, so the
+  nutrition label is untouched. (v1.2's Precise Location entry stays.)
+- **Review notes** — unchanged, including the Whereabouts/background-location
+  justification. Re-check only that the demo account still signs in.
+- **Screenshots** — still accurate, with ONE caveat: the Hub now ships with
+  compact tiles, so a Hub screenshot taken with the large two-column tiles no
+  longer matches a fresh install. Not a rejection risk; reshoot when convenient.
+
 ## Screenshots plan (6.7" iPhone required; add 6.5" + iPad if you keep tablet support)
 
 Each screenshot = one screen with a bold caption bar on top. Lead with the differentiators.
