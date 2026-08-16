@@ -10,6 +10,7 @@ import { Card, Txt } from './ui'
 import SafetyBanner from '../apps/location/SafetyBanner'
 import NudgesBanner from '../apps/pings/NudgesBanner'
 import TodaySection from './TodaySection'
+import InviteBanner from './InviteBanner'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { useAuth } from '../lib/auth'
@@ -121,6 +122,12 @@ export default function Hub() {
         <NudgesBanner />
         {/* An active safety radius — tap to manage or stop it. */}
         <SafetyBanner />
+        {/* Household of one — where to find the invite code. Last of the
+            banners: a live nudge or a running safety watch is time-sensitive
+            and should sit above a standing suggestion. On a brand-new
+            household those two render nothing anyway, so in the case this is
+            actually for it lands directly under Today. */}
+        <InviteBanner />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: compact ? sp.sm : sp.md }}>
           {apps.map((app) => {
             const Icon = app.icon

@@ -886,6 +886,9 @@ export const pt: Record<keyof typeof en, string> = {
   'home.years': '{n} anos',
   'home.overdue': 'Atrasado',
   'home.dueToday': 'Para hoje',
+  'home.invite.title': 'Convide sua família',
+  'home.invite.body': 'Compartilhe seu código de convite em Ajustes para que possam entrar.',
+  'home.invite.dismiss': 'Dispensar lembrete de convite',
   'home.moreItems': '+{n} mais',
 
   'months.options': 'Opções do orçamento',

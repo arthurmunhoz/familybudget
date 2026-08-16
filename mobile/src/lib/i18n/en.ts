@@ -887,6 +887,9 @@ export const en = {
   'home.years': '{n} years',
   'home.overdue': 'Overdue',
   'home.dueToday': 'Due today',
+  'home.invite.title': 'Invite your family',
+  'home.invite.body': 'Share your invite code from Settings so they can join.',
+  'home.invite.dismiss': 'Dismiss invite reminder',
   'home.moreItems': '+{n} more',
 
   'months.options': 'Budget options',

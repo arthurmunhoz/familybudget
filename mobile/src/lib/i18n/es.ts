@@ -886,6 +886,9 @@ export const es: Record<keyof typeof en, string> = {
   'home.years': '{n} años',
   'home.overdue': 'Atrasado',
   'home.dueToday': 'Para hoy',
+  'home.invite.title': 'Invita a tu familia',
+  'home.invite.body': 'Comparte tu código de invitación desde Ajustes para que puedan unirse.',
+  'home.invite.dismiss': 'Descartar recordatorio de invitación',
   'home.moreItems': '+{n} más',
 
   'months.options': 'Opciones del presupuesto',

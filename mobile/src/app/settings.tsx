@@ -15,6 +15,7 @@ import {
   StyleSheet,
   Switch,
   View,
+  type LayoutChangeEvent,
 } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -173,7 +174,7 @@ function PlusConfetti() {
 
 // Household members + (owner-only) invite code. Fetches its own data so it can
 // refresh after a member is removed. Uses the migration-051 owner RPCs.
-function HouseholdSection() {
+function HouseholdSection({ highlight = false }: { highlight?: boolean }) {
   const { c } = useTheme()
   const { t } = useI18n()
   const { profile } = useAuth()
@@ -308,7 +309,7 @@ function HouseholdSection() {
       </Card>
 
       {isOwner ? (
-        <Card style={{ gap: sp.md }}>
+        <Card style={{ gap: sp.md, ...(highlight ? { borderWidth: 2, borderColor: c.accent } : {}) }}>
           <View style={{ gap: 2 }}>
             <Txt style={{ fontFamily: fonts.semibold }}>{t('household.inviteCode')}</Txt>
             <Txt variant="faint">{t('household.inviteHint')}</Txt>
@@ -515,29 +516,39 @@ export default function Settings() {
   const [cityMsg, setCityMsg] = useState<TKey | null>(null)
   const unit = lang === 'en' ? 'fahrenheit' : 'celsius'
 
-  // Deep-link from the Hub's "Set city" button (?highlight=weather): scroll to
-  // the Weather section and briefly outline it.
+  // Deep-link to a section and briefly outline it — from the Hub's "Set city"
+  // button (?highlight=weather) and its invite banner (?highlight=invite).
+  // Each target registers its own y via onLayout under the same key.
   const params = useLocalSearchParams<{ highlight?: string }>()
   const scrollRef = useRef<ScrollView>(null)
-  const [weatherY, setWeatherY] = useState<number | null>(null)
-  const [highlightWeather, setHighlightWeather] = useState(false)
+  const [sectionY, setSectionY] = useState<Record<string, number>>({})
+  const [highlighted, setHighlighted] = useState<string | null>(null)
   const handledHighlight = useRef(false)
+  const registerSection = useCallback(
+    (key: string) => (e: LayoutChangeEvent) => {
+      const { y } = e.nativeEvent.layout
+      setSectionY((prev) => (prev[key] === y ? prev : { ...prev, [key]: y }))
+    },
+    [],
+  )
 
+  const target = params.highlight
+  const targetY = target ? sectionY[target] : undefined
   useEffect(() => {
-    if (params.highlight !== 'weather' || weatherY == null || handledHighlight.current) return
+    if (!target || targetY == null || handledHighlight.current) return
     // Don't lock in `handledHighlight` until the scroll actually fires — the
-    // Plus and Notifications cards above this section resolve async state
-    // (isPlus, pushOn) shortly after mount and can change height, re-firing
-    // this section's onLayout with a corrected y. Locking too early meant the
-    // scroll used a stale pre-settle offset and landed short of the card.
+    // Plus and Notifications cards above resolve async state (isPlus, pushOn)
+    // shortly after mount and can change height, re-firing a section's onLayout
+    // with a corrected y. Locking too early meant the scroll used a stale
+    // pre-settle offset and landed short of the card.
     const id = setTimeout(() => {
       handledHighlight.current = true
-      scrollRef.current?.scrollTo({ y: Math.max(0, weatherY - 12), animated: true })
-      setHighlightWeather(true)
-      setTimeout(() => setHighlightWeather(false), 2400)
+      scrollRef.current?.scrollTo({ y: Math.max(0, targetY - 12), animated: true })
+      setHighlighted(target)
+      setTimeout(() => setHighlighted(null), 2400)
     }, 350)
     return () => clearTimeout(id)
-  }, [params.highlight, weatherY])
+  }, [target, targetY])
 
   // Reflect the current OS permission from the start (no prompt).
   useEffect(() => {
@@ -747,7 +758,9 @@ export default function Settings() {
 
         <Divider />
 
-        <HouseholdSection />
+        <View onLayout={registerSection('invite')}>
+          <HouseholdSection highlight={highlighted === 'invite'} />
+        </View>
 
         <Divider />
 
@@ -936,13 +949,13 @@ export default function Settings() {
         {/* Weather / home city (drives the Today section on the home screen) */}
         <View
           style={{ gap: sp.sm }}
-          onLayout={(e) => setWeatherY(e.nativeEvent.layout.y)}
+          onLayout={registerSection('weather')}
         >
           <Txt variant="label">{t('settings.weather')}</Txt>
           <Card
             style={{
               gap: sp.md,
-              ...(highlightWeather ? { borderWidth: 2, borderColor: c.accent } : {}),
+              ...(highlighted === 'weather' ? { borderWidth: 2, borderColor: c.accent } : {}),
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>

@@ -901,7 +901,7 @@ export default function ShoppingList() {
                   onPress={addCustomStore}
                   disabled={!storeInput.trim()}
                   style={[
-                    styles.panelBtn,
+                    styles.panelBtnDocked,
                     { backgroundColor: c.accent, opacity: storeInput.trim() ? 1 : 0.5 },
                   ]}
                 >
@@ -1330,6 +1330,22 @@ const styles = StyleSheet.create({
   },
   panelBtn: {
     borderRadius: radius.md,
+    paddingHorizontal: sp.xl,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // A panel button that IS the last thing in the sheet, so its bottom edge sits
+  // against the screen's own curve — both bottom corners follow it, the same
+  // shape Btn's `curveBottom` and NewItemButton use. iPhone only: sheetRadius
+  // falls back to the plain large radius on Android, whose screens are square.
+  // Only for a button that's genuinely last — the edit panel's Save has a
+  // Delete beneath it and stays evenly rounded.
+  panelBtnDocked: {
+    borderTopLeftRadius: radius.md,
+    borderTopRightRadius: radius.md,
+    borderBottomLeftRadius: sheetRadius,
+    borderBottomRightRadius: sheetRadius,
     paddingHorizontal: sp.xl,
     paddingVertical: 12,
     alignItems: 'center',
