@@ -97,7 +97,6 @@ export function PercentPicker({
         )
       })}
       <TextInput
-        inputAccessoryViewButtonLabel={t('common.done')}
         value={custom}
         onChangeText={(txt) => {
           setCustom(txt)
@@ -160,10 +159,8 @@ export function MiniInput({
   width?: number
 } & React.ComponentProps<typeof TextInput>) {
   const { c } = useTheme()
-  const { t } = useI18n()
   return (
     <TextInput
-      inputAccessoryViewButtonLabel={t('common.done')}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}

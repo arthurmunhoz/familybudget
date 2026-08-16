@@ -37,7 +37,6 @@ export function EvenSplit() {
               amount itself was greyed out. */}
           <Txt style={{ fontSize: 32, fontWeight: '600', color: bill ? c.text : c.textFaint }}>$</Txt>
           <TextInput
-            inputAccessoryViewButtonLabel={t('common.done')}
             value={bill}
             onChangeText={setBill}
             keyboardType="decimal-pad"

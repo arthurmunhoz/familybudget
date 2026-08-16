@@ -234,6 +234,7 @@ export function RoutineSheet({
               style={{ flexGrow: 0 }}
               contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl, gap: sp.md }}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             >
               {tasks.length === 0 ? (
                 <Btn title={t('petcare.useTemplate')} variant="secondary" onPress={seedTemplate} loading={busy} />

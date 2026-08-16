@@ -355,7 +355,6 @@ export default function AdminHousehold() {
           ) : (
             <View style={{ flexDirection: 'row', gap: sp.sm }}>
               <TextInput
-                inputAccessoryViewButtonLabel={t('common.done')}
                 value={mName}
                 onChangeText={setMName}
                 placeholder={t('admin.memberName')}
@@ -363,7 +362,6 @@ export default function AdminHousehold() {
                 style={[inputStyle, { width: 90 }]}
               />
               <TextInput
-                inputAccessoryViewButtonLabel={t('common.done')}
                 value={mEmail}
                 onChangeText={setMEmail}
                 placeholder={t('admin.memberEmail')}

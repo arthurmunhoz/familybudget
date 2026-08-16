@@ -792,7 +792,6 @@ export default function ShoppingList() {
 
           <View style={styles.inputRow}>
             <TextInput
-              inputAccessoryViewButtonLabel={t('common.done')}
               value={label}
               onChangeText={setLabel}
               onSubmitEditing={add}
@@ -884,7 +883,6 @@ export default function ShoppingList() {
                       name and colour as they're typed. */}
                   <StoreLogo slug={null} name={storeInput || '?'} color={customColor} size={40} />
                   <TextInput
-                    inputAccessoryViewButtonLabel={t('common.done')}
                     value={storeInput}
                     onChangeText={setStoreInput}
                     onSubmitEditing={addCustomStore}
@@ -932,7 +930,6 @@ export default function ShoppingList() {
                     size={40}
                   />
                   <TextInput
-                    inputAccessoryViewButtonLabel={t('common.done')}
                     value={editName}
                     onChangeText={setEditName}
                     placeholder={t('shopping.storeName')}

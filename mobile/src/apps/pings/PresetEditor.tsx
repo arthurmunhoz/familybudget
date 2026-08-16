@@ -68,7 +68,6 @@ export function PresetEditor({
             <View style={{ gap: 6 }}>
               <Txt variant="label">{t('pings.presetEmoji')}</Txt>
               <TextInput
-                inputAccessoryViewButtonLabel={t('common.done')}
                 value={emoji}
                 onChangeText={setEmoji}
                 maxLength={4}
@@ -86,7 +85,6 @@ export function PresetEditor({
             <View style={{ flex: 1, gap: 6 }}>
               <Txt variant="label">{t('pings.presetLabel')}</Txt>
               <TextInput
-                inputAccessoryViewButtonLabel={t('common.done')}
                 value={label}
                 onChangeText={setLabel}
                 placeholder={t('pings.presetLabelPlaceholder')}

@@ -218,7 +218,6 @@ export default function PingComposer({
       {/* AI free-text */}
       <View style={styles.aiRow}>
         <TextInput
-          inputAccessoryViewButtonLabel={t('common.done')}
           value={text}
           onChangeText={setText}
           onSubmitEditing={sendAI}

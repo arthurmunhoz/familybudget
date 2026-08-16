@@ -207,7 +207,6 @@ export default function ManageCategoriesSheet({
   const editorRow = (onSave: () => void, saveLabel: string, key?: string) => (
     <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingVertical: sp.sm }}>
       <TextInput
-        inputAccessoryViewButtonLabel={t('common.done')}
         value={draftIcon}
         onChangeText={setDraftIcon}
         placeholder="🏷️"
@@ -216,7 +215,6 @@ export default function ManageCategoriesSheet({
         style={iconInput}
       />
       <TextInput
-        inputAccessoryViewButtonLabel={t('common.done')}
         value={draftName}
         onChangeText={setDraftName}
         placeholder={t('manageCats.namePlaceholder')}
@@ -283,6 +281,7 @@ export default function ManageCategoriesSheet({
             <ScrollView
               contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl }}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             >
               {/* Defaults (built-in presets) */}
               <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>

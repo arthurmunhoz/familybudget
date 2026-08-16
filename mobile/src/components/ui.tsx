@@ -24,7 +24,6 @@ import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 import { pickOn } from '../theme/contrast'
-import { useI18n } from '../hooks/useI18n'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
 
@@ -86,6 +85,12 @@ export function Screen({
             style={{ flex: 1 }}
             contentContainerStyle={[{ paddingBottom: sp.xxl }, inner]}
             keyboardShouldPersistTaps="handled"
+            // Swipe to put the keyboard away — the app's one way out, since
+            // number pads have no return key and the system's own Done toolbar
+            // is not usable here (see the keyboard note in mobile/CLAUDE.md).
+            // Paired with keyboardShouldPersistTaps above, so a tap on a button
+            // still lands while the keyboard is up rather than only closing it.
+            keyboardDismissMode="on-drag"
             onScroll={onScroll}
             scrollEventThrottle={16}
           >
@@ -238,7 +243,6 @@ export function Field({
   ...rest
 }: TextInputProps & { label?: string }) {
   const { c } = useTheme()
-  const { t } = useI18n()
   return (
     <View style={{ gap: 6 }}>
       {label ? <Txt variant="label">{label}</Txt> : null}
@@ -255,7 +259,6 @@ export function Field({
         // `inputAccessoryViewID` makes RN skip this native toolbar, so the old
         // code actively removed the Done button it was trying to add. Don't
         // reintroduce inputAccessoryViewID here — see mobile/CLAUDE.md.
-        inputAccessoryViewButtonLabel={t('common.done')}
         placeholderTextColor={c.textFaint}
         style={[
           {

@@ -353,7 +353,6 @@ export default function Admin() {
             </View>
             <View style={{ flexDirection: 'row', gap: sp.sm }}>
               <TextInput
-                inputAccessoryViewButtonLabel={t('common.done')}
                 value={newHousehold}
                 onChangeText={setNewHousehold}
                 onSubmitEditing={createHousehold}
@@ -381,7 +380,6 @@ export default function Admin() {
           {/* search */}
           <View style={{ justifyContent: 'center' }}>
             <TextInput
-              inputAccessoryViewButtonLabel={t('common.done')}
               value={search}
               onChangeText={setSearch}
               placeholder={t('admin.searchHouseholds')}

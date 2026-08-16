@@ -314,6 +314,7 @@ export default function EntryForm({
             style={{ flexGrow: 0 }}
             contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
             {/* expense / income — compact centered pill */}
             <View style={{ alignItems: 'center' }}>
@@ -374,7 +375,6 @@ export default function EntryForm({
                 $
               </Txt>
               <TextInput
-                inputAccessoryViewButtonLabel={t('common.done')}
                 value={amount}
                 onChangeText={(v) => setAmount(v.replace(/[^0-9.,]/g, ''))}
                 keyboardType="decimal-pad"
@@ -695,7 +695,6 @@ export default function EntryForm({
               {newCatOpen ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginTop: sp.md }}>
                   <TextInput
-                    inputAccessoryViewButtonLabel={t('common.done')}
                     value={newCatIcon}
                     onChangeText={setNewCatIcon}
                     placeholder="🏷️"
@@ -713,7 +712,6 @@ export default function EntryForm({
                     }}
                   />
                   <TextInput
-                    inputAccessoryViewButtonLabel={t('common.done')}
                     value={newCatName}
                     onChangeText={setNewCatName}
                     placeholder={t('entry.newCategoryPlaceholder')}

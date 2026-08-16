@@ -59,7 +59,6 @@ export function Discount() {
         >
           <Txt style={{ fontSize: 18, color: price ? c.text : c.textFaint }}>$</Txt>
           <TextInput
-            inputAccessoryViewButtonLabel={t('common.done')}
             value={price}
             onChangeText={setPrice}
             keyboardType="decimal-pad"
@@ -144,7 +143,6 @@ export function Discount() {
             )
           })}
           <TextInput
-            inputAccessoryViewButtonLabel={t('common.done')}
             value={custom}
             onChangeText={onCustom}
             keyboardType="decimal-pad"

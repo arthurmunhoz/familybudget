@@ -137,10 +137,8 @@ function NumInput({
   width?: number
 }) {
   const { c } = useTheme()
-  const { t } = useI18n()
   return (
     <TextInput
-      inputAccessoryViewButtonLabel={t('common.done')}
       value={value}
       onChangeText={onChangeText}
       keyboardType="decimal-pad"
@@ -579,6 +577,7 @@ export function EditProfile({
             style={{ flexGrow: 0 }}
             contentContainerStyle={{ gap: sp.md, paddingBottom: sp.sm }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
             {/* your name (allowed_users.display_name — how the family sees you) */}
             <View style={{ gap: 6 }}>

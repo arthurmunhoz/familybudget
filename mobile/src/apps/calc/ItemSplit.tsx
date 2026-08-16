@@ -211,7 +211,6 @@ export function ItemSplit() {
         </View>
         <View style={{ flexDirection: 'row', gap: sp.sm, marginTop: sp.sm }}>
           <TextInput
-            inputAccessoryViewButtonLabel={t('common.done')}
             value={nameInput}
             onChangeText={setNameInput}
             onSubmitEditing={() => addPerson(nameInput)}
