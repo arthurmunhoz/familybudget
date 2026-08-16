@@ -36,10 +36,11 @@ Draft:
 > between all of it. Collapsing everything into a single spot turned five
 > habits into one.
 >
-> 2. **Make the ask cheaper than the nag.** My wife was never going to
-> maintain a task app, but she'll tap one button. One-tap pings with read
-> receipts replaced most of our coordination texting, so the calendar only
-> has to carry real events.
+> 2. **Make the ask cheaper than the nag.** Nobody in our house was going to
+> maintain a task app. What worked was making the smallest interactions
+> one tap: my wife can ask for help or check in from a widget without even
+> opening the app, and read receipts mean no "did you see my text?"
+> follow-up. The calendar then only has to carry actual events.
 >
 > Full disclosure: I'm a mobile developer and eventually got annoyed enough
 > to build our own app for all of this, so I have an obvious "one place"
@@ -50,36 +51,38 @@ Draft:
 ## 2. r/ProductivityApps — "Looking for the best app to manage a household together"
 https://www.reddit.com/r/ProductivityApps/comments/1v2j2l8/
 Jul 21 · OP (EducationalHunter787) active 6 days ago ("What combination do you use?").
-Context: wish-list is nearly One Roof's feature list verbatim — shared calendar
-w/ Google sync, recurring assignable tasks, shared shopping lists, misc lists,
-notes/docs, file storage, free/cheap. Considering Notion/TickTick.
+Context: wish-list overlaps One Roof on calendar w/ Google sync, shared
+shopping lists, and docs — but ALSO wants assignable recurring tasks and
+notes, which One Roof does not do. Considering Notion/TickTick.
 ⚠️ SUB RULES: self-promotion requires 10 in-community karma and only once/month.
 Play: name-drop with disclosure, no link (small removal risk, low stakes) — and
 build the 10 karma in this sub for a proper flaired post later.
-Note: OP wants Android+iPhone — One Roof is iOS only right now. Say so honestly;
-it keeps the comment credible even if it rules us out for this OP.
+Note: OP wants Android+iPhone AND task assignment/notes — One Roof is iOS only
+and deliberately isn't a task manager or notes app. Say both honestly; the
+candor is what makes the rest credible.
 
 Draft:
 
-> Went shopping for almost exactly this list a couple of years ago and hit
-> the same Notion/TickTick fork. Honest take: Notion can technically do
-> everything on your list, but "technically" is the trap — it only works if
-> both people maintain it, and in our house that lasted about three weeks.
-> TickTick nails the task half, but you'll still be juggling separate places
-> for the calendar, the lists, and the docs, and the juggling is what kills
-> these systems.
+> Honest take on the Notion route since you're considering it: it can
+> technically hold everything on your list, but "technically" is the trap —
+> a workspace only works if BOTH people maintain it, and in any household
+> there's a less-enthusiastic partner. Whatever you pick, that person is the
+> whole ballgame.
 >
-> After a decade building mobile apps for other people, I gave up and built
-> the household app I wanted — shared calendar with Google/Apple sync,
-> shopping list that works offline in the store, docs behind Face ID,
-> budgets. It's called One Roof (disclosure: it's mine, and I'm not linking
-> per sub rules). One honest caveat for your case: it's iOS-only today with
-> Android on the way, so if you need Android right now it won't fit yet.
+> We lived the messy version of your list for years (a paper notebook on the
+> kitchen counter for groceries, work schedules nobody else could see, a
+> monthly savings goal we could never actually verify), and after a decade
+> building mobile apps for other people I ended up building our own: shared
+> shopping list that syncs between phones and works offline in the store, a
+> shared calendar that syncs two-way with Google and Apple Calendar, shared
+> budgets so we finally know what we spend and save, and documents behind
+> Face ID. It's called One Roof (disclosure: mine; not linking per sub
+> rules).
 >
-> Whatever you pick, the one criterion I'd hold hard after living this:
-> adding anything must take under five seconds on a phone. The moment it's
-> slower, the less-enthusiastic partner stops, and the whole system quietly
-> becomes your second job.
+> Two honest caveats against your list: it's iOS-only today (Android coming),
+> and it deliberately does NOT do general task management with assignees or
+> notes — so if those two are must-haves it won't fit yet, and TickTick plus
+> a shared calendar might serve you better.
 
 ## 3. r/ProductivityApps — "Apps for organising household"
 21d old · 21 comments. Same sub, same rules. Second karma-building spot —
