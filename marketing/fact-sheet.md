@@ -57,3 +57,7 @@ invent features, stats, or anecdotes.
 - Don't quote free-vs-Plus limits or prices without checking with Arthur.
 - Never invent usage stats ("cut our texts by 80%"), trial anecdotes ("Notion
   lasted three weeks for us"), or experiences Arthur didn't describe.
+- Never ascribe a feeling, motive, or failure story to Arthur/his household
+  ("that person burned out") that he hasn't stated. The facts above say WHAT
+  their old systems were, not WHY they failed or HOW it felt — for anything
+  narrative, interview Arthur first and quote his answers.

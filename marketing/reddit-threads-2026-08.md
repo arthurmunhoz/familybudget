@@ -22,19 +22,17 @@ third link-dropper. Story reply, no link.
 Draft:
 
 > No kids here — two working adults and two dogs, one with allergies that
-> generates more appointments than some toddlers — but we went through your
-> exact cycle. Shared calendar, then a paper notebook on the kitchen counter,
-> and everything died the same way: it slowly became one person's job, and
-> that person burned out.
+> generates a lot of vet appointments — but we had our own version of this:
+> a paper notebook on the kitchen counter for groceries, the dogs' exam and
+> vaccine history scattered across vet emails and bank receipts, and no
+> single place where both of our schedules lived.
 >
-> Two things finally stuck for us:
+> What stuck for us:
 >
-> 1. **One place instead of five.** The notebook died because it couldn't
-> leave the kitchen. The calendar died because groceries lived in the
-> notebook, the dogs' vet stuff lived in old emails, and "when are you home"
-> lived in a text thread — so one of us had to be the human sync layer
-> between all of it. Collapsing everything into a single spot turned five
-> habits into one.
+> 1. **One place instead of five.** [PLACEHOLDER — Arthur: what actually
+> made the notebook/scattered setup fail for you two? Fill with the real
+> moment before posting.] Collapsing groceries, the dogs' care, the
+> calendar, and money into one spot turned five habits into one.
 >
 > 2. **Make the ask cheaper than the nag.** Nobody in our house was going to
 > maintain a task app. What worked was making the smallest interactions
