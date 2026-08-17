@@ -73,11 +73,12 @@ const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: FolderLock, key: 'settings.plusFeatureVault' },
 ]
 
-// Where "Manage subscription" goes. A paid plan is managed by the STORE that sold
-// it, and the Apple URL is a dead end on Android — it opens a browser page the
-// user has no account on. Play's deep link needs no package/sku to land on the
-// user's subscription list.
-const STORE_SUBSCRIPTIONS_URL =
+// Where "Manage subscription" goes when RevenueCat has no `managementUrl` for
+// us (see below) — this device's own store. A paid plan is managed by the STORE
+// that sold it, and the Apple URL is a dead end on Android: it opens a browser
+// page the user has no account on. Play's deep link needs no package/sku to
+// land on the user's subscription list.
+const DEVICE_STORE_SUBSCRIPTIONS_URL =
   Platform.OS === 'android'
     ? 'https://play.google.com/store/account/subscriptions'
     : 'https://apps.apple.com/account/subscriptions'
@@ -513,7 +514,7 @@ export default function Settings() {
     return [...APPS].sort((a, b) => rank(a.id) - rank(b.id))
   }, [appOrder])
   const { profile, signOut } = useAuth()
-  const { isPlus, restore, isTrial, trialDaysLeft, trialExpired } = usePlus()
+  const { isPlus, restore, isTrial, trialDaysLeft, trialExpired, managementUrl } = usePlus()
   const { t, lang, setLang } = useI18n()
   const [pushMsg, setPushMsg] = useState<TKey | null>(null)
   const [pushOn, setPushOn] = useState<boolean | null>(null)
@@ -774,7 +775,11 @@ export default function Settings() {
             <Btn
               title={t('settings.manageSubscription')}
               variant="secondary"
-              onPress={() => Linking.openURL(STORE_SUBSCRIPTIONS_URL)}
+              // RevenueCat's managementUrl points at the store that SOLD this
+              // subscription, which is the only correct answer once the app is
+              // on two stores — subscribe on an iPhone, open the Android app,
+              // and the device's own store lists nothing to manage.
+              onPress={() => Linking.openURL(managementUrl ?? DEVICE_STORE_SUBSCRIPTIONS_URL)}
             />
           ) : (
             <>

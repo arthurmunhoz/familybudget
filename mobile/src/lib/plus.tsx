@@ -48,6 +48,13 @@ interface PlusState {
    *  upsell may honestly say "your trial ended". False for someone who never had
    *  one, which is why this comes from the server rather than `!isPlus`. */
   trialExpired: boolean
+  /** Where "Manage subscription" should go, from RevenueCat: the store that
+   *  actually SOLD the active subscription, not the one this device happens to
+   *  run. A household that subscribed on an iPhone and then opens the Android
+   *  app has to be sent to Apple, or they land on a Play page listing nothing.
+   *  Null when there's no active store subscription (free, or on the signup
+   *  trial, which we grant ourselves) — callers fall back to the device store. */
+  managementUrl: string | null
   loading: boolean
   /** Buy a package. Returns true if Plus is now active, false if the user cancelled. */
   purchase: (pkg: PurchasesPackage) => Promise<boolean>
@@ -237,6 +244,7 @@ export function PlusProvider({ children }: { children: ReactNode }) {
     isTrial: onTrial,
     trialDaysLeft: onTrial ? daysUntil(trialEndsAt) : null,
     trialExpired: trialExpired && !plus,
+    managementUrl: info?.managementURL ?? null,
     loading,
     purchase,
     restore,

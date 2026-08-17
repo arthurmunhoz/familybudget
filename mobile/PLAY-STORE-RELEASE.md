@@ -341,14 +341,44 @@ Answer honestly on encryption in transit (yes) and deletion (yes — in-app, §3
 The Anthropic one is the item people forget; a photo leaving the device for
 processing is data sharing even though it isn't retained for training.
 
-### 3.3 App access
+### 3.3 App access ← the credentials you give Apple do NOT work here
 
-The app is fully behind sign-in. Because signup is open — a reviewer can sign in
-with any Google account and `create_household` puts them straight into a working
-household — you can plausibly declare "all functionality available without special
-access". Safer is to provide reviewer instructions plus a test account. Note that
-`devSignIn` (email/password) is `__DEV__`-gated and **won't exist in the production
-build**, so don't promise credentials that only work in dev.
+The app is fully behind sign-in, and the production build offers exactly two
+ways in: **Sign in with Apple** (iOS only) and **Continue with Google**. The
+email/password path (`devSignIn` in `src/lib/auth.tsx`, wired to
+`EXPO_PUBLIC_DEV_EMAIL`/`_PASSWORD`) is `__DEV__`-gated in
+`src/components/Login.tsx` and **does not exist in a release build**.
+
+So the App Store demo account — a Supabase email/password login like
+`preview@oneroof.dev` — is **useless to a Play reviewer**: it isn't a Google
+account, so it can't go through "Continue with Google", and the form it was made
+for isn't in the build they get. Handing it to Play is a rejection.
+
+Pick one before you fill in the App access form:
+
+1. **Create a real Google account for review** (recommended). Any free Gmail,
+   e.g. `oneroof.review@gmail.com`. Sign into it once on a device, let
+   onboarding create a household, and seed that household with a couple of
+   members, a budget, a pet and a place so the reviewer sees a working app
+   rather than an empty one — this matters most for §3.1, where they have to
+   watch background location actually do something. Then give Play the address
+   and password under App access. No code change, and it uses the same path a
+   real user takes.
+2. **Ship email/password sign-in for everyone** — ungate `devSignIn` into a
+   proper "Sign in with email" option. That's a product decision (password
+   reset, account recovery, support load), not a review workaround, and it's a
+   bigger change than the review needs.
+3. **Declare "no special access required"** — technically true, since signup is
+   open and any Google account lands in a fresh household via
+   `create_household`. Weakest option: the reviewer sees an empty household with
+   no other members, which makes the family-location feature they're scrutinising
+   look like it does nothing.
+
+Google sign-in itself needs nothing extra on Android: `signInWithGoogle` runs
+Supabase's own OAuth in a browser tab (`WebBrowser.openAuthSessionAsync`) and
+returns via the `oneroof://` scheme, so there's no native Google client ID or
+SHA-1 fingerprint to register. Do confirm `oneroof://auth-callback` is in
+Supabase Auth → URL Configuration → Redirect URLs before the reviewer tries it.
 
 Anything gated behind Plus won't be reachable by a reviewer on Android until §1.5
 lands — mention that in the notes rather than letting them find a dead end.
