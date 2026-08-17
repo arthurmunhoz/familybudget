@@ -23,6 +23,11 @@ async function sendExpoPush(
     /** 'high' asks APNs to deliver immediately rather than batching for power —
      *  used for high-priority nudges, which are the whole point of the flag. */
     priority?: 'default' | 'normal' | 'high'
+    /** ANDROID ONLY, and the Android half of `priority`: importance lives on the
+     *  channel, not the message, so an urgent nudge must be routed to the
+     *  MAX-importance channel or it arrives with no heads-up and no sound.
+     *  Ignored by APNs. Must match ANDROID_CHANNEL in mobile/src/lib/notifications.ts. */
+    channelId?: 'default' | 'urgent'
   }[],
 ): Promise<number> {
   const valid = messages.filter(
@@ -157,6 +162,7 @@ export default async function handler(req: any, res: any) {
         body,
         data: { url: '/location' },
         sound: 'default' as const,
+        channelId: 'default' as const,
       })),
     )
     return res.status(200).json({ ok: true, sent: placeSent, expoSent: placeExpoSent })
@@ -281,7 +287,9 @@ export default async function handler(req: any, res: any) {
       body: ping.message,
       data: { url: '/pings', tel },
       sound: 'default' as const,
-      ...(ping.high_priority === true ? { priority: 'high' as const } : {}),
+      ...(ping.high_priority === true
+        ? { priority: 'high' as const, channelId: 'urgent' as const }
+        : { channelId: 'default' as const }),
     })),
   )
 

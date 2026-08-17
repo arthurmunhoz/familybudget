@@ -42,6 +42,10 @@ example
 /ios
 /android
 
+# Firebase config for Android push (FCM). Per-project config, supplied to EAS
+# rather than committed; app.config.js attaches it only when present.
+google-services.json
+
 # @bacons/apple-targets output (generated from targets/*/expo-target.config.js
 # at prebuild — the hand-written .swift/config files are committed, these aren't)
 targets/**/Assets.xcassets/

@@ -725,6 +725,31 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx pod-install       # if you used --no-ins
   isn't UTF-8.
 - Then build: `npx expo run:ios`, or open `ios/OneRoof.xcworkspace` in Xcode.
 
+## Android push (channels + FCM) — read before touching notifications
+Android delivery differs from iOS in three ways that are easy to break silently.
+Full Play-release context in `PLAY-STORE-RELEASE.md`.
+- **Importance lives on the CHANNEL, not the message.** `ensureAndroidChannels()`
+  in `lib/notifications.ts` creates `default` (DEFAULT importance) and `urgent`
+  (MAX + vibration). A high-priority nudge sent into `default` arrives with no
+  heads-up and no sound — the `high_priority` flag becomes cosmetic.
+- **Channel ids are a CROSS-REPO CONTRACT.** `ANDROID_CHANNEL` here, the
+  `channelId` unions in `api/send-ping.ts` + `api/send-digest.ts`, and
+  `defaultChannel` in `app.json` must all agree. Renaming one silently dumps
+  pushes into an OS-named channel the user can't find in Settings.
+- **`ensureAndroidChannels()` must run BEFORE `requestPermissionsAsync` AND before
+  every `getExpoPushTokenAsync`.** On Android 13+ the OS permission prompt does not
+  appear until a channel exists, so the wrong order means the user is never asked.
+  All three token call sites already do this — keep it that way if you add a fourth.
+- **The notification icon must be a 96×96 all-white PNG with transparency**
+  (`assets/images/notification-icon.png`, shared shape with the PWA's
+  `public/roof-badge-96.png`). Android draws small icons as a silhouette from the
+  alpha channel, so pointing the plugin at the full-colour `icon.png` renders a
+  solid white square. This was a real shipped-config bug; don't reintroduce it.
+- **FCM is conditional.** `app.config.js` sets `android.googleServicesFile` only if
+  `mobile/google-services.json` exists (gitignored). Setting it unconditionally
+  breaks `prebuild`/EAS for everyone without the file. Without FCM credentials
+  uploaded to EAS, Android push is dead — every push feature, not just nudges.
+
 ## i18n Rule
 All user-facing strings (labels, titles, placeholders, button text, alerts, error messages) **must** be
 translated via `t()` keys. **Exception:** the app name "One Roof" only. No hardcoded English.

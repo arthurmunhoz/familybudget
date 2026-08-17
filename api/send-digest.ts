@@ -27,6 +27,11 @@ type ExpoMessage = {
   body: string
   data?: Record<string, unknown>
   sound?: 'default'
+  /** ANDROID ONLY: routes the notification to a channel we created on the device.
+   *  Without it Android drops the digest into an OS-named default channel the
+   *  user can't recognise in Settings. Must match ANDROID_CHANNEL in
+   *  mobile/src/lib/notifications.ts. */
+  channelId?: 'default' | 'urgent'
 }
 
 // Best-effort Expo (native) push, sent alongside web-push. Errors swallowed so
@@ -330,7 +335,14 @@ export default async function handler(req: any, res: any) {
     // Native (Expo) push
     const expoMsgs: ExpoMessage[] = (expoByHousehold.get(householdId) ?? []).map((t) => {
       const { title, body } = build(t.user_email)
-      return { to: t.token, title, body, data: { url: link }, sound: 'default' as const }
+      return {
+        to: t.token,
+        title,
+        body,
+        data: { url: link },
+        sound: 'default' as const,
+        channelId: 'default' as const,
+      }
     })
     expoSent += await sendExpoPush(expoMsgs)
   }

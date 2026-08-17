@@ -34,75 +34,83 @@ the tester list so you can add people without a new release.
 
 ## 1. Must-fix in the app before submitting
 
-These are real defects or blockers on Android, verified in the current tree.
+These were real defects or blockers on Android, verified in the tree. **All four
+are now DONE in code** — what remains is the console work called out in §1.1.
 
-### 1.1 FCM credentials — without this, zero push notifications
+### 1.1 FCM credentials — without this, zero push notifications ✅ code done / ⚠️ console work remains
 
-There is no `google-services.json` in `mobile/` and no `android.googleServicesFile`
-key in `app.json`. Android push goes through Firebase Cloud Messaging; Expo's push
-service can't deliver to Android without FCM V1 credentials. Everything push-driven
-dies silently: Nudges fan-out (`api/send-ping.ts`), the daily digest
+Android push goes through Firebase Cloud Messaging; Expo's push service can't
+deliver to Android without FCM V1 credentials. Everything push-driven dies
+silently otherwise: Nudges fan-out (`api/send-ping.ts`), the daily digest
 (`api/send-digest.ts`), ack pushes and Whereabouts live-wake (`api/ack-ping.ts`).
 
-Steps:
+`app.config.js` now attaches `android.googleServicesFile` **only when
+`mobile/google-services.json` exists**. Setting it unconditionally would make
+`expo prebuild` and EAS fail on the missing file, so it self-wires: drop the file
+in and Android push works; leave it out and iOS builds are unaffected. The file is
+gitignored, so EAS needs it supplied.
+
+**Still yours to do (needs your Google account):**
 1. Firebase console → new project (or reuse) → add an **Android** app with package
    `com.oneroof.app`.
-2. Download `google-services.json` into `mobile/`, add `"googleServicesFile":
-   "./google-services.json"` under `android` in `app.json`. Git-ignore it if you'd
-   rather not commit it, but EAS needs it at build time.
+2. Download `google-services.json` into `mobile/`.
 3. Firebase → Project settings → Service accounts → generate a private key, then
    upload it to Expo: `eas credentials` → Android → *FCM V1 service account key*.
 
 No server change needed — `exp.host/--/api/v2/push/send` handles both platforms
-off the same Expo token, and `push_subscriptions` / the expo-token table are
-already platform-agnostic.
+off the same Expo token, and the expo-token table is already platform-agnostic.
 
-### 1.2 The notification icon will render as a solid white square
+### 1.2 Notification icon rendered as a solid white square ✅ done
 
 Verified via `npx expo config --type introspect`: the manifest points
 `expo.modules.notifications.default_notification_icon` and
 `com.google.firebase.messaging.default_notification_icon` at
-`@drawable/notification_icon`, generated from the `expo-notifications` plugin's
-`icon: "./assets/images/icon.png"` in `app.json`.
+`@drawable/notification_icon`, which was generated from
+`icon: "./assets/images/icon.png"`. That file measured **100% opaque with 1431
+distinct colours** — and Android draws notification small icons as a **silhouette
+from the alpha channel**, so it would have rendered as a plain white square.
 
-`assets/images/icon.png` is a **1024×1024 full-colour RGBA** image with an opaque
-background. Android draws notification small icons as a **silhouette from the
-alpha channel** — an opaque square becomes a white square in the status bar and
-notification shade.
+Expo 56's docs require "96x96 all-white png with transparency". `public/roof-badge-96.png`
+— the glyph the PWA already uses for exactly this purpose — measured 96×96, pure
+`(255,255,255)`, 23% alpha coverage: already precisely the required format. Copied
+to `assets/images/notification-icon.png` and the plugin now points at it, so both
+clients share one canonical badge shape. `color: "#c2603f"` was already correct and
+now has real alpha to tint.
 
-The web PWA already solved exactly this (`public/roof-badge-96.png`, and
-`CLAUDE.md` documents why). Do the same here: add a monochrome, transparent-
-background roof glyph (e.g. `assets/images/notification-icon.png`, 96×96, white
-glyph on transparent) and point the plugin at it. `color: "#c2603f"` is already
-wired correctly (`@color/notification_icon_color`), so the tint will work once the
-glyph has real alpha.
+### 1.3 No Android notification channels ✅ done
 
-### 1.3 No Android notification channels — high-priority Nudges won't be urgent
+`setNotificationChannelAsync` appeared nowhere in `src/`. On Android **importance is
+a property of the channel, not the message**, so a `high_priority` Nudge arrived at
+default importance — no heads-up banner, no sound override — silently defeating the
+one feature where urgency is the entire point.
 
-`grep -rn "setNotificationChannelAsync" src` returns nothing. On Android every
-notification lands in a channel, and **importance is a property of the channel,
-not the message** — so a `high_priority` Nudge (the red, forced-to-everyone,
-Call-CTA one) arrives at default importance: no heads-up banner, no sound
-override. That silently breaks the one feature where urgency is the whole point.
+Expo 56's docs also revealed a **second, worse bug**: on Android 13+ the OS
+permission prompt does not appear until at least one channel exists, and
+`getExpoPushTokenAsync` requires one. So the old order (request permission → get
+token) meant an Android user was **never even asked** for notification permission.
 
-Create the channels at startup (alongside the existing permission request in
-`src/lib/notifications.ts`) — at minimum a default channel and an `urgent` channel
-with `AndroidImportance.MAX` — then pass `channelId` on the push payload from
-`api/send-ping.ts`, which already knows whether the ping is urgent (it sets the
-`urgent` flag today). Mirror the same for the digest.
+`src/lib/notifications.ts` now exports `ensureAndroidChannels()`, creating a
+`default` channel (DEFAULT importance) and an `urgent` one (MAX importance +
+vibration), called **before** the permission request and before all three
+`getExpoPushTokenAsync` call sites. `api/send-ping.ts` routes high-priority nudges
+to `urgent` and everything else to `default`; `api/send-digest.ts` uses `default`.
 
-### 1.4 Drop the microphone permission
+> **Cross-repo contract:** the channel id strings are shared between
+> `ANDROID_CHANNEL` in `mobile/src/lib/notifications.ts`, the `channelId` unions in
+> `api/send-ping.ts` + `api/send-digest.ts`, and `defaultChannel` in `app.json`.
+> Renaming one without the others silently drops pushes into an OS-named channel.
 
-`app.json` declares `android.permission.RECORD_AUDIO`, and `expo-image-picker`'s
-plugin adds it again unless told not to. Nothing in `src/` records audio —
-`grep -rn "RECORD_AUDIO\|expo-av\|expo-audio\|recordAsync" src` is empty. Microphone
-is a sensitive permission; shipping one you don't use invites a review question at
-best and a rejection at worst.
+### 1.4 Microphone permission dropped ✅ done
 
-Two changes, both needed (the plugin re-adds it otherwise):
-- remove `"android.permission.RECORD_AUDIO"` from `app.json` → `android.permissions`
-- pass `microphonePermission: false` to the `expo-image-picker` plugin — that path
-  calls `withBlockedPermissions`, which actively blocks any package from merging it in
+`app.json` declared `android.permission.RECORD_AUDIO` and `expo-image-picker`'s
+plugin re-added it. Nothing in `src/` records audio. Microphone is a sensitive
+permission; shipping an unused one invites a review question at best.
+
+Removed from `android.permissions`, plus `microphonePermission: false` on the
+`expo-image-picker` plugin — that path calls `withBlockedPermissions`, so the
+introspected manifest now carries `RECORD_AUDIO` with `tools:node="remove"`,
+actively preventing **any** library from merging it back in. Verified in the
+resolved config.
 
 ### 1.5 Plus purchasing has no Android path
 

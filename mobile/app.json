@@ -41,8 +41,7 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {
@@ -75,7 +74,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Attach photos for receipts, pets, profiles and documents.",
-          "cameraPermission": "Take photos to scan receipts and bills, capture documents, and add pet and profile photos."
+          "cameraPermission": "Take photos to scan receipts and bills, capture documents, and add pet and profile photos.",
+          "microphonePermission": false
         }
       ],
       [
@@ -87,8 +87,9 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#c2603f"
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#c2603f",
+          "defaultChannel": "default"
         }
       ],
       [

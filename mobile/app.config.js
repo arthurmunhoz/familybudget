@@ -10,6 +10,22 @@
 //     map + Directions call (see src/lib/location.ts, src/apps/location).
 // None of this takes effect until a native rebuild (`npx expo prebuild` or an
 // EAS dev build). See mobile/WHEREABOUTS-SETUP.md.
+//
+// It also wires FCM for Android push, but only if google-services.json is
+// actually present — see the comment on googleServicesFile below.
+const fs = require('node:fs')
+const path = require('node:path')
+
+// Android push (Nudges, the daily digest, ack + live-wake silent pushes) is
+// delivered by FCM, which needs this Firebase config file in the build. Setting
+// the key unconditionally would make `expo prebuild`/EAS FAIL on a missing file,
+// so it's attached only when the file exists: drop it in and Android push wires
+// itself up; leave it out and iOS builds carry on unaffected. The file is
+// gitignored (it's per-Firebase-project config, not a secret but not ours to
+// commit), so CI/EAS needs it supplied — see PLAY-STORE-RELEASE.md §1.1.
+const GOOGLE_SERVICES = path.join(__dirname, 'google-services.json')
+const googleServicesFile = fs.existsSync(GOOGLE_SERVICES) ? './google-services.json' : undefined
+
 module.exports = ({ config }) => {
   const ios = config.ios ?? {}
   const android = config.android ?? {}
@@ -41,6 +57,7 @@ module.exports = ({ config }) => {
     },
     android: {
       ...android,
+      ...(googleServicesFile ? { googleServicesFile } : {}),
       permissions: Array.from(
         new Set([
           ...(android.permissions ?? []),
