@@ -752,6 +752,12 @@ export const pt: Record<keyof typeof en, string> = {
   'settings.plus': 'One Roof Plus',
   'settings.plusActive': 'Ativo · toda a sua casa',
   'settings.active': 'ATIVO',
+  // Teste de cadastro (migração 084). `count` escolhe o plural após o `|`.
+  'settings.trial': 'TESTE',
+  'settings.trialDaysLeft': 'Falta {count} dia de teste grátis|Faltam {count} dias de teste grátis',
+  'settings.trialEndsToday': 'Seu teste grátis termina hoje',
+  'settings.trialEnded': 'Seu teste grátis terminou. Assine para ter isso de volta:',
+  'settings.keepPlus': 'Manter o One Roof Plus',
   'settings.plusFeatureScans': 'Leituras de recibos e contas com IA ilimitadas',
   'settings.plusFeatureVault': 'Bloqueio Face ID para o cofre de documentos',
   'settings.plusFeatureCalendar': 'Sincronização bidirecional com Google e Apple Calendar',
@@ -768,6 +774,10 @@ export const pt: Record<keyof typeof en, string> = {
   // Paywall
   'paywall.subtitle': 'Uma assinatura para a casa toda.',
   'paywall.alreadyPlus': 'Você tem o One Roof Plus ✓',
+  'paywall.trialDaysLeft': 'Falta {count} dia de teste grátis|Faltam {count} dias de teste grátis',
+  'paywall.trialEndsToday': 'Seu teste grátis termina hoje',
+  'paywall.trialThenFree':
+    'Depois sua casa continua no plano grátis — nada é apagado e todos mantêm a conta.',
   'paywall.unavailable': 'As compras no app não estão disponíveis nesta versão.',
   'paywall.loadingPlans': 'Carregando planos…',
   'paywall.noPlans': 'Os planos ainda não estão prontos. Volte em breve.',

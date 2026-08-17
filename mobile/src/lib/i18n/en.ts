@@ -753,6 +753,12 @@ export const en = {
   'settings.plus': 'One Roof Plus',
   'settings.plusActive': 'Active · your whole household',
   'settings.active': 'ACTIVE',
+  // Signup trial (migration 084). `count` picks the plural across the `|`.
+  'settings.trial': 'TRIAL',
+  'settings.trialDaysLeft': '{count} day left in your free trial|{count} days left in your free trial',
+  'settings.trialEndsToday': 'Your free trial ends today',
+  'settings.trialEnded': 'Your free trial has ended. Subscribe to get these back:',
+  'settings.keepPlus': 'Keep One Roof Plus',
   'settings.plusFeatureScans': 'Unlimited AI receipt & bill scans',
   'settings.plusFeatureVault': 'Face ID lock for the Document Vault',
   'settings.plusFeatureCalendar': 'Google & Apple Calendar two-way sync',
@@ -769,6 +775,10 @@ export const en = {
   // Paywall
   'paywall.subtitle': 'One subscription for your whole household.',
   'paywall.alreadyPlus': "You're on One Roof Plus ✓",
+  'paywall.trialDaysLeft': '{count} day left in your free trial|{count} days left in your free trial',
+  'paywall.trialEndsToday': 'Your free trial ends today',
+  'paywall.trialThenFree':
+    'After that your household stays on the free plan — nothing is deleted, and everyone keeps their account.',
   'paywall.unavailable': "In-app purchases aren't available in this build.",
   'paywall.loadingPlans': 'Loading plans…',
   'paywall.noPlans': "Plans aren't set up yet. Please check back soon.",

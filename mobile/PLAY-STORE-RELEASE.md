@@ -112,7 +112,63 @@ introspected manifest now carries `RECORD_AUDIO` with `tools:node="remove"`,
 actively preventing **any** library from merging it back in. Verified in the
 resolved config.
 
-### 1.5 Plus purchasing has no Android path
+### 1.4b The 30-day trial (migration 084) ✅ code done
+
+Every **newly created** household now gets 30 days of Plus with no card, granted by
+`create_household()`. Deliberately not retroactive — existing households, including
+paying iOS users, are untouched.
+
+It needed no new gating code: `household_is_plus()` already treats `expires_at` as
+the guard, so the trial row (`plan='plus'`, `product='trial'`) opens every existing
+gate and closes it on lapse. Verified against the live DB in a rolled-back
+transaction: active trial → `household_is_plus` true; expired trial → false and the
+member cap computes back to 4; and a purchase upsert cleanly replaces the trial row.
+
+Because migration 059's trigger only fires on INSERT, a household that grew to 8
+members during the trial **keeps all 8** after it lapses — it just can't add a 9th.
+Nobody is ever removed.
+
+`current_household_plan()` additively reports `trial_ends_at` and `trial_expired`,
+which the client turns into `isTrial` / `trialDaysLeft` / `trialExpired`
+(`src/lib/plus.tsx`). Two subtleties worth preserving if you touch it:
+- A live RevenueCat entitlement **suppresses** the trial framing, because right
+  after a mid-trial purchase the DB row still says `trial` until the webhook lands,
+  and telling someone who just paid that their trial expires in 12 days reads as a
+  failed payment.
+- `trialExpired` is server-sourced rather than inferred from `!isPlus`, so "your
+  trial ended" can never be shown to someone who never had one.
+
+**Testing the countdown and the lapse:** `admin_start_trial(household, days)` re-arms
+a trial on an existing household (admin only). Pass a negative number to simulate a
+lapse — e.g. `select public.admin_start_trial('<household-uuid>', -1);`. It refuses
+to overwrite a real purchase, so it can't resurrect a lapsed paid plan.
+
+### 1.5 Plus purchasing has no Android path ✅ code done / ⚠️ console work remains
+
+`src/lib/purchases.ts` now picks the store key by platform
+(`EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` on Android, iOS key on iOS) instead of
+returning early off iOS. With no key for the running platform it still degrades to
+"free, paywall unavailable" rather than crashing.
+
+Also fixed in passing: Settings' "Manage subscription" was hardcoded to
+`apps.apple.com`, which on Android opens a page the user has no account on. It's
+now per-platform (`STORE_SUBSCRIPTIONS_URL`), and a trial shows "Keep One Roof Plus"
+→ paywall instead, since a server-granted trial has no store subscription to manage.
+
+**Still yours to do:**
+1. Play Console → create the subscription products (monthly + annual, matching the
+   product ids you'll map in RevenueCat).
+2. RevenueCat → add a Play Store app, upload a Google Cloud service-account JSON
+   with Play Developer API access, map the products to the `plus` entitlement.
+3. `eas secret:create --name EXPO_PUBLIC_REVENUECAT_ANDROID_KEY --value <key>`
+   (same pattern as the iOS key — not committed to `eas.json`).
+
+> **Purchases cannot be tested on a sideloaded APK.** Google Play Billing only
+> talks to a build Play itself recognises — matching package name *and* signature.
+> On a sideloaded build the SDK configures fine but `getOfferings()` returns
+> nothing, so the paywall correctly reads "unavailable". Real purchase testing
+> needs the AAB on an internal-testing track plus a license-tested account.
+> The **trial** needs none of that and tests fine on a sideloaded APK.
 
 `src/lib/purchases.ts` hard-returns off iOS:
 
@@ -295,6 +351,33 @@ work. Everything else is an edit of existing copy.
 
 ---
 
+## 4b. Getting it onto your own Android phone today
+
+This is the fastest loop and needs no Play upload. The `preview` profile is
+`distribution: internal`, which builds an **APK** you can install directly:
+
+```bash
+cd mobile && eas build --platform android --profile preview
+```
+
+EAS prints a QR code / URL when it finishes — open it on the phone and install
+(you'll need "install unknown apps" allowed for your browser). First Android build
+also prompts to generate a keystore; let EAS manage it.
+
+What works and what doesn't on that sideloaded build:
+
+| | Works? |
+|---|---|
+| Sign in with Google, all six apps, the 30-day trial + countdown | ✅ |
+| Push notifications (nudges, digest, urgent channel) | only after `google-services.json` + the FCM key are in place (§1.1) |
+| Buying Plus | ❌ — needs an internal-testing track, see the note in §1.5 |
+| Mapbox map | ✅ if `EXPO_PUBLIC_MAPBOX_TOKEN` is an EAS secret |
+
+**To see the trial**, sign in with a Google account that has no household — a fresh
+account lands on Onboarding, and `create_household()` grants the 30 days. Signing in
+as your existing account puts you in a household that predates the migration and has
+no trial; use `admin_start_trial()` (§1.4b) to arm one there instead.
+
 ## 5. Build and submit
 
 ```bash
@@ -337,7 +420,10 @@ Not blockers; they're parity gaps you should know about before someone reports t
 - **No Apple Calendar sync** (`isAppleCalendarAvailable` is iOS-gated). Google
   Calendar sync works and is the relevant one on Android — but it's Plus-gated, so
   it's unreachable until §1.5 lands.
-- **Plus is unreachable** until §1.5 — see the member-cap note there.
+- **Plus is unreachable until the Play products exist** (§1.5). The 30-day trial
+  covers new households in the meantime, but a household whose trial lapses before
+  billing is live has no way to pay — so finish §1.5 before the first closed
+  testers hit day 30.
 - **`ACTIVITY_RECOGNITION`** may be requested by `expo-location` on Android. If it
   shows up in the merged manifest and you don't need it, block it rather than
   explaining it on a form.

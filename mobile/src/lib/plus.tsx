@@ -2,7 +2,7 @@
 // household (so Plus is shared across members), and exposes the current plan +
 // purchase/restore. Gating screens use usePlus().isPlus; the paywall uses the
 // offering + purchase(). Everything degrades gracefully to "free" when the SDK
-// isn't configured (no key / not a native iOS build), so the app never blocks.
+// isn't configured (no store key for this platform), so the app never blocks.
 import {
   createContext,
   useCallback,
@@ -34,8 +34,20 @@ interface PlusState {
   isFree: boolean
   /** The current RevenueCat offering (plans to show on the paywall), or null. */
   offering: PurchasesOffering | null
-  /** RevenueCat is configured (key present, real iOS build) — the paywall can sell. */
+  /** RevenueCat is configured (store key present, real build) — the paywall can sell. */
   available: boolean
+  /** This household's Plus comes from the free 30-day signup trial, not a purchase
+   *  (migration 084). `isPlus` is true either way — this only drives honest copy:
+   *  a countdown instead of "you're subscribed". Never gate a feature on it. */
+  isTrial: boolean
+  /** Whole days left on the trial (0 = under 24h, i.e. "ends today"), null when
+   *  not on trial. Because it's floored, a 30-day trial reads "29 days left" for
+   *  its first day — deliberate: overstating is worse than a day of understating. */
+  trialDaysLeft: number | null
+  /** The household HAD a trial, it lapsed, and no purchase replaced it — so an
+   *  upsell may honestly say "your trial ended". False for someone who never had
+   *  one, which is why this comes from the server rather than `!isPlus`. */
+  trialExpired: boolean
   loading: boolean
   /** Buy a package. Returns true if Plus is now active, false if the user cancelled. */
   purchase: (pkg: PurchasesPackage) => Promise<boolean>
@@ -52,8 +64,26 @@ export const memberLimit = (isPlus: boolean) => (isPlus ? MEMBER_LIMIT_PLUS : ME
 
 const Ctx = createContext<PlusState | null>(null)
 
-/** Shape of the current_household_plan() RPC (migration 060). */
-type PlanSignal = { plus?: boolean; admin_free?: boolean }
+/** Shape of the current_household_plan() RPC (migration 060, extended by 084). */
+type PlanSignal = {
+  plus?: boolean
+  admin_free?: boolean
+  /** ISO timestamp of an ACTIVE signup trial's expiry, else null/absent. */
+  trial_ends_at?: string | null
+  trial_expired?: boolean
+}
+
+/** WHOLE days remaining until `iso` — floored, so under 24h left gives 0, which the
+ *  UI renders as "ends today". Rounding UP instead would make 0 unreachable (any
+ *  remaining time becomes ≥1) and would overstate: 36h left would read "2 days".
+ *  Null for absent/unparseable input; never negative (an already-lapsed trial is
+ *  reported by `trial_expired`, not by a negative count here). */
+function daysUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const ms = new Date(iso).getTime()
+  if (Number.isNaN(ms)) return null
+  return Math.max(0, Math.floor((ms - Date.now()) / 86_400_000))
+}
 
 export function PlusProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth()
@@ -68,6 +98,11 @@ export function PlusProvider({ children }: { children: ReactNode }) {
   // RevenueCat OR below so the "preview the Free experience" toggle can actually
   // turn Plus off even while the admin holds a real (sandbox) entitlement.
   const [adminFree, setAdminFree] = useState(false)
+  // Signup-trial state (migration 084). Held as the raw expiry rather than a day
+  // count so the countdown re-derives on every render — a day count frozen in
+  // state would go stale in an app left open overnight.
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null)
+  const [trialExpired, setTrialExpired] = useState(false)
 
   // Configure once, up front.
   useEffect(() => {
@@ -85,10 +120,14 @@ export function PlusProvider({ children }: { children: ReactNode }) {
         const p = data as PlanSignal
         setServerPlus(p.plus === true)
         setAdminFree(p.admin_free === true)
+        setTrialEndsAt(p.trial_ends_at ?? null)
+        setTrialExpired(p.trial_expired === true)
       })
     } else {
       setServerPlus(false)
       setAdminFree(false)
+      setTrialEndsAt(null)
+      setTrialExpired(false)
     }
 
     if (!purchasesReady()) {
@@ -135,6 +174,8 @@ export function PlusProvider({ children }: { children: ReactNode }) {
       const p = (data ?? {}) as PlanSignal
       setServerPlus(p.plus === true)
       setAdminFree(p.admin_free === true)
+      setTrialEndsAt(p.trial_ends_at ?? null)
+      setTrialExpired(p.trial_expired === true)
     }
     if (!purchasesReady()) return
     try {
@@ -182,11 +223,20 @@ export function PlusProvider({ children }: { children: ReactNode }) {
   // purchase immediacy — but NOT when an admin has forced Free for testing.
   const plus = serverPlus || (hasPlus(info) && !adminFree)
 
+  // Trial framing is suppressed by a LIVE RevenueCat entitlement, for the same
+  // reason `plus` ORs one in: right after a mid-trial purchase the DB row still
+  // says 'trial' until the webhook lands, and telling someone who just paid that
+  // their trial expires in 12 days reads as the payment having failed.
+  const onTrial = trialEndsAt !== null && !hasPlus(info)
+
   const value: PlusState = {
     isPlus: plus,
     isFree: !loading && !plus,
     offering,
     available: purchasesReady(),
+    isTrial: onTrial,
+    trialDaysLeft: onTrial ? daysUntil(trialEndsAt) : null,
+    trialExpired: trialExpired && !plus,
     loading,
     purchase,
     restore,

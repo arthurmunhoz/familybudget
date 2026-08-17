@@ -9,6 +9,7 @@ import {
   Animated,
   Easing,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -71,6 +72,15 @@ const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Lock, key: 'settings.plusFeaturePrivate' },
   { icon: FolderLock, key: 'settings.plusFeatureVault' },
 ]
+
+// Where "Manage subscription" goes. A paid plan is managed by the STORE that sold
+// it, and the Apple URL is a dead end on Android — it opens a browser page the
+// user has no account on. Play's deep link needs no package/sku to land on the
+// user's subscription list.
+const STORE_SUBSCRIPTIONS_URL =
+  Platform.OS === 'android'
+    ? 'https://play.google.com/store/account/subscriptions'
+    : 'https://apps.apple.com/account/subscriptions'
 
 // Warm golden tones for the Plus card confetti.
 const CONFETTI_GOLDS = ['#F4C95D', '#E7B24A', '#D99E3B', '#F8DE93']
@@ -503,7 +513,7 @@ export default function Settings() {
     return [...APPS].sort((a, b) => rank(a.id) - rank(b.id))
   }, [appOrder])
   const { profile, signOut } = useAuth()
-  const { isPlus, restore } = usePlus()
+  const { isPlus, restore, isTrial, trialDaysLeft, trialExpired } = usePlus()
   const { t, lang, setLang } = useI18n()
   const [pushMsg, setPushMsg] = useState<TKey | null>(null)
   const [pushOn, setPushOn] = useState<boolean | null>(null)
@@ -716,9 +726,21 @@ export default function Settings() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>{t('settings.plus')}</Txt>
-                  <Txt variant="faint">{t('settings.plusActive')}</Txt>
+                  {/* On the signup trial everything below is unlocked, but saying
+                      "active" would imply a subscription they don't have — show
+                      what's actually true: how long is left. */}
+                  <Txt variant="faint">
+                    {isTrial
+                      ? trialDaysLeft === 0
+                        ? t('settings.trialEndsToday')
+                        : t('settings.trialDaysLeft', { count: trialDaysLeft ?? 0 })
+                      : t('settings.plusActive')}
+                  </Txt>
                 </View>
-                <StatusPill on label={t('settings.active')} />
+                <StatusPill
+                  on
+                  label={isTrial ? t('settings.trial') : t('settings.active')}
+                />
               </View>
               <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
               <View style={{ gap: sp.sm }}>
@@ -729,7 +751,13 @@ export default function Settings() {
             </Card>
           ) : (
             <Card style={{ gap: sp.md }}>
-              <Txt variant="muted">{t('settings.plusUnlock')}</Txt>
+              {/* Someone whose 30-day trial lapsed has ALREADY seen these features
+                  — pitching them as new reads as if the app forgot. `trialExpired`
+                  is server-sourced so this never shows to someone who never had a
+                  trial (which a bare `!isPlus` could not distinguish). */}
+              <Txt variant="muted">
+                {trialExpired ? t('settings.trialEnded') : t('settings.plusUnlock')}
+              </Txt>
               <View style={{ gap: sp.sm }}>
                 {PLUS_FEATURES.map((f) => (
                   <FeatureRow key={f.key} icon={f.icon} label={t(f.key)} />
@@ -738,11 +766,15 @@ export default function Settings() {
             </Card>
           )}
 
-          {isPlus ? (
+          {isPlus && isTrial ? (
+            // A trial is granted by our own server, so there is no store
+            // subscription to "manage" — the useful action is to convert.
+            <Btn title={t('settings.keepPlus')} onPress={() => router.push('/paywall')} />
+          ) : isPlus ? (
             <Btn
               title={t('settings.manageSubscription')}
               variant="secondary"
-              onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
+              onPress={() => Linking.openURL(STORE_SUBSCRIPTIONS_URL)}
             />
           ) : (
             <>

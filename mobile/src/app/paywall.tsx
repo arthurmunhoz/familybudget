@@ -59,7 +59,8 @@ export default function Paywall() {
   const { c, dark } = useTheme()
   const { scheme } = useSchemePref()
   const { t } = useI18n()
-  const { offering, isPlus, available, loading, purchase, restore } = usePlus()
+  const { offering, isPlus, available, loading, purchase, restore, isTrial, trialDaysLeft } =
+    usePlus()
   const packages = offering?.availablePackages ?? []
   // Default-select the annual plan (best value) if present, else the first.
   const [selected, setSelected] = useState<string | null>(null)
@@ -146,7 +147,24 @@ export default function Paywall() {
           ))}
         </Card>
 
-        {isPlus ? (
+        {/* A trial user IS isPlus, so a bare `isPlus` check would show them
+            "you already have Plus" and hide the plans — leaving the Settings
+            "Keep One Roof Plus" button pointing at a dead end. They need to see
+            what happens when the trial ends, and be able to buy. */}
+        {isTrial ? (
+          <Card>
+            <Txt style={{ fontWeight: '700', textAlign: 'center' }}>
+              {trialDaysLeft === 0
+                ? t('paywall.trialEndsToday')
+                : t('paywall.trialDaysLeft', { count: trialDaysLeft ?? 0 })}
+            </Txt>
+            <Txt variant="muted" style={{ textAlign: 'center' }}>
+              {t('paywall.trialThenFree')}
+            </Txt>
+          </Card>
+        ) : null}
+
+        {isPlus && !isTrial ? (
           <Card>
             <Txt style={{ fontWeight: '700', color: c.income, textAlign: 'center' }}>
               {t('paywall.alreadyPlus')}
