@@ -355,11 +355,15 @@ lands — mention that in the notes rather than letting them find a dead end.
 
 ### 3.4 Account deletion URL
 
-In-app deletion exists (§2). Play *additionally* requires a **web-accessible URL**
-where a user who has already uninstalled can request account and data deletion.
-`public/privacy.html` describes in-app deletion but that isn't the same thing. Add a
-clearly-labelled deletion section (with a contact route) to `public/support.html`
-or `privacy.html` and give Play that URL.
+✅ Done. In-app deletion already existed (§2); Play *additionally* requires a
+**web-accessible URL** where someone who has already uninstalled can request
+account and data deletion. `public/support.html` now carries an anchored section
+covering both routes — the in-app path and an email request for uninstalled users.
+
+Give Play this URL:
+`https://one-roof-app.vercel.app/support.html#delete-account`
+
+⚠️ It only goes live on the next `npx vercel deploy --prod`.
 
 ### 3.5 The remaining "App content" declarations
 
