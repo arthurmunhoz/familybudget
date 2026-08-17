@@ -1,7 +1,7 @@
 // Shared UI primitives for the One Roof RN app — themed Screen, header, card,
 // button, text, and text field. Every module screen builds from these so the
 // "Warm Hearth" look stays consistent.
-import { type ReactNode, type Ref } from 'react'
+import { useRef, type ReactNode, type Ref } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -24,6 +24,7 @@ import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 import { pickOn } from '../theme/contrast'
+import { useRevealOnFocus } from './KeyboardScroll'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
 
@@ -240,13 +241,22 @@ export function Btn({
 export function Field({
   label,
   style,
+  onFocus,
   ...rest
 }: TextInputProps & { label?: string }) {
   const { c } = useTheme()
+  // Inside a <KeyboardScroll>, focusing scrolls this row into view above the
+  // keyboard. Inert everywhere else — see components/KeyboardScroll.tsx.
+  const reveal = useRevealOnFocus()
+  const row = useRef<View>(null)
   return (
-    <View style={{ gap: 6 }}>
+    <View ref={row} style={{ gap: 6 }}>
       {label ? <Txt variant="label">{label}</Txt> : null}
       <TextInput
+        onFocus={(e) => {
+          reveal(row.current)
+          onFocus?.(e)
+        }}
         // Puts a "Done" toolbar above the NUMBER PADS (number/decimal/phone) —
         // the keyboards with no return key to dismiss with. RN builds the
         // toolbar natively from this label; it ignores the prop on keyboards

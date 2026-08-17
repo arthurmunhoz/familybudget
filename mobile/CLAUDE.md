@@ -200,6 +200,29 @@ Architecture, systems, remaining setup, and the improvement backlog are in
       (`setDefaultInputAccessoryView` returns early when the id is set), so a
       dead accessory view actively *removes* the Done button iOS would
       otherwise have drawn.
+- **Keeping the focused field VISIBLE**: `@/components/KeyboardScroll` — a
+  ScrollView that measures the focused field against its content and scrolls it
+  into the visible window. `<Field>` reports its own focus through that
+  context, so a form gets the behaviour by swapping its `ScrollView` for
+  `<KeyboardScroll>` — no per-field wiring, and the report is inert anywhere
+  else. Use it for any tall form in a modal (`PetForm` is the reference).
+  Two things it relies on:
+  - **The host must put the sheet above the keyboard**, because KeyboardScroll
+    treats its own layout height as the visible window. Don't hardcode that
+    lift: RN gives an Android modal's dialog `SOFT_INPUT_ADJUST_RESIZE`, so its
+    window shrinks by itself, while an iOS modal's doesn't move. `PetForm`
+    measures the difference (root height now vs. at rest) and makes up only
+    what the platform didn't. A flat `marginBottom: kb` double-lifts Android.
+  - **`Screen` already handles the plain-screen case** with its
+    KeyboardAvoidingView; KeyboardScroll is for modals, where KAV mis-measures
+    (same reason `useKeyboardHeight` exists).
+- **Photo framing**: `@/components/PhotoCropper` — pinch/pan a picked image
+  inside a CIRCLE (matching the round hero) and hand back a 512px square JPEG +
+  base64, ready to upload. Used by `usePetIdentity`: picking no longer uploads
+  straight away, it stages the asset in `picked` and `PetHero` renders the
+  cropper over it. Reusable for any round avatar; the crop maths is in
+  `cropRect` (source pixels, not screen), kept separate so it can be reasoned
+  about without a device.
 - **i18n** `@/hooks/useI18n`: `useI18n()` → `{ t, lang, setLang }`. Dicts in
   `@/lib/i18n` (en/es/pt) are the PWA dicts copied verbatim — add keys to all 3.
 - **Pure logic copied from the PWA** lives in `@/lib/` (types, format, calendar,

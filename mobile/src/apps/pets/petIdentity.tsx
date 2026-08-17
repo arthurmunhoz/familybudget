@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { Pencil, X } from 'lucide-react-native'
 
+import { PhotoCropper, type CroppedPhoto } from '@/components/PhotoCropper'
 import { Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
@@ -28,6 +29,9 @@ const HERO_BTN = 30
 
 export type PetIdentity = ReturnType<typeof usePetIdentity>
 
+/** A photo straight off the picker, waiting to be framed. */
+type PickedPhoto = { uri: string; width: number; height: number }
+
 /** Owns the name + photo of the pet being edited. The host holds this so the
  *  hero (pinned, outside the scroll) and the form (inside it) agree. */
 export function usePetIdentity(pet: Pet | null) {
@@ -39,6 +43,7 @@ export function usePetIdentity(pet: Pet | null) {
   const [photoPath, setPhotoPath] = useState(pet?.photo_path ?? '')
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [picked, setPicked] = useState<PickedPhoto | null>(null)
 
   // Sign the existing photo for preview.
   useEffect(() => {
@@ -52,6 +57,9 @@ export function usePetIdentity(pet: Pet | null) {
     }
   }, [pet?.photo_path])
 
+  /** Pick a photo. It isn't uploaded straight away any more: the picked image
+   *  goes to the cropper (rendered by PetHero) so the pet can be centred in the
+   *  circle first, and `usePickedPhoto` finishes the job. */
   async function addPhoto() {
     if (uploading || !profile) return
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -63,22 +71,37 @@ export function usePetIdentity(pet: Pet | null) {
       mediaTypes: ['images'],
       quality: 1,
     })
-    if (result.canceled || !result.assets[0]) return
+    const asset = result.canceled ? null : result.assets[0]
+    if (!asset) return
+    setPicked({ uri: asset.uri, width: asset.width, height: asset.height })
+  }
+
+  /** The cropper's output: already square, already 512px, already JPEG. */
+  async function usePickedPhoto(photo: CroppedPhoto) {
+    setPicked(null)
+    if (!profile) return
     setUploading(true)
     try {
-      // Resize to 512px (longest edge auto), encode to JPEG base64.
-      const ctx = ImageManipulator.manipulate(result.assets[0].uri).resize({ width: 512 })
-      const ref = await ctx.renderAsync()
-      const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.8, base64: true })
-      if (!out.base64) throw new Error('no base64')
-      const bytes = decodeBase64(out.base64)
+      // The cropper hands back base64 unless the crop itself failed, in which
+      // case it returns the untouched original and we do the plain resize here.
+      let uri = photo.uri
+      let base64 = photo.base64
+      if (!base64) {
+        const ctx = ImageManipulator.manipulate(uri).resize({ width: 512 })
+        const ref = await ctx.renderAsync()
+        const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.8, base64: true })
+        if (!out.base64) throw new Error('no base64')
+        uri = out.uri
+        base64 = out.base64
+      }
+      const bytes = decodeBase64(base64)
       const path = `${profile.household_id}/pets/${randomUUID()}.jpg`
       const { error } = await supabase.storage
         .from('documents')
         .upload(path, bytes, { contentType: 'image/jpeg', cacheControl: '604800' })
       if (error) throw error
       setPhotoPath(path)
-      setPhotoPreview(out.uri)
+      setPhotoPreview(uri)
     } catch {
       Alert.alert(t('pets.photoFailed'))
     }
@@ -100,6 +123,10 @@ export function usePetIdentity(pet: Pet | null) {
     uploading,
     addPhoto,
     removePhoto,
+    /** The picked-but-not-yet-framed photo; PetHero renders the cropper on it. */
+    picked,
+    usePickedPhoto,
+    cancelPicked: () => setPicked(null),
   }
 }
 
@@ -120,7 +147,17 @@ export function PetHero({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const { emoji, photoPath, photoPreview, uploading, addPhoto, removePhoto } = identity
+  const {
+    emoji,
+    photoPath,
+    photoPreview,
+    uploading,
+    addPhoto,
+    removePhoto,
+    picked,
+    usePickedPhoto,
+    cancelPicked,
+  } = identity
 
   const size = scrollY
     ? scrollY.interpolate({
@@ -201,6 +238,19 @@ export function PetHero({
       >
         <Pencil size={15} color={c.onAccent} />
       </Pressable>
+
+      {/* Frame the picked photo before it's uploaded. Lives here rather than in
+          the hosts so both the Add-pet sheet and the details screen get it from
+          the one place the hero is rendered. */}
+      {picked ? (
+        <PhotoCropper
+          uri={picked.uri}
+          width={picked.width}
+          height={picked.height}
+          onCancel={cancelPicked}
+          onDone={usePickedPhoto}
+        />
+      ) : null}
     </Animated.View>
   )
 }
