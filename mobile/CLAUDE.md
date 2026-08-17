@@ -737,6 +737,31 @@ LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx pod-install       # if you used --no-ins
   isn't UTF-8.
 - Then build: `npx expo run:ios`, or open `ios/OneRoof.xcworkspace` in Xcode.
 
+## `EXPO_PUBLIC_*` vars: `.env.local` is INVISIBLE to EAS builds
+A cloud EAS build uploads only **git-tracked** files, and `.env.local` is
+gitignored — so a var that lives only there inlines as `undefined` and the feature
+**ships dark with no build error and no warning**. This is the native twin of the
+web app's "Vercel sensitive vars aren't exposed to the build" trap (see the root
+`CLAUDE.md`), and it has already bitten once: the first Android build shipped with a
+blank Whereabouts map because `EXPO_PUBLIC_MAPBOX_TOKEN` was in `.env.local` and
+nowhere else, while `RNMAPBOX_DOWNLOAD_TOKEN` *was* on EAS — so the native SDK
+built fine and only the runtime token was missing, which looks like a broken map
+rather than a missing env var.
+- **Before blaming the code, check what the builder actually sees:**
+  `npx eas env:list --environment preview` (also `production`, `development`).
+- Add one with `npx eas env:create --name X --value Y --environment production
+  --environment preview --environment development --visibility plaintext
+  --scope project`. `eas.json`'s per-profile `env` block is the other valid home;
+  EAS env vars are preferred for anything you'd rather not commit.
+- **Visibility: `plaintext` for `EXPO_PUBLIC_*`.** They are compiled into the JS
+  bundle and readable by anyone with the APK, so `secret` buys no security and only
+  makes the value unverifiable afterwards. Reserve `secret` for build-time
+  credentials that never reach the client (`RNMAPBOX_DOWNLOAD_TOKEN`).
+- **There is no `expo-updates` in this project**, so an env-var fix CANNOT be shipped
+  over the air — every change needs a full rebuild.
+- `.env.example` is tracked and lists every var plus which ones EAS needs; keep it
+  current when adding one.
+
 ## Android push (channels + FCM) — read before touching notifications
 Android delivery differs from iOS in three ways that are easy to break silently.
 Full Play-release context in `PLAY-STORE-RELEASE.md`.

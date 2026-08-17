@@ -160,8 +160,17 @@ now per-platform (`STORE_SUBSCRIPTIONS_URL`), and a trial shows "Keep One Roof P
    product ids you'll map in RevenueCat).
 2. RevenueCat → add a Play Store app, upload a Google Cloud service-account JSON
    with Play Developer API access, map the products to the `plus` entitlement.
-3. `eas secret:create --name EXPO_PUBLIC_REVENUECAT_ANDROID_KEY --value <key>`
-   (same pattern as the iOS key — not committed to `eas.json`).
+3. Add the key as an **EAS env var**, not just to `.env.local` — a gitignored
+   `.env.local` is invisible to cloud builds and the key would inline as
+   `undefined`, shipping the paywall dark (this is what blanked the map, see §4c):
+   ```
+   npx eas env:create --name EXPO_PUBLIC_REVENUECAT_ANDROID_KEY --value <key> \
+     --environment production --environment preview --environment development \
+     --visibility plaintext --scope project
+   ```
+   ⚠️ `EXPO_PUBLIC_REVENUECAT_IOS_KEY` is **also absent** from all three EAS
+   environments — check whether the shipped App Store build was produced locally
+   (where `.env.local` is read) before assuming iOS billing is wired on EAS.
 
 > **Purchases cannot be tested on a sideloaded APK.** Google Play Billing only
 > talks to a build Play itself recognises — matching package name *and* signature.
@@ -414,12 +423,39 @@ What works and what doesn't on that sideloaded build:
 | Sign in with Google, all six apps, the 30-day trial + countdown | ✅ |
 | Push notifications (nudges, digest, urgent channel) | only after `google-services.json` + the FCM key are in place (§1.1) |
 | Buying Plus | ❌ — needs an internal-testing track, see the note in §1.5 |
-| Mapbox map | ✅ if `EXPO_PUBLIC_MAPBOX_TOKEN` is an EAS secret |
+| Mapbox map | ✅ — but only from the NEXT build; see §4c |
 
 **To see the trial**, sign in with a Google account that has no household — a fresh
 account lands on Onboarding, and `create_household()` grants the 30 days. Signing in
 as your existing account puts you in a household that predates the migration and has
 no trial; use `admin_start_trial()` (§1.4b) to arm one there instead.
+
+## 4c. Fixed: the blank Whereabouts map on the first Android build
+
+**Symptom:** Whereabouts showed the roster and "Set EXPO_PUBLIC_MAPBOX_TOKEN and
+rebuild the app to load the map" instead of a map.
+
+**Cause:** `EXPO_PUBLIC_MAPBOX_TOKEN` existed only in `mobile/.env.local`, which is
+gitignored — and an EAS cloud build uploads only git-tracked files, so it inlined as
+`undefined`. `RNMAPBOX_DOWNLOAD_TOKEN` *was* already an EAS env var, which is why
+the native Mapbox SDK compiled fine and only the runtime token was missing. That
+combination reads as a broken map rather than a missing variable. Confirmed with
+`eas env:list`: all three environments had the download token and nothing else.
+
+**Fix applied:** `EXPO_PUBLIC_MAPBOX_TOKEN` created as a project EAS env var
+(`plaintext`) in production + preview + development, and verified readable for
+preview. `plaintext` is deliberate — a `pk.` token is compiled into the bundle and
+readable from any APK, so `secret` would buy nothing and make it unverifiable.
+
+**Needs a rebuild.** `EXPO_PUBLIC_*` values are inlined at build time and there is no
+`expo-updates` in this project, so there is no over-the-air path:
+
+```bash
+cd mobile && eas build --platform android --profile preview
+```
+
+`.env.example` now documents every var and which ones EAS needs, and `CLAUDE.md`
+carries the gotcha, so the next `EXPO_PUBLIC_*` var doesn't repeat this.
 
 ## 5. Build and submit
 
