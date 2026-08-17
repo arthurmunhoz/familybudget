@@ -65,6 +65,26 @@ export const en = {
   'location.fg.title': 'Sharing your location',
   'location.fg.body': 'One Roof is sharing your location with your household.',
 
+  // Prominent disclosure — shown BEFORE the OS background-location prompt.
+  // Required by Google Play (see mobile/PLAY-STORE-RELEASE.md §3.1): it must
+  // name the app, say location is collected in the background even when the app
+  // is closed, and say what it is used for. Reword with care.
+  'location.disclosure.title': 'Before you turn on sharing',
+  'location.disclosure.intro':
+    'One Roof collects location data to put you on your family’s map and to tell your household when you arrive at or leave the places you save.',
+  'location.disclosure.bgTitle': 'Even when the app is closed',
+  'location.disclosure.bgBody':
+    'One Roof collects location data in the background — even when the app is closed or not in use — so your family’s map and place alerts keep working while your phone is in your pocket.',
+  'location.disclosure.whoTitle': 'Only your household',
+  'location.disclosure.whoBody':
+    'Your location is shared only with the members of your household. It is never sold and never shown to anyone else.',
+  'location.disclosure.controlTitle': 'You stay in control',
+  'location.disclosure.controlBody':
+    'Sharing stays off until you turn it on, and you can pause it or turn it off at any time.',
+  'location.disclosure.next': 'Next, your phone will ask you to allow location access.',
+  'location.disclosure.accept': 'Continue',
+  'location.disclosure.decline': 'Not now',
+
   // Whereabouts — Places & geofences (Phase 2)
   'location.tab.places': 'Places',
   'location.tab.activity': 'Activity',

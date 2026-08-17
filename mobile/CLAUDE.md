@@ -299,6 +299,18 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   `NavPicker` / `NudgePicker` (pick a map app / a nudge, from the map),
   `SharingControls` (toggle + pause), `locationUi` (card geometry, member
   colors, ringed avatar, battery chip, `WatchingChip`, `timeAgo`).
+- **Prominent disclosure before the background prompt** —
+  `src/apps/location/LocationDisclosure.tsx`, a full-screen explainer that names
+  One Roof, states location is collected in the background even when the app is
+  closed, says it's shared only with the household, and offers Continue / Not
+  now. **Google Play requires it *before* `requestBackgroundPermissionsAsync`**
+  and rejects builds without it (`PLAY-STORE-RELEASE.md` §3.1 has the flow, the
+  full copy, and the demo-video shot list). Both entry points — the sharing
+  toggle and Resume — go through `gate()` in `SharingControls`, which shows it
+  and only then calls `ensureBackgroundPermission()`; it's skipped only when
+  `hasBackgroundPermission()` is already true (no OS prompt would appear).
+  Copy lives in `location.disclosure.*` (en/es/pt). Any new caller of
+  `ensureBackgroundPermission()` MUST show this screen first.
 - The detail card carries **three** actions — Navigate, Nudge, Call. Apple/
   Google/Waze used to be three separate buttons in that row, which left each one
   too narrow for a readable label, so the glyph carried the whole meaning. They

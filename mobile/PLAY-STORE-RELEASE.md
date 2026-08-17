@@ -259,12 +259,55 @@ declaration form** and a genuinely strict review. It needs:
 
 Your architecture is actually a good story here: sharing is **opt-in and off by
 default**, visible only to the household, and `src/lib/location.ts` documents the
-design. Say exactly that. Check whether the current onboarding for Whereabouts
-already shows a disclosure screen that meets the bar — if it doesn't, that's a
-small UI addition and it's cheaper than a rejection.
+design. Say exactly that.
+
+**Status: the disclosure screen exists — `src/apps/location/LocationDisclosure.tsx`.**
+It was added on 2026-08-17; before that there was none (`SharingControls`
+called `ensureBackgroundPermission()` straight from the toggle, so the OS prompt
+was the first thing the user saw). Reference this exact screen on the
+declaration form and film it in the demo video.
+
+*Where it appears*: Hub → Whereabouts → the "Your location" sheet (tap your own
+card) → flipping **Share my location** on. It also fires on **Resume sharing**
+after a pause. Both paths run through `gate()` in
+`src/apps/location/SharingControls.tsx`, which shows the screen and only calls
+`ensureBackgroundPermission()` after the user taps **Continue** — it is skipped
+only when Always-permission is already granted, i.e. when no OS prompt would
+appear at all. Declining ("Not now") requests nothing and leaves sharing off.
+
+*What the screen says* (en/es/pt, keys `location.disclosure.*` in
+`src/lib/i18n/`) — full English text, for pasting into the declaration form:
+
+> **Before you turn on sharing**
+> One Roof collects location data to put you on your family's map and to tell
+> your household when you arrive at or leave the places you save.
+>
+> **Even when the app is closed** — One Roof collects location data in the
+> background — even when the app is closed or not in use — so your family's map
+> and place alerts keep working while your phone is in your pocket.
+>
+> **Only your household** — Your location is shared only with the members of
+> your household. It is never sold and never shown to anyone else.
+>
+> **You stay in control** — Sharing stays off until you turn it on, and you can
+> pause it or turn it off at any time.
+>
+> Next, your phone will ask you to allow location access.
+> \[ Continue ]  \[ Not now ]
+
+*Demo video shot list* (matches the flow above): Hub → Whereabouts (map, sharing
+off) → tap your card → "Your location" sheet → toggle **Share my location** →
+**the disclosure screen** (hold on it) → **Continue** → the Android
+location prompt → **Allow all the time** → back on the map with your own pin
+live, then background the app and show a place alert arriving.
+
+If the copy changes, change it in en/es/pt together, keep the "even when the app
+is closed or not in use" clause, and re-record the video.
 
 Also expect the separate **Foreground service permissions** declaration for
-`FOREGROUND_SERVICE_LOCATION`, describing the same feature.
+`FOREGROUND_SERVICE_LOCATION`, describing the same feature. The Android
+foreground-service notification text is `location.fg.title` / `location.fg.body`
+("One Roof is sharing your location with your household").
 
 ### 3.2 Data Safety form
 

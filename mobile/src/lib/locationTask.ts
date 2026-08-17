@@ -206,8 +206,23 @@ export function registerLocationTask(): void {
   // no-op: the module-scope defineTask above is the real work
 }
 
+/** Whether Always-authorization is already granted — i.e. whether calling
+ *  `ensureBackgroundPermission()` would put an OS prompt on screen. Callers use
+ *  this to decide if the prominent disclosure has to be shown first. */
+export async function hasBackgroundPermission(): Promise<boolean> {
+  const current = await Location.getBackgroundPermissionsAsync().catch(() => null)
+  return !!current?.granted
+}
+
 /** Ask for Always-authorization (needed for background). Requests foreground
- *  first (iOS requires the two-step escalation). Returns whether it's granted. */
+ *  first (iOS requires the two-step escalation). Returns whether it's granted.
+ *
+ *  COMPLIANCE: Google Play requires a prominent in-app disclosure BEFORE this
+ *  prompt (mobile/PLAY-STORE-RELEASE.md §3.1). The disclosure lives in
+ *  apps/location/LocationDisclosure.tsx and is gated by SharingControls — this
+ *  module has no i18n/UI, so it can't show it itself. Any NEW caller of this
+ *  function must show that screen first (check `hasBackgroundPermission()` and
+ *  skip it only when permission is already granted). */
 export async function ensureBackgroundPermission(): Promise<boolean> {
   if (!(await ensureForegroundPermission())) return false
   const current = await Location.getBackgroundPermissionsAsync()

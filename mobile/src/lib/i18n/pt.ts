@@ -63,6 +63,24 @@ export const pt: Record<keyof typeof en, string> = {
   'location.fg.title': 'Compartilhando sua localização',
   'location.fg.body': 'O One Roof está compartilhando sua localização com sua família.',
 
+  // Aviso em destaque — exibido ANTES da permissão de localização em segundo
+  // plano do sistema (ver mobile/PLAY-STORE-RELEASE.md §3.1).
+  'location.disclosure.title': 'Antes de ativar o compartilhamento',
+  'location.disclosure.intro':
+    'O One Roof coleta dados de localização para colocar você no mapa da família e avisar quando você chega ou sai dos lugares que salvar.',
+  'location.disclosure.bgTitle': 'Mesmo com o app fechado',
+  'location.disclosure.bgBody':
+    'O One Roof coleta dados de localização em segundo plano — mesmo quando o app está fechado ou não está em uso — para que o mapa da família e os avisos de lugares continuem funcionando com o celular no bolso.',
+  'location.disclosure.whoTitle': 'Só a sua família',
+  'location.disclosure.whoBody':
+    'Sua localização é compartilhada apenas com os membros da sua família. Ela nunca é vendida nem mostrada a mais ninguém.',
+  'location.disclosure.controlTitle': 'Você no controle',
+  'location.disclosure.controlBody':
+    'O compartilhamento fica desligado até você ativar, e você pode pausar ou desligar quando quiser.',
+  'location.disclosure.next': 'Em seguida, seu celular vai pedir permissão para acessar a localização.',
+  'location.disclosure.accept': 'Continuar',
+  'location.disclosure.decline': 'Agora não',
+
   // Whereabouts — Lugares e geocercas (Fase 2)
   'location.tab.places': 'Lugares',
   'location.tab.activity': 'Atividade',

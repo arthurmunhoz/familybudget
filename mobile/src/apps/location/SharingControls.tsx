@@ -2,6 +2,11 @@
 // until tonight), and resume — plus the "pausing is visible, never a silent gap"
 // reassurance. Turning sharing on requests Always-permission and starts the
 // background task; off/pause stops it. All writes go through @/lib/location.
+//
+// Turning on and resuming both go through `gate()` first, which shows the
+// LocationDisclosure screen before the OS background-location prompt — a Google
+// Play requirement (PLAY-STORE-RELEASE.md §3.1), not a nicety. Don't call
+// ensureBackgroundPermission() from here without it.
 import { useEffect, useState } from 'react'
 import { Linking, Modal, Pressable, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -13,9 +18,15 @@ import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { captureAndUpload, isPaused, pauseSharing, resumeSharing, setSharing } from '@/lib/location'
-import { ensureBackgroundPermission, startBackgroundUpdates, stopBackgroundUpdates } from '@/lib/locationTask'
+import {
+  ensureBackgroundPermission,
+  hasBackgroundPermission,
+  startBackgroundUpdates,
+  stopBackgroundUpdates,
+} from '@/lib/locationTask'
 import type { MemberLocation } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { LocationDisclosure } from './LocationDisclosure'
 
 /** Local 12-hour clock without depending on Intl being present on Android. */
 function clock(d: Date): string {
@@ -65,6 +76,8 @@ export function SharingControls({
   const [permDenied, setPermDenied] = useState(false)
   const [householdName, setHouseholdName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Which action is waiting behind the prominent disclosure (see `gate` below).
+  const [pending, setPending] = useState<'enable' | 'resume' | null>(null)
 
   useEffect(() => {
     let active = true
@@ -141,9 +154,25 @@ export function SharingControls({
     setBusy(false)
   }
 
+  /** Google Play requires the prominent disclosure to be on screen BEFORE the
+   *  background-location prompt (PLAY-STORE-RELEASE.md §3.1), so every path that
+   *  can reach ensureBackgroundPermission() runs through here first. When
+   *  permission is already granted no prompt will appear, so the disclosure is
+   *  skipped and the action runs straight away. */
+  const gate = (action: 'enable' | 'resume') => {
+    void (async () => {
+      if (await hasBackgroundPermission()) {
+        await (action === 'enable' ? enable() : resume())
+        return
+      }
+      setPending(action)
+    })()
+  }
+
   const onToggle = (v: boolean) => {
     if (busy) return
-    void (v ? enable() : disable())
+    if (v) gate('enable')
+    else void disable()
   }
 
   const in1h = () => new Date(Date.now() + 60 * 60 * 1000)
@@ -221,7 +250,11 @@ export function SharingControls({
                 <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>
                   {t('location.share.pausedUntil', { time: clock(pausedUntil) })}
                 </Txt>
-                <Btn title={t('location.share.resume')} variant="secondary" onPress={resume} />
+                <Btn
+                  title={t('location.share.resume')}
+                  variant="secondary"
+                  onPress={() => gate('resume')}
+                />
               </View>
             ) : (
               <>
@@ -242,6 +275,27 @@ export function SharingControls({
           <Btn title={t('common.done')} onPress={onClose} />
         </View>
       </View>
+
+      {/* Prominent disclosure — must be on screen BEFORE the OS background
+          prompt. Rendered INSIDE this Modal on purpose: a second Modal
+          presented as a sibling of an open one silently fails to appear on iOS
+          (same pattern as PlacesSheet → PlaceForm). */}
+      {pending ? (
+        <LocationDisclosure
+          onAccept={() => {
+            const action = pending
+            setPending(null)
+            void (action === 'enable' ? enable() : resume())
+          }}
+          onDecline={() => {
+            const action = pending
+            setPending(null)
+            // Nothing was requested and nothing changed — snap the switch back
+            // off. (Declining a resume leaves the paused state as it was.)
+            if (action === 'enable') setOn(false)
+          }}
+        />
+      ) : null}
     </Modal>
   )
 }
