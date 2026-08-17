@@ -1,0 +1,335 @@
+# One Roof — Google Play release requirements
+
+Scope: shipping a **native Android build of `mobile/` via EAS** (not a TWA wrapper
+of the PWA). Everything below was verified against this repo on 2026-08-17, not
+copied from a generic checklist — file references are real and the gaps are real.
+
+Companion doc: `APP-STORE-LISTING.md` (Apple copy; most of the store text is
+reusable, the character limits differ).
+
+---
+
+## 0. The timeline constraint — start this first
+
+Your Play account is a **personal/individual** account, so before you can even
+*apply* for production access Google requires:
+
+- a **closed testing** track running
+- with **at least 12 testers opted in**
+- who stay opted in **14 continuous days**
+
+Then you apply for production access, which is a manual review that takes days,
+not minutes. **Realistic floor is ~3 weeks from first closed-test upload to
+public listing.** Nothing in the code blocks you from uploading a closed-test
+build today, so the right order is:
+
+1. Fix the four **must-fix** items in §1 (a day of work).
+2. Upload an AAB to closed testing, recruit the 12 testers, start the 14-day clock.
+3. Do the store listing, Data Safety, and declarations (§3–§4) while the clock runs.
+
+Testers must accept the opt-in link and *stay* opted in. Use a Google Group as
+the tester list so you can add people without a new release.
+
+---
+
+## 1. Must-fix in the app before submitting
+
+These are real defects or blockers on Android, verified in the current tree.
+
+### 1.1 FCM credentials — without this, zero push notifications
+
+There is no `google-services.json` in `mobile/` and no `android.googleServicesFile`
+key in `app.json`. Android push goes through Firebase Cloud Messaging; Expo's push
+service can't deliver to Android without FCM V1 credentials. Everything push-driven
+dies silently: Nudges fan-out (`api/send-ping.ts`), the daily digest
+(`api/send-digest.ts`), ack pushes and Whereabouts live-wake (`api/ack-ping.ts`).
+
+Steps:
+1. Firebase console → new project (or reuse) → add an **Android** app with package
+   `com.oneroof.app`.
+2. Download `google-services.json` into `mobile/`, add `"googleServicesFile":
+   "./google-services.json"` under `android` in `app.json`. Git-ignore it if you'd
+   rather not commit it, but EAS needs it at build time.
+3. Firebase → Project settings → Service accounts → generate a private key, then
+   upload it to Expo: `eas credentials` → Android → *FCM V1 service account key*.
+
+No server change needed — `exp.host/--/api/v2/push/send` handles both platforms
+off the same Expo token, and `push_subscriptions` / the expo-token table are
+already platform-agnostic.
+
+### 1.2 The notification icon will render as a solid white square
+
+Verified via `npx expo config --type introspect`: the manifest points
+`expo.modules.notifications.default_notification_icon` and
+`com.google.firebase.messaging.default_notification_icon` at
+`@drawable/notification_icon`, generated from the `expo-notifications` plugin's
+`icon: "./assets/images/icon.png"` in `app.json`.
+
+`assets/images/icon.png` is a **1024×1024 full-colour RGBA** image with an opaque
+background. Android draws notification small icons as a **silhouette from the
+alpha channel** — an opaque square becomes a white square in the status bar and
+notification shade.
+
+The web PWA already solved exactly this (`public/roof-badge-96.png`, and
+`CLAUDE.md` documents why). Do the same here: add a monochrome, transparent-
+background roof glyph (e.g. `assets/images/notification-icon.png`, 96×96, white
+glyph on transparent) and point the plugin at it. `color: "#c2603f"` is already
+wired correctly (`@color/notification_icon_color`), so the tint will work once the
+glyph has real alpha.
+
+### 1.3 No Android notification channels — high-priority Nudges won't be urgent
+
+`grep -rn "setNotificationChannelAsync" src` returns nothing. On Android every
+notification lands in a channel, and **importance is a property of the channel,
+not the message** — so a `high_priority` Nudge (the red, forced-to-everyone,
+Call-CTA one) arrives at default importance: no heads-up banner, no sound
+override. That silently breaks the one feature where urgency is the whole point.
+
+Create the channels at startup (alongside the existing permission request in
+`src/lib/notifications.ts`) — at minimum a default channel and an `urgent` channel
+with `AndroidImportance.MAX` — then pass `channelId` on the push payload from
+`api/send-ping.ts`, which already knows whether the ping is urgent (it sets the
+`urgent` flag today). Mirror the same for the digest.
+
+### 1.4 Drop the microphone permission
+
+`app.json` declares `android.permission.RECORD_AUDIO`, and `expo-image-picker`'s
+plugin adds it again unless told not to. Nothing in `src/` records audio —
+`grep -rn "RECORD_AUDIO\|expo-av\|expo-audio\|recordAsync" src` is empty. Microphone
+is a sensitive permission; shipping one you don't use invites a review question at
+best and a rejection at worst.
+
+Two changes, both needed (the plugin re-adds it otherwise):
+- remove `"android.permission.RECORD_AUDIO"` from `app.json` → `android.permissions`
+- pass `microphonePermission: false` to the `expo-image-picker` plugin — that path
+  calls `withBlockedPermissions`, which actively blocks any package from merging it in
+
+### 1.5 Plus purchasing has no Android path
+
+`src/lib/purchases.ts` hard-returns off iOS:
+
+```ts
+const IOS_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? ''
+if (configured || Platform.OS !== 'ios' || !IOS_KEY) return
+```
+
+So an Android build behaves as permanently free. That degrades gracefully (no
+crash, no paywall — `plus.tsx` is explicit about this), so it is **not a blocker
+for a closed-test build**, but you can't sell Plus on Android until it's wired.
+
+The good news: **the server needs no changes.** `api/revenuecat-webhook.ts` keys
+off `app_user_id` = `household_id` and branches only on event type — it records
+`store` but never switches on it. Google Play events will flow through the existing
+webhook untouched.
+
+To enable it:
+1. Play Console → create the subscription products with **the same product IDs**
+   you'd want RevenueCat to map to the `plus` entitlement.
+2. RevenueCat → add a Play Store app, upload a Google Cloud service-account JSON
+   with Play Developer API access, map the products to the `plus` entitlement.
+3. Add `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` to `eas.json` env (or as an EAS secret)
+   and branch `configurePurchases()` on `Platform.OS` to pick the right key.
+4. Play requires digital subscriptions to use **Google Play Billing** — which
+   RevenueCat uses — so no policy issue, but you must have at least one active
+   subscription product before the listing can reference paid features.
+
+> Note: `MEMBER_LIMIT_FREE = 4` still applies on Android, so a free Android
+> household is capped at 4 members with no way to upgrade until this lands.
+> That's a support question waiting to happen — decide deliberately.
+
+### 1.6 Verify after `expo prebuild` (can't be confirmed from config alone)
+
+- **`foregroundServiceType="location"`** on the background-location service. It
+  did not appear in the introspected manifest; it may come from the library's own
+  manifest at merge time. Android 14+ **crashes** a foreground service started
+  without a declared type. Check `android/app/src/main/AndroidManifest.xml`.
+- **`com.google.android.gms.permission.AD_ID`.** If RevenueCat or Play Billing
+  merges it in, Play's Advertising ID declaration must say so — or block the
+  permission. You don't use an ad ID, so blocking is cleaner.
+- **`CAMERA`** and the storage permissions arrive via library manifest merge
+  rather than the config plugin — confirm the final list matches what you declare.
+- **Edge-to-edge.** Mandatory at targetSdk 35+, and Expo enables it by default.
+  The app uses `react-native-safe-area-context` throughout, so it should be fine,
+  but bottom action bars and sheets need a real-device pass (see §5).
+- **Target API level.** Expo SDK 56 / RN 0.85 generates a current target
+  (API 36 / Android 16), which clears Play's requirement for new apps. Confirm the
+  generated `build.gradle` rather than assuming.
+
+---
+
+## 2. Already fine — no work needed
+
+Worth knowing so you don't go looking:
+
+| Thing | Status |
+|---|---|
+| `android.package` | `com.oneroof.app` — set |
+| Adaptive icon | foreground + background + **monochrome** all present (`assets/images/android-icon-*.png`) — themed-icon ready |
+| Splash screen | `expo-splash-screen` configured with light + dark |
+| `versionCode` | `appVersionSource: "remote"` + `autoIncrement: true` — EAS manages it |
+| Google sign-in | `makeRedirectUri({ scheme: 'oneroof' })` is platform-agnostic; Expo generates the Android intent filter from `scheme`. Same `oneroof://auth-callback` URL iOS already uses, so Supabase's allow-list needs nothing new |
+| Apple sign-in button | correctly hidden off iOS via `appleAuthSupported` |
+| Account deletion (in-app) | `delete_my_account` RPC, wired in `src/app/settings.tsx` — satisfies Play's in-app requirement |
+| Backend / API | `EXPO_PUBLIC_API_BASE` already points at the deployed Vercel API; every `api/` endpoint is platform-agnostic |
+| RevenueCat webhook | store-agnostic (see §1.5) |
+| Mapbox | `@rnmapbox/maps` supports Android; `RNMAPBOX_DOWNLOAD_TOKEN` + `EXPO_PUBLIC_MAPBOX_TOKEN` are project-level EAS secrets, so they carry over |
+| Android UI branches | date pickers, sheet radii, keyboard behaviour and `textAlignVertical` already have `Platform.OS === 'android'` paths — someone wrote this cross-platform-aware |
+| Unused iOS-only deps | `expo-symbols` only appears in an unused Expo-template `collapsible.tsx`; `expo-glass-effect` and `@expo/ui` aren't imported anywhere. Nothing to strip |
+
+---
+
+## 3. Play Console declarations — the ones that will actually cost you time
+
+### 3.1 Background location declaration ← highest rejection risk
+
+You request `ACCESS_BACKGROUND_LOCATION`, which triggers Play's **Permissions
+declaration form** and a genuinely strict review. It needs:
+
+- A written justification of the core feature that requires it.
+- A **demo video** (YouTube/Drive link) showing the in-app flow: the prominent
+  disclosure, the user granting permission, and the feature working.
+- **Prominent disclosure in-app** *before* the permission prompt: a screen that
+  names the app, says location is collected in the background, and says what it's
+  used for. This is a distinct requirement from the OS prompt and from your privacy
+  policy — reviewers check for it specifically.
+
+Your architecture is actually a good story here: sharing is **opt-in and off by
+default**, visible only to the household, and `src/lib/location.ts` documents the
+design. Say exactly that. Check whether the current onboarding for Whereabouts
+already shows a disclosure screen that meets the bar — if it doesn't, that's a
+small UI addition and it's cheaper than a rejection.
+
+Also expect the separate **Foreground service permissions** declaration for
+`FOREGROUND_SERVICE_LOCATION`, describing the same feature.
+
+### 3.2 Data Safety form
+
+The longest form. Based on what the app actually does, you're declaring collection
+of: email + name, profile photos, **precise location**, **photos and documents**,
+budget/spending amounts, pet records, calendar events, and a push token (device
+identifier). Both *precise location* and *financial info* count as sensitive
+categories.
+
+Third parties data is shared with or processed by — all of which must be listed:
+
+| Recipient | What | Why |
+|---|---|---|
+| Supabase | everything | backend / storage (first-party processor) |
+| Anthropic | receipt & bill **photos** | `api/scan-receipt.ts`, `api/scan-bill.ts` vision scanning |
+| Mapbox | location | map tiles + Directions ETAs |
+| Google Calendar | calendar events | opt-in two-way sync |
+| RevenueCat | purchase data | subscription entitlement |
+| Expo / FCM | push token | notification delivery |
+
+Answer honestly on encryption in transit (yes) and deletion (yes — in-app, §3.4).
+The Anthropic one is the item people forget; a photo leaving the device for
+processing is data sharing even though it isn't retained for training.
+
+### 3.3 App access
+
+The app is fully behind sign-in. Because signup is open — a reviewer can sign in
+with any Google account and `create_household` puts them straight into a working
+household — you can plausibly declare "all functionality available without special
+access". Safer is to provide reviewer instructions plus a test account. Note that
+`devSignIn` (email/password) is `__DEV__`-gated and **won't exist in the production
+build**, so don't promise credentials that only work in dev.
+
+Anything gated behind Plus won't be reachable by a reviewer on Android until §1.5
+lands — mention that in the notes rather than letting them find a dead end.
+
+### 3.4 Account deletion URL
+
+In-app deletion exists (§2). Play *additionally* requires a **web-accessible URL**
+where a user who has already uninstalled can request account and data deletion.
+`public/privacy.html` describes in-app deletion but that isn't the same thing. Add a
+clearly-labelled deletion section (with a contact route) to `public/support.html`
+or `privacy.html` and give Play that URL.
+
+### 3.5 The remaining "App content" declarations
+
+Mostly quick, but all of them block release until answered:
+
+- **Privacy policy** → `https://one-roof-app.vercel.app/privacy.html` (already live)
+- **Ads** → no ads
+- **Content rating** → IARC questionnaire; expect the equivalent of Everyone/3+
+- **Target audience** → 18+ (or 13+). Do **not** declare it child-directed — despite
+  the name it's a household tool for adults, and Families policy adds significant
+  extra requirements
+- **Advertising ID** → declare none, and confirm `AD_ID` isn't merged in (§1.6)
+- **Financial features** → none apply. You track spending the user types or
+  photographs; you don't connect bank accounts, lend, or handle crypto
+- **Health apps** → no. Pet records are not human health data
+- **News / Government / COVID contact-tracing** → no
+- **Data deletion** → point at §3.4's URL
+- **User-generated content** → content is private to a household, not publicly
+  broadcast, so the public-UGC moderation requirements shouldn't attach. Answer the
+  form accurately and don't over-claim social features
+
+---
+
+## 4. Store listing assets
+
+Text is largely reusable from `APP-STORE-LISTING.md`, but Play's fields differ:
+
+| Field | Limit | Source |
+|---|---|---|
+| App name | 30 | `One Roof: Family Organizer` (26) — same as Apple |
+| Short description | 80 | **new copy needed** — Apple's 30-char subtitle is too short to reuse |
+| Full description | 4000 | adapt Apple's description; Play renders plain text, so drop the `•` styling if it looks rough |
+| App icon | 512×512 PNG, 32-bit | export from `assets/images/icon.png` |
+| Feature graphic | **1024×500** | **doesn't exist yet** — required, and there's no Apple equivalent to reuse |
+| Phone screenshots | 2–8, min 320px side | **new captures needed** — Android device frames, not the iOS ones |
+| Tablet screenshots | optional | `supportsTablet` is iOS-only config; skip unless you want tablet distribution |
+| Privacy policy URL | — | already live |
+
+The feature graphic and Android screenshots are the only genuinely new creative
+work. Everything else is an edit of existing copy.
+
+---
+
+## 5. Build and submit
+
+```bash
+cd mobile && eas build --platform android --profile production
+```
+
+`eas.json`'s `production` profile already carries the Supabase + API env, and EAS
+defaults to an **AAB** for the production profile, which is what Play requires for
+new apps. EAS generates and holds the upload keystore; Play App Signing manages the
+release key. Then:
+
+```bash
+cd mobile && eas submit --platform android --profile production
+```
+
+`submit.production` in `eas.json` is `{}` — the first `eas submit` will prompt for a
+Google service-account JSON with Play Developer API access. Create it in Google
+Cloud, grant it access in Play Console → Users and permissions, and store it as an
+EAS secret so later submits are non-interactive.
+
+**Device testing is not optional here.** Everything in this repo has been verified
+on iOS and in a Chromium PWA preview; no part of the Android native build has ever
+run. Before the closed test, walk a real Android device through: Google sign-in,
+push arrival (nudge + urgent nudge), receipt scan camera flow, document scanner,
+biometric vault unlock, the Mapbox map, background location, and bottom-bar layout
+under edge-to-edge.
+
+---
+
+## 6. Known Android v1 gaps — ship or fix, but decide
+
+Not blockers; they're parity gaps you should know about before someone reports them.
+
+- **No home-screen widgets.** `targets/widgets/*.swift` is WidgetKit — iOS only.
+  Android needs a separate Glance/AppWidget implementation. `api/widget.ts` is
+  transport-agnostic, so the backend would be reusable.
+- **Google sign-in only.** Apple sign-in is correctly hidden on Android, so a
+  household member whose account was created with Apple can't sign in on an Android
+  phone. Worth a line in the FAQ.
+- **No Apple Calendar sync** (`isAppleCalendarAvailable` is iOS-gated). Google
+  Calendar sync works and is the relevant one on Android — but it's Plus-gated, so
+  it's unreachable until §1.5 lands.
+- **Plus is unreachable** until §1.5 — see the member-cap note there.
+- **`ACTIVITY_RECOGNITION`** may be requested by `expo-location` on Android. If it
+  shows up in the merged manifest and you don't need it, block it rather than
+  explaining it on a form.
