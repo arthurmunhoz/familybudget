@@ -134,6 +134,24 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 - **Auth** `@/lib/auth`: `useAuth()` → `{ session, profile, profiles, loading,
   signInWithApple, signInWithGoogle, devSignIn, signOut }`. `profiles` = household
   members.
+  - **`oneroof://auth-callback` must stay a real route** (`app/auth-callback.tsx`).
+    Google sign-in and the Google Calendar connect both redirect there, and the
+    platforms deliver that redirect DIFFERENTLY: iOS's
+    ASWebAuthenticationSession swallows it and returns the URL to
+    `openAuthSessionAsync` without reopening the app, so no route is involved —
+    which is why the missing file went unnoticed for months. Android's Chrome
+    Custom Tab fires an Intent instead, expo-router renders `/auth-callback`,
+    and with no file there it showed "Unmatched Route" with the `?code=` on
+    screen: **sign-in on Android could not complete at all.** Don't delete the
+    route because "nothing links to it" — the OS does.
+  - Both deliveries can fire for one redirect, so `completeOAuthRedirect`
+    (`@/lib/oauthRedirect`) is idempotent per code: a PKCE code is single-use,
+    and callers share one promise so the loser of the race still gets the
+    session — including `provider_refresh_token`, which only exists on the
+    session the one exchange returned (the Calendar connect needs it).
+  - `devSignIn` (email/password) is `__DEV__`-gated in `components/Login.tsx`,
+    so a RELEASE build has only Apple + Google. That's why an email/password
+    demo account is useless to a Play reviewer — see `PLAY-STORE-RELEASE.md` §3.3.
 - **Data fetching** `@/hooks/useCachedQuery`: stale-while-revalidate over an
   in-memory cache — returns the last value instantly, refetches in the
   background, re-renders only if the data actually changed. One query object per

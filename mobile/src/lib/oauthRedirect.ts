@@ -23,17 +23,35 @@ function callbackParams(url: string): URLSearchParams {
   return out
 }
 
+/** The exchange in flight (or the last one done), kept so a redirect delivered
+ *  TWICE is only exchanged once.
+ *
+ *  Android delivers it twice: the `oneroof://auth-callback` intent reopens the
+ *  app — which `app/auth-callback.tsx` handles — AND `openAuthSessionAsync`
+ *  resolves with the same URL. A PKCE code is single-use, so whichever caller
+ *  lost that race would get "invalid request" and report a failed sign-in.
+ *  Sharing one promise also keeps `provider_refresh_token` reachable for the
+ *  Google Calendar connect flow: those tokens exist only on the session the one
+ *  exchange returned, so a second caller must get that same session back rather
+ *  than a fresh `getSession()` (which has no provider tokens). */
+let exchanging: { code: string; session: Promise<Session | null> } | null = null
+
+async function exchange(code: string): Promise<Session | null> {
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+  if (error) throw error
+  return data.session
+}
+
 /** Complete the redirect and return the resulting session (null if the URL
  *  carried neither a code nor tokens). Throws if the provider reported an
- *  error or the exchange failed. */
+ *  error or the exchange failed. Safe to call twice with the same URL. */
 export async function completeOAuthRedirect(url: string): Promise<Session | null> {
   const params = callbackParams(url)
 
   const code = params.get('code')
   if (code) {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-    if (error) throw error
-    return data.session
+    if (exchanging?.code !== code) exchanging = { code, session: exchange(code) }
+    return exchanging.session
   }
 
   const access_token = params.get('access_token')

@@ -374,11 +374,20 @@ Pick one before you fill in the App access form:
    no other members, which makes the family-location feature they're scrutinising
    look like it does nothing.
 
-Google sign-in itself needs nothing extra on Android: `signInWithGoogle` runs
-Supabase's own OAuth in a browser tab (`WebBrowser.openAuthSessionAsync`) and
-returns via the `oneroof://` scheme, so there's no native Google client ID or
-SHA-1 fingerprint to register. Do confirm `oneroof://auth-callback` is in
-Supabase Auth → URL Configuration → Redirect URLs before the reviewer tries it.
+Google sign-in needs no native Google client ID and no SHA-1 fingerprint:
+`signInWithGoogle` runs Supabase's own OAuth in a browser tab
+(`WebBrowser.openAuthSessionAsync`) and returns via the `oneroof://` scheme.
+Confirm `oneroof://auth-callback` is in Supabase Auth → URL Configuration →
+Redirect URLs before the reviewer tries it.
+
+⚠️ **It was still broken on Android until 2026-08-17** — worth knowing, because
+any test build made before that fix cannot sign in at all. `oneroof://auth-callback`
+had no matching expo-router route, which iOS never exposed (its
+ASWebAuthenticationSession swallows the redirect) but Android did: the redirect
+Intent reopened the app onto expo-router's "Unmatched Route" screen with the
+`?code=` visible and no session. Fixed by `src/app/auth-callback.tsx`. **Verify
+Google sign-in end-to-end on an Android build before uploading** — a reviewer
+who can't get past the login screen is an automatic rejection.
 
 Anything gated behind Plus won't be reachable by a reviewer on Android until §1.5
 lands — mention that in the notes rather than letting them find a dead end.
