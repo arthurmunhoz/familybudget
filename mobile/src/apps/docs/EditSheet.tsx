@@ -9,6 +9,7 @@ import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import type { FamilyDocument, DocCategory, Profile } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { CATEGORIES } from './docUtils'
 
@@ -28,6 +29,7 @@ export default function EditSheet({
   onDelete: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
 
   const [title, setTitle] = useState(doc.title)
@@ -139,7 +141,7 @@ export default function EditSheet({
             </Pressable>
           </ScrollView>
 
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl }}>
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap }}>
             <Btn
               title={saving ? t('common.saving') : t('common.saveChanges')}
               onPress={save}

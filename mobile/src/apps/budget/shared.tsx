@@ -9,6 +9,7 @@ import { CalendarDays, ChevronDown } from 'lucide-react-native'
 import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { formatDay } from '@/lib/format'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 
 const toISO = (d: Date): string => {
@@ -45,6 +46,7 @@ export function DatePickerModal({
   onClose: () => void
 }) {
   const { c, dark } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
 
   if (Platform.OS === 'android') {
@@ -76,7 +78,7 @@ export function DatePickerModal({
             borderTopRightRadius: radius.lg,
             paddingHorizontal: sp.lg,
             paddingTop: sp.md,
-            paddingBottom: sp.xl,
+            paddingBottom: bottomGap,
             gap: sp.md,
           }}
         >

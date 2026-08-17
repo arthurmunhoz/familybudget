@@ -9,6 +9,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'r
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { useTheme, radius, sp } from '@/theme/theme'
 import { Txt } from '@/components/ui'
 import type { Budget } from '@/lib/types'
@@ -16,6 +17,7 @@ import type { Budget } from '@/lib/types'
 export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose: () => void }) {
   const { t } = useI18n()
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { profile, profiles } = useAuth()
   const [shared, setShared] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
@@ -63,7 +65,10 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.sheet, { backgroundColor: c.sheet }]} onPress={() => {}}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}
+          onPress={() => {}}
+        >
           <View style={[styles.grab, { backgroundColor: c.border }]} />
 
           <Txt variant="title">{t('budget.whoCanViewTitle')}</Txt>

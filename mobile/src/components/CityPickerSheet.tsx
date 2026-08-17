@@ -17,6 +17,7 @@ import { MapPin, X } from 'lucide-react-native'
 
 import { Field, Txt } from './ui'
 import { useI18n } from '../hooks/useI18n'
+import { useBottomGap } from '../hooks/useBottomGap'
 import { radius, sp, useTheme } from '../theme/theme'
 import { saveHomeLocation, searchCities, type HomeLocation } from '../lib/weather'
 import type { TKey } from '../lib/i18n'
@@ -24,6 +25,7 @@ import type { TKey } from '../lib/i18n'
 export function CityPickerSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { t } = useI18n()
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<HomeLocation[]>([])
   const [searching, setSearching] = useState(false)
@@ -93,7 +95,7 @@ export function CityPickerSheet({ onClose, onSaved }: { onClose: () => void; onS
             {/* keyboardShouldPersistTaps: a suggestion must be tappable while the
                 keyboard is still up, otherwise the first tap only dismisses it. */}
             <ScrollView
-              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl, gap: sp.md }}
+              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: bottomGap, gap: sp.md }}
               keyboardShouldPersistTaps="handled"
             >
               <Field

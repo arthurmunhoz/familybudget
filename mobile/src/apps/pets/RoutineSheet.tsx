@@ -19,6 +19,7 @@ import type { TKey } from '@/lib/i18n'
 import { templateTasks } from '@/lib/petCare'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetTaskIcon } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { CARE_ICONS, CARE_ICON_IDS } from './petUi'
 
@@ -44,6 +45,7 @@ export function RoutineSheet({
   onChanged: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const [busy, setBusy] = useState(false)
 
@@ -232,7 +234,7 @@ export function RoutineSheet({
 
             <ScrollView
               style={{ flexGrow: 0 }}
-              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl, gap: sp.md }}
+              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: bottomGap, gap: sp.md }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
             >

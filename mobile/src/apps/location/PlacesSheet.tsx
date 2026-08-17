@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { formatDistance } from '@/lib/location'
 import { fetchMyPlaceWatches, fetchPlaceEvents, fetchPlaces } from '@/lib/places'
 import type { Place, PlaceEvent, PlaceWatch, Profile } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
 import { Segmented } from '@/apps/budget/shared'
 import { timeAgo } from './locationUi'
@@ -36,6 +37,7 @@ export function PlacesSheet({
   onShowOnMap: (place: Place) => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
 
   const [tab, setTab] = useState<'places' | 'activity'>('places')
@@ -110,11 +112,12 @@ export function PlacesSheet({
               borderTopRightRadius: 22,
               paddingTop: sp.lg,
               paddingHorizontal: sp.lg,
-              // A plain gap under the footer, NOT the safe-area inset: the
-              // button's curved bottom is meant to sit down in the screen's
-              // corner, and insets.bottom (34pt) would float it well clear of
-              // the curve. Matches Pet Care's routine sheet.
-              paddingBottom: sp.xl,
+              // Only HALF of iOS's inset, so the button's curved bottom sits
+              // down in the screen's corner instead of floating clear of it —
+              // but the WHOLE of Android's navigation bar, which would
+              // otherwise cover the footer. useBottomGap does both; sp.xl is
+              // the floor when there's no system bar at all.
+              paddingBottom: bottomGap,
               gap: sp.md,
               // Fit the content (a household with 1 place gets a short sheet),
               // capped so a long list still leaves the map visible.

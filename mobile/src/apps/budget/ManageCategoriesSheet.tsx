@@ -27,6 +27,7 @@ import type { TKey } from '@/lib/i18n'
 import { CATEGORIES } from '@/lib/categories'
 import { supabase } from '@/lib/supabase'
 import type { CategoryOverride, CustomCategory } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 // Editable presets — salary is income-only, so it stays out of expense mgmt.
@@ -45,6 +46,7 @@ export default function ManageCategoriesSheet({
   onClose: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const [customList, setCustomList] = useState<CustomCategory[]>(categories)
   const [ovr, setOvr] = useState<CategoryOverride[]>(overrides)
@@ -279,7 +281,7 @@ export default function ManageCategoriesSheet({
             </View>
 
             <ScrollView
-              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl }}
+              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: bottomGap }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
             >

@@ -34,6 +34,10 @@ export const ROSTER_BOTTOM_GAP = 12
  *  map it covers, which is what BOTH the camera padding and the Mapbox logo
  *  offset are derived from — keep them derived, never hardcode a total. */
 export const ROSTER_CHROME = ROSTER_SHADOW_PAD * 2 + ROSTER_BOTTOM_GAP
+/** NOTE: `ROSTER_BOTTOM_GAP` is a MINIMUM. The roster sits on the screen's
+ *  bottom edge, so on Android it also has to span the navigation bar — whose
+ *  height is a per-user setting. Whereabouts widens it with `useBottomGap` and
+ *  derives the real roster height from that; don't reintroduce a fixed total. */
 
 /** Cards float directly on the map, so they carry their own lift. Matches the
  *  Toast's shadow — the app's other free-floating element. */

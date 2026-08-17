@@ -9,6 +9,7 @@ import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { createPingPreset, presetText, updatePingPreset } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 
 export function PresetEditor({
@@ -21,6 +22,7 @@ export function PresetEditor({
   onSaved: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const [emoji, setEmoji] = useState(preset?.emoji ?? '📣')
   const [label, setLabel] = useState(preset ? presetText(preset, t) : '')
@@ -53,7 +55,7 @@ export function PresetEditor({
             borderTopLeftRadius: radius.lg,
             borderTopRightRadius: radius.lg,
             padding: sp.lg,
-            paddingBottom: sp.xl,
+            paddingBottom: bottomGap,
             gap: sp.md,
           }}
         >

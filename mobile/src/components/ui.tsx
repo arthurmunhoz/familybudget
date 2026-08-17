@@ -24,6 +24,7 @@ import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 import { pickOn } from '../theme/contrast'
+import { useBottomGap } from '../hooks/useBottomGap'
 import { useRevealOnFocus } from './KeyboardScroll'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
@@ -73,6 +74,10 @@ export function Screen({
 }) {
   const { c } = useTheme()
   const inner = pad ? { paddingHorizontal: sp.lg } : undefined
+  // The scroller runs to the screen's bottom edge (`edges` deliberately omits
+  // 'bottom'), so the tail padding is also what keeps the LAST item clear of
+  // the system bar. sp.xxl alone left it under Android's navigation bar.
+  const tail = useBottomGap(sp.xxl)
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={edges}>
       {header ? <View style={inner}>{header}</View> : null}
@@ -84,7 +89,7 @@ export function Screen({
           <Animated.ScrollView
             ref={scrollRef}
             style={{ flex: 1 }}
-            contentContainerStyle={[{ paddingBottom: sp.xxl }, inner]}
+            contentContainerStyle={[{ paddingBottom: tail }, inner]}
             keyboardShouldPersistTaps="handled"
             // Swipe to put the keyboard away — the app's one way out, since
             // number pads have no return key and the system's own Done toolbar
@@ -346,10 +351,11 @@ export function NewItemButton({
   plus?: boolean
 }) {
   const { c } = useTheme()
-  const insets = useSafeAreaInsets()
-  // Half the inset still clears the home indicator; the sp.xs floor covers
-  // home-button devices (inset 0) so it never sits flush on the bezel.
-  const bottom = Math.max(Math.round(insets.bottom / 2), sp.xs)
+  // Half the inset still clears iOS's home indicator; on Android the whole
+  // navigation bar has to be cleared or it sits on top of the button. The sp.xs
+  // floor covers home-button devices (inset 0) so it never sits flush on the
+  // bezel. See hooks/useBottomGap.
+  const bottom = useBottomGap(sp.xs)
   return (
     <Pressable
       accessibilityRole="button"

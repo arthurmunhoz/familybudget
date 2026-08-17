@@ -15,6 +15,7 @@ import { HOUSEHOLD_COLOR, KIND_EMOJI, memberColor } from '@/lib/calendar'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { CalendarEvent, EventKind, EventRecurrence, Profile } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { DateField } from '@/apps/pets/petUi'
 import { OwnerChip, Pill, TimeField } from './calendarUi'
@@ -59,6 +60,7 @@ export default function EventForm({
   onDelete: (ev: CalendarEvent) => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const [saving, setSaving] = useState(false)
   const set = (patch: Partial<EventDraft>) => setDraft({ ...draft, ...patch })
@@ -298,7 +300,7 @@ export default function EventForm({
             />
           </ScrollView>
 
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl, gap: sp.md }}>
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap, gap: sp.md }}>
             <Btn
               title={editing ? t('common.saveChanges') : t('calendar.saveEvent')}
               onPress={save}

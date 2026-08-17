@@ -37,6 +37,7 @@ import {
 } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { DatePickerModal } from './shared'
@@ -48,6 +49,7 @@ type EntryBalance = Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>
 
 export default function Months({ budgetId }: { budgetId: string }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const { profile } = useAuth()
   const { isPlus } = usePlus()
@@ -368,7 +370,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
                 borderTopLeftRadius: radius.lg,
                 borderTopRightRadius: radius.lg,
                 padding: sp.md,
-                paddingBottom: sp.xl,
+                paddingBottom: bottomGap,
                 gap: sp.xs,
               }}
             >

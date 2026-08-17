@@ -12,6 +12,7 @@ import { Btn, Card, Txt } from '@/components/ui'
 import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { GLASS, GlassWash } from '@/theme/glass'
 import { useSchemePref } from '@/theme/scheme-pref'
@@ -57,6 +58,7 @@ function periodLabel(pkg: PurchasesPackage, t: (key: TKey) => string): string {
 
 export default function Paywall() {
   const { c, dark } = useTheme()
+  const bottomGap = useBottomGap(sp.xxl)
   const { scheme } = useSchemePref()
   const { t } = useI18n()
   const { offering, isPlus, available, loading, purchase, restore, isTrial, trialDaysLeft } =
@@ -110,7 +112,7 @@ export default function Paywall() {
       {/* GLASS: this is a modal ROUTE, so a transparent bg would show the screen
           behind it. Paint the wash as an opaque backing (matches the app). */}
       {GLASS ? <GlassWash dark={dark} scheme={scheme} /> : null}
-      <ScrollView contentContainerStyle={{ padding: sp.lg, paddingBottom: sp.xxl, gap: sp.lg }}>
+      <ScrollView contentContainerStyle={{ padding: sp.lg, paddingBottom: bottomGap, gap: sp.lg }}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={t('common.close')}>
             <X size={24} color={c.textMuted} />

@@ -31,6 +31,7 @@ import {
   WATCH_LIMIT_ERROR,
 } from '@/lib/safetyRadius'
 import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
 import { pickOn } from '@/theme/contrast'
 import { MemberAvatar, Section } from './locationUi'
@@ -57,6 +58,7 @@ export function SafetyRadiusSheet({
   onClose: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const kb = useKeyboardHeight()
 
@@ -196,12 +198,12 @@ export function SafetyRadiusSheet({
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
-            // A plain gap, NOT the safe-area inset: the bottom button's curve is
-            // meant to sit down in the screen's corner, and insets.bottom (34pt)
-            // would float it well clear of it. Less again while the keyboard is
-            // up, since marginBottom below has already lifted the whole drawer
-            // (the home-indicator inset sits behind the keyboard anyway).
-            paddingBottom: kb > 0 ? sp.lg : sp.xl,
+            // Half of iOS's inset (the button's curve is meant to sit down in
+            // the screen's corner, not float clear of it) but all of Android's
+            // navigation bar, which would otherwise cover the button — see
+            // useBottomGap. Less again while the keyboard is up, since
+            // marginBottom below has already lifted the whole drawer.
+            paddingBottom: kb > 0 ? sp.lg : bottomGap,
             marginBottom: kb,
             // sp.lg between sections, same rhythm as the place form — sp.md had
             // everything packed together.

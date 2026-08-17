@@ -12,6 +12,7 @@ import type { TKey } from '@/lib/i18n'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { DocCategory, Profile } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { CATEGORIES, formatBytes, randomUUID } from './docUtils'
 
@@ -43,6 +44,7 @@ export default function UploadSheet({
   onSaved: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
 
   const [title, setTitle] = useState(file.name.replace(/\.[^.]+$/, ''))
@@ -156,7 +158,7 @@ export default function UploadSheet({
             </ChipRow>
           </ScrollView>
 
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl }}>
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap }}>
             <Btn
               title={uploading ? t('docs.uploading') : t('docs.saveDoc')}
               onPress={upload}

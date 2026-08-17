@@ -53,6 +53,7 @@ import { usePlus } from '@/lib/plus'
 import { requestLive } from '@/lib/liveLocation'
 import { alertBreach, circlePolygon, fetchMyWatch, isOutside } from '@/lib/safetyRadius'
 import type { MemberLocation, Place, PlaceWatch, Profile, SafetyWatch } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import {
   BatteryChip,
@@ -63,7 +64,6 @@ import {
   MemberAvatar,
   Pulse,
   ROSTER_BOTTOM_GAP,
-  ROSTER_CHROME,
   ROSTER_SHADOW_PAD,
   timeAgo,
   WatchingChip,
@@ -103,11 +103,16 @@ const DRIVING_SPEED_MS = 3.5 // ~12.6 km/h — above walking pace → "Driving"
 const INITIAL_ZOOM = 13 // frame the user + their neighborhood on first open (not too tight)
 const FOCUS_ZOOM = 15 // closer, for when you've picked one person to look at
 
-/** How much map the floating roster covers, bottom-up. Drives where a focused
- *  member gets centred and where the breach banner sits. (The Mapbox/OSM credits
- *  used to be derived from this too, back when they sat above the roster; they
- *  live in the top-left now, so the roster can no longer cover them at all.) */
-const ROSTER_HEIGHT = CARD_H + ROSTER_CHROME
+/** How much map the floating roster covers, bottom-up — what the camera padding,
+ *  the breach banner's offset and the list padding are all derived from.
+ *
+ *  It is NOT a constant: the roster sits on the screen's bottom edge, so it also
+ *  spans whatever system bar is down there, and that's a per-user setting on
+ *  Android (3-button navigation ~48dp, gesture pill ~16–24, hidden 0). Hence
+ *  `gap` — see hooks/useBottomGap. (The Mapbox/OSM credits used to be derived
+ *  from this too, back when they sat above the roster; they live in the top-left
+ *  now, so the roster can no longer cover them at all.) */
+const rosterHeightFor = (gap: number) => CARD_H + ROSTER_SHADOW_PAD * 2 + gap
 /** Frame a place with room around its circle rather than flush to the edges. */
 const PLACE_FRAME_MARGIN = 1.7
 
@@ -314,6 +319,12 @@ export default function Whereabouts() {
   const { profile, profiles } = useAuth()
   const { isFree } = usePlus()
   const myEmail = profile?.email ?? null
+
+  // The roster floats on the screen's bottom edge, so its gap has to clear the
+  // system bar — otherwise Android's navigation bar covers the bottom of every
+  // member card, including your own (the way into the sharing controls).
+  const rosterGap = useBottomGap(ROSTER_BOTTOM_GAP)
+  const rosterHeight = rosterHeightFor(rosterGap)
 
   const cameraRef = useRef<Camera>(null)
   const rosterRef = useRef<ScrollView>(null)
@@ -616,11 +627,11 @@ export default function Whereabouts() {
         paddingLeft: sp.xl,
         paddingRight: sp.xl,
         // Clear the floating roster, or the place lands behind it.
-        paddingBottom: ROSTER_HEIGHT + sp.md,
+        paddingBottom: rosterHeight + sp.md,
       },
       animationDuration: 600,
     })
-  }, [])
+  }, [rosterHeight])
 
   const recenter = useCallback(() => {
     const pts = livePins.map((x) => [x.loc.lng, x.loc.lat] as [number, number])
@@ -679,7 +690,7 @@ export default function Whereabouts() {
             paddingTop: 0,
             paddingLeft: 0,
             paddingRight: 0,
-            paddingBottom: ROSTER_HEIGHT,
+            paddingBottom: rosterHeight,
           },
         })
       }
@@ -692,7 +703,7 @@ export default function Whereabouts() {
       // out at its final size (onExpandedLayout).
       if (!isMine) focusPending.current = true
     },
-    [selected, locByEmail, myEmail],
+    [selected, locByEmail, myEmail, rosterHeight],
   )
 
   /** The expanded card reporting where it ended up. Scrolling to its real x is
@@ -957,7 +968,7 @@ export default function Whereabouts() {
               position: 'absolute',
               left: sp.lg,
               right: sp.lg,
-              bottom: ROSTER_HEIGHT + sp.sm,
+              bottom: rosterHeight + sp.sm,
               gap: sp.sm,
             }}
           >
@@ -1023,7 +1034,7 @@ export default function Whereabouts() {
             left: 0,
             right: 0,
             bottom: 0,
-            paddingBottom: ROSTER_BOTTOM_GAP,
+            paddingBottom: rosterGap,
           }}
         >
           <ScrollView

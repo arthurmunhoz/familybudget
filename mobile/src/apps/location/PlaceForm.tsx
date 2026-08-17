@@ -24,6 +24,7 @@ import {
   upsertPlaceWatch,
 } from '@/lib/places'
 import type { Place, PlaceWatch, Profile } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
 import { Section } from './locationUi'
 
@@ -139,6 +140,7 @@ export function PlaceForm({
   onSaved: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const kb = useKeyboardHeight()
 
@@ -385,11 +387,11 @@ export function PlaceForm({
             borderTopLeftRadius: 22,
             borderTopRightRadius: 22,
             padding: sp.lg,
-            // A plain gap, NOT the safe-area inset: the Save button's curved
-            // bottom is meant to sit down in the screen's corner, and
-            // insets.bottom (34pt) would float it clear of the curve. Less while
-            // the keyboard is up, since marginBottom already lifts the drawer.
-            paddingBottom: kb > 0 ? sp.lg : sp.xl,
+            // Half of iOS's inset (the Save button's curve is meant to sit
+            // down in the screen's corner) but all of Android's navigation bar,
+            // which would otherwise cover it — see useBottomGap. Less while the
+            // keyboard is up, since marginBottom already lifts the drawer.
+            paddingBottom: kb > 0 ? sp.lg : bottomGap,
             marginBottom: kb,
             gap: sp.md,
             maxHeight: '88%',

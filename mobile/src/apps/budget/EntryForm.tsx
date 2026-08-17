@@ -36,6 +36,7 @@ import { track } from '@/lib/analytics'
 import { addDaysISO, formatDay, formatMoney, shortName, todayISO } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { CategoryOverride, CategoryRule, CustomCategory, Entry, EntryType, Profile } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { Chip, DatePickerModal } from './shared'
 import ManageCategoriesSheet from './ManageCategoriesSheet'
@@ -93,6 +94,7 @@ export default function EntryForm({
   onSaved: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
 
   const today = todayISO()
@@ -598,7 +600,7 @@ export default function EntryForm({
           </ScrollView>
 
           {/* footer */}
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl, gap: sp.md }}>
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap, gap: sp.md }}>
             {error ? <Txt style={{ color: c.expense, fontSize: 13 }}>{error}</Txt> : null}
             <Btn title={saveTitle} onPress={save} loading={saving} />
             {entry ? (
@@ -630,7 +632,7 @@ export default function EntryForm({
               borderTopRightRadius: radius.lg,
               paddingHorizontal: sp.lg,
               paddingTop: sp.lg,
-              paddingBottom: sp.xl,
+              paddingBottom: bottomGap,
               gap: sp.md,
             }}
           >

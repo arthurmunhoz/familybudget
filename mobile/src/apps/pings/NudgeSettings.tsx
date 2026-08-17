@@ -16,6 +16,7 @@ import { DraggableList } from '@/components/DraggableList'
 import { useI18n } from '@/hooks/useI18n'
 import { deletePingPreset, presetText, reorderPingPresets } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { PresetEditor } from './PresetEditor'
 
@@ -31,6 +32,7 @@ export function NudgeSettings({
   onClose: () => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<PingPreset | null>(null)
@@ -116,7 +118,10 @@ export function NudgeSettings({
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={[styles.sheet, { backgroundColor: c.sheet }]} onPress={() => {}}>
+          <Pressable
+          style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}
+          onPress={() => {}}
+        >
             <View style={[styles.grab, { backgroundColor: c.border }]} />
 
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>

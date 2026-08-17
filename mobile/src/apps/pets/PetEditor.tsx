@@ -14,6 +14,7 @@ import type { TKey } from '@/lib/i18n'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet } from '@/lib/types'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import type { PetIdentity } from './petIdentity'
 import { SPECIES, speciesEmoji } from './petMeta'
@@ -34,6 +35,7 @@ export function PetEditor({
   onSaved: (name?: string) => void
 }) {
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const { name, setName, emoji, setEmoji, photoPath } = identity
 
@@ -228,7 +230,7 @@ export function PetEditor({
               borderTopLeftRadius: radius.lg,
               borderTopRightRadius: radius.lg,
               paddingTop: sp.lg,
-              paddingBottom: sp.xl,
+              paddingBottom: bottomGap,
               maxHeight: '70%',
             }}
           >

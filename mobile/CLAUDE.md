@@ -200,6 +200,26 @@ Architecture, systems, remaining setup, and the improvement backlog are in
       (`setDefaultInputAccessoryView` returns early when the id is set), so a
       dead accessory view actively *removes* the Done button iOS would
       otherwise have drawn.
+- **Clearing the system bar at the bottom — `@/hooks/useBottomGap`.** Anything
+  docked to the bottom edge (a sheet's last row, a pinned CTA, a floating bar,
+  a scroller's tail) MUST get its bottom padding from this hook. Never a
+  constant, and never `insets.bottom` raw:
+  - **Android's navigation bar is an OCCLUDER** — content under it is invisible
+    and untappable — and its height is a per-USER setting, not a per-device
+    one: 3-button ~48dp, gesture pill ~16–24, hidden 0. Under edge-to-edge
+    (mandatory since Expo SDK 54) the app draws behind it regardless, so a
+    fixed gap covers some users' CTAs and not others'. This is why "it looks
+    fine on my phone" proves nothing.
+  - **iOS's home indicator is an OVERLAY** — content may sit near it, and
+    clearing the full 34pt floats a docked button off the screen's curve. So
+    the hook takes HALF on iOS and ALL on Android.
+  - `useBottomGap(min)` returns `max(clearance, min)`. Pass the constant the
+    code used before and iOS stays pixel-identical while Android gains exactly
+    what its bar needs. Applied to `Screen`'s scroll tail, `NewItemButton`, and
+    every bottom sheet — if you add a sheet, use it there too.
+  - Several sheets carry an old comment saying to use a plain gap and NOT the
+    inset. That reasoning was iOS-only and is now inside the hook; don't take
+    it as licence to hardcode.
 - **Keeping the focused field VISIBLE**: `@/components/KeyboardScroll` — a
   ScrollView that measures the focused field against its content and scrolls it
   into the visible window. `<Field>` reports its own focus through that

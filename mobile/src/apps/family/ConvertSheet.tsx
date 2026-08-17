@@ -5,6 +5,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { useTheme, sp, radius } from '@/theme/theme'
 import { Txt } from '@/components/ui'
 import { bloodCompat, convertRows, primaryLabel, type ConvertKind } from './units'
@@ -22,6 +23,7 @@ export function ConvertSheet({
 }) {
   const { t } = useI18n()
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xxl)
 
   const compat = kind === 'blood' ? bloodCompat(raw) : null
   const rows = kind === 'blood' ? null : convertRows(kind, raw)
@@ -30,7 +32,10 @@ export function ConvertSheet({
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* Inner press-catcher so taps on the sheet don't close it. */}
-        <Pressable style={[styles.sheet, { backgroundColor: c.sheet }]} onPress={() => {}}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}
+          onPress={() => {}}
+        >
           <View style={[styles.grab, { backgroundColor: c.border }]} />
 
           <Txt variant="label">{label}</Txt>

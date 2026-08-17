@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
 import { formatPhone, formatDay } from '@/lib/format'
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { useTheme, sp, radius, fonts } from '@/theme/theme'
 import { Btn, Field, Txt } from '@/components/ui'
 import type { MemberProfile, Profile } from '@/lib/types'
@@ -373,6 +374,7 @@ export function EditProfile({
 }) {
   const { t, lang } = useI18n()
   const { c } = useTheme()
+  const bottomGap = useBottomGap(sp.xl)
   // Default unit for empty fields: imperial for English, metric otherwise.
   const metric = lang !== 'en'
 
@@ -501,7 +503,7 @@ export function EditProfile({
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { backgroundColor: c.sheet }]}>
+        <View style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}>
           {/* header */}
           <View style={styles.sheetHead}>
             <Txt variant="h2">{t('family.editTitle')}</Txt>
