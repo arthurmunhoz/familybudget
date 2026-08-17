@@ -101,7 +101,7 @@ Questions or ideas? one.roof.family.organizer@gmail.com
 
 ---
 
-## What's New (v1.3) — 4000 char max; paste into the new version's "What's New"
+## What's New (v1.2.1) — 4000 char max; paste into the new version's "What's New"
 
 A polish-and-reliability release: no new marquee feature, so the notes lead with
 the fix people actually felt (stale data on reopen) rather than manufacturing a
@@ -160,7 +160,7 @@ Esta versão é sobre as coisas que você sente todo dia.
 Dúvidas ou ideias? one.roof.family.organizer@gmail.com
 ```
 
-### What does NOT change for v1.3
+### What does NOT change for v1.2.1
 - **Promotional text** — keep v1.2's Whereabouts line. It targets people seeing
   the listing for the first time, and this release adds no new marquee feature.
 - **App Privacy** — no new data collected and no new permissions, so the
