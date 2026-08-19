@@ -471,6 +471,85 @@ Text is largely reusable from `APP-STORE-LISTING.md`, but Play's fields differ:
 The feature graphic and Android screenshots are the only genuinely new creative
 work. Everything else is an edit of existing copy.
 
+### Short description (80 max) — 78
+
+```
+Shared calendar, shopping list, budget, pets and a family map — under one roof
+```
+
+### Full description (4000 max) — 2840
+
+Written for Play, not pasted from Apple. Four things had to change, and they're
+the things to preserve if you edit it:
+
+- **No iOS-only features.** Apple's copy sells Home-Screen widgets, Apple
+  Calendar sync and a "Face ID–locked vault". None of those exist on Android —
+  widgets and Apple Calendar aren't built, and the lock is a fingerprint or face
+  unlock. Promising them here is a listing that lies.
+- **Plus features are named as Plus.** Receipt scanning is capped monthly on
+  free, and Google Calendar sync, the vault lock, split-by-item, private budgets
+  and Safety Radius are all Plus. They're described in the body and then
+  attributed in the Plus block, mirroring the app's own paywall list
+  (`settings.plusFeature*`), so nothing reads as free that isn't.
+- **No kids framing.** A household here is couples, roommates and pets — see
+  `marketing/fact-sheet.md`. Place examples are home/work/class/the vet, not the
+  school run.
+- **Only claims on the fact sheet.** Every bullet traces to a verified feature.
+  No stats, no anecdotes.
+
+```
+Run your whole home from one app — not five.
+
+One Roof keeps your household's shopping list, budget, calendar, pets, documents and everyday coordination in a single shared space. Everyone at home sees the same thing, in sync, instantly.
+
+WHAT'S INSIDE
+
+• SHOPPING LIST — add an item and watch it appear on everyone's phone. Group by store, tick things off as you shop, and keep adding even with no signal: your changes upload themselves once you're back online.
+
+• MONEY — shared budgets by month, week or day, with categories you control. Photograph a receipt and the amount, date and category are filled in for you. See what your household really spends and saves, month after month, instead of starting from zero each time.
+
+• SHARED CALENDAR — everyone's plans in one place, color-coded by person, with birthdays, anniversaries and renewal reminders.
+
+• WHEREABOUTS — see your family on a live map with real drive-time ETAs, and get a heads-up when someone reaches or leaves a place that matters: home, work, class, the vet. Sharing is OFF until you turn it on, you can pause it whenever you like, and it is only ever visible to your own household.
+
+• PET CARE — a shared daily checklist, so "did anyone feed the dogs?" stops being a question. Track medications and recurring care, log weight over time, and keep vet visits and vaccines with a reminder before the next one is due.
+
+• DOCUMENTS — IDs, insurance, registrations and renewal dates kept together, so the number you need on a trip isn't buried in an old email.
+
+• NUDGES — one tap to say "on my way", "dinner's ready" or "need a hand". You can see when someone has read it, and an urgent nudge carries a call button.
+
+• FAMILY — everyone's details on one card: birthdays, phone numbers, sizes, blood types.
+
+• CALCULATOR — split a bill evenly, compare unit prices in the aisle, and work out a discount without guessing.
+
+A HOUSEHOLD IS WHOEVER LIVES UNDER YOUR ROOF
+
+Couples, families, roommates — and the pets. One invite code brings everyone in.
+
+PRIVATE BY DESIGN
+
+No ads. No tracking. We don't sell your data — not now, not later. Each household's information is walled off inside the database, so it's visible to its members and to nobody else.
+
+ONE ROOF PLUS
+
+Every new household starts with 30 days of Plus included, no card needed. Plus adds:
+
+• Unlimited AI receipt and bill scans
+• Two-way Google Calendar sync
+• A fingerprint or face lock on the Document Vault
+• Split a bill by item, straight from a photo
+• Multiple budgets, and private budgets only you can see
+• Safety Radius — draw a zone around someone and know the moment they leave it
+• Up to 12 people in your household
+
+One subscription covers the whole home: you pay per household, never per person.
+
+Available in English, Spanish and Portuguese.
+
+Questions or ideas? one.roof.family.organizer@gmail.com
+```
+
+
 ---
 
 ## 4b. Getting it onto your own Android phone today
