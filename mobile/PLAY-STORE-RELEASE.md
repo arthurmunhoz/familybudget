@@ -463,13 +463,34 @@ Text is largely reusable from `APP-STORE-LISTING.md`, but Play's fields differ:
 | Short description | 80 | **new copy needed** — Apple's 30-char subtitle is too short to reuse |
 | Full description | 4000 | adapt Apple's description; Play renders plain text, so drop the `•` styling if it looks rough |
 | App icon | 512×512 PNG, 32-bit | export from `assets/images/icon.png` |
-| Feature graphic | **1024×500** | **doesn't exist yet** — required, and there's no Apple equivalent to reuse |
+| Feature graphic | **1024×500** | ✅ `store/play-feature-graphic.png` — built here, no Apple equivalent to reuse |
 | Phone screenshots | 2–8, min 320px side | **new captures needed** — Android device frames, not the iOS ones |
 | Tablet screenshots | optional | `supportsTablet` is iOS-only config; skip unless you want tablet distribution |
 | Privacy policy URL | — | already live |
 
-The feature graphic and Android screenshots are the only genuinely new creative
-work. Everything else is an edit of existing copy.
+Android screenshots are now the only genuinely new creative work left.
+Everything else is an edit of existing copy.
+
+### Feature graphic — `store/play-feature-graphic.png`
+
+1024×500, RGB with **no alpha** (Play rejects transparency). Brand lockup on
+the app's own clay gradient: the roof glyph, the Fraunces wordmark, the tagline
+from the support page, and the module names as pills so a browsing user learns
+what the app does without reading the description.
+
+It is generated, not hand-drawn — `store/play-feature-graphic.html` is the
+source and `bash mobile/store/render-feature-graphic.sh` re-renders it through
+headless Chrome at exactly 1024×500. The fonts are pulled from the web app's
+`node_modules` at render time (the same Fraunces + Hanken Grotesk the app
+ships, so the graphic can't drift from the product's type) and are deliberately
+not committed. Edit the HTML and re-run rather than retouching the PNG.
+
+Two constraints baked into the layout, worth keeping if you restyle it:
+- **Nothing important within ~24px of any edge**, and the text block stays left
+  of the artwork — Play crops this asset for some placements.
+- **No price or promotional text** ("free", "30 days", "#1", "download now").
+  Play disallows it in graphic assets, which is why the Plus trial appears only
+  in the description.
 
 ### Short description (80 max) — 78
 

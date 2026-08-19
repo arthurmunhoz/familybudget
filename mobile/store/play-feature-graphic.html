@@ -1,0 +1,52 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+@font-face { font-family:'Fraunces'; src:url('fraunces.woff2') format('woff2-variations'); font-weight:100 900; }
+@font-face { font-family:'Hanken'; src:url('hanken.woff2') format('woff2-variations'); font-weight:100 900; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:1024px; height:500px; overflow:hidden; }
+.stage {
+  position:relative; width:1024px; height:500px;
+  background:
+    radial-gradient(120% 140% at 88% 12%, #d4794f 0%, rgba(212,121,79,0) 55%),
+    radial-gradient(90% 120% at 6% 96%, #9d4527 0%, rgba(157,69,39,0) 60%),
+    linear-gradient(118deg, #b45530 0%, #c2603f 46%, #a94e2c 100%);
+}
+/* Oversized glyph bleeding off the right — depth without competing for attention. */
+.watermark { position:absolute; right:-86px; top:50%; transform:translateY(-50%); width:486px; opacity:.115; }
+.watermark svg { display:block; width:100%; }
+.content { position:absolute; left:88px; top:50%; transform:translateY(-50%); width:640px; }
+.lockup { display:flex; align-items:center; gap:22px; margin-bottom:26px; }
+.mark { width:76px; height:76px; flex:none; }
+.mark svg { display:block; width:100%; }
+.name { font-family:'Fraunces'; font-weight:700; font-size:72px; line-height:1;
+        color:#fdf7f0; letter-spacing:-1.4px; }
+.tagline { font-family:'Hanken'; font-weight:500; font-size:31px; line-height:1.28;
+           color:rgba(255,248,240,.93); letter-spacing:-.2px; margin-bottom:30px; }
+.pills { display:flex; flex-wrap:wrap; gap:9px; max-width:560px; }
+.brk { flex-basis:100%; height:0; }
+.pill { font-family:'Hanken'; font-weight:600; font-size:16.5px; color:#fdf7f0;
+        background:rgba(255,246,236,.17); border:1px solid rgba(255,246,236,.26);
+        border-radius:999px; padding:8px 15px; white-space:nowrap; }
+</style></head><body>
+<div class="stage">
+  <div class="watermark">
+    <svg viewBox="0 0 100 100" fill="#fff8f0"><path fill-rule="evenodd" d="M10,52 L50,14 L90,52 L78,52 L78,82 L58,82 L58,66 A8,8 0 0 0 42,66 L42,82 L22,82 L22,52 Z"/></svg>
+  </div>
+  <div class="content">
+    <div class="lockup">
+      <div class="mark">
+        <svg viewBox="0 0 100 100" fill="#fdf7f0"><path fill-rule="evenodd" d="M10,52 L50,14 L90,52 L78,52 L78,82 L58,82 L58,66 A8,8 0 0 0 42,66 L42,82 L22,82 L22,52 Z"/></svg>
+      </div>
+      <div class="name">One Roof</div>
+    </div>
+    <div class="tagline">Your whole home, in one shared app.</div>
+    <div class="pills">
+      <span class="pill">Shopping list</span><span class="pill">Money</span>
+      <span class="pill">Calendar</span><span class="pill">Pet care</span>
+      <span class="brk"></span>
+      <span class="pill">Documents</span><span class="pill">Family map</span>
+      <span class="pill">Nudges</span>
+    </div>
+  </div>
+</div>
+</body></html>
