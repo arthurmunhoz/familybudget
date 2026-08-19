@@ -26,6 +26,30 @@ Output lands in `out/` at 1080×1920 — **upload those, not these**. Raw phone
 captures are around 20:9, which is taller than the 9:16 Play allows, so they get
 rejected on upload.
 
+## First, build a fresh APK
+
+There is no `expo-updates` in this project, so **nothing reaches a phone without
+a build** — every JS change is compiled in. Any APK from before 2026-08-19 is
+the wrong thing to photograph:
+
+- **Google sign-in was broken on Android** until the `auth-callback` route
+  landed, so you cannot sign in as the review account on an older build — and
+  that account is what you should be shooting with.
+- **The navigation bar covered docked buttons**, and the Add-pet sheet hid its
+  own fields behind the keyboard. Those are precisely the surfaces in shots 02,
+  06 and 08.
+- **The Whereabouts map may be blank** if the build predates
+  `EXPO_PUBLIC_MAPBOX_TOKEN` being added as an EAS env var (§4c) — which makes
+  shot 01, the most important one, impossible.
+
+```bash
+cd mobile && eas build --platform android --profile preview
+```
+
+`preview` is `distribution: internal`, so it produces an installable APK rather
+than an AAB, and it carries release chrome — no dev-menu artifacts and no
+`__DEV__` email/password button on the login screen.
+
 ## Two things to get right before you shoot
 
 **Use demo data, not your household.** These images are public forever. Sign in
