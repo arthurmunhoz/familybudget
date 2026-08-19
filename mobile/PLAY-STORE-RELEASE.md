@@ -402,7 +402,21 @@ covering both routes — the in-app path and an email request for uninstalled us
 Give Play this URL:
 `https://one-roof-app.vercel.app/support.html#delete-account`
 
-⚠️ It only goes live on the next `npx vercel deploy --prod`.
+The section satisfies all three things Play checks on that page: it names One
+Roof, it spells out both routes (in-app, and email for someone who has already
+uninstalled), and it states what is deleted, what is kept and for how long —
+the last one being the bullet most pages miss. Keep all three if you edit it.
+
+The "what is kept" wording tracks `delete_my_account()` (migration 078): a
+member who ISN'T the last in their household leaves the household's shared
+content behind, because budgets/lists/pets/documents belong to the household
+row, not to the account. Say so plainly rather than implying everything goes.
+
+⚠️ **It only goes live on the next `npx vercel deploy --prod`, and as of
+2026-08-17 production still serves the OLD page** — no `#delete-account` anchor
+and no email route. Deploy BEFORE pasting the URL into the Data safety form, or
+a reviewer following it lands on a page that tells uninstalled users to open an
+app they no longer have.
 
 ### 3.5 The remaining "App content" declarations
 
