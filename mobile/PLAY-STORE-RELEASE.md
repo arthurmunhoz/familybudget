@@ -50,12 +50,25 @@ silently otherwise: Nudges fan-out (`api/send-ping.ts`), the daily digest
 in and Android push works; leave it out and iOS builds are unaffected. The file is
 gitignored, so EAS needs it supplied.
 
-**Still yours to do (needs your Google account):**
-1. Firebase console → new project (or reuse) → add an **Android** app with package
-   `com.oneroof.app`.
-2. Download `google-services.json` into `mobile/`.
-3. Firebase → Project settings → Service accounts → generate a private key, then
-   upload it to Expo: `eas credentials` → Android → *FCM V1 service account key*.
+✅ **Done** (project `one-roof-family-organizer`, package `com.oneroof.app` — both
+cross-checked against the service account's `project_id`; a mismatch there fails
+silently at send time rather than at upload).
+
+⚠️ **A gitignored `google-services.json` is NOT enough.** EAS warns
+*"not checked in to your repository and won't be uploaded to the builder"* and then
+builds without it — push dies silently and the build still succeeds. The supported
+route is an EAS **file** env var, which materialises the file on the builder:
+
+```
+npx eas env:create --name GOOGLE_SERVICES_JSON --type file \
+  --value ./google-services.json --visibility secret --scope project \
+  --environment production --environment preview --environment development
+```
+
+`app.config.js` reads `process.env.GOOGLE_SERVICES_JSON` first and falls back to the
+local file, so `expo prebuild` / `run:android` still work off disk. Confirmation that
+it is wired: the "won't be uploaded to the builder" warning disappears from
+`eas build` output.
 
 No server change needed — `exp.host/--/api/v2/push/send` handles both platforms
 off the same Expo token, and the expo-token table is already platform-agnostic.

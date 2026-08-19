@@ -23,8 +23,19 @@ const path = require('node:path')
 // itself up; leave it out and iOS builds carry on unaffected. The file is
 // gitignored (it's per-Firebase-project config, not a secret but not ours to
 // commit), so CI/EAS needs it supplied — see PLAY-STORE-RELEASE.md §1.1.
+// EAS never uploads a gitignored file, even one referenced here — it warns
+// "not checked in to your repository and won't be uploaded to the builder" and
+// then builds WITHOUT it, so push dies silently. The supported route is a FILE
+// env var: `GOOGLE_SERVICES_JSON` is materialised on the builder and its value is
+// the absolute path to it. Locally that var is unset and we fall back to the file
+// on disk, so `expo prebuild` / `run:android` still work.
+//   npx eas env:create --name GOOGLE_SERVICES_JSON --type file \
+//     --value ./google-services.json --visibility secret --scope project \
+//     --environment production --environment preview --environment development
 const GOOGLE_SERVICES = path.join(__dirname, 'google-services.json')
-const googleServicesFile = fs.existsSync(GOOGLE_SERVICES) ? './google-services.json' : undefined
+const googleServicesFile =
+  process.env.GOOGLE_SERVICES_JSON ??
+  (fs.existsSync(GOOGLE_SERVICES) ? './google-services.json' : undefined)
 
 module.exports = ({ config }) => {
   const ios = config.ios ?? {}

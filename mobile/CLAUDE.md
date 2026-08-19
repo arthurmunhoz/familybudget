@@ -822,6 +822,17 @@ rather than a missing env var.
   over the air — every change needs a full rebuild.
 - `.env.example` is tracked and lists every var plus which ones EAS needs; keep it
   current when adding one.
+- **A gitignored FILE that `app.config.js` points at is not uploaded either** — EAS
+  warns "not checked in to your repository and won't be uploaded to the builder" and
+  then builds WITHOUT it, succeeding. Ship such files as an EAS **file** env var
+  (`--type file`), which materialises them on the builder and exposes the path as
+  `process.env.<NAME>`; `google-services.json` is wired exactly this way. Read the
+  env var first and fall back to the on-disk file so local prebuilds still work.
+- **`mobile/ios/` and `mobile/android/` get archived by EAS even though they are
+  gitignored**, which is why a cloud build uploads ~1.5 GB and spends ~7 min doing
+  it. They are generated (CNG) — deleting them locally costs only a `prebuild` to
+  regenerate. A `.easignore` in `mobile/` did NOT change the archive size; don't
+  reach for that without measuring.
 
 ## Android push (channels + FCM) — read before touching notifications
 Android delivery differs from iOS in three ways that are easy to break silently.
