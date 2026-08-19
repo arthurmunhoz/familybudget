@@ -213,6 +213,22 @@ Architecture, systems, remaining setup, and the improvement backlog are in
       whatever is behind it — in a sheet that's the page showing through the
       gap below. It's a native `UIToolbar`; nothing about it is stylable from
       JS. Removed 2026-08-16 for that reason.
+    - **A `returnKeyType` on a number pad summons that same capsule** with no
+      accessory prop anywhere in sight — this is the way it comes back by
+      accident. `setDefaultInputAccessoryView` builds the toolbar when the
+      keyboard is a number/decimal/phone pad AND `returnKeyType` is any of
+      done/go/next/search/send/join/route/google/yahoo/emergencyCall; the unset
+      default is the one value NOT in that set. So never pair `returnKeyType`
+      with `keyboardType="decimal-pad"|"number-pad"|"phone-pad"`: there is no
+      return key for it to label, and the only visible effect is the capsule.
+      (Audited 2026-08-19 — every `returnKeyType` in the app is on a text
+      keyboard, and no number pad has one.)
+    - **To check any of this you MUST turn off the simulator's hardware
+      keyboard** (I/O → Keyboard → Connect Hardware Keyboard, or `defaults write
+      com.apple.iphonesimulator ConnectHardwareKeyboard -bool false` then
+      restart Simulator). With it on, no software keyboard is drawn and no
+      accessory bar with it — the screen looks fixed whether it is or not. That
+      false negative has cost two rounds of debugging.
     - Beware the second-order trap if you ever reintroduce either: setting
       `inputAccessoryViewID` makes RN skip its own number-pad toolbar
       (`setDefaultInputAccessoryView` returns early when the id is set), so a
