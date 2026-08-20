@@ -28,7 +28,7 @@ import { Avatar } from './Avatar'
 import { MemberDetails } from './MemberDetail'
 import { EditProfile } from './EditProfile'
 import { ConvertSheet } from './ConvertSheet'
-import { type Member } from './familyShared'
+import { hasDetails, type Member } from './familyShared'
 import { type ConvertKind } from './units'
 
 const AV_BASE = 84 // rendered avatar size (scaled per position by the carousel)
@@ -141,6 +141,37 @@ export default function Family() {
           {members.map((m) => {
             const p = byEmail[m.email]
             const isMe = m.email === profile?.email
+            // Nothing filled in yet → no card at all. A full-height card around
+            // one line of grey text read as a loading failure; the name is
+            // already under the photo in the carousel, so the card's chrome was
+            // carrying nothing.
+            if (!hasDetails(p)) {
+              return (
+                <View
+                  key={m.email}
+                  style={{
+                    width,
+                    paddingHorizontal: sp.xl,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: sp.lg,
+                  }}
+                >
+                  <Txt variant="muted" style={{ textAlign: 'center', lineHeight: 22 }}>
+                    {isMe
+                      ? t('family.emptyMine')
+                      : t('family.emptyOther', { name: m.display_name })}
+                  </Txt>
+                  {isMe ? (
+                    // Bounded rather than edge-to-edge: a lone button stretched
+                    // across a phone reads as a form footer, not an invitation.
+                    <View style={{ width: '100%', maxWidth: 320 }}>
+                      <Btn title={t('family.addMyInfo')} onPress={openEditMine} />
+                    </View>
+                  ) : null}
+                </View>
+              )
+            }
             return (
               <View
                 key={m.email}

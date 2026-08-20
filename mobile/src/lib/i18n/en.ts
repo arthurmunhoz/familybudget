@@ -638,6 +638,13 @@ export const en = {
   'family.editTitle': 'My info',
   'family.you': 'You',
   'family.empty': 'Nothing filled in yet.',
+  // Shown INSTEAD of the card when a member has filled nothing in — see the
+  // empty branch in Family.tsx. Mine gets a reason to bother; someone else's is
+  // just a statement of fact, since I can't fill it in for them.
+  'family.emptyMine':
+    'You haven’t added your details yet. Sizes, blood type, allergies — the things your household ends up asking you for.',
+  'family.emptyOther': '{name} hasn’t added any details yet.',
+  'family.addMyInfo': 'Add my info',
   'family.yrs': '{years} yrs old',
   'family.notSet': 'Not set',
   'family.saveFailed': 'Could not save — please try again.',

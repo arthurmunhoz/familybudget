@@ -12,6 +12,16 @@ export interface Member {
 export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
 /** Plain text profile fields, in display order (birthday handled separately). */
+/** Does this member have anything to show on their card? Kept next to FIELDS
+ *  because it has to agree with what MemberDetails actually renders — Family
+ *  swaps the whole card for a centred empty state when this is false, and the
+ *  two disagreeing would mean either an empty card or a hidden detail. */
+export function hasDetails(profile: MemberProfile | undefined): boolean {
+  if (!profile) return false
+  if (profile.birthday) return true
+  return FIELDS.some(([key]) => !!profile[key])
+}
+
 export const FIELDS: [keyof MemberProfile, TKey][] = [
   ['phone', 'family.phone'],
   ['blood_type', 'family.bloodType'],

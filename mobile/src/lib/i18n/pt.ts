@@ -634,6 +634,10 @@ export const pt: Record<keyof typeof en, string> = {
   'family.editTitle': 'Minhas informações',
   'family.you': 'Você',
   'family.empty': 'Nada preenchido ainda.',
+  'family.emptyMine':
+    'Você ainda não adicionou seus dados. Tamanhos, tipo sanguíneo, alergias — o que sua família sempre acaba perguntando.',
+  'family.emptyOther': '{name} ainda não adicionou os dados.',
+  'family.addMyInfo': 'Adicionar meus dados',
   'family.yrs': '{years} anos',
   'family.notSet': 'Não definido',
   'family.saveFailed': 'Não foi possível salvar — tente novamente.',

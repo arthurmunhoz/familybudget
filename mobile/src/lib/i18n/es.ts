@@ -634,6 +634,10 @@ export const es: Record<keyof typeof en, string> = {
   'family.editTitle': 'Mi información',
   'family.you': 'Tú',
   'family.empty': 'Aún no hay nada.',
+  'family.emptyMine':
+    'Todavía no agregas tus datos. Tallas, tipo de sangre, alergias — lo que tu familia acaba preguntándote.',
+  'family.emptyOther': '{name} todavía no agregó sus datos.',
+  'family.addMyInfo': 'Agregar mis datos',
   'family.yrs': '{years} años',
   'family.notSet': 'Sin definir',
   'family.saveFailed': 'No se pudo guardar — inténtalo de nuevo.',
