@@ -32,6 +32,60 @@ the tester list so you can add people without a new release.
 
 ---
 
+## 1.0 The Android package name is NOT the iOS bundle id ← read before any build
+
+`android.package` is **`one.roof.family.organizer`**. The iOS bundle id stays
+`com.oneroof.app`. They differ on purpose and must not be "tidied up" into
+agreement.
+
+Why: the first upload to Play was rejected with two errors that are the same
+fact stated twice —
+
+```
+Your APK or Android App Bundle needs to have the package name one.roof.family.organizer
+Remove conflicts from the manifest ... content provider authorities are in use
+by other developers: com.oneroof.app.androidx-startup
+```
+
+The second is the real news: `androidx-startup`'s provider authority is derived
+from the applicationId, and Play reports it as **claimed by another developer**
+— so `com.oneroof.app` is not available on Play at all, by anyone but its
+owner. And a Play app's package is immutable after the console entry is
+created, so the listing could not be moved to meet the build either. The build
+had to move.
+
+**Changing it has one hard prerequisite: Firebase.** `google-services.json`
+registers clients per package, and ours holds only `com.oneroof.app`. The Google
+Services Gradle plugin FAILS the build with "No matching client found for
+package name" when there's no match — so a rebuild without this step does not
+produce a broken app, it produces no app:
+
+1. Firebase console → the SAME project (`one-roof-family-organizer`) → Add app →
+   Android → package `one.roof.family.organizer`. Keep the old client; one
+   project holds many, and the downloaded file will carry both.
+2. Download the new `google-services.json` over `mobile/google-services.json`.
+3. Re-upload it to EAS, since the builder reads the env var, not your disk:
+   ```
+   npx eas env:delete GOOGLE_SERVICES_JSON --non-interactive
+   npx eas env:create --name GOOGLE_SERVICES_JSON --type file \
+     --value ./google-services.json --visibility secret --scope project \
+     --environment production --environment preview --environment development
+   ```
+4. Rebuild.
+
+Knock-on effects, all one-time:
+- **RevenueCat's Play app must use `one.roof.family.organizer`** when you wire
+  billing (§1.5) — the store app is keyed by package name.
+- **Any sideloaded APK on your phone is a different app now.** The old package
+  won't be replaced or upgraded; uninstall it or you'll have two One Roofs.
+- **Google sign-in is unaffected** — it runs Supabase's OAuth in a browser and
+  returns via the `oneroof://` scheme, so there's no SHA-1 or package
+  registration tied to it.
+- **iOS is untouched.** Its bundle id, App Group (`group.com.oneroof.app`) and
+  widgets all key off the Apple id, which has not changed.
+
+---
+
 ## 1. Must-fix in the app before submitting
 
 These were real defects or blockers on Android, verified in the tree. **All four
@@ -249,7 +303,7 @@ Worth knowing so you don't go looking:
 
 | Thing | Status |
 |---|---|
-| `android.package` | `com.oneroof.app` — set |
+| `android.package` | `one.roof.family.organizer` — see §1.0; NOT the iOS bundle id |
 | Adaptive icon | foreground + background + **monochrome** all present (`assets/images/android-icon-*.png`) — themed-icon ready |
 | Splash screen | `expo-splash-screen` configured with light + dark |
 | `versionCode` | `appVersionSource: "remote"` + `autoIncrement: true` — EAS manages it |

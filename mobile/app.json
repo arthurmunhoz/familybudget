@@ -31,7 +31,7 @@
       }
     },
     "android": {
-      "package": "com.oneroof.app",
+      "package": "one.roof.family.organizer",
       "adaptiveIcon": {
         "backgroundColor": "#fbf6f0",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
