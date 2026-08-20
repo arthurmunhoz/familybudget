@@ -857,6 +857,26 @@ rather than a missing env var.
   (`--type file`), which materialises them on the builder and exposes the path as
   `process.env.<NAME>`; `google-services.json` is wired exactly this way. Read the
   env var first and fall back to the on-disk file so local prebuilds still work.
+- **Bumping the version for a local Xcode archive: edit `app.json`, then
+  PREBUILD.** `expo.version` + `expo.ios.buildNumber` are written into
+  `ios/OneRoof/Info.plist` as LITERALS at prebuild time, so editing Xcode's
+  General tab does nothing durable and editing `app.json` alone doesn't reach
+  the archive. This already cost one confused archive that read 1.2.0 (3) while
+  Xcode showed 1.2.1 (4).
+  - **The incremental `expo prebuild -p ios` FAILS on this project** —
+    `@bacons/apple-targets` can't update the existing `OneRoofWidgets` target
+    (`Cannot read properties of undefined (reading 'removeFromProject')`). Use
+    `--clean`, which regenerates `ios/` and reinstalls pods.
+  - **Xcode's General tab lies about the build number.** It shows the app
+    target's `CURRENT_PROJECT_VERSION`, which prebuild leaves at the template
+    default of `1`; the number that actually ships is the literal in
+    `Info.plist`. The WIDGET target is the opposite — it has
+    `GENERATE_INFOPLIST_FILE = YES`, so ITS version really does come from
+    `CURRENT_PROJECT_VERSION`/`MARKETING_VERSION` (prebuild sets both correctly).
+    Patch the app target's two `CURRENT_PROJECT_VERSION` lines to match after a
+    prebuild if you want the UI to agree; nothing ships differently either way.
+  - `eas.json` sets `appVersionSource: "remote"`, so an EAS build takes its
+    numbers from EAS, NOT from `app.json`. `app.json` governs local archives only.
 - **`mobile/ios/` and `mobile/android/` get archived by EAS even though they are
   gitignored**, which is why a cloud build uploads ~1.5 GB and spends ~7 min doing
   it. They are generated (CNG) — deleting them locally costs only a `prebuild` to
