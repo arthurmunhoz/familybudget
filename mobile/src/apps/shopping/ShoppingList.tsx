@@ -655,7 +655,7 @@ export default function ShoppingList() {
           away, which is the only way out now that scrolling doesn't. The add
           bar below is deliberately OUTSIDE it — tapping beside the field you
           are typing in shouldn't close the keyboard. */}
-      <DismissKeyboard>
+      <DismissKeyboard style={{ flex: 1 }}>
         <View style={{ paddingHorizontal: sp.lg }}>
           <AppHeader
             title={t('shopping.title')}

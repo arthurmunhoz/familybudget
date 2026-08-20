@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, Switch, TextInput, View } from 'react-native'
 import { X } from 'lucide-react-native'
 
-import { Btn, Txt } from '@/components/ui'
+import { Btn, DismissKeyboard, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { createPingPreset, presetText, updatePingPreset } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
@@ -49,7 +49,7 @@ export function PresetEditor({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}
       >
-        <View
+        <DismissKeyboard
           style={{
             backgroundColor: c.sheet,
             borderTopLeftRadius: radius.lg,
@@ -134,7 +134,7 @@ export function PresetEditor({
             loading={saving}
             disabled={!label.trim()}
           />
-        </View>
+        </DismissKeyboard>
       </KeyboardAvoidingView>
     </Modal>
   )

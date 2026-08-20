@@ -190,7 +190,11 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     from `@/components/ui` for the fixed chrome AROUND the scrollers — headers,
     backgrounds, and lists too full to leave a gap to tap. `Screen` wraps its
     whole body in one, so plain screens get it for free; ShoppingList wraps its
-    header + list by hand because it doesn't use `Screen`.
+    header + list by hand because it doesn't use `Screen`. It can also BE a
+    sheet panel rather than wrap one — pass the panel's own style and delete the
+    `View` it replaces, which is how SafetyRadiusSheet, PresetEditor and the
+    rename dialog in Months got covered (none of them has a scroller around
+    their fields).
   - **Tapping the dimmed backdrop** in sheets that have one (EntryForm calls
     `Keyboard.dismiss()` there), plus the return key on ordinary text keyboards.
   - **Scrolling deliberately does NOT dismiss.** `keyboardDismissMode="on-drag"`

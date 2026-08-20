@@ -16,6 +16,7 @@ import {
   TextInput,
   type TextInputProps,
   View,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native'
 import type { ScrollViewProps } from 'react-native'
@@ -61,16 +62,20 @@ export function Txt({
  *  this never fires mid-drag. Scrollers cover their own inert space through
  *  `keyboardShouldPersistTaps="handled"`; this covers the fixed chrome around
  *  them (headers, backgrounds) and lists too full to leave a gap to tap.
- *  `accessible={false}` keeps it out of VoiceOver — it is not a control. */
+ *  `accessible={false}` keeps it out of VoiceOver — it is not a control.
+ *
+ *  `style` is applied as-is and nothing is assumed, so this can either WRAP a
+ *  page (`style={{ flex: 1 }}`) or BE a sheet panel — pass the panel's own
+ *  style and drop the View it replaces, and the layout is unchanged. */
 export function DismissKeyboard({
   children,
   style,
 }: {
   children: ReactNode
-  style?: ViewStyle
+  style?: StyleProp<ViewStyle>
 }) {
   return (
-    <Pressable accessible={false} onPress={() => Keyboard.dismiss()} style={[{ flex: 1 }, style]}>
+    <Pressable accessible={false} onPress={() => Keyboard.dismiss()} style={style}>
       {children}
     </Pressable>
   )
@@ -109,7 +114,7 @@ export function Screen({
   const tail = useBottomGap(sp.xxl)
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={edges}>
-      <DismissKeyboard>
+      <DismissKeyboard style={{ flex: 1 }}>
       {header ? <View style={inner}>{header}</View> : null}
       {scroll ? (
         // `padding` is what makes the keyboard's top edge the bottom of the

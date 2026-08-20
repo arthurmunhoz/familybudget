@@ -17,7 +17,17 @@ import {
   X,
 } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
+import {
+  AppHeader,
+  Btn,
+  Card,
+  DismissKeyboard,
+  EmptyState,
+  Field,
+  Loader,
+  NewItemButton,
+  Txt,
+} from '@/components/ui'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useToday } from '@/hooks/useToday'
 import { track } from '@/lib/analytics'
@@ -425,7 +435,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
       {/* rename modal */}
       {renameOpen && (
         <Modal visible animationType="slide" transparent onRequestClose={() => setRenameOpen(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
+          <DismissKeyboard style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
             <View style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
               <Txt variant="h2">{t('months.renameTitle')}</Txt>
               <Field value={name} onChangeText={setName} autoFocus />
@@ -434,7 +444,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
                 <Btn title={t('common.save')} onPress={renameBudget} loading={saving} disabled={!name.trim()} style={{ flex: 1 }} />
               </View>
             </View>
-          </View>
+          </DismissKeyboard>
         </Modal>
       )}
 

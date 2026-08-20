@@ -8,7 +8,7 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-nat
 import { router } from 'expo-router'
 import { ShieldCheck, Sparkles } from 'lucide-react-native'
 
-import { Btn, Field, Txt } from '@/components/ui'
+import { Btn, DismissKeyboard, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { usePlus } from '@/lib/plus'
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
@@ -190,7 +190,7 @@ export function SafetyRadiusSheet({
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
-        <View
+        <DismissKeyboard
           style={{
             // c.sheet (not c.card): the glass skin makes `card` translucent, which
             // would let the map bleed through this panel's text.
@@ -236,7 +236,7 @@ export function SafetyRadiusSheet({
               </View>
 
               <Section shrink>
-                <ScrollView style={{ flexShrink: 1 }}>
+                <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled">
                   {watch.watched.map((email, i) => {
                     const p = profiles.find((x) => x.email === email)
                     const loc = locByEmail.get(email)
@@ -325,7 +325,7 @@ export function SafetyRadiusSheet({
               {!myLive ? <Txt variant="muted">{t('location.safety.needLocation')}</Txt> : null}
 
               <Section title={t('location.safety.pickPeople')} shrink>
-                <ScrollView style={{ flexShrink: 1 }}>
+                <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled">
                   {others.map((p, i) => {
                     const on = picked.includes(p.email)
                     return (
@@ -551,7 +551,7 @@ export function SafetyRadiusSheet({
               )}
             </>
           )}
-        </View>
+        </DismissKeyboard>
       </View>
     </Modal>
   )
