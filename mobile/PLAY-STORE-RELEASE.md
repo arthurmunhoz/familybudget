@@ -462,7 +462,7 @@ Text is largely reusable from `APP-STORE-LISTING.md`, but Play's fields differ:
 | App name | 30 | `One Roof: Family Organizer` (26) — same as Apple |
 | Short description | 80 | **new copy needed** — Apple's 30-char subtitle is too short to reuse |
 | Full description | 4000 | adapt Apple's description; Play renders plain text, so drop the `•` styling if it looks rough |
-| App icon | 512×512 PNG, 32-bit | export from `assets/images/icon.png` |
+| App icon | 512×512 PNG, 32-bit | ✅ `store/play-store-icon-512.png` |
 | Feature graphic | **1024×500** | ✅ `store/play-feature-graphic.png` — built here, no Apple equivalent to reuse |
 | Phone screenshots | 2–8, min 320px side | ⚠️ **you must shoot these** — `store/screenshots/raw/README.md` has the shot list; the compositor is built |
 | Tablet screenshots | optional | `supportsTablet` is iOS-only config; skip unless you want tablet distribution |
@@ -493,6 +493,31 @@ taller than 9:16 and gets rejected at upload. Compositing onto a fixed
 
 Rendering goes through Chrome rather than PIL because the captions must use the
 app's own UI face, and those font files are woff2 — which PIL cannot read.
+
+### App icon — `store/play-store-icon-512.png`
+
+⚠️ **The Android launcher icon was the Expo template's blue chevron** until
+2026-08-20. `app.json` pointed `adaptiveIcon` at
+`assets/images/android-icon-{foreground,background,monochrome}.png`, and all
+three were still the scaffold's placeholder art — so the clay house only ever
+appeared on iOS and in the stores, never on an Android home screen.
+
+`store/render-app-icon.py` now renders every icon from one vector definition:
+`icon.png`, `splash-icon.png`, the three adaptive layers, and the 512 Play
+listing icon. Three things it gets right that are easy to miss:
+
+- **The adaptive foreground is sized to the SAFE ZONE, not the canvas.** Android
+  launchers pick their own mask, and only the middle 66% is guaranteed. The
+  limit is the glyph's diagonal, not its width — at 490px wide on a 1024 canvas
+  the half-diagonal is 325 against a safe radius of 341. A full-bleed glyph
+  loses its eaves on a round launcher.
+- **The monochrome layer is shape-only.** Android 13+ themed icons tint the
+  alpha channel; colour in that file is ignored and then looks broken.
+- **`icon.png` has no alpha, the adaptive layers must have it.** The script
+  asserts both rather than hoping.
+
+The doorway is a cut-out, not a filled or lit shape: a lit door was tried and
+mushes together at 48dp, where the notch still reads.
 
 ### Feature graphic — `store/play-feature-graphic.png`
 
