@@ -184,21 +184,30 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     verbatim port any more) — the extra behaviour is native-only by nature.
 - **Dismissing the keyboard**: iOS gives no global gesture for it, and this app
   deliberately has **no "Done" bar of any kind**. The way out is:
-  - **`keyboardDismissMode="on-drag"` on the surrounding scroller** — swipe the
-    content and the keyboard goes. The shared `Screen` primitive sets it, so
-    every scrolling screen has it for free; a modal with its own `ScrollView`
-    must set it itself (RoutineSheet, EditProfile, EntryForm,
-    ManageCategoriesSheet, ShoppingList all do). Prefer `on-drag` over
-    `interactive`: interactive needs the scroll area to extend UNDER the
-    keyboard, and a `KeyboardAvoidingView` guarantees it doesn't. Pair it with
-    `keyboardShouldPersistTaps="handled"` so a tap on a button still lands
-    instead of only closing the keyboard. Do NOT put it on a HORIZONTAL
-    scroller (a chip row) — picking a chip isn't "I'm done typing".
+  - **A tap on anything inert.** Two mechanisms, both already wired:
+    `keyboardShouldPersistTaps="handled"` on every scroller (a tap no child
+    claimed dismisses; a tap on a button still lands), and `<DismissKeyboard>`
+    from `@/components/ui` for the fixed chrome AROUND the scrollers — headers,
+    backgrounds, and lists too full to leave a gap to tap. `Screen` wraps its
+    whole body in one, so plain screens get it for free; ShoppingList wraps its
+    header + list by hand because it doesn't use `Screen`.
   - **Tapping the dimmed backdrop** in sheets that have one (EntryForm calls
     `Keyboard.dismiss()` there), plus the return key on ordinary text keyboards.
-  - **Number pads have no return key**, so on those the scroll gesture IS the
-    only way out. Any new `decimal-pad`/`number-pad` field must sit inside a
-    scroller that dismisses, or a sheet whose backdrop does.
+  - **Scrolling deliberately does NOT dismiss.** `keyboardDismissMode="on-drag"`
+    was the mechanism from 2026-08-16 to 2026-08-20 and was removed: it made it
+    impossible to scroll a form to see what you were typing, which is the main
+    reason to scroll while a keyboard is up. Don't reintroduce it. (`interactive`
+    is not an option either — it needs the scroll area to extend UNDER the
+    keyboard, and the `KeyboardAvoidingView` guarantees it doesn't.)
+  - **The keyboard's top edge is the bottom of the layout**, and that is what
+    makes tap-to-dismiss sufficient: `KeyboardAvoidingView` with
+    `behavior="padding"` (iOS) shrinks the page to the space above the keyboard,
+    so every row is reachable by scrolling instead of by hiding the keyboard.
+    Android gets the same from `adjustResize`. A modal can't use KAV (it
+    mis-measures — see `useKeyboardHeight`) and lifts itself instead.
+  - **Number pads have no return key**, so a tap is the ONLY way out of one. Any
+    new `decimal-pad`/`number-pad` field must sit inside a `Screen`, a
+    `<DismissKeyboard>`, or a sheet whose backdrop dismisses.
   - **Do NOT add a Done button back.** Both mechanisms iOS offers were tried and
     rejected on this app:
     - `<InputAccessoryView>` **cannot work** under the New Architecture as a

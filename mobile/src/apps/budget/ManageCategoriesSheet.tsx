@@ -283,7 +283,6 @@ export default function ManageCategoriesSheet({
             <ScrollView
               contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: bottomGap }}
               keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
             >
               {/* Defaults (built-in presets) */}
               <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>

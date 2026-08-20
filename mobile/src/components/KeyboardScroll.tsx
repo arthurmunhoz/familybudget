@@ -120,7 +120,6 @@ export function KeyboardScroll({
         // starts null — the type just predates React 19's stricter RefObject.
         innerViewRef={contentRef as RefObject<View>}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
         scrollEventThrottle={16}
         {...rest}
         onLayout={(e) => {

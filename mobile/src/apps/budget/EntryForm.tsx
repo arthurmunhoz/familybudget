@@ -316,7 +316,6 @@ export default function EntryForm({
             style={{ flexGrow: 0 }}
             contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
           >
             {/* expense / income — compact centered pill */}
             <View style={{ alignItems: 'center' }}>
@@ -649,7 +648,7 @@ export default function EntryForm({
               </Pressable>
             </View>
 
-            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+            <ScrollView keyboardShouldPersistTaps="handled">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
                 {allExpenseCats.map((cat) => {
                   const active = category === cat.id

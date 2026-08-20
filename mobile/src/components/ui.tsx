@@ -4,6 +4,7 @@
 import { useRef, type ReactNode, type Ref } from 'react'
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -47,6 +48,34 @@ export function Txt({
   return <Text {...rest} style={[map[variant], style]} />
 }
 
+/** Tap anything inert to put the keyboard away.
+ *
+ *  This is the app's way out of a keyboard. It replaced
+ *  `keyboardDismissMode="on-drag"` on 2026-08-20: dismissing on scroll meant
+ *  you could not move a form up to read what you were typing without losing
+ *  the keyboard, which is the opposite of what scrolling is for.
+ *
+ *  It is safe to wrap a whole page in: a Pressable only ever sees taps that
+ *  NOTHING else claimed — buttons, rows and text fields win the responder
+ *  first — and a scroll gesture takes the responder away on its first move, so
+ *  this never fires mid-drag. Scrollers cover their own inert space through
+ *  `keyboardShouldPersistTaps="handled"`; this covers the fixed chrome around
+ *  them (headers, backgrounds) and lists too full to leave a gap to tap.
+ *  `accessible={false}` keeps it out of VoiceOver — it is not a control. */
+export function DismissKeyboard({
+  children,
+  style,
+}: {
+  children: ReactNode
+  style?: ViewStyle
+}) {
+  return (
+    <Pressable accessible={false} onPress={() => Keyboard.dismiss()} style={[{ flex: 1 }, style]}>
+      {children}
+    </Pressable>
+  )
+}
+
 export function Screen({
   children,
   scroll = false,
@@ -80,8 +109,13 @@ export function Screen({
   const tail = useBottomGap(sp.xxl)
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={edges}>
+      <DismissKeyboard>
       {header ? <View style={inner}>{header}</View> : null}
       {scroll ? (
+        // `padding` is what makes the keyboard's top edge the bottom of the
+        // page: the KAV grows a bottom pad the height of the keyboard, so the
+        // scroller shrinks to the space left above it and every row can be
+        // reached by scrolling WITHOUT the keyboard getting in the way.
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
@@ -90,13 +124,11 @@ export function Screen({
             ref={scrollRef}
             style={{ flex: 1 }}
             contentContainerStyle={[{ paddingBottom: tail }, inner]}
+            // A tap on inert content puts the keyboard away; a tap on a button
+            // still lands. Scrolling deliberately does NOT dismiss (see
+            // DismissKeyboard) — you need to be able to scroll a form to read
+            // what you are typing.
             keyboardShouldPersistTaps="handled"
-            // Swipe to put the keyboard away — the app's one way out, since
-            // number pads have no return key and the system's own Done toolbar
-            // is not usable here (see the keyboard note in mobile/CLAUDE.md).
-            // Paired with keyboardShouldPersistTaps above, so a tap on a button
-            // still lands while the keyboard is up rather than only closing it.
-            keyboardDismissMode="on-drag"
             onScroll={onScroll}
             scrollEventThrottle={16}
           >
@@ -106,6 +138,7 @@ export function Screen({
       ) : (
         <View style={[{ flex: 1 }, inner]}>{children}</View>
       )}
+      </DismissKeyboard>
     </SafeAreaView>
   )
 }

@@ -579,7 +579,6 @@ export function EditProfile({
             style={{ flexGrow: 0 }}
             contentContainerStyle={{ gap: sp.md, paddingBottom: sp.sm }}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
           >
             {/* your name (allowed_users.display_name — how the family sees you) */}
             <View style={{ gap: 6 }}>

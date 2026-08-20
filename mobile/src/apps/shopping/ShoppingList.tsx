@@ -25,7 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronLeft, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
 
-import { AppHeader, Loader, Txt } from '@/components/ui'
+import { AppHeader, DismissKeyboard, Loader, Txt } from '@/components/ui'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
 import { readCache, useRevalidateOnForeground, writeCache } from '@/hooks/useCachedQuery'
@@ -651,82 +651,84 @@ export default function ShoppingList() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
-      <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader
-          title={t('shopping.title')}
-          right={
-            openCount > 0 ? (
-              <View style={[styles.countPill, { backgroundColor: c.surface }]}>
-                <Txt variant="label">{openCount}</Txt>
-              </View>
-            ) : undefined
-          }
-        />
-      </View>
-
-      {loading ? (
-        <Loader />
-      ) : items.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={[styles.emptyIcon, { backgroundColor: c.surface }]}>
-            <ShoppingCart size={40} strokeWidth={2} color={c.textFaint} />
-          </View>
-          <Txt variant="body" style={{ color: c.textMuted, marginTop: sp.lg }}>
-            {t('shopping.empty')}
-          </Txt>
-          <Txt variant="faint">{t('shopping.emptyHint')}</Txt>
+      {/* Header + list: a tap on any inert part of either puts the keyboard
+          away, which is the only way out now that scrolling doesn't. The add
+          bar below is deliberately OUTSIDE it — tapping beside the field you
+          are typing in shouldn't close the keyboard. */}
+      <DismissKeyboard>
+        <View style={{ paddingHorizontal: sp.lg }}>
+          <AppHeader
+            title={t('shopping.title')}
+            right={
+              openCount > 0 ? (
+                <View style={[styles.countPill, { backgroundColor: c.surface }]}>
+                  <Txt variant="label">{openCount}</Txt>
+                </View>
+              ) : undefined
+            }
+          />
         </View>
-      ) : (
-        <SectionList
-          ref={listRef}
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          // REQUIRED by the scroll-to-added-item above: without getItemLayout,
-          // scrollToIndex throws an invariant for any row past the last one
-          // measured, and this handler is what turns that into a graceful
-          // approximate scroll instead of a red screen.
-          onScrollToIndexFailed={(info) => {
-            listRef.current
-              ?.getScrollResponder()
-              ?.scrollTo({ y: info.averageItemLength * info.index, animated: true })
-          }}
-          renderSectionHeader={renderSectionHeader}
-          stickySectionHeadersEnabled={false}
-          // flex:1 so the list fills the space ABOVE the add bar (which is now
-          // in normal flow) — the old `paddingBottom: 220 + inset` was a guess
-          // at the overlay's height and hid rows whenever the bar was taller.
-          style={{ flex: 1 }}
-          contentContainerStyle={{
-            paddingHorizontal: sp.lg,
-            paddingBottom: sp.md,
-          }}
-          ItemSeparatorComponent={() => <View style={{ height: sp.sm }} />}
-          SectionSeparatorComponent={() => <View style={{ height: sp.xs }} />}
-          keyboardShouldPersistTaps="handled"
-          // Swipe the list to put the keyboard away. The other two ways out
-          // both stop working on a FULL list: there's no blank area left to tap
-          // (this list grows to fill the screen), and the return key adds the
-          // item without dismissing — `blurOnSubmit={false}` below, which is
-          // deliberate so you can rattle off several items in a row.
-          // `on-drag` and not `interactive`: interactive needs the scroll area
-          // to extend UNDER the keyboard so you can drag it down, and the
-          // KeyboardAvoidingView here does the opposite — it lifts the add bar
-          // and shrinks the list to sit entirely above it, leaving nothing to
-          // grab. Scrolling loses nothing, since whatever you'd typed stays in
-          // the field.
-          keyboardDismissMode="on-drag"
-          ListFooterComponent={
-            doneCount > 0 ? (
-              <Pressable onPress={clearChecked} style={styles.clearBtn}>
-                <Txt variant="label" style={{ color: c.accent }}>
-                  {t('shopping.clearChecked')}
-                </Txt>
-              </Pressable>
-            ) : null
-          }
-        />
-      )}
+
+        {loading ? (
+          <Loader />
+        ) : items.length === 0 ? (
+          <View style={styles.empty}>
+            <View style={[styles.emptyIcon, { backgroundColor: c.surface }]}>
+              <ShoppingCart size={40} strokeWidth={2} color={c.textFaint} />
+            </View>
+            <Txt variant="body" style={{ color: c.textMuted, marginTop: sp.lg }}>
+              {t('shopping.empty')}
+            </Txt>
+            <Txt variant="faint">{t('shopping.emptyHint')}</Txt>
+          </View>
+        ) : (
+          <SectionList
+            ref={listRef}
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            // REQUIRED by the scroll-to-added-item above: without getItemLayout,
+            // scrollToIndex throws an invariant for any row past the last one
+            // measured, and this handler is what turns that into a graceful
+            // approximate scroll instead of a red screen.
+            onScrollToIndexFailed={(info) => {
+              listRef.current
+                ?.getScrollResponder()
+                ?.scrollTo({ y: info.averageItemLength * info.index, animated: true })
+            }}
+            renderSectionHeader={renderSectionHeader}
+            stickySectionHeadersEnabled={false}
+            // flex:1 so the list fills the space ABOVE the add bar (which is now
+            // in normal flow) — the old `paddingBottom: 220 + inset` was a guess
+            // at the overlay's height and hid rows whenever the bar was taller.
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              paddingHorizontal: sp.lg,
+              paddingBottom: sp.md,
+            }}
+            ItemSeparatorComponent={() => <View style={{ height: sp.sm }} />}
+            SectionSeparatorComponent={() => <View style={{ height: sp.xs }} />}
+            // Scrolling the list does NOT dismiss the keyboard — the whole
+            // point of scrolling here is to check what's already on the list
+            // while you type the next item. The way out is a tap on anything
+            // inert (the DismissKeyboard around the header and list), which
+            // still works on a list too full to have a gap left in it: the
+            // header is always there. The return key deliberately doesn't
+            // dismiss either — `blurOnSubmit={false}` below, so you can rattle
+            // off several items in a row.
+            ListFooterComponent={
+              doneCount > 0 ? (
+                <Pressable onPress={clearChecked} style={styles.clearBtn}>
+                  <Txt variant="label" style={{ color: c.accent }}>
+                    {t('shopping.clearChecked')}
+                  </Txt>
+                </Pressable>
+              ) : null
+            }
+          />
+        )}
+
+      </DismissKeyboard>
 
       {/* Add bar: store chips + text field, pinned above the keyboard. */}
       <KeyboardAvoidingView
@@ -967,10 +969,6 @@ export default function ShoppingList() {
                   style={{ maxHeight: 420 }}
                   contentContainerStyle={{ paddingBottom: sp.md }}
                   keyboardShouldPersistTaps="handled"
-                  // Same as the main list: this sheet has its own text field
-                  // (the custom-store name) and, in a sheet, even less spare
-                  // room to tap.
-                  keyboardDismissMode="on-drag"
                 >
                   {stores.length > 0 ? (
                     <>
