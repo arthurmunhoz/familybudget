@@ -41,6 +41,17 @@ export async function takePendingDisplayName(): Promise<string> {
 
 WebBrowser.maybeCompleteAuthSession()
 
+/** How long the launch screen will wait for the stored session before giving
+ *  up and rendering. Long enough that a healthy-but-slow Keychain read still
+ *  wins the race (so nobody sees Login flash), short enough that a wedged one
+ *  doesn't look like a crash. See the effect in AuthProvider. */
+const SESSION_READ_DEADLINE_MS = 8000
+
+/** Profile lookups retry on a transient failure rather than resolving to "no
+ *  household" — that would send a signed-in member to Onboarding and invite
+ *  them to create a SECOND household. */
+const PROFILE_RETRY_MS = [700, 2000, 5000]
+
 const DEV_EMAIL = process.env.EXPO_PUBLIC_DEV_EMAIL ?? ''
 const DEV_PASSWORD = process.env.EXPO_PUBLIC_DEV_PASSWORD ?? ''
 
@@ -72,16 +83,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
-      setSession(data.session)
-      setLoading(false)
-    })
+    const done = () => {
+      if (active) setLoading(false)
+    }
+    // `loading` gates the whole app behind BrandSplash, so this promise must
+    // ALWAYS resolve it — it previously had neither a catch nor a deadline, and
+    // one stuck session read left the app spinning on its launch screen until it
+    // was force-quit (reported on Android, first launch after installing).
+    // Bailing out early is safe: `onAuthStateChange` below fires INITIAL_SESSION
+    // with whatever the read eventually finds, so a slow-but-alive read still
+    // lands the user in the Hub instead of on Login.
+    const bail = setTimeout(done, SESSION_READ_DEADLINE_MS)
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return
+        setSession(data.session)
+      })
+      .catch(() => {
+        /* treated as "no session" — the user can sign in again */
+      })
+      .finally(() => {
+        clearTimeout(bail)
+        done()
+      })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next)
+      done()
     })
     return () => {
       active = false
+      clearTimeout(bail)
       sub.subscription.unsubscribe()
     }
   }, [])
@@ -125,19 +157,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     let active = true
-    supabase
-      .from('allowed_users')
-      .select('email, display_name, household_id, is_admin, role')
-      .eq('email', email)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) {
-          setProfile((data as Profile) ?? null)
-          setProfileLoaded(true)
-        }
-      })
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    // Retried, not caught-and-cleared: this query is what decides Hub vs
+    // Onboarding, and a network blip resolving to `null` would tell a member
+    // with a household that they haven't got one. Only a real answer from the
+    // server — row or no row — is allowed to set `profileLoaded`.
+    const attempt = async (n: number) => {
+      try {
+        const { data, error } = await supabase
+          .from('allowed_users')
+          .select('email, display_name, household_id, is_admin, role')
+          .eq('email', email)
+          .maybeSingle()
+        if (!active) return
+        if (error) throw error
+        setProfile((data as Profile) ?? null)
+        setProfileLoaded(true)
+      } catch {
+        if (!active) return
+        const wait = PROFILE_RETRY_MS[n]
+        if (wait != null) timer = setTimeout(() => void attempt(n + 1), wait)
+      }
+    }
+    void attempt(0)
+
     return () => {
       active = false
+      if (timer) clearTimeout(timer)
     }
   }, [email])
 

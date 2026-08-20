@@ -63,6 +63,44 @@ function secureStore(): SecureStoreModule | null {
 /** Comfortably under the Keychain's practical per-entry ceiling. */
 const CHUNK_SIZE = 1800
 
+/** A native call that never settles must not take the launch down with it.
+ *
+ *  This read is the FIRST thing supabase-js does — `getSession()` awaits its
+ *  own `initialize()`, which awaits this storage read — so anything that
+ *  wedges here strands the app on its launch spinner until the user force
+ *  quits. On Android that is a live risk on the FIRST launch after an install,
+ *  because expo-secure-store is talking to the Android Keystore, which
+ *  generates its key on first use; the second launch finds the key already
+ *  there and flies (exactly the "stuck once, fine after reopening" report).
+ *
+ *  A rejection was already handled — it falls back to AsyncStorage. A hang was
+ *  not, and couldn't be, without bounding it. 6s is deliberately generous: a
+ *  healthy Keychain read is milliseconds, so this only ever fires when
+ *  something is genuinely stuck. */
+const READ_TIMEOUT_MS = 6000
+
+function withTimeout<T>(work: Promise<T>, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let settled = false
+    const finish = (v: T) => {
+      if (settled) return
+      settled = true
+      resolve(v)
+    }
+    const timer = setTimeout(() => finish(fallback), READ_TIMEOUT_MS)
+    work.then(
+      (v) => {
+        clearTimeout(timer)
+        finish(v)
+      },
+      () => {
+        clearTimeout(timer)
+        finish(fallback)
+      },
+    )
+  })
+}
+
 function opts(mod: SecureStoreModule): SecureStoreOptions {
   return { keychainAccessible: mod.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY }
 }
@@ -117,7 +155,10 @@ export const secureSessionStore = {
     const mod = secureStore()
     if (!mod) return AsyncStorage.getItem(key)
     try {
-      const stored = await readChunks(mod, key)
+      // Timed out, NOT on the write path: a bounded write that "fails" would
+      // still fall through to removing the plaintext copy below, which could
+      // drop a session we never actually persisted.
+      const stored = await withTimeout(readChunks(mod, key), null)
       if (stored != null) return stored
       // One-time migration off AsyncStorage so upgrades don't sign users out.
       const legacy = await AsyncStorage.getItem(key)
