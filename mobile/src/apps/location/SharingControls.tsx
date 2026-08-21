@@ -7,8 +7,8 @@
 // LocationDisclosure screen before the OS background-location prompt — a Google
 // Play requirement (PLAY-STORE-RELEASE.md §3.1), not a nicety. Don't call
 // ensureBackgroundPermission() from here without it.
-import { useEffect, useState } from 'react'
-import { Linking, Modal, Pressable, StyleSheet, Switch, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChevronRight } from 'lucide-react-native'
 
@@ -78,6 +78,23 @@ export function SharingControls({
   const [busy, setBusy] = useState(false)
   // Which action is waiting behind the prominent disclosure (see `gate` below).
   const [pending, setPending] = useState<'enable' | 'resume' | null>(null)
+  /** A ref as well as `busy`, because state is set asynchronously: two taps in
+   *  the same frame both read `busy === false` and both start an action. The
+   *  ref flips synchronously, so the second tap loses. */
+  const inFlight = useRef(false)
+
+  /** Run one sharing action at a time, with the switch showing progress for the
+   *  WHOLE of it — including the permission check, which used to run before
+   *  anything was marked busy. */
+  const run = (fn: () => Promise<void>) => {
+    if (inFlight.current) return
+    inFlight.current = true
+    setBusy(true)
+    void fn().finally(() => {
+      inFlight.current = false
+      setBusy(false)
+    })
+  }
 
   useEffect(() => {
     let active = true
@@ -96,62 +113,69 @@ export function SharingControls({
   const fgLabels = { title: t('location.fg.title'), body: t('location.fg.body') }
   const toast = (text: string) => onToast({ emoji: '📍', text })
 
+  /** Put the first fix on the map WITHOUT holding the UI open for it.
+   *
+   *  `captureAndUpload` asks for a fresh GPS position, and a cold GPS fix on
+   *  Android is seconds — tens of them indoors. Awaiting it before flipping the
+   *  switch is what made turning sharing on feel broken: the toggle sprang back,
+   *  nothing happened, and people tapped again. The background task is already
+   *  running by this point and reports fixes on its own, so this only makes the
+   *  dot appear sooner; `onChanged` re-runs when it lands. */
+  const primeFirstFix = () => {
+    void captureAndUpload()
+      .then(() => onChanged())
+      .catch(() => {})
+  }
+
   const enable = async () => {
-    setBusy(true)
+    // Optimistic: the switch moves on touch. Reverted below if the OS prompt is
+    // declined, which is the only way this fails visibly.
+    setOn(true)
     const ok = await ensureBackgroundPermission()
     if (!ok) {
+      setOn(false)
       setPermDenied(true)
-      setBusy(false)
       return
     }
     setPermDenied(false)
     await setSharing(true)
     await startBackgroundUpdates(fgLabels).catch(() => {})
-    await captureAndUpload().catch(() => {})
-    setOn(true)
     setPausedUntil(null)
     toast(t('location.toast.on'))
     onChanged()
-    setBusy(false)
+    primeFirstFix()
   }
 
   const disable = async () => {
-    setBusy(true)
-    await setSharing(false)
-    await stopBackgroundUpdates().catch(() => {})
     setOn(false)
     setPausedUntil(null)
+    await setSharing(false)
+    await stopBackgroundUpdates().catch(() => {})
     toast(t('location.toast.off'))
     onChanged()
-    setBusy(false)
   }
 
   const doPause = async (until: Date) => {
-    setBusy(true)
+    setPausedUntil(until)
     await pauseSharing(until)
     await stopBackgroundUpdates().catch(() => {})
-    setPausedUntil(until)
     toast(t('location.toast.paused'))
     onChanged()
-    setBusy(false)
   }
 
   const resume = async () => {
-    setBusy(true)
+    setPausedUntil(null)
+    setOn(true)
     const ok = await ensureBackgroundPermission()
     if (!ok) {
       setPermDenied(true)
-      setBusy(false)
       return
     }
     await resumeSharing()
     await startBackgroundUpdates(fgLabels).catch(() => {})
-    await captureAndUpload().catch(() => {})
-    setPausedUntil(null)
-    setOn(true)
     toast(t('location.toast.on'))
     onChanged()
-    setBusy(false)
+    primeFirstFix()
   }
 
   /** Google Play requires the prominent disclosure to be on screen BEFORE the
@@ -160,19 +184,18 @@ export function SharingControls({
    *  permission is already granted no prompt will appear, so the disclosure is
    *  skipped and the action runs straight away. */
   const gate = (action: 'enable' | 'resume') => {
-    void (async () => {
+    run(async () => {
       if (await hasBackgroundPermission()) {
         await (action === 'enable' ? enable() : resume())
         return
       }
       setPending(action)
-    })()
+    })
   }
 
   const onToggle = (v: boolean) => {
-    if (busy) return
     if (v) gate('enable')
-    else void disable()
+    else run(disable)
   }
 
   const in1h = () => new Date(Date.now() + 60 * 60 * 1000)
@@ -215,12 +238,20 @@ export function SharingControls({
               <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>
                 {on ? t('location.share.toggle') : t('location.share.off')}
               </Txt>
-              {on && householdName ? (
+              {/* While an action runs, say so where the reassurance line goes —
+                  turning sharing on can wait on an OS prompt and a network
+                  write, and silence there is what made people tap twice. */}
+              {busy ? (
+                <Txt variant="muted" style={{ fontSize: 12 }}>
+                  {on ? t('location.share.turningOn') : t('location.share.turningOff')}
+                </Txt>
+              ) : on && householdName ? (
                 <Txt variant="muted" style={{ fontSize: 12 }}>
                   {t('location.share.visibleTo', { name: householdName })}
                 </Txt>
               ) : null}
             </View>
+            {busy ? <ActivityIndicator color={c.accent} style={{ marginRight: sp.sm }} /> : null}
             <Switch
               value={on}
               onValueChange={onToggle}
@@ -254,15 +285,17 @@ export function SharingControls({
                   title={t('location.share.resume')}
                   variant="secondary"
                   onPress={() => gate('resume')}
+                  loading={busy}
+                  disabled={busy}
                 />
               </View>
             ) : (
               <>
                 <Txt variant="label">{t('location.share.break')}</Txt>
                 <View style={{ backgroundColor: c.surface, borderRadius: radius.md, paddingHorizontal: sp.md }}>
-                  <PauseRow label={t('location.share.pause1h')} onPress={() => void doPause(in1h())} />
+                  <PauseRow label={t('location.share.pause1h')} onPress={() => run(() => doPause(in1h()))} />
                   <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
-                  <PauseRow label={t('location.share.pauseTonight')} onPress={() => void doPause(endOfToday())} />
+                  <PauseRow label={t('location.share.pauseTonight')} onPress={() => run(() => doPause(endOfToday()))} />
                 </View>
               </>
             )
@@ -285,7 +318,10 @@ export function SharingControls({
           onAccept={() => {
             const action = pending
             setPending(null)
-            void (action === 'enable' ? enable() : resume())
+            // Through run(), like every other entry point: this is the SLOWEST
+            // path — an OS prompt, a write and a task start — so it is the one
+            // that most needs the switch to show progress.
+            run(action === 'enable' ? enable : resume)
           }}
           onDecline={() => {
             const action = pending

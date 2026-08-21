@@ -51,6 +51,8 @@ export const en = {
   'location.share.toggle': 'Share my location',
   'location.share.visibleTo': 'Visible to {name}',
   'location.share.off': 'Sharing is off',
+  'location.share.turningOn': 'Turning on…',
+  'location.share.turningOff': 'Turning off…',
   'location.share.break': 'Take a break',
   'location.share.pause1h': 'Pause for 1 hour',
   'location.share.pauseTonight': 'Pause until tonight',

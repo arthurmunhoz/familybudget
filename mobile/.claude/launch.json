@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "mobile-web",
+      "name": "landing",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["expo", "start", "--web"],
-      "port": 8081
+      "runtimeArgs": ["serve", "-l", "5180", "/Users/arthurmunhoz/Documents/Arthur/FamilyApps/family-budget/landing"],
+      "port": 5180
     }
   ]
 }

@@ -49,6 +49,8 @@ export const pt: Record<keyof typeof en, string> = {
   'location.share.toggle': 'Compartilhar minha localização',
   'location.share.visibleTo': 'Visível para {name}',
   'location.share.off': 'Compartilhamento desativado',
+  'location.share.turningOn': 'Ativando…',
+  'location.share.turningOff': 'Desligando…',
   'location.share.break': 'Faça uma pausa',
   'location.share.pause1h': 'Pausar por 1 hora',
   'location.share.pauseTonight': 'Pausar até a noite',
