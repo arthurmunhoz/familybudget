@@ -91,7 +91,7 @@ Knock-on effects, all one-time:
 These were real defects or blockers on Android, verified in the tree. **All four
 are now DONE in code** — what remains is the console work called out in §1.1.
 
-### 1.1 FCM credentials — without this, zero push notifications ✅ code done / ⚠️ console work remains
+### 1.1 FCM credentials — without this, zero push notifications ✅ done
 
 Android push goes through Firebase Cloud Messaging; Expo's push service can't
 deliver to Android without FCM V1 credentials. Everything push-driven dies
@@ -104,9 +104,29 @@ silently otherwise: Nudges fan-out (`api/send-ping.ts`), the daily digest
 in and Android push works; leave it out and iOS builds are unaffected. The file is
 gitignored, so EAS needs it supplied.
 
-✅ **Done** (project `one-roof-family-organizer`, package `com.oneroof.app` — both
-cross-checked against the service account's `project_id`; a mismatch there fails
-silently at send time rather than at upload).
+✅ **Done, all three parts** (2026-08-22):
+
+| Piece | Where it lives | What it does |
+|---|---|---|
+| `google-services.json` | EAS file env var, compiled into the app | lets the app register with FCM and get a token |
+| FCM V1 service account key | Expo credentials, per app identifier | lets Expo's push service authenticate to FCM and send |
+| Android channels | `src/lib/notifications.ts` (§1.3) | decides whether a push arrives as a heads-up |
+
+All three are required and each fails silently on its own, which is why "push
+doesn't work on Android" was never one bug.
+
+Two things cross-checked, because both fail at SEND time rather than at upload
+— i.e. the build succeeds, the app looks healthy, and nothing ever arrives:
+
+- The service account's project (`one-roof-family-organizer`) matches
+  `project_info.project_id` in `google-services.json`. ✅
+- `google-services.json` contains a client for `one.roof.family.organizer`, the
+  package actually being built. ✅ (It also still carries `com.oneroof.app` for
+  the App Store build — see §1.0 for why the two differ.)
+
+**The FCM key is per application identifier.** It was added under
+`one.roof.family.organizer`; a key sitting on the old identifier does nothing
+for the build on Play. Same trap as the keystore.
 
 ⚠️ **A gitignored `google-services.json` is NOT enough.** EAS warns
 *"not checked in to your repository and won't be uploaded to the builder"* and then
