@@ -162,7 +162,7 @@ export const es: Record<keyof typeof en, string> = {
   'location.safety.entered': '{name} volvió al área',
   'location.safety.breachBody': 'a {dist} del centro',
   'location.card.manage': 'Gestionar mi ubicación',
-  'location.card.sharing': 'Compartir',
+  'location.card.sharing': 'Ajustes',
   'location.card.watching': 'Vigilando',
   'location.safety.bannerTitle': 'Radio de seguridad activo',
   'location.safety.bannerWho': 'Vigilando a {names}',

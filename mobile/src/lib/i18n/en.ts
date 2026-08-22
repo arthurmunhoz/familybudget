@@ -166,7 +166,10 @@ export const en = {
   'location.safety.entered': '{name} is back inside',
   'location.safety.breachBody': '{dist} from the centre',
   'location.card.manage': 'Manage location sharing',
-  'location.card.sharing': 'Sharing',
+  // The button on YOUR OWN card. Deliberately not "Sharing": as a label
+  // under a gear it read as a statement of fact, so it looked like
+  // location sharing was already on when it wasn't.
+  'location.card.sharing': 'Settings',
   'location.card.watching': 'Watching',
   'location.safety.bannerTitle': 'Safety radius on',
   'location.safety.bannerWho': 'Watching {names}',
