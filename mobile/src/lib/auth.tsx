@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as WebBrowser from 'expo-web-browser'
@@ -47,10 +47,17 @@ WebBrowser.maybeCompleteAuthSession()
  *  doesn't look like a crash. See the effect in AuthProvider. */
 const SESSION_READ_DEADLINE_MS = 8000
 
-/** Profile lookups retry on a transient failure rather than resolving to "no
- *  household" — that would send a signed-in member to Onboarding and invite
- *  them to create a SECOND household. */
-const PROFILE_RETRY_MS = [700, 2000, 5000]
+/** Backoff for the profile lookup. Retrying rather than resolving to "no
+ *  household" matters because the latter would send a signed-in member to
+ *  Onboarding and invite them to create a SECOND one.
+ *
+ *  The last value REPEATS FOREVER. Giving up after a few tries left
+ *  `profileLoaded` false, and the root route renders BrandSplash for as long as
+ *  that is false — so abandoning the retry stranded the user on the launch
+ *  spinner with no way out but force-quitting. That is the "stuck at login,
+ *  sometimes" report: it needed only a few seconds of bad connectivity right
+ *  after sign-in, which is exactly when this runs. */
+const PROFILE_RETRY_MS = [700, 2000, 5000, 10_000]
 
 const DEV_EMAIL = process.env.EXPO_PUBLIC_DEV_EMAIL ?? ''
 const DEV_PASSWORD = process.env.EXPO_PUBLIC_DEV_PASSWORD ?? ''
@@ -157,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     let active = true
+    let settled = false
     let timer: ReturnType<typeof setTimeout> | null = null
 
     // Retried, not caught-and-cleared: this query is what decides Hub vs
@@ -164,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // with a household that they haven't got one. Only a real answer from the
     // server — row or no row — is allowed to set `profileLoaded`.
     const attempt = async (n: number) => {
+      if (!active || settled) return
       try {
         const { data, error } = await supabase
           .from('allowed_users')
@@ -172,19 +181,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle()
         if (!active) return
         if (error) throw error
+        settled = true
         setProfile((data as Profile) ?? null)
         setProfileLoaded(true)
       } catch {
         if (!active) return
-        const wait = PROFILE_RETRY_MS[n]
-        if (wait != null) timer = setTimeout(() => void attempt(n + 1), wait)
+        // Never runs off the end of the list — the last delay repeats, so this
+        // keeps trying and heals itself when the connection comes back.
+        const wait = PROFILE_RETRY_MS[Math.min(n, PROFILE_RETRY_MS.length - 1)]
+        timer = setTimeout(() => void attempt(n + 1), wait)
       }
     }
     void attempt(0)
 
+    // Reopening the app is what people do when a screen looks stuck, so make it
+    // work instead of making them wait out the backoff.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || settled) return
+      if (timer) clearTimeout(timer)
+      void attempt(0)
+    })
+
     return () => {
       active = false
       if (timer) clearTimeout(timer)
+      sub.remove()
     }
   }, [email])
 

@@ -30,6 +30,7 @@ import { AppPrefsProvider } from '@/hooks/useAppPrefs';
 import { TilePrefProvider } from '@/hooks/useTilePref';
 import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
 import { useGeofenceSync } from '@/hooks/useGeofenceSync';
+import { useLocationSync } from '@/hooks/useLocationSync';
 import { useSyncPushToken } from '@/hooks/useSyncPushToken';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 import { SchemePrefProvider, useSchemePref } from '@/theme/scheme-pref';
@@ -98,6 +99,9 @@ function Chrome() {
   // Register this device's geofences on launch/foreground, not just when the
   // Whereabouts screen is opened — see useGeofenceSync.
   useGeofenceSync();
+  // Android drops background location updates when the app is terminated and
+  // never restarts them on its own — see the hook.
+  useLocationSync();
   // Repair a stale/rotated Expo push token on launch (never prompts).
   useSyncPushToken();
   return (

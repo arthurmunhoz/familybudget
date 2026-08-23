@@ -383,6 +383,21 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
 - `src/lib/locationTask.ts` — the background TASK (module-scope `defineTask`, same
   pattern as `backgroundNotifications.ts`); `registerLocationTask()` runs in
   `_layout`. `startBackgroundUpdates` takes localized foreground-service labels.
+- **Android drops background location on termination and NEVER restarts it.**
+  Expo 56's docs: *"A terminated app will not automatically restart when a
+  location or geofencing event occurs due to platform limitations"* — iOS does
+  relaunch. So a force-stop, a reboot, or an OEM battery optimiser killing the
+  foreground service stops this device reporting for good. `useLocationSync`
+  (`_layout`, sibling of `useGeofenceSync`) restarts it on launch and on every
+  foreground when `member_locations.sharing` says it should be running, and
+  primes a fresh fix when it had to. Symptom if this ever regresses: your own
+  pin frozen while everyone else's moves, and no place crossings — so no
+  arrival/departure alerts about you — while the UI still says sharing is on.
+- **`timeInterval` is ANDROID-ONLY and must be set.** With `distanceInterval`
+  alone the fused provider picks its own cadence. `activityType`,
+  `pausesUpdatesAutomatically` and `showsBackgroundLocationIndicator` are
+  iOS-only; `deferredUpdatesInterval` applies to both and BATCHES delivery, so
+  a saver-mode fix can arrive a cadence late by design.
 - `src/apps/location/` — `Whereabouts` (map + bottom sheet, owns the data + one
   Realtime channel), `MemberDetailCard` (the EXPANDED roster card — **leads with
   drive-time ETA**, then distance/battery/where-they-are, navigate, nudge/call),

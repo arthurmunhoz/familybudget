@@ -70,6 +70,10 @@ function taskOptions(mode: 'saver' | 'live', labels: FgLabels | null): Location.
       : {
           accuracy: Location.Accuracy.Balanced,
           distanceInterval: 60, // meters between updates
+          // ANDROID-ONLY, and it was missing: with distanceInterval alone the
+          // fused provider decides its own cadence, so a phone that moves
+          // steadily can go a long time between reports. iOS ignores it.
+          timeInterval: 60_000,
           deferredUpdatesInterval: 60_000, // ms — batch to save battery
           pausesUpdatesAutomatically: true,
           activityType: Location.ActivityType.Other,
@@ -242,6 +246,32 @@ export async function startBackgroundUpdates(labels: FgLabels): Promise<void> {
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
   if (already) return
   await Location.startLocationUpdatesAsync(LOCATION_TASK, taskOptions('saver', labels))
+}
+
+/** Restart background delivery if this device SHOULD be sharing but isn't.
+ *
+ *  Android does not bring a terminated app back for location events — Expo 56's
+ *  docs put it plainly: "A terminated app will not automatically restart when a
+ *  location or geofencing event occurs due to platform limitations", where iOS
+ *  "will restart the terminated app". So on Android a force-stop, a reboot, or
+ *  an OEM battery optimiser killing the foreground service leaves sharing dead
+ *  until the user thinks to toggle it off and on. Nothing restarted it: the only
+ *  callers of startBackgroundUpdates are the switch and Resume.
+ *
+ *  Symptom this fixes: your own pin frozen on the family map while everyone
+ *  else's moves, no place crossings recorded, and therefore no arrival or
+ *  departure alerts about you — with the app looking perfectly healthy, because
+ *  `sharing` is still true in the database.
+ *
+ *  Returns true if it actually had to restart, so the caller can prime a fresh
+ *  fix and put the stale pin right immediately. */
+export async function resumeBackgroundUpdatesIfSharing(labels: FgLabels): Promise<boolean> {
+  const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
+  if (already) return false
+  const mine = await fetchMyLocation().catch(() => null)
+  if (!isSharingEnabled(mine)) return false
+  await startBackgroundUpdates(labels)
+  return true
 }
 
 /** Stop background delivery (called when the user turns sharing off/pauses). */
