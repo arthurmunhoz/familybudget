@@ -43,6 +43,12 @@ export type EventName =
   | 'pet.weight_logged'
   // Nudges
   | 'nudge.sent'
+  // Diagnostics, NOT domain actions — deliberately left out of SEMANTIC_EVENTS
+  // so they never appear in the family activity feed. These exist because the
+  // push fan-out failed silently for two months (see lib/pushFanout.ts); this
+  // is the only place a device-side failure becomes visible from a desk.
+  | 'push.fanout.failed'
+  | 'push.fanout.retried'
   // Documents
   | 'doc.uploaded'
   | 'doc.opened'

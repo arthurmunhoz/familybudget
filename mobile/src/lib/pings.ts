@@ -2,6 +2,7 @@
 // to their phones. Insert goes through RLS (household + sender stamped by column
 // defaults); the push is a best-effort call to api/send-ping.
 import { track } from './analytics'
+import { requestPushFanout } from './pushFanout'
 import { supabase } from './supabase'
 import type { TKey } from './i18n'
 import type { Ping, PingAck, PingPreset } from './types'
@@ -124,16 +125,9 @@ export async function sendPing(
   // Log shape, not content: nudge text is user content and web_events is
   // readable by the GLOBAL super-admin across every household.
   track('nudge.sent', { messageLength: message.length, kind, recipients: recipients?.length ?? null })
-  try {
-    const token = await authToken()
-    await fetch(`${API_BASE}/api/send-ping`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ping_id: data.id }),
-    })
-  } catch {
-    // best-effort push only
-  }
+  // Best-effort, but no longer INVISIBLE: this call silently failed for every
+  // nudge for two months. See lib/pushFanout.ts.
+  await requestPushFanout({ ping_id: data.id }, 'nudge')
 }
 
 /** AI: map free text → {kind, emoji, message} in the user's language, then send

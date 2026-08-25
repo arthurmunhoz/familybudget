@@ -11,43 +11,19 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-// Best-effort Expo (native) push, sent alongside web-push. Errors swallowed so
-// a push failure never breaks the request. Only well-formed Expo tokens are sent.
-async function sendExpoPush(
-  messages: {
-    to: string
-    title: string
-    body: string
-    data?: Record<string, unknown>
-    sound?: 'default'
-    /** 'high' asks APNs to deliver immediately rather than batching for power —
-     *  used for high-priority nudges, which are the whole point of the flag. */
-    priority?: 'default' | 'normal' | 'high'
-    /** ANDROID ONLY, and the Android half of `priority`: importance lives on the
-     *  channel, not the message, so an urgent nudge must be routed to the
-     *  MAX-importance channel or it arrives with no heads-up and no sound.
-     *  Ignored by APNs. Must match ANDROID_CHANNEL in mobile/src/lib/notifications.ts. */
-    channelId?: 'default' | 'urgent'
-  }[],
-): Promise<number> {
-  const valid = messages.filter(
-    (m) => typeof m.to === 'string' && m.to.startsWith('ExponentPushToken'),
-  )
-  let sent = 0
-  for (let i = 0; i < valid.length; i += 100) {
-    const chunk = valid.slice(i, i + 100)
-    try {
-      const r = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(chunk),
-      })
-      if (r.ok) sent += chunk.length
-    } catch {
-      /* swallow */
-    }
+import { sendExpoPush } from '../api-shared/expoPush'
+
+// Expo push now lives in api-shared/expoPush.ts, which READS the response:
+// exp.host returns 200 even when every message failed, so the previous
+// `if (r.ok) sent += chunk.length` counted dead tokens as delivered and never
+// pruned them. Kept outside api/ because Vercel's Hobby plan caps that folder
+// at 12 functions and this project is exactly at the cap.
+
+/** Delete tokens Expo told us are permanently unusable. */
+function pruneDeadTokens(db: any) {
+  return async (tokens: string[]) => {
+    await db.from('expo_push_tokens').delete().in('token', tokens)
   }
-  return sent
 }
 
 export default async function handler(req: any, res: any) {
@@ -164,8 +140,14 @@ export default async function handler(req: any, res: any) {
         sound: 'default' as const,
         channelId: 'default' as const,
       })),
+      pruneDeadTokens(db),
     )
-    return res.status(200).json({ ok: true, sent: placeSent, expoSent: placeExpoSent })
+    return res.status(200).json({
+      ok: true,
+      sent: placeSent,
+      expoSent: placeExpoSent.sent,
+      expoFailed: placeExpoSent.failed,
+    })
   }
 
   const { ping_id } = req.body ?? {}
@@ -291,7 +273,10 @@ export default async function handler(req: any, res: any) {
         ? { priority: 'high' as const, channelId: 'urgent' as const }
         : { channelId: 'default' as const }),
     })),
+    pruneDeadTokens(db),
   )
 
-  return res.status(200).json({ ok: true, sent, expoSent })
+  // expoFailed is reported rather than hidden: a nudge that reached nobody used
+  // to return the same 200 as one that reached everybody.
+  return res.status(200).json({ ok: true, sent, expoSent: expoSent.sent, expoFailed: expoSent.failed })
 }

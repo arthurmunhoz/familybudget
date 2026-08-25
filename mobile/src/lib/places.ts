@@ -6,15 +6,9 @@
 // Realtime and pushes "Emma arrived at School" to the rest of the household via
 // api/send-ping (?action=place-event).
 import { supabase } from './supabase'
+import { requestPushFanout } from './pushFanout'
 import { haversineMeters, type LatLng } from './location'
 import type { Place, PlaceEvent, PlaceWatch } from './types'
-
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
-
-async function authToken(): Promise<string> {
-  const { data } = await supabase.auth.getSession()
-  return data.session?.access_token ?? ''
-}
 
 async function myEmail(): Promise<string | null> {
   const { data } = await supabase.auth.getSession()
@@ -129,16 +123,8 @@ export async function recordPlaceEvent(placeId: string, type: 'arrive' | 'leave'
   })
   if (error || !eventId) return
 
-  try {
-    const token = await authToken()
-    if (token && API_BASE) {
-      await fetch(`${API_BASE}/api/send-ping`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: 'place-event', place_event_id: eventId }),
-      })
-    }
-  } catch {
-    // best-effort push — the event is saved and still shows live via Realtime
-  }
+  // The alert half of a crossing. Runs from the HEADLESS geofence task as well
+  // as the app, so a failure here has no UI at all to notice it — which is why
+  // it goes through the instrumented helper. See lib/pushFanout.ts.
+  await requestPushFanout({ action: 'place-event', place_event_id: eventId }, 'place-event')
 }
