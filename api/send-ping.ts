@@ -11,13 +11,101 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-import { sendExpoPush } from '../api-shared/expoPush'
+// Expo push, INLINE and self-contained — like ack-ping.ts, send-digest.ts and
+// widget.ts. This was briefly extracted to a file outside api/ to avoid adding
+// a 13th function to api/ (Vercel's Hobby cap). That broke production outright:
+// Vercel bundles only what lives under api/, so the deployed function died at
+// module load with
+//   ERR_MODULE_NOT_FOUND: Cannot find module '/var/task/api-shared/expoPush'
+// and every nudge got a 500 before it ran a single line. A function in api/
+// must import nothing from outside api/ — duplicate the helper instead.
+//
+// What this does that the old one-liner didn't: exp.host returns HTTP 200 even
+// when every message in the batch failed. The real outcome is per-message, in
+// the "tickets" array. `if (r.ok) sent += chunk.length` counted dead tokens as
+// delivered and never pruned them.
+//   • DeviceNotRegistered — app uninstalled, data cleared, or token rotated.
+//   • InvalidCredentials  — Expo holds no FCM credentials for THAT token's app
+//     (e.g. tokens minted by the old com.oneroof.app build).
+// Both mean "never send here again", so both are pruned and the token list
+// heals itself instead of silently eating a share of every send.
+interface ExpoMessage {
+  to: string
+  title: string
+  body: string
+  data?: Record<string, unknown>
+  sound?: 'default'
+  priority?: 'default' | 'normal' | 'high'
+  /** ANDROID ONLY: importance lives on the channel, not the message. Must match
+   *  ANDROID_CHANNEL in mobile/src/lib/notifications.ts. */
+  channelId?: 'default' | 'urgent'
+}
 
-// Expo push now lives in api-shared/expoPush.ts, which READS the response:
-// exp.host returns 200 even when every message failed, so the previous
-// `if (r.ok) sent += chunk.length` counted dead tokens as delivered and never
-// pruned them. Kept outside api/ because Vercel's Hobby plan caps that folder
-// at 12 functions and this project is exactly at the cap.
+interface Ticket {
+  status?: string
+  id?: string
+  message?: string
+  details?: { error?: string }
+}
+
+/** Ticket errors that mean the token is permanently unusable. Anything else
+ *  (rate limits, a message too big) is transient or our fault, not the token's,
+ *  so it must NOT cost the user their registration. */
+const DEAD_TOKEN_ERRORS = new Set(['DeviceNotRegistered', 'InvalidCredentials'])
+
+async function sendExpoPush(
+  messages: ExpoMessage[],
+  /** Called with tokens that should be deleted. Optional so callers that have
+   *  no database handle can still send. */
+  onDeadTokens?: (tokens: string[]) => Promise<void>,
+): Promise<{ sent: number; failed: number }> {
+  const valid = messages.filter(
+    (m) => typeof m.to === 'string' && m.to.startsWith('ExponentPushToken'),
+  )
+  let sent = 0
+  let failed = 0
+  const dead: string[] = []
+
+  for (let i = 0; i < valid.length; i += 100) {
+    const chunk = valid.slice(i, i + 100)
+    try {
+      const r = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(chunk),
+      })
+      if (!r.ok) {
+        failed += chunk.length
+        continue
+      }
+      const body = (await r.json().catch(() => null)) as { data?: Ticket[] } | null
+      const tickets = body?.data
+      if (!Array.isArray(tickets)) {
+        // Shouldn't happen, but an unreadable body is not proof of delivery.
+        failed += chunk.length
+        continue
+      }
+      tickets.forEach((ticket, idx) => {
+        if (ticket?.status === 'ok') {
+          sent += 1
+          return
+        }
+        failed += 1
+        const err = ticket?.details?.error
+        const tok = chunk[idx]?.to
+        if (tok && err && DEAD_TOKEN_ERRORS.has(err)) dead.push(tok)
+      })
+    } catch {
+      failed += chunk.length
+    }
+  }
+
+  if (dead.length && onDeadTokens) {
+    // Pruning is best-effort: failing to clean up must never fail a send.
+    await onDeadTokens(Array.from(new Set(dead))).catch(() => {})
+  }
+  return { sent, failed }
+}
 
 /** Delete tokens Expo told us are permanently unusable. */
 function pruneDeadTokens(db: any) {
