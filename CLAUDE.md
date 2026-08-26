@@ -534,7 +534,24 @@ here too:
   there. Rewrites match in order, so the `/(.*)` → index.html catch-all stays
   last. **`vercel.json` can hold no comments** — Vercel's schema rejects unknown
   keys (even `_comment`), which is why this warning lives here instead.
-- Deploys are MANUAL: `npx vercel deploy --prod --yes`.
+- **A file in `api/` must import NOTHING from outside `api/`.** Vercel bundles
+  only what lives under `api/`, so a relative import that escapes the folder
+  compiles and deploys clean, then dies at module load in production:
+  `ERR_MODULE_NOT_FOUND: Cannot find module '/var/task/api-shared/expoPush'`.
+  The whole function 500s before its first line — auth checks included. This
+  happened on 2026-08-26: an Expo-push helper was hoisted to `api-shared/` to
+  dodge the 12-function cap, and every nudge and place alert 500'd for a day.
+  Do NOT extract shared code out of `api/` to save a function slot —
+  `ack-ping.ts`, `send-digest.ts`, `send-ping.ts` and `widget.ts` each keep
+  their own inline copy of the Expo sender ON PURPOSE. Duplicate instead.
+  Fastest check that a function BOOTS (as opposed to merely deploying): POST to
+  it with no auth. A healthy function answers `401`; a broken import answers
+  `500 FUNCTION_INVOCATION_FAILED`. `npx vercel logs <deployment-url> --json`
+  gives the exact missing module.
+- Deploys are MANUAL: `npx vercel deploy --prod --yes` (add
+  `--scope arthur-munhoz-projects`, or it fails "Not authorized"). **`tsc` and
+  `npm run build` do NOT cover `api/`** — neither would have caught the above.
+  After deploying any `api/` change, curl the endpoint and confirm it boots.
 - **A `VITE_*` var added with `vercel env add` defaults to type "Sensitive" on
   this project, and Vercel does NOT expose sensitive vars to the build** — so
   Vite silently inlines `undefined` and the feature ships dark. Add public
