@@ -16,7 +16,16 @@ export type PushResult = { ok: boolean; reason?: 'simulator' | 'denied' | 'no-pr
  *  strings are a cross-repo contract: renaming one here silently drops pushes
  *  into the OS default channel. `DEFAULT` matches the `defaultChannel` set on
  *  the expo-notifications config plugin in app.json. */
-export const ANDROID_CHANNEL = { DEFAULT: 'default', URGENT: 'urgent' } as const
+export const ANDROID_CHANNEL = { DEFAULT: 'household', URGENT: 'urgent' } as const
+
+/** Channel ids this app has retired. Android REFUSES to let an app raise the
+ *  importance of a channel that already exists — the user owns that setting once
+ *  it is created, and recreating it with the same id restores the old value
+ *  rather than the new one. The only way to ship an importance change is a NEW
+ *  channel id. 'default' was IMPORTANCE_DEFAULT, so ordinary nudges landed
+ *  silently in the shade with no heads-up banner while urgent ones popped up.
+ *  Deleting the retired id keeps a dead duplicate out of Android's settings. */
+const RETIRED_CHANNELS = ['default']
 
 /** Create the Android notification channels. No-op off Android.
  *
@@ -32,14 +41,19 @@ export const ANDROID_CHANNEL = { DEFAULT: 'default', URGENT: 'urgent' } as const
  *      means the user is never asked.
  *    • Expo requires a channel to exist before getExpoPushTokenAsync.
  *  Re-calling is safe and cheap: after creation only name/description can change,
- *  so this cannot clobber a user's own importance choice for the channel. */
+ *  so this cannot clobber a user's own importance choice for the channel. That
+ *  same rule is why changing an importance needs a new channel id — see
+ *  RETIRED_CHANNELS above. */
 export async function ensureAndroidChannels(): Promise<void> {
   if (Platform.OS !== 'android') return
   try {
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL.DEFAULT, {
+      // HIGH, not DEFAULT: a nudge is a person poking you and has to be seen
+      // when it lands. DEFAULT only files it in the shade, so every ordinary
+      // nudge went unnoticed until the phone was next unlocked and swiped down.
       name: 'Household updates',
       description: 'Nudges, reminders and the daily digest.',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: Notifications.AndroidImportance.HIGH,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
       sound: 'default',
     })
@@ -52,6 +66,9 @@ export async function ensureAndroidChannels(): Promise<void> {
       vibrationPattern: [0, 250, 250, 250],
       enableVibrate: true,
     })
+    for (const id of RETIRED_CHANNELS) {
+      await Notifications.deleteNotificationChannelAsync(id).catch(() => {})
+    }
   } catch {
     /* best effort — a channel failure must never block sign-in or a token refresh */
   }

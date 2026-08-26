@@ -37,8 +37,10 @@ interface ExpoMessage {
   sound?: 'default'
   priority?: 'default' | 'normal' | 'high'
   /** ANDROID ONLY: importance lives on the channel, not the message. Must match
-   *  ANDROID_CHANNEL in mobile/src/lib/notifications.ts. */
-  channelId?: 'default' | 'urgent'
+   *  ANDROID_CHANNEL in mobile/src/lib/notifications.ts (ids are versioned:
+   *  raising a channel's importance requires a NEW id, so this must be updated
+   *  in lockstep with the app or notifications land on a fallback channel). */
+  channelId?: 'household' | 'urgent'
 }
 
 interface Ticket {
@@ -226,7 +228,7 @@ export default async function handler(req: any, res: any) {
         body,
         data: { url: '/location' },
         sound: 'default' as const,
-        channelId: 'default' as const,
+        channelId: 'household' as const,
       })),
       pruneDeadTokens(db),
     )
@@ -359,7 +361,7 @@ export default async function handler(req: any, res: any) {
       sound: 'default' as const,
       ...(ping.high_priority === true
         ? { priority: 'high' as const, channelId: 'urgent' as const }
-        : { channelId: 'default' as const }),
+        : { channelId: 'household' as const }),
     })),
     pruneDeadTokens(db),
   )
