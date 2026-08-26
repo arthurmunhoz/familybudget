@@ -9,7 +9,7 @@
 //  • semantic   — typed domain actions (entry.created, nudge.sent, …) that say
 //    precisely what the user did. These are what the activity feed renders; the
 //    payload travels in `meta` (see lib/activityFeed.ts for the render catalog).
-import { AppState, type AppStateStatus } from 'react-native'
+import { AppState, type AppStateStatus, Platform } from 'react-native'
 
 import { supabase } from './supabase'
 
@@ -207,7 +207,10 @@ export function initAnalytics(userEmail: string): void {
   if (installed) return
   installed = true
 
-  track('session_start', { platform: 'ios' })
+  // Report the REAL platform. This was hardcoded 'ios' from the iOS-only days,
+  // so every Android session logged itself as an iPhone — which makes a
+  // cross-platform bug practically undebuggable from web_events.
+  track('session_start', { platform: Platform.OS })
 
   // Flush when the app leaves the foreground — iOS may suspend it.
   AppState.addEventListener('change', (next: AppStateStatus) => {

@@ -5,9 +5,13 @@
 //     goes to everyone, ignoring the picker.
 //  3. An AI "just type it" box → /api/suggest-ping → {kind, emoji, message}.
 //
-// Sending is a direct insert into `pings` (household_id + sender_email stamped by
-// defaults); on success it calls onSent so the screen can flash a confirmation
-// toast. Preset MANAGEMENT lives in the ⚙️ Nudge-settings modal, not here — this
+// Sending ALWAYS goes through `sendPing` in lib/pings.ts — never a bare insert
+// into `pings`. The insert is only half of a send: the row shows up instantly
+// over Realtime, but the phones only buzz if the server-side fan-out is asked
+// to run afterwards. This screen had its own local insert helper for two
+// months, so every nudge sent from the app looked fine and pushed to nobody.
+// On success it calls onSent so the screen can flash a confirmation toast.
+// Preset MANAGEMENT lives in the ⚙️ Nudge-settings modal, not here — this
 // screen is only for sending. `presets` is owned by the screen and passed in.
 import { useMemo, useState } from 'react'
 import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
@@ -18,24 +22,11 @@ import type { ToastData } from '@/components/Toast'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
-import { presetText } from '@/lib/pings'
+import { presetText, sendPing } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
-
-async function insertPing(
-  kind: string,
-  emoji: string,
-  message: string,
-  recipients: string[] | null,
-  highPriority: boolean,
-): Promise<void> {
-  const { error } = await supabase
-    .from('pings')
-    .insert({ kind, emoji, message, recipients, high_priority: highPriority })
-  if (error) throw error
-}
 
 export default function PingComposer({
   presets,
@@ -84,7 +75,7 @@ export default function PingComposer({
       const toEveryone = p.high_priority || everyone
       const recipients = toEveryone ? null : [...selected]
       const label = presetText(p, t)
-      await insertPing(p.preset_key ?? 'custom', p.emoji, label, recipients, p.high_priority)
+      await sendPing(p.preset_key ?? 'custom', p.emoji, label, recipients, p.high_priority)
       onSent({ emoji: p.emoji, text: t('pings.sentToast', { label, who: toEveryone ? t('pings.everyone') : toLabel }) })
     } catch {
       Alert.alert(t('pings.failed'))
@@ -117,7 +108,7 @@ export default function PingComposer({
       } catch {
         // AI unreachable — fall back to the typed text verbatim.
       }
-      await insertPing(kind, emoji, message, everyone ? null : [...selected], false)
+      await sendPing(kind, emoji, message, everyone ? null : [...selected], false)
       onSent({ emoji, text: t('pings.sentToast', { label: message, who: toLabel }) })
       setText('')
     } catch {
