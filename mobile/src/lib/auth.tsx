@@ -326,7 +326,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     clearWidgetData()
     clearCache()
-    await supabase.auth.signOut()
+    // scope:'local' — supabase-js defaults to 'global', which revokes EVERY
+    // session this user has on EVERY device. That silently half-breaks the
+    // other phones: the JWT still passes PostgREST (signature + exp are checked
+    // locally, so writes keep working) but every server-side call that
+    // validates against /auth/v1/user starts returning 401. Nudges saved and
+    // never pushed. Signing out here must only sign out THIS device.
+    await supabase.auth.signOut({ scope: 'local' })
   }, [])
 
   return (

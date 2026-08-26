@@ -114,7 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    // scope:'local' — the default 'global' revokes this user's session on every
+    // device, which silently breaks server-side auth on their other phones
+    // while local writes keep working. See mobile/src/lib/auth.tsx.
+    await supabase.auth.signOut({ scope: 'local' })
   }
 
   return (
