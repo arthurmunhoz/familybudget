@@ -141,8 +141,10 @@ export default function PingComposer({
               <ChevronDown size={16} strokeWidth={2} color={c.textFaint} />
             )}
           </Pressable>
+          {/* `sheet`, not `surface`: this floats over the presets, so it has to be
+              OPAQUE — the glass skin's translucent surface let them show through. */}
           {pickerOpen && (
-            <View style={[styles.pickerBody, { backgroundColor: c.surface }]}>
+            <View style={[styles.pickerBody, { backgroundColor: c.sheet }]}>
               <Pressable onPress={() => setSelected(new Set())} style={styles.pickerRow}>
                 <Txt style={{ flex: 1, fontWeight: '600', color: c.text }}>{t('pings.everyone')}</Txt>
                 {everyone && <Check size={16} strokeWidth={2.5} color={c.accent} />}
