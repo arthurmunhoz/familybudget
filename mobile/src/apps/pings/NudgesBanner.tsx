@@ -1,8 +1,8 @@
 // Home-screen nudge banners (the RN equivalent of the PWA's PingsBanner). Two
 // groups, both between the Hub header and the app grid:
 //  • RECEIVED — active nudges sent TO me I haven't acknowledged, each with a
-//    respond CTA (Got it / Call). Tapping the body deep-links to the Nudges
-//    "Past" tab with the nudge highlighted.
+//    respond CTA (Got it / Call). The row itself is inert: this banner IS the
+//    inbox — there is no nudge history screen behind it.
 //  • SENT — active nudges I sent, showing who has acknowledged ("seen by …"),
 //    each with an ✕ to dismiss from my home (persisted per-device via
 //    AsyncStorage; the nudge itself still lives until it expires).
@@ -12,7 +12,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Linking, Pressable, StyleSheet, Vibration, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { router } from 'expo-router'
 import { Phone, ThumbsUp, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
@@ -182,12 +181,9 @@ export default function NudgesBanner() {
               },
             ]}
           >
-            {/* Body → deep-link to the Past tab, highlighting this nudge. */}
-            <Pressable
-              onPress={() => router.push({ pathname: '/pings', params: { tab: 'past', focus: p.id } })}
-              style={styles.body}
-              accessibilityRole="button"
-            >
+            {/* Body is inert — the CTAs beside it are the only actions, and
+                there is no history screen to deep-link into. */}
+            <View style={styles.body}>
               <Txt style={styles.emoji}>{p.emoji}</Txt>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt numberOfLines={2} style={{ fontWeight: '600', color: c.text }}>
@@ -197,8 +193,8 @@ export default function NudgesBanner() {
                   {nameOf(p.sender_email)} · {timeAgo(p.created_at)}
                 </Txt>
               </View>
-            </Pressable>
-            {/* Respond CTAs (separate targets so they don't trigger the deep-link).
+            </View>
+            {/* Respond CTAs.
                 Help nudges get Call AND Got it, so a recipient can acknowledge —
                 and dismiss the banner — without having to call. Other nudges just
                 get Got it. */}
@@ -256,11 +252,7 @@ export default function NudgesBanner() {
               { backgroundColor: c.card, borderColor: c.border, borderLeftColor: c.textFaint },
             ]}
           >
-            <Pressable
-              onPress={() => router.push({ pathname: '/pings', params: { tab: 'past', focus: p.id } })}
-              style={styles.body}
-              accessibilityRole="button"
-            >
+            <View style={styles.body}>
               <Txt style={styles.emoji}>{p.emoji}</Txt>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt numberOfLines={2} style={{ fontWeight: '600', color: c.text }}>
@@ -270,7 +262,7 @@ export default function NudgesBanner() {
                   {t('pings.you')} · {seen}
                 </Txt>
               </View>
-            </Pressable>
+            </View>
             {/* ✕ dismiss from my home (persists on this device). */}
             <Pressable
               onPress={() => dismiss(p.id)}

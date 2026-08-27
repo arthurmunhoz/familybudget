@@ -164,7 +164,7 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     transition itself, so every screen built on it is covered — do NOT add a
     second `AppState` listener next to one (that just fetches twice). A screen
     holding its own optimistic/Realtime state instead of a cached query
-    (ShoppingList, Nudges, NudgesBanner) subscribes with
+    (ShoppingList, NudgesBanner) subscribes with
     `useRevalidateOnForeground(load)`. (`inactive` is deliberately not a
     trigger: Control Centre, the notification shade and permission dialogs all
     fire it without ever backgrounding.)
