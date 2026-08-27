@@ -55,3 +55,7 @@ targets/**/generated.entitlements
 # Supabase CLI scratch (created when the MCP links the project)
 supabase/.temp/
 .vercel
+
+# Local EAS build artifacts
+build-*.aab
+build-*.apk
