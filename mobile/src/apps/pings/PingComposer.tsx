@@ -165,6 +165,17 @@ export default function PingComposer({
         </View>
       )}
 
+      {/* Tap-anywhere-else backdrop. Sits ABOVE the presets but below the
+          picker (zIndex 5 vs 10), so the first tap outside only closes the
+          list — it never also fires the preset underneath it. */}
+      {pickerOpen && (
+        <Pressable
+          onPress={() => setPickerOpen(false)}
+          accessible={false}
+          style={[StyleSheet.absoluteFill, { zIndex: 5, elevation: 5 }]}
+        />
+      )}
+
       {/* Presets header */}
       <Txt variant="label" style={{ textTransform: 'uppercase', color: c.textFaint, marginBottom: sp.sm }}>
         {t('app.pings.name')}
