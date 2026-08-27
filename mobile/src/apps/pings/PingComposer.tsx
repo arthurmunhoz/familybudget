@@ -119,9 +119,11 @@ export default function PingComposer({
 
   return (
     <View>
-      {/* Recipient picker */}
+      {/* Recipient picker. zIndex/elevation so the open list paints OVER the
+          presets below it — it's absolutely positioned (see pickerBody) so
+          opening it overlays the page instead of pushing it down. */}
       {members.length > 0 && (
-        <View style={{ marginBottom: sp.lg }}>
+        <View style={{ marginBottom: sp.lg, zIndex: 10, elevation: 10 }}>
           <Pressable
             onPress={() => setPickerOpen((v) => !v)}
             style={[styles.pickerHead, { backgroundColor: c.surface }]}
@@ -247,7 +249,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: sp.lg,
     paddingVertical: 10,
   },
-  pickerBody: { marginTop: 6, borderRadius: radius.md, padding: 6 },
+  pickerBody: {
+    // Floats over the content below instead of displacing it.
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 6,
+    borderRadius: radius.md,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+  },
   pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
