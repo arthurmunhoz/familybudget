@@ -13,8 +13,8 @@
 // On success it calls onSent so the screen can flash a confirmation toast.
 // Preset MANAGEMENT lives in the ⚙️ Nudge-settings modal, not here — this
 // screen is only for sending. `presets` is owned by the screen and passed in.
-import { useMemo, useState } from 'react'
-import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { useMemo, useRef, useState } from 'react'
+import { Alert, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { Check, ChevronDown, ChevronUp, Send, Sparkles } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
@@ -44,6 +44,17 @@ export default function PingComposer({
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pickerOpen, setPickerOpen] = useState(false)
+  // Where on SCREEN the TO: pill is, measured when the list opens — the list
+  // renders in a Modal (its own window), so it needs window coordinates.
+  const headRef = useRef<View>(null)
+  const [anchor, setAnchor] = useState<{ x: number; y: number; w: number } | null>(null)
+
+  const openPicker = () => {
+    headRef.current?.measureInWindow((x, y, w, h) => {
+      setAnchor({ x, y: y + h + 6, w })
+      setPickerOpen(true)
+    })
+  }
   const [text, setText] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
@@ -119,13 +130,15 @@ export default function PingComposer({
 
   return (
     <View>
-      {/* Recipient picker. zIndex/elevation so the open list paints OVER the
-          presets below it — it's absolutely positioned (see pickerBody) so
-          opening it overlays the page instead of pushing it down. */}
+      {/* Recipient picker. The open list lives in a Modal so it overlays the
+          page instead of pushing it down, and a tap ANYWHERE else — including
+          below the composer — closes it. It's anchored under the pill with
+          `anchor`, measured on open. */}
       {members.length > 0 && (
-        <View style={{ marginBottom: sp.lg, zIndex: 10, elevation: 10 }}>
+        <View style={{ marginBottom: sp.lg }}>
           <Pressable
-            onPress={() => setPickerOpen((v) => !v)}
+            ref={headRef}
+            onPress={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
             style={[styles.pickerHead, { backgroundColor: c.surface }]}
             accessibilityRole="button"
           >
@@ -141,39 +154,50 @@ export default function PingComposer({
               <ChevronDown size={16} strokeWidth={2} color={c.textFaint} />
             )}
           </Pressable>
-          {/* `sheet`, not `surface`: this floats over the presets, so it has to be
-              OPAQUE — the glass skin's translucent surface let them show through. */}
-          {pickerOpen && (
-            <View style={[styles.pickerBody, { backgroundColor: c.sheet }]}>
-              <Pressable onPress={() => setSelected(new Set())} style={styles.pickerRow}>
-                <Txt style={{ flex: 1, fontWeight: '600', color: c.text }}>{t('pings.everyone')}</Txt>
-                {everyone && <Check size={16} strokeWidth={2.5} color={c.accent} />}
-              </Pressable>
-              {members.map((m) => {
-                const on = !everyone && selected.has(m.email)
-                return (
-                  <Pressable key={m.email} onPress={() => toggle(m.email)} style={styles.pickerRow}>
-                    <Txt numberOfLines={1} style={{ flex: 1, color: c.text }}>
-                      {m.display_name}
+          <Modal
+            visible={pickerOpen && anchor !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setPickerOpen(false)}
+          >
+            {/* Full-screen dismiss target. Undimmed: this is a dropdown, not a
+                sheet — the page stays legible behind it. */}
+            <Pressable style={{ flex: 1 }} onPress={() => setPickerOpen(false)} accessible={false}>
+              {anchor ? (
+                // `sheet`, not `surface`: it floats over the presets, so it has
+                // to be OPAQUE — the glass skin's surface token is translucent.
+                <View
+                  style={[
+                    styles.pickerBody,
+                    { backgroundColor: c.sheet, left: anchor.x, top: anchor.y, width: anchor.w },
+                  ]}
+                >
+                  <Pressable onPress={() => setSelected(new Set())} style={styles.pickerRow}>
+                    <Txt style={{ flex: 1, fontWeight: '600', color: c.text }}>
+                      {t('pings.everyone')}
                     </Txt>
-                    {on && <Check size={16} strokeWidth={2.5} color={c.accent} />}
+                    {everyone && <Check size={16} strokeWidth={2.5} color={c.accent} />}
                   </Pressable>
-                )
-              })}
-            </View>
-          )}
+                  {members.map((m) => {
+                    const on = !everyone && selected.has(m.email)
+                    return (
+                      <Pressable
+                        key={m.email}
+                        onPress={() => toggle(m.email)}
+                        style={styles.pickerRow}
+                      >
+                        <Txt numberOfLines={1} style={{ flex: 1, color: c.text }}>
+                          {m.display_name}
+                        </Txt>
+                        {on && <Check size={16} strokeWidth={2.5} color={c.accent} />}
+                      </Pressable>
+                    )
+                  })}
+                </View>
+              ) : null}
+            </Pressable>
+          </Modal>
         </View>
-      )}
-
-      {/* Tap-anywhere-else backdrop. Sits ABOVE the presets but below the
-          picker (zIndex 5 vs 10), so the first tap outside only closes the
-          list — it never also fires the preset underneath it. */}
-      {pickerOpen && (
-        <Pressable
-          onPress={() => setPickerOpen(false)}
-          accessible={false}
-          style={[StyleSheet.absoluteFill, { zIndex: 5, elevation: 5 }]}
-        />
       )}
 
       {/* Presets header */}
@@ -263,12 +287,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   pickerBody: {
-    // Floats over the content below instead of displacing it.
+    // Positioned in the Modal's window from the measured anchor.
     position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    marginTop: 6,
     borderRadius: radius.md,
     padding: 6,
     shadowColor: '#000',
