@@ -228,6 +228,13 @@ export default async function handler(req: any, res: any) {
         body,
         data: { url: '/location' },
         sound: 'default' as const,
+        // FCM transport priority, NOT the channel's importance. Without it the
+        // message is normal-priority, and Android parks normal-priority FCM in
+        // Doze until the next maintenance window — an arrival alert that lands
+        // an hour later, or only when the app is next opened, is worthless.
+        // Measured on a Samsung S9+ (not on the device-idle whitelist, which is
+        // the default): every place alert and ordinary nudge was deferred.
+        priority: 'high' as const,
         channelId: 'household' as const,
       })),
       pruneDeadTokens(db),
@@ -359,9 +366,13 @@ export default async function handler(req: any, res: any) {
       body: ping.message,
       data: { url: '/pings', tel },
       sound: 'default' as const,
+      // priority is the FCM transport (beats Doze); channelId is how Android
+      // presents it. Both nudges are high-priority to SEND — a nudge nobody
+      // sees until they open the app is not a nudge — and only an urgent one
+      // gets the louder channel.
       ...(ping.high_priority === true
         ? { priority: 'high' as const, channelId: 'urgent' as const }
-        : { channelId: 'household' as const }),
+        : { priority: 'high' as const, channelId: 'household' as const }),
     })),
     pruneDeadTokens(db),
   )
