@@ -872,6 +872,23 @@ rather than a missing env var.
   (`--type file`), which materialises them on the builder and exposes the path as
   `process.env.<NAME>`; `google-services.json` is wired exactly this way. Read the
   env var first and fall back to the on-disk file so local prebuilds still work.
+  - **`eas build --local` hits this too, and the on-disk fallback does NOT save
+    you.** A local build copies the project to a temp dir the same way the
+    uploader does, so the gitignored file is left behind — and the EAS secret is
+    only materialised on EAS's own builders, so `process.env.GOOGLE_SERVICES_JSON`
+    is unset. `googleServicesFile` resolves to `undefined`, the
+    `com.google.gms:google-services` Gradle plugin is never applied, and the APK
+    ships with NO Firebase config. It installs and runs fine; push is simply dead
+    forever, because the app cannot register with FCM at all. Always pass the path
+    explicitly:
+    `GOOGLE_SERVICES_JSON=$PWD/google-services.json npx eas build -p android --profile preview --local`
+    Verify before installing — the APK must contain the sender id:
+    `unzip -p <apk> resources.arsc | strings | grep 190924216094`
+    The symptom if you skip this: `adb logcat` shows "Default FirebaseApp failed
+    to initialize", the server's Expo pushes all come back `DeviceNotRegistered`
+    in the RECEIPT (the ticket says ok), and the app looks completely healthy
+    because nudges still arrive over Realtime the moment it is opened. Diagnosed
+    the hard way on 2026-08-30.
 - **Bumping the version for a local Xcode archive: edit `app.json`, then
   PREBUILD.** `expo.version` + `expo.ios.buildNumber` are written into
   `ios/OneRoof/Info.plist` as LITERALS at prebuild time, so editing Xcode's
