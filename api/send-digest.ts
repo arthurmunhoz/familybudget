@@ -36,11 +36,77 @@ type ExpoMessage = {
 
 // Best-effort Expo (native) push, sent alongside web-push. Errors swallowed so
 // a push failure never breaks the digest. Only well-formed Expo tokens are sent.
-async function sendExpoPush(messages: ExpoMessage[]): Promise<number> {
+/** Ticket errors that mean the token is permanently unusable. Anything else
+ *  (rate limits, a message too big) is transient or our fault, not the token's,
+ *  so it must NOT cost the user their registration. */
+const DEAD_TOKEN_ERRORS = new Set(['DeviceNotRegistered', 'InvalidCredentials'])
+/** Receipts are not instant. Wait once, read what is ready, and leave the rest —
+ *  the next send gets another chance, so the token list still heals. */
+const RECEIPT_DELAY_MS = 2000
+/** getReceipts takes at most 1000 ids per call; stay well under. */
+const RECEIPT_CHUNK = 300
+
+interface Ticket {
+  status?: string
+  id?: string
+  details?: { error?: string }
+}
+
+interface Receipt {
+  status?: string
+  details?: { error?: string }
+}
+
+/** ticket id -> the error its receipt reported. Absent means ok OR not ready
+ *  yet; the two are deliberately not distinguished, because both mean "do
+ *  nothing". See api/send-ping.ts for why receipts matter at all: exp.host
+ *  answers a send with a ticket that says `ok` even for a device that can
+ *  receive nothing — DeviceNotRegistered only ever shows up in the receipt. */
+async function fetchReceiptErrors(ticketIds: string[]): Promise<Map<string, string>> {
+  const errors = new Map<string, string>()
+  if (!ticketIds.length) return errors
+  await new Promise((resolve) => setTimeout(resolve, RECEIPT_DELAY_MS))
+
+  for (let i = 0; i < ticketIds.length; i += RECEIPT_CHUNK) {
+    try {
+      const r = await fetch('https://exp.host/--/api/v2/push/getReceipts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ ids: ticketIds.slice(i, i + RECEIPT_CHUNK) }),
+      })
+      if (!r.ok) continue
+      const body = (await r.json().catch(() => null)) as { data?: Record<string, Receipt> } | null
+      for (const [id, receipt] of Object.entries(body?.data ?? {})) {
+        if (receipt?.status === 'error') errors.set(id, receipt?.details?.error ?? 'Unknown')
+      }
+    } catch {
+      // A receipt we could not read is not evidence of anything — leave it.
+    }
+  }
+  return errors
+}
+
+/** Delete tokens Expo told us are permanently unusable. */
+function pruneDeadTokens(db: any) {
+  return async (tokens: string[]) => {
+    await db.from('expo_push_tokens').delete().in('token', tokens)
+  }
+}
+
+async function sendExpoPush(
+  messages: ExpoMessage[],
+  /** Called with tokens Expo says are permanently unusable, so they can be
+   *  deleted. Optional so a caller with no database handle can still send. */
+  onDeadTokens?: (tokens: string[]) => Promise<void>,
+): Promise<number> {
   const valid = messages.filter(
     (m) => typeof m.to === 'string' && m.to.startsWith('ExponentPushToken'),
   )
   let sent = 0
+  const dead: string[] = []
+  /** Accepted ticket id -> the token it was for, so a receipt can be traced
+   *  back to the registration that has to be pruned. */
+  const pending = new Map<string, string>()
   for (let i = 0; i < valid.length; i += 100) {
     const chunk = valid.slice(i, i + 100)
     try {
@@ -49,10 +115,40 @@ async function sendExpoPush(messages: ExpoMessage[]): Promise<number> {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(chunk),
       })
-      if (r.ok) sent += chunk.length
+      // HTTP 200 means Expo took the batch, NOT that any message was accepted:
+      // the per-message outcome is in `tickets`. `if (r.ok) sent += chunk.length`
+      // counted dead tokens as delivered and never pruned them.
+      if (!r.ok) continue
+      const body = (await r.json().catch(() => null)) as { data?: Ticket[] } | null
+      const tickets = body?.data
+      if (!Array.isArray(tickets)) continue
+      tickets.forEach((ticket, idx) => {
+        const tok = chunk[idx]?.to
+        if (ticket?.status === 'ok') {
+          sent += 1
+          // Provisionally sent. The receipt below is what settles it.
+          if (ticket.id && tok) pending.set(ticket.id, tok)
+          return
+        }
+        const err = ticket?.details?.error
+        if (tok && err && DEAD_TOKEN_ERRORS.has(err)) dead.push(tok)
+      })
     } catch {
       /* swallow */
     }
+  }
+
+  // A ticket only says Expo took the message. Drop every send the receipt
+  // rejects, and prune the tokens that failed permanently.
+  for (const [id, err] of await fetchReceiptErrors(Array.from(pending.keys()))) {
+    const tok = pending.get(id)
+    if (!tok) continue
+    sent -= 1
+    if (DEAD_TOKEN_ERRORS.has(err)) dead.push(tok)
+  }
+  if (dead.length && onDeadTokens) {
+    // Pruning is best-effort: failing to clean up must never fail a send.
+    await onDeadTokens(Array.from(new Set(dead))).catch(() => {})
   }
   return sent
 }
@@ -344,7 +440,7 @@ export default async function handler(req: any, res: any) {
         channelId: 'household' as const,
       }
     })
-    expoSent += await sendExpoPush(expoMsgs)
+    expoSent += await sendExpoPush(expoMsgs, pruneDeadTokens(db))
   }
 
   if (stale.length) {
