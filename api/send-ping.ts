@@ -196,13 +196,37 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'Pings are not configured (missing env).' })
   }
 
-  // Identify the caller from their JWT.
-  const userRes = await fetch(`${url}/auth/v1/user`, {
-    headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
-  })
-  if (!userRes.ok) return res.status(401).json({ error: 'Unauthorized' })
-  const callerEmail = (await userRes.json())?.email
-  if (!callerEmail) return res.status(401).json({ error: 'Unauthorized' })
+  // INTERNAL caller: the database itself, via the pg_net trigger + pg_cron
+  // sweeper (migration 085). It presents INTERNAL_PUSH_SECRET — its own secret,
+  // not the Cron one, so the two can be rotated independently — in place of a
+  // user JWT.
+  //
+  // Why this exists: the fan-out used to depend on the SENDER'S PHONE surviving
+  // a second round-trip after the insert. It often doesn't — an app suspended
+  // the moment it is pocketed, or a headless geofence task torn down straight
+  // after recording a crossing, both leave the row saved and the push never
+  // asked for. Measured on 2026-09-04: 11 of one member's nudges over four days
+  // reached nobody, with no request ever arriving here. Postgres has no such
+  // problem, so the row itself now triggers the push.
+  //
+  // An internal call is trusted to name the row, and ONLY that: everything that
+  // decides who hears about it — the household, the recipients list, the
+  // place_watchers gate, the sender exclusion — is still read from the row
+  // server-side, exactly as for a user call. The one-shot `pushed_at` claim
+  // below is what keeps a trigger and the sweeper from double-pushing.
+  const internalSecret = process.env.INTERNAL_PUSH_SECRET
+  const internal = !!internalSecret && token === internalSecret
+
+  let callerEmail = ''
+  if (!internal) {
+    // Identify the caller from their JWT.
+    const userRes = await fetch(`${url}/auth/v1/user`, {
+      headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
+    })
+    if (!userRes.ok) return res.status(401).json({ error: 'Unauthorized' })
+    callerEmail = (await userRes.json())?.email
+    if (!callerEmail) return res.status(401).json({ error: 'Unauthorized' })
+  }
 
   const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
@@ -215,12 +239,29 @@ export default async function handler(req: any, res: any) {
 
     const { data: ev } = await db
       .from('place_events')
-      .select('id, household_id, place_id, user_email, type')
+      .select('id, household_id, place_id, user_email, type, pushed_at')
       .eq('id', eventId)
       .single()
     if (!ev) return res.status(404).json({ error: 'Event not found' })
-    // Only the member the crossing belongs to may announce it.
-    if (ev.user_email !== callerEmail) return res.status(403).json({ error: 'Forbidden' })
+    // Only the member the crossing belongs to may announce it — or the database
+    // itself, which read the row it is announcing.
+    if (!internal && ev.user_email !== callerEmail) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    // One fan-out per crossing — same conditional-UPDATE claim as a nudge
+    // (migration 085). Needed now that the row's own trigger announces it as
+    // well as the phone that recorded it: whoever loses the update sends
+    // nothing, so nobody hears "arrived at Home" twice.
+    if (ev.pushed_at) return res.status(200).json({ ok: true, skipped: 'already_pushed' })
+    const { data: evClaimed } = await db
+      .from('place_events')
+      .update({ pushed_at: new Date().toISOString() })
+      .eq('id', ev.id)
+      .is('pushed_at', null)
+      .select('id')
+      .maybeSingle()
+    if (!evClaimed) return res.status(200).json({ ok: true, skipped: 'already_pushed' })
 
     const { data: place } = await db
       .from('places')
@@ -328,16 +369,21 @@ export default async function handler(req: any, res: any) {
   // ping and immediately post their own id; the widget in api/widget.ts pushes
   // inline and never calls this endpoint), so this is invisible in normal use —
   // it just stops another household member from re-firing someone else's nudge.
-  if (ping.sender_email !== callerEmail) return res.status(403).json({ error: 'Forbidden' })
+  // (The database is exempt: it read the row it is announcing — see `internal`.)
+  if (!internal && ping.sender_email !== callerEmail) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
 
   // The caller must be a member of the ping's household.
-  const { data: caller } = await db
-    .from('allowed_users')
-    .select('household_id')
-    .eq('email', callerEmail)
-    .single()
-  if (!caller || caller.household_id !== ping.household_id) {
-    return res.status(403).json({ error: 'Forbidden' })
+  if (!internal) {
+    const { data: caller } = await db
+      .from('allowed_users')
+      .select('household_id')
+      .eq('email', callerEmail)
+      .single()
+    if (!caller || caller.household_id !== ping.household_id) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
   }
 
   // An expired nudge is already gone from every banner — never push it.
