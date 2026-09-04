@@ -89,7 +89,7 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#c2603f",
-          "defaultChannel": "default"
+          "defaultChannel": "household"
         }
       ],
       [

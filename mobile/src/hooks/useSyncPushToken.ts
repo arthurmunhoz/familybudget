@@ -12,7 +12,7 @@
 import { useEffect } from 'react'
 
 import { useAuth } from '@/lib/auth'
-import { refreshPushToken } from '@/lib/notifications'
+import { ensurePushPermissionOnce, refreshPushToken } from '@/lib/notifications'
 
 export function useSyncPushToken(): void {
   const { profile } = useAuth()
@@ -22,6 +22,11 @@ export function useSyncPushToken(): void {
     // Needs a session: user_email / household_id are stamped from the JWT by
     // column defaults, and RLS scopes the row to the signed-in user.
     if (!email) return
-    void refreshPushToken()
+    // Ask once if this device has never been asked, THEN refresh — a brand new
+    // Android 13+ install otherwise never gets a token at all.
+    void (async () => {
+      await ensurePushPermissionOnce()
+      await refreshPushToken()
+    })()
   }, [email])
 }

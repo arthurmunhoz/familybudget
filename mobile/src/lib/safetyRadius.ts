@@ -9,6 +9,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Notifications from 'expo-notifications'
 
+import { ANDROID_CHANNEL } from './notifications'
 import { supabase } from './supabase'
 import { haversineMeters, type LatLng } from './location'
 import type { SafetyWatch } from './types'
@@ -82,8 +83,17 @@ export async function scheduleWatchEndedNotice(
       if (!req.granted) return
     }
     const id = await Notifications.scheduleNotificationAsync({
-      content: { title, body, sound: 'default' },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at) },
+      content: { title, body, sound: 'default', data: { url: '/location' } },
+      // `channelId` lives on the TRIGGER, not on the content or the top level.
+      // It must be explicit on Android: without it the notification goes to the
+      // config plugin's `defaultChannel`, which `ensureAndroidChannels()`
+      // DELETES on every launch (RETIRED_CHANNELS) — and Android silently drops
+      // anything posted to a deleted channel, so this never appeared at all.
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(at),
+        channelId: ANDROID_CHANNEL.DEFAULT,
+      },
     })
     await AsyncStorage.setItem(ENDED_NOTICE_KEY, id)
   } catch {
@@ -190,8 +200,15 @@ export async function alertBreach(name: string, distanceLabel: string): Promise<
         title: `⚠️ ${name}`,
         body: `${distanceLabel}`,
         sound: 'default',
+        data: { url: '/location' },
       },
-      trigger: null, // immediately
+      // A bare `{ channelId }` IS the "deliver immediately" trigger
+      // (ChannelAwareTriggerInput) — `trigger: null` delivers immediately too
+      // but has nowhere to carry a channel, so on Android it landed on the
+      // deleted default and was never shown. URGENT, not DEFAULT: someone left
+      // the radius they were being watched for, which is the one notification
+      // in this app that has to interrupt.
+      trigger: { channelId: ANDROID_CHANNEL.URGENT },
     })
   } catch {
     // best-effort — the in-app alert still shows

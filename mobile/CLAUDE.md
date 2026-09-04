@@ -889,6 +889,29 @@ rather than a missing env var.
     in the RECEIPT (the ticket says ok), and the app looks completely healthy
     because nudges still arrive over Realtime the moment it is opened. Diagnosed
     the hard way on 2026-08-30.
+- **A local notification's `channelId` goes on the TRIGGER, not the content.**
+  `{ channelId }` on its own IS the deliver-immediately trigger
+  (`ChannelAwareTriggerInput`); `trigger: null` also fires immediately but has
+  nowhere to carry a channel. Omitting it sends the notification to the
+  expo-notifications plugin's `defaultChannel`, and `ensureAndroidChannels()`
+  DELETES retired channel ids on every launch — Android silently drops anything
+  posted to a deleted channel. Every Safety Radius alert was lost this way on
+  Android until 2026-09-04. Keep `defaultChannel` in app.json equal to
+  `ANDROID_CHANNEL.DEFAULT`, and never let an id appear in both that field and
+  `RETIRED_CHANNELS`.
+- **Something must actually ASK for notification permission.** For a long time
+  only the Settings "Reminders" toggle prompted, which was survivable on iOS
+  hand-installs and fatal for Android 13+, where POST_NOTIFICATIONS is a runtime
+  permission: a Play install that never visits Settings has no push token, and
+  the server discards every nudge and place alert addressed to it while the app
+  looks perfectly healthy. `ensurePushPermissionOnce()` (called from
+  `useSyncPushToken`) asks once and records it, so a decline is never nagged.
+- **Every push carries `data.url` and something has to read it.**
+  `backgroundNotifications.ts` routes taps ('/pings', '/location') via both
+  `addNotificationResponseReceivedListener` AND
+  `getLastNotificationResponseAsync` — the latter is the ONLY way to see the tap
+  that launched the app, since the listener is installed after that tap was
+  delivered. Silent types are skipped.
 - **A geofence registration does NOT survive what `hasStartedGeofencingAsync`
   claims it does.** Play Services drops every fence on reboot, on its own
   updates, and when an OEM battery manager sleeps the app — while

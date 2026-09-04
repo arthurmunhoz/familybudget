@@ -3,6 +3,7 @@
 // EAS projectId (set by `eas init`). The SEND side (digest/pings) needs a
 // server change to use Expo push receipts — see ARTHUR-TODO.
 import { Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
 import Constants from 'expo-constants'
@@ -14,8 +15,12 @@ export type PushResult = { ok: boolean; reason?: 'simulator' | 'denied' | 'no-pr
 /** Android notification channel ids. The SERVER picks one per push (`channelId`
  *  in the Expo message — see api/send-ping.ts and api/send-digest.ts), so these
  *  strings are a cross-repo contract: renaming one here silently drops pushes
- *  into the OS default channel. `DEFAULT` matches the `defaultChannel` set on
- *  the expo-notifications config plugin in app.json. */
+ *  into the OS default channel. `DEFAULT` must stay equal to the
+ *  `defaultChannel` on the expo-notifications config plugin in app.json — they
+ *  disagreed until 2026-09-04 (plugin said 'default', which RETIRED_CHANNELS
+ *  below DELETES on every launch), so every notification posted without an
+ *  explicit channel — all of Safety Radius — went to a deleted channel and
+ *  Android dropped it silently. */
 export const ANDROID_CHANNEL = { DEFAULT: 'household', URGENT: 'urgent' } as const
 
 /** Channel ids this app has retired. Android REFUSES to let an app raise the
@@ -89,6 +94,43 @@ export async function getPushEnabled(): Promise<boolean> {
     return perm.status === 'granted'
   } catch {
     return false
+  }
+}
+
+/** Set once we have asked, so a decline is never nagged. */
+const ASKED_KEY = 'oneroof-push-asked'
+
+/** Ask for notification permission ONCE, on first launch after sign-in.
+ *
+ *  Until this existed, the ONLY thing that ever prompted was the Settings
+ *  "Reminders" toggle — so a user who never opened Settings had no token, and
+ *  every nudge and place alert addressed to them was silently discarded. That
+ *  was survivable while the app was iOS-only and hand-installed, but Android
+ *  13+ made POST_NOTIFICATIONS a runtime permission: on a Play install the
+ *  default outcome is a phone that receives nothing and looks fine.
+ *
+ *  Deliberately conservative — asks only when the OS says it has never been
+ *  asked, records the attempt so a decline is never repeated, and registers the
+ *  token itself when granted so there is no second launch of lag. */
+export async function ensurePushPermissionOnce(): Promise<void> {
+  try {
+    if (!Device.isDevice) return
+    const perm = await Notifications.getPermissionsAsync()
+    if (perm.status === 'granted') return
+    // Already answered no — on both platforms re-asking is a no-op anyway, and
+    // the Settings toggle is the supported way back.
+    if (perm.status === 'denied' || perm.canAskAgain === false) return
+    if (await AsyncStorage.getItem(ASKED_KEY)) return
+    // Written BEFORE prompting: a crash or a dismissed prompt must not turn
+    // this into a nag on every launch.
+    await AsyncStorage.setItem(ASKED_KEY, '1')
+    // Android 13+ shows no prompt at all until a channel exists — same
+    // ordering requirement as registerForPush below.
+    await ensureAndroidChannels()
+    const req = await Notifications.requestPermissionsAsync()
+    if (req.status === 'granted') await refreshPushToken()
+  } catch {
+    /* best effort — never block a launch on this */
   }
 }
 
