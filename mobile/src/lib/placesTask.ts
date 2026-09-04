@@ -23,6 +23,24 @@ const MAX_REGIONS = 20
 /** Which region set we last handed to the OS (see syncGeofences). */
 const SIGNATURE_KEY = 'oneroof-geofence-signature'
 
+/** Has THIS process actually armed the regions yet?
+ *
+ *  `hasStartedGeofencingAsync` and the stored signature both survive the app
+ *  process — but the OS's real geofence list does NOT. Play Services drops
+ *  every fence on reboot, on its own updates, and when an OEM battery manager
+ *  sleeps the app, and TaskManager keeps reporting "started" through all of it.
+ *  Trusting the signature across launches therefore turned a single loss into
+ *  PERMANENT silence: the signature matched, we returned early, and the fences
+ *  were never re-created. Measured on a Galaxy S9+ — 11 days without one
+ *  crossing while location sharing kept updating perfectly, so the map looked
+ *  healthy and only the alerts were gone.
+ *
+ *  So the signature now only suppresses repeats WITHIN a process; a cold launch
+ *  always re-arms. That costs one redundant startGeofencingAsync per launch,
+ *  and the Enters it re-announces are dropped by `record_place_event`
+ *  (migration 071) before they reach anyone. */
+let armedThisProcess = false
+
 TaskManager.defineTask(GEOFENCE_TASK, async ({ data, error }) => {
   if (error) return
   const { eventType, region } = (data ?? {}) as {
@@ -79,6 +97,7 @@ export async function syncGeofences(): Promise<void> {
   if (!isSharingEnabled(mine)) {
     if (running) await Location.stopGeofencingAsync(GEOFENCE_TASK).catch(() => {})
     await AsyncStorage.removeItem(SIGNATURE_KEY).catch(() => {})
+    armedThisProcess = false
     return
   }
 
@@ -98,24 +117,33 @@ export async function syncGeofences(): Promise<void> {
   if (!regions.length) {
     if (running) await Location.stopGeofencingAsync(GEOFENCE_TASK).catch(() => {})
     await AsyncStorage.removeItem(SIGNATURE_KEY).catch(() => {})
+    armedThisProcess = false
     return
   }
 
-  // Already monitoring exactly this set? Leave it alone — see the note above.
-  // Only skip while it's actually RUNNING, so a set that somehow stopped still
-  // gets re-registered rather than being trusted from the stored signature.
+  // Already monitoring exactly this set IN THIS PROCESS? Leave it alone — see
+  // the note above. Both conditions matter: `running` catches a set that
+  // stopped, and `armedThisProcess` catches the case `running` lies about —
+  // fences the OS silently dropped while TaskManager still calls them started.
   const signature = regionSignature(regions)
-  if (running) {
+  if (running && armedThisProcess) {
     const previous = await AsyncStorage.getItem(SIGNATURE_KEY).catch(() => null)
     if (previous === signature) return
   }
 
-  await Location.startGeofencingAsync(GEOFENCE_TASK, regions).catch(() => {})
-  await AsyncStorage.setItem(SIGNATURE_KEY, signature).catch(() => {})
+  let armed = true
+  await Location.startGeofencingAsync(GEOFENCE_TASK, regions).catch(() => {
+    armed = false
+  })
+  armedThisProcess = armed
+  // Only remember a set we actually armed, so a failed start is retried on the
+  // next foreground instead of being skipped by its own signature.
+  if (armed) await AsyncStorage.setItem(SIGNATURE_KEY, signature).catch(() => {})
 }
 
 export async function stopGeofences(): Promise<void> {
   const running = await Location.hasStartedGeofencingAsync(GEOFENCE_TASK).catch(() => false)
   if (running) await Location.stopGeofencingAsync(GEOFENCE_TASK).catch(() => {})
   await AsyncStorage.removeItem(SIGNATURE_KEY).catch(() => {})
+  armedThisProcess = false
 }

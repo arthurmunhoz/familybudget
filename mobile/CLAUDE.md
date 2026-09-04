@@ -889,6 +889,24 @@ rather than a missing env var.
     in the RECEIPT (the ticket says ok), and the app looks completely healthy
     because nudges still arrive over Realtime the moment it is opened. Diagnosed
     the hard way on 2026-08-30.
+- **A geofence registration does NOT survive what `hasStartedGeofencingAsync`
+  claims it does.** Play Services drops every fence on reboot, on its own
+  updates, and when an OEM battery manager sleeps the app — while
+  expo-task-manager goes on reporting the task as started. `syncGeofences`
+  therefore must NOT skip re-registering on the strength of the stored region
+  signature alone: it re-arms once per cold launch (`armedThisProcess` in
+  `lib/placesTask.ts`) and only uses the signature to suppress repeats within a
+  process. Skipping across launches turned one dropped registration into
+  permanent silence — a Galaxy S9+ went 11 days without recording a single
+  crossing while `member_locations` kept updating, so the map looked healthy and
+  only the place alerts were missing. Re-arming re-announces Enter for wherever
+  you are standing; `record_place_event` (migration 071) drops those, which is
+  what makes it safe.
+- **Android geofences need a radius comfortably larger than the reported
+  accuracy.** The battery-saver location profile reports ~100 m on Android, so a
+  100 m place is at the edge of what Play Services will call a crossing at all;
+  iOS at ~10 m accuracy fires the same fence reliably. Prefer 150-200 m+ for
+  anywhere that must alert on Android.
 - **Bumping the version for a local Xcode archive: edit `app.json`, then
   PREBUILD.** `expo.version` + `expo.ios.buildNumber` are written into
   `ios/OneRoof/Info.plist` as LITERALS at prebuild time, so editing Xcode's
