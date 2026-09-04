@@ -63,6 +63,7 @@ export const en = {
   'location.share.openSettings': 'Open Settings',
   'location.toast.on': 'Location sharing on',
   'location.toast.off': 'Location sharing off',
+  'location.toast.failed': "Couldn't update sharing — check your connection",
   'location.toast.paused': 'Sharing paused',
   'location.fg.title': 'Sharing your location',
   'location.fg.body': 'One Roof is sharing your location with your household.',

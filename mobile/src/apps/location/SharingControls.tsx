@@ -61,7 +61,9 @@ export function SharingControls({
   onClose,
 }: {
   myLocation: MemberLocation | null
-  onChanged: () => void
+  /** `patch` is applied to MY roster row immediately, so the card over the map
+   *  shows the new state on the same tap instead of after a refetch. */
+  onChanged: (patch?: Partial<MemberLocation>) => void
   onToast: (t: ToastData) => void
   onClose: () => void
 }) {
@@ -91,7 +93,15 @@ export function SharingControls({
     if (inFlight.current) return
     inFlight.current = true
     setBusy(true)
-    void fn().finally(() => {
+    void fn()
+      .catch(() => {
+        // A write that failed used to reject into `void` and vanish, leaving the
+        // switch showing a state the household cannot actually see. Say so, and
+        // put the switch back where the server still has it.
+        setOn(!!myLocation?.sharing)
+        toast(t('location.toast.failed'))
+      })
+      .finally(() => {
       inFlight.current = false
       setBusy(false)
     })
@@ -143,7 +153,7 @@ export function SharingControls({
     await startBackgroundUpdates(fgLabels).catch(() => {})
     setPausedUntil(null)
     toast(t('location.toast.on'))
-    onChanged()
+    onChanged({ sharing: true, paused_until: null })
     primeFirstFix()
   }
 
@@ -153,7 +163,7 @@ export function SharingControls({
     await setSharing(false)
     await stopBackgroundUpdates().catch(() => {})
     toast(t('location.toast.off'))
-    onChanged()
+    onChanged({ sharing: false, paused_until: null, lat: null, lng: null })
   }
 
   const doPause = async (until: Date) => {
@@ -161,7 +171,7 @@ export function SharingControls({
     await pauseSharing(until)
     await stopBackgroundUpdates().catch(() => {})
     toast(t('location.toast.paused'))
-    onChanged()
+    onChanged({ sharing: true, paused_until: until.toISOString(), lat: null, lng: null })
   }
 
   const resume = async () => {
@@ -175,7 +185,7 @@ export function SharingControls({
     await resumeSharing()
     await startBackgroundUpdates(fgLabels).catch(() => {})
     toast(t('location.toast.on'))
-    onChanged()
+    onChanged({ sharing: true, paused_until: null })
     primeFirstFix()
   }
 

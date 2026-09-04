@@ -483,11 +483,24 @@ export default function Whereabouts() {
     }
   }, [revalidate])
 
+  /** MY row, overridden until the refetch catches up. Toggling sharing writes to
+   *  the server and then revalidates, and the card over the map used to sit on
+   *  the old value for the whole round-trip — so turning sharing on left "Not
+   *  sharing" on screen. SharingControls reports what it just wrote and this
+   *  applies it on the same tap. */
+  const [myOverride, setMyOverride] = useState<Partial<MemberLocation> | null>(null)
+
   const locByEmail = useMemo(() => {
     const m = new Map<string, MemberLocation>()
     for (const l of locs) m.set(l.user_email, l)
+    if (myOverride && myEmail) {
+      const mine = m.get(myEmail)
+      // Only patch a row that exists — inventing one would render a member card
+      // for someone the roster query hasn't returned.
+      if (mine) m.set(myEmail, { ...mine, ...myOverride })
+    }
     return m
-  }, [locs])
+  }, [locs, myOverride, myEmail])
 
   const colors = useMemo(() => buildMemberColors(profiles.map((p) => p.email)), [profiles])
   const nameFor = useCallback(
@@ -1152,7 +1165,12 @@ export default function Whereabouts() {
       {sharingOpen ? (
         <SharingControls
           myLocation={myLoc ?? null}
-          onChanged={() => revalidate()}
+          onChanged={(patch) => {
+            if (patch) setMyOverride(patch)
+            // The write already landed, so the refetch agrees with the override;
+            // dropping it afterwards keeps the server as the source of truth.
+            void Promise.resolve(revalidate()).finally(() => setMyOverride(null))
+          }}
           onToast={setToast}
           onClose={() => setSharingOpen(false)}
         />

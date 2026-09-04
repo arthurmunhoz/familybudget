@@ -147,7 +147,13 @@ export async function setSharing(on: boolean): Promise<void> {
   const row: LocUpsert = on
     ? { user_email: email, sharing: true, paused_until: null }
     : { user_email: email, sharing: false, paused_until: null, lat: null, lng: null, accuracy: null, speed: null }
-  await supabase.from('member_locations').upsert(row, { onConflict: 'user_email' })
+  // Throw rather than resolve quietly: the caller flips a switch on the
+  // strength of this, so a failed write that looks like a success leaves the UI
+  // claiming you are sharing when the household cannot see you.
+  const { error } = await supabase
+    .from('member_locations')
+    .upsert(row, { onConflict: 'user_email' })
+  if (error) throw error
 }
 
 /** Pause sharing until `until` (keeps `sharing` true so the family sees a
@@ -155,21 +161,24 @@ export async function setSharing(on: boolean): Promise<void> {
 export async function pauseSharing(until: Date): Promise<void> {
   const email = await myEmail()
   if (!email) return
-  await supabase
+  // See setSharing: a silent failure would leave the UI lying about your state.
+  const { error } = await supabase
     .from('member_locations')
     .upsert(
       { user_email: email, sharing: true, paused_until: until.toISOString(), lat: null, lng: null, accuracy: null, speed: null },
       { onConflict: 'user_email' },
     )
+  if (error) throw error
 }
 
 /** Clear any pause and resume live sharing. */
 export async function resumeSharing(): Promise<void> {
   const email = await myEmail()
   if (!email) return
-  await supabase
+  const { error } = await supabase
     .from('member_locations')
     .upsert({ user_email: email, sharing: true, paused_until: null }, { onConflict: 'user_email' })
+  if (error) throw error
 }
 
 // ---------------------------------------------------------------------------

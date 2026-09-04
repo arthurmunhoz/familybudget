@@ -61,6 +61,7 @@ export const pt: Record<keyof typeof en, string> = {
   'location.share.openSettings': 'Abrir Ajustes',
   'location.toast.on': 'Compartilhamento ativado',
   'location.toast.off': 'Compartilhamento desativado',
+  'location.toast.failed': 'Não foi possível atualizar — verifique sua conexão',
   'location.toast.paused': 'Compartilhamento pausado',
   'location.fg.title': 'Compartilhando sua localização',
   'location.fg.body': 'O One Roof está compartilhando sua localização com sua família.',
