@@ -62,6 +62,12 @@ function taskOptions(mode: 'saver' | 'live', labels: FgLabels | null): Location.
       ? {
           accuracy: Location.Accuracy.High,
           distanceInterval: 10,
+          // ANDROID-ONLY, and it was missing here for the same reason the saver
+          // branch below documents: with distanceInterval alone the fused
+          // provider picks its own cadence, so someone being WATCHED could
+          // still report only every minute or two — they vanish off the edge of
+          // the frame between fixes. iOS ignores it and uses the distance.
+          timeInterval: 5_000,
           deferredUpdatesInterval: 0,
           pausesUpdatesAutomatically: false,
           activityType: Location.ActivityType.Other,

@@ -889,6 +889,14 @@ rather than a missing env var.
     in the RECEIPT (the ticket says ok), and the app looks completely healthy
     because nudges still arrive over Realtime the moment it is opened. Diagnosed
     the hard way on 2026-08-30.
+- **Watching a member follows them.** Opening a card arms `followRef` in
+  Whereabouts and every position they report re-centres the camera (holding the
+  watcher's zoom, offset by the roster height); a drag or pinch — detected via
+  `onCameraChanged`'s `gestures.isGestureActive`, which programmatic setCamera
+  calls do not set — releases it until a card is picked again. Both live and
+  saver task options must carry an explicit `timeInterval`: without one Android's
+  fused provider chooses its own cadence, so even a WATCHED member reported
+  every minute or two and drove off the edge of the frame between fixes.
 - **`canAskAgain` is NOT "the OS will refuse to prompt".** On Android it comes
   from `shouldShowRequestPermissionRationale()`, which is equally false for a
   permission that has never been requested — so `if (!canAskAgain) return false`

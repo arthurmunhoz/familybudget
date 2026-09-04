@@ -684,11 +684,40 @@ export default function Whereabouts() {
    *  YOUR OWN card is framed but never expanded. Everything the expanded version
    *  offered you — your battery, the way into sharing — now lives on the compact
    *  card, so opening it would just show the same two things again. */
+  /** Keep the camera on the member whose card is open.
+   *
+   *  `select` framed them once, at the moment of the tap, and then let them
+   *  drive out of shot — watching someone on the move meant chasing them by
+   *  hand. This re-centres on every position they report (Realtime pushes those
+   *  as they land), holding whatever zoom the watcher has chosen rather than
+   *  snapping back to FOCUS_ZOOM.
+   *
+   *  Panning the map hands control back: following a moving dot is only
+   *  helpful while you want it, and yanking the view out from under someone
+   *  who is looking somewhere else is worse than not following at all. Tapping
+   *  the card again re-arms it. */
+  const followRef = useRef(false)
+
+  useEffect(() => {
+    if (!selected || !followRef.current) return
+    const loc = locByEmail.get(selected)
+    if (!isSharingLive(loc)) return
+    cameraRef.current?.setCamera({
+      centerCoordinate: [loc.lng, loc.lat],
+      animationDuration: 700,
+      // Same offset as `select`: the roster sits over the bottom of the map.
+      padding: { paddingTop: 0, paddingLeft: 0, paddingRight: 0, paddingBottom: rosterHeight },
+    })
+  }, [selected, locByEmail, rosterHeight])
+
   const select = useCallback(
     (email: string) => {
       const isMine = email === myEmail
       const collapsing = !isMine && selected === email
       setSelected(isMine ? null : collapsing ? null : email)
+      // Picking someone (re)arms following; collapsing the card releases the
+      // camera back to you.
+      followRef.current = !collapsing && !isMine
       if (collapsing) return
 
       const loc = locByEmail.get(email)
@@ -793,6 +822,13 @@ export default function Whereabouts() {
             // sources so they're re-added AFTERWARDS — without it the safety
             // circle can quietly vanish when you change map mode.
             onDidFinishLoadingStyle={() => setStyleEpoch((n) => n + 1)}
+            // A drag/pinch means the watcher wants to look somewhere specific —
+            // stop re-centring on the followed member until they pick a card
+            // again. Programmatic setCamera calls report no active gesture, so
+            // following does not cancel itself.
+            onCameraChanged={(state) => {
+              if (state?.gestures?.isGestureActive) followRef.current = false
+            }}
             scaleBarEnabled={false}
             compassEnabled={false}
             // Mapbox's ToS requires the logo and OpenStreetMap's ODbL requires
