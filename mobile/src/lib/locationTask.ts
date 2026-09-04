@@ -229,10 +229,15 @@ export async function hasBackgroundPermission(): Promise<boolean> {
  *  them to Settings instead. */
 export async function canAskBackgroundPermission(): Promise<boolean> {
   try {
+    // `denied` AND `!canAskAgain` together — never `canAskAgain` alone, which is
+    // also false for a permission that has simply never been asked for. Getting
+    // that wrong here would send a brand-new install to "Open Settings" instead
+    // of the prompt it should have seen.
     const fg = await Location.getForegroundPermissionsAsync()
-    if (!fg.granted && !fg.canAskAgain) return false
+    if (fg.status === 'denied' && !fg.canAskAgain) return false
     const bg = await Location.getBackgroundPermissionsAsync()
-    return bg.granted || bg.canAskAgain
+    if (bg.granted) return true
+    return !(bg.status === 'denied' && !bg.canAskAgain)
   } catch {
     // Unknown is not "impossible" — let the normal path try and fail visibly.
     return true
@@ -252,7 +257,9 @@ export async function ensureBackgroundPermission(): Promise<boolean> {
   if (!(await ensureForegroundPermission())) return false
   const current = await Location.getBackgroundPermissionsAsync()
   if (current.granted) return true
-  if (!current.canAskAgain) return false
+  // See ensureForegroundPermission: `canAskAgain` is not a reliable "will not
+  // prompt" signal, and skipping the request on it silently blocked a fresh
+  // install from ever seeing the dialog.
   const req = await Location.requestBackgroundPermissionsAsync()
   return req.granted
 }

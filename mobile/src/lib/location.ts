@@ -190,7 +190,17 @@ async function readBattery(): Promise<number | null> {
 export async function ensureForegroundPermission(): Promise<boolean> {
   const current = await Location.getForegroundPermissionsAsync()
   if (current.granted) return true
-  if (!current.canAskAgain) return false
+  // NOTE: no `canAskAgain` short-circuit. It reads as false in more cases than
+  // "permanently denied" — on Android it is derived from
+  // shouldShowRequestPermissionRationale(), which is also false for a permission
+  // that has NEVER been requested. Bailing on it therefore skipped the prompt
+  // entirely on a fresh install: verified 2026-09-04 on a Galaxy S9+, where the
+  // system permission dialog was never launched once in the whole life of the
+  // install while the user tapped Continue over and over.
+  //
+  // Asking anyway costs nothing — when the OS really will not prompt, the
+  // request resolves denied immediately, which is the same answer the
+  // short-circuit gave.
   const req = await Location.requestForegroundPermissionsAsync()
   return req.granted
 }

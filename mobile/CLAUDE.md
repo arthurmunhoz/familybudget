@@ -889,6 +889,17 @@ rather than a missing env var.
     in the RECEIPT (the ticket says ok), and the app looks completely healthy
     because nudges still arrive over Realtime the moment it is opened. Diagnosed
     the hard way on 2026-08-30.
+- **`canAskAgain` is NOT "the OS will refuse to prompt".** On Android it comes
+  from `shouldShowRequestPermissionRationale()`, which is equally false for a
+  permission that has never been requested — so `if (!canAskAgain) return false`
+  before the request skips the dialog on a FRESH INSTALL. Verified 2026-09-04 on
+  a Galaxy S9+: `dumpsys` showed all three location permissions denied with no
+  USER_FIXED flag, location services on, and the logcat buffer covering the
+  whole life of the install contained ZERO GrantPermissions entries — the system
+  dialog was never launched while the user tapped Continue repeatedly. Just call
+  request*PermissionsAsync(); when the OS genuinely will not prompt it resolves
+  denied immediately. Only treat it as unaskable when status === 'denied' AND
+  !canAskAgain together (that is what `canAskBackgroundPermission()` does).
 - **Never show the prominent disclosure when the OS will not prompt.** Once
   Android has stopped asking for background location (the user said no, or on
   11+ where "Allow all the time" is only offered in Settings),
