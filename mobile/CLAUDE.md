@@ -889,6 +889,14 @@ rather than a missing env var.
     in the RECEIPT (the ticket says ok), and the app looks completely healthy
     because nudges still arrive over Realtime the moment it is opened. Diagnosed
     the hard way on 2026-08-30.
+- **Never show the prominent disclosure when the OS will not prompt.** Once
+  Android has stopped asking for background location (the user said no, or on
+  11+ where "Allow all the time" is only offered in Settings),
+  `ensureBackgroundPermission()` returns false having displayed NOTHING — so the
+  disclosure-then-prompt flow becomes a loop: accept, no dialog, the switch
+  snaps back, and the Settings link is hidden behind the screen being
+  re-accepted. `gate()` in SharingControls checks
+  `canAskBackgroundPermission()` first and goes straight to the Settings hint.
 - **A local notification's `channelId` goes on the TRIGGER, not the content.**
   `{ channelId }` on its own IS the deliver-immediately trigger
   (`ChannelAwareTriggerInput`); `trigger: null` also fires immediately but has

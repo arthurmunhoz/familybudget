@@ -218,6 +218,27 @@ export async function hasBackgroundPermission(): Promise<boolean> {
   return !!current?.granted
 }
 
+/** Can the OS still be asked for background location, or is the only way in
+ *  through Settings?
+ *
+ *  Android stops prompting once the user has said no (and on 11+ the "Allow all
+ *  the time" choice is only offered in Settings at all). When that happens
+ *  `ensureBackgroundPermission()` returns false having shown NOTHING — so a
+ *  caller that puts the prominent disclosure up first leaves the user tapping
+ *  Continue forever with no dialog and no explanation. Ask this first and send
+ *  them to Settings instead. */
+export async function canAskBackgroundPermission(): Promise<boolean> {
+  try {
+    const fg = await Location.getForegroundPermissionsAsync()
+    if (!fg.granted && !fg.canAskAgain) return false
+    const bg = await Location.getBackgroundPermissionsAsync()
+    return bg.granted || bg.canAskAgain
+  } catch {
+    // Unknown is not "impossible" — let the normal path try and fail visibly.
+    return true
+  }
+}
+
 /** Ask for Always-authorization (needed for background). Requests foreground
  *  first (iOS requires the two-step escalation). Returns whether it's granted.
  *

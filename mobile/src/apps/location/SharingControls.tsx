@@ -19,6 +19,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { captureAndUpload, isPaused, pauseSharing, resumeSharing, setSharing } from '@/lib/location'
 import {
+  canAskBackgroundPermission,
   ensureBackgroundPermission,
   hasBackgroundPermission,
   startBackgroundUpdates,
@@ -187,6 +188,15 @@ export function SharingControls({
     run(async () => {
       if (await hasBackgroundPermission()) {
         await (action === 'enable' ? enable() : resume())
+        return
+      }
+      // The OS will not prompt again — showing the disclosure would put the
+      // user in a loop: accept, no dialog appears, the switch snaps back, and
+      // the only way forward (Settings) is hidden behind the very screen they
+      // keep re-accepting. Go straight to the Settings hint instead.
+      if (!(await canAskBackgroundPermission())) {
+        if (action === 'enable') setOn(false)
+        setPermDenied(true)
         return
       }
       setPending(action)
