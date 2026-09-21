@@ -24,6 +24,7 @@ import {
   upsertMyFix,
 } from './location'
 import { fetchMyLiveWindowMs } from './liveLocation'
+import { rearmGeofencesIfStale } from './placesTask'
 
 export const LOCATION_TASK = 'oneroof-location-updates'
 
@@ -205,6 +206,11 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
       battery: await readBattery(),
     })
     await manageLiveRamp()
+    // Android sheds geofences silently while this task keeps running — each
+    // delivered fix is the one chance to notice and re-arm on a phone that's
+    // out moving with the app never opened. Cheap: one AsyncStorage read
+    // unless the hourly re-arm is actually due (no-op on iOS).
+    await rearmGeofencesIfStale()
   } catch {
     // best-effort — a dropped background fix is caught up by the next one
   }

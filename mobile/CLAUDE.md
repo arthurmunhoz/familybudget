@@ -945,18 +945,26 @@ rather than a missing env var.
   expo-task-manager goes on reporting the task as started. `syncGeofences`
   therefore must NOT skip re-registering on the strength of the stored region
   signature alone: it re-arms once per cold launch (`armedThisProcess` in
-  `lib/placesTask.ts`) and only uses the signature to suppress repeats within a
-  process. Skipping across launches turned one dropped registration into
-  permanent silence — a Galaxy S9+ went 11 days without recording a single
-  crossing while `member_locations` kept updating, so the map looked healthy and
-  only the place alerts were missing. Re-arming re-announces Enter for wherever
-  you are standing; `record_place_event` (migration 071) drops those, which is
-  what makes it safe.
+  `lib/placesTask.ts`) and, **on Android, also whenever the last arm is older
+  than an hour** (`ARMED_AT_KEY`/`rearmDue`) — checked on every foreground AND
+  on every delivered background fix (`rearmGeofencesIfStale()`, called from
+  `locationTask.ts`'s task callback). That last hook is the load-bearing one:
+  cold-launch-only re-arming still left a phone that was out moving with the
+  app never opened unprotected — the S9+ recorded near-zero crossings for
+  three weeks (Aug 24–Sep 18, 2026) while `member_locations` kept updating, so
+  the map looked healthy and only the place alerts were missing. Re-arming
+  re-announces Enter for wherever you are standing; `record_place_event`
+  (migration 071) drops those, which is what makes hourly re-arms safe.
 - **Android geofences need a radius comfortably larger than the reported
-  accuracy.** The battery-saver location profile reports ~100 m on Android, so a
-  100 m place is at the edge of what Play Services will call a crossing at all;
-  iOS at ~10 m accuracy fires the same fence reliably. Prefer 150-200 m+ for
-  anywhere that must alert on Android.
+  accuracy — and this is now ENFORCED at registration.** The battery-saver
+  location profile reports ~100 m on Android, so a 100 m place is at the edge
+  of what Play Services will call a crossing at all; iOS at ~10 m accuracy
+  fires the same fence reliably (the household's 100 m Home was the other half
+  of the S9+ three-week silence). `syncGeofences` clamps the REGISTERED radius
+  to `ANDROID_MIN_FENCE_RADIUS_M` (200 m) on Android only — the stored
+  `places.radius_m` is untouched (household-shared; iOS honors it precisely),
+  so an Android alert can fire up to ~200 m out and the map ring still draws
+  the stored radius. Don't "fix" this by editing the place's radius in data.
 - **Bumping the version for a local Xcode archive: edit `app.json`, then
   PREBUILD.** `expo.version` + `expo.ios.buildNumber` are written into
   `ios/OneRoof/Info.plist` as LITERALS at prebuild time, so editing Xcode's
