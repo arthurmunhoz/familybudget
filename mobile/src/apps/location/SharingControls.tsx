@@ -200,13 +200,17 @@ export function SharingControls({
         await (action === 'enable' ? enable() : resume())
         return
       }
-      // The OS will not prompt again — showing the disclosure would put the
-      // user in a loop: accept, no dialog appears, the switch snaps back, and
-      // the only way forward (Settings) is hidden behind the very screen they
-      // keep re-accepting. Go straight to the Settings hint instead.
-      if (!(await canAskBackgroundPermission())) {
+      // Only trust Android's "the OS won't prompt" signals AFTER an attempt
+      // has actually failed (permDenied). Pre-checking on the first try is
+      // how sharing went completely dead on a fresh/revoked install
+      // (2026-09-22): Android reports denied + !canAskAgain for a permission
+      // a request WOULD happily prompt for — a Settings revoke resets to
+      // exactly that combo — so the disclosure and the dialog never appeared
+      // at all. Once an attempt HAS failed, the check earns its keep: it
+      // stops the loop of re-accepting the disclosure with no dialog behind
+      // it (the Settings hint is already on screen at that point).
+      if (permDenied && !(await canAskBackgroundPermission())) {
         if (action === 'enable') setOn(false)
-        setPermDenied(true)
         return
       }
       setPending(action)

@@ -908,14 +908,25 @@ rather than a missing env var.
   request*PermissionsAsync(); when the OS genuinely will not prompt it resolves
   denied immediately. Only treat it as unaskable when status === 'denied' AND
   !canAskAgain together (that is what `canAskBackgroundPermission()` does).
-- **Never show the prominent disclosure when the OS will not prompt.** Once
-  Android has stopped asking for background location (the user said no, or on
-  11+ where "Allow all the time" is only offered in Settings),
-  `ensureBackgroundPermission()` returns false having displayed NOTHING — so the
-  disclosure-then-prompt flow becomes a loop: accept, no dialog, the switch
-  snaps back, and the Settings link is hidden behind the screen being
-  re-accepted. `gate()` in SharingControls checks
-  `canAskBackgroundPermission()` first and goes straight to the Settings hint.
+- **Android's "the OS won't prompt" signals may only be trusted AFTER an
+  attempt has failed — never as a pre-flight check.** Both halves of this were
+  paid for with a real bug:
+  - Once Android has stopped asking for background location (the user said no,
+    or on 11+ where "Allow all the time" is only offered in Settings),
+    `ensureBackgroundPermission()` returns false having displayed NOTHING — so
+    an unconditional disclosure-then-prompt flow loops: accept, no dialog, the
+    switch snaps back (2026-09-04).
+  - But pre-checking `canAskBackgroundPermission()` BEFORE the first attempt
+    killed sharing entirely on a fresh/revoked install (2026-09-22): Android
+    reports `denied` + `!canAskAgain` for a permission a request WOULD happily
+    prompt for — a Settings revoke resets to exactly that combo — so neither
+    the disclosure nor the dialog ever appeared, only the Settings alert.
+  `gate()` in SharingControls therefore always shows the disclosure and
+  attempts the request on the FIRST try, and consults
+  `canAskBackgroundPermission()` only when `permDenied` says an attempt
+  already failed (the Settings hint is on screen by then, so skipping the
+  disclosure can't hide the way forward). Don't "simplify" this in either
+  direction.
 - **A local notification's `channelId` goes on the TRIGGER, not the content.**
   `{ channelId }` on its own IS the deliver-immediately trigger
   (`ChannelAwareTriggerInput`); `trigger: null` also fires immediately but has
