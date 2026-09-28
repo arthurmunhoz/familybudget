@@ -381,8 +381,38 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   `driveEta`, `haversineMeters`, `formatDistance`/`formatEta`, nav deep-links.
   Keep `@rnmapbox/maps` imports OUT of here (screens only).
 - `src/lib/locationTask.ts` — the background TASK (module-scope `defineTask`, same
-  pattern as `backgroundNotifications.ts`); `registerLocationTask()` runs in
-  `_layout`. `startBackgroundUpdates` takes localized foreground-service labels.
+  pattern as `backgroundNotifications.ts`). `startBackgroundUpdates` takes
+  localized foreground-service labels.
+- **Every background task is defined from `mobile/index.ts` (package.json
+  `main`), NOT from `_layout`.** On Android a location fix, geofence crossing or
+  data-only push that arrives after the process died boots a HEADLESS JS
+  context: the entry runs, nothing renders — and Metro loads route files
+  (`_layout` included) lazily, on first render. A task defined only via
+  `_layout` is therefore missing there, and expo-task-manager then
+  UNREGISTERS it (`TaskManager.ts`: "requested but looks like it is not
+  defined"). Because `LocationTaskService` is `START_REDELIVER_INTENT`, the
+  first Samsung process kill did exactly that: the S9+ stopped reporting for
+  days (2026-09-26) while the UI still said "sharing". Expo's docs say "import
+  it at the top of _layout" — that is not enough on Android. A NEW task module
+  must be imported in `index.ts`; `__tests__/whereabouts/headless.test.ts`
+  fails if it isn't.
+- **expo-location refuses a `foregroundService` (re)start unless the app is
+  foregrounded** (`ForegroundServiceStartNotAllowedException`, every Android
+  version). So: background code (live-wake ramp, relax from a delivered fix)
+  re-registers WITHOUT the service block via `reconfigureOptions()` — the
+  running service is left alone — and `resumeBackgroundUpdatesIfSharing()`
+  (every foreground, via `useLocationSync`) RE-APPLIES the full options on
+  Android even when the task is already registered, because after an OS kill
+  the task survives but its service doesn't. Never build task options without
+  the `foregroundService` block from the foreground: re-registering without it
+  there STOPS the running service. `storedLabels()` never returns null for that
+  reason.
+- **The background-notification task gets a different payload per platform.**
+  iOS: `notification.request.content.data`. Android data-only FCM: the
+  serialized RemoteMessage, our data as a JSON string in `data.body` /
+  `data.dataString` (wrapped under `notification` on the JobScheduler path).
+  Parse with `notificationTaskPayload()`; reading only the iOS shape is how
+  every Android live-wake was ignored.
 - **Android drops background location on termination and NEVER restarts it.**
   Expo 56's docs: *"A terminated app will not automatically restart when a
   location or geofencing event occurs due to platform limitations"* — iOS does
@@ -791,8 +821,13 @@ There is no browser/simulator in the agent harness. The gate is:
 ```
 cd mobile && npx tsc --noEmit            # types
 cd mobile && npx expo export --platform ios --output-dir /tmp/x   # Metro bundle resolves all imports
+cd mobile && npm test && npx tsc --noEmit -p __tests__           # Whereabouts behaviour tests (Jest, Android preset)
 ```
-Both must pass before committing. Real on-device behavior (auth, camera, Face ID,
+All must pass before committing. The Jest suite (`__tests__/whereabouts/`,
+spec in its `SPEC.md`) fakes expo-location / task-manager / notifications and
+Supabase over a shared `world()` and models Android's headless boot; it
+proves JS contracts only. `DEVICE-TEST.md` next to it is the two-phone
+protocol for what only a device can show. Real on-device behavior (auth, camera, Face ID,
 push, layout) must be checked by a human on a simulator/device — say so, don't
 claim it's verified. For a NATIVE dependency + config plugin (below), also run
 `npx expo config --type introspect --json` to confirm the plugin applies and the

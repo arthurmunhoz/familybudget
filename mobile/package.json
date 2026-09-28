@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "version": "1.0.0",
   "dependencies": {
     "@bacons/apple-targets": "^4.0.7",

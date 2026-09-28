@@ -77,13 +77,47 @@ function handleAckPayload(data: unknown): void {
   })
 }
 
+/** Our push's `data` object, from whichever shape the task was handed.
+ *
+ *  The platforms DIFFER, and reading only the first shape is how every live-wake
+ *  to a backgrounded Android phone was silently ignored:
+ *  - iOS: `{ notification: { request: { content: { data } } } }`.
+ *  - Android (a data-only FCM message — no title/body): the serialized
+ *    RemoteMessage, `{ data: { body: '<json>', dataString: '<json>', … },
+ *    notification: null }` — Expo ships our `data` as a JSON STRING in `body`
+ *    (expo-notifications RemoteMessageSerializer). When the delivery goes
+ *    through expo's JobScheduler path instead, that same message arrives
+ *    wrapped one level down, under `notification`. */
+export function notificationTaskPayload(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return undefined
+  const d = data as Record<string, any>
+  const ios = d.notification?.request?.content?.data
+  if (ios) return ios
+  for (const message of [d, d.notification]) {
+    if (!message || typeof message !== 'object') continue
+    const fcm = message.data && typeof message.data === 'object' ? message.data : message
+    const raw = fcm.dataString ?? fcm.body
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw)
+      } catch {
+        continue
+      }
+    }
+    if (raw && typeof raw === 'object') return raw
+    if (typeof fcm.type === 'string') return fcm
+  }
+  return undefined
+}
+
 // Must run at module scope (not inside a component/effect) — Expo re-runs
 // this definition on every JS load, background or foreground, before
-// registerBackgroundNotifications() below ever gets a chance to run.
+// registerBackgroundNotifications() below ever gets a chance to run. On
+// Android that includes HEADLESS loads, which never evaluate _layout — that is
+// why mobile/index.ts imports this module directly.
 TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => {
   if (error) return
-  const payload = (data as { notification?: { request?: { content?: { data?: unknown } } } })
-    ?.notification?.request?.content?.data
+  const payload = notificationTaskPayload(data)
   handleAckPayload(payload)
   // Background wake: ramp the location task + stream a burst (not just one
   // fix) — the foreground listener below keeps the cheap single fix, since

@@ -11,6 +11,7 @@
 //
 // Like backgroundNotifications.ts, the task MUST be defined at module scope so
 // the OS can wake it headlessly; importing this module is what registers it.
+import { AppState, Platform } from 'react-native'
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 import * as Battery from 'expo-battery'
@@ -25,6 +26,7 @@ import {
 } from './location'
 import { fetchMyLiveWindowMs } from './liveLocation'
 import { rearmGeofencesIfStale } from './placesTask'
+import { DICTS, detectLang } from './i18n'
 
 export const LOCATION_TASK = 'oneroof-location-updates'
 
@@ -45,19 +47,51 @@ const LIVE_BURST_MS = 20_000 // how much of the ~30s wake window the burst uses
 
 type FgLabels = { title: string; body: string }
 
-async function storedLabels(): Promise<FgLabels | null> {
+/** The persisted (localized) labels, else the device language's. NEVER null:
+ *  options without `foregroundService` make Android throttle background fixes
+ *  to a few an hour, and re-registering without it from the foreground STOPS
+ *  a running service — both look exactly like "sharing stopped updating". */
+async function storedLabels(): Promise<FgLabels> {
   try {
     const raw = await AsyncStorage.getItem(BG_LABELS_KEY)
-    return raw ? (JSON.parse(raw) as FgLabels) : null
+    if (raw) return JSON.parse(raw) as FgLabels
   } catch {
-    return null
+    // fall through to the device-language labels
   }
+  const dict = DICTS[detectLang()]
+  return { title: dict['location.fg.title'], body: dict['location.fg.body'] }
+}
+
+/** True while a watcher has this device ramped to the live cadence. */
+async function isLiveRamped(): Promise<boolean> {
+  const raw = await AsyncStorage.getItem(LIVE_UNTIL_KEY).catch(() => null)
+  return !!raw && Number(raw) > Date.now()
+}
+
+/** Options for re-registering the RUNNING task from wherever we are.
+ *
+ *  Android's expo-location refuses a `foregroundService` start unless the app
+ *  is foregrounded (LocationModule throws ForegroundServiceStartNotAllowed) —
+ *  so a ramp from a live-wake or a relax from a delivered fix, both of which
+ *  run in the background, used to THROW: the ramp took the wake's burst down
+ *  with it, and a failed relax left the phone on the 5 s high-accuracy cadence
+ *  until it was next opened. Without the block, re-registering requires only
+ *  background permission (which sharing already demands), and the service that
+ *  is already running is left alone — expo only touches it when foregrounded.
+ *  The next foreground resume re-applies the full options. */
+async function reconfigureOptions(mode: 'saver' | 'live'): Promise<Location.LocationTaskOptions> {
+  const opts = taskOptions(mode, await storedLabels())
+  if (Platform.OS === 'android' && AppState.currentState !== 'active') {
+    const { foregroundService: _service, ...rest } = opts
+    return rest
+  }
+  return opts
 }
 
 /** Task options for the two cadences. Android's foreground-service labels are
  *  persisted at start time (localized by the caller) so a background restart
- *  can reuse them; omitted if somehow missing (iOS never uses them). */
-function taskOptions(mode: 'saver' | 'live', labels: FgLabels | null): Location.LocationTaskOptions {
+ *  can reuse them (iOS never uses them). */
+function taskOptions(mode: 'saver' | 'live', labels: FgLabels): Location.LocationTaskOptions {
   const base: Location.LocationTaskOptions =
     mode === 'live'
       ? {
@@ -86,16 +120,14 @@ function taskOptions(mode: 'saver' | 'live', labels: FgLabels | null): Location.
           activityType: Location.ActivityType.Other,
           showsBackgroundLocationIndicator: false,
         }
-  return labels
-    ? {
-        ...base,
-        foregroundService: {
-          notificationTitle: labels.title,
-          notificationBody: labels.body,
-          notificationColor: '#c2603f',
-        },
-      }
-    : base
+  return {
+    ...base,
+    foregroundService: {
+      notificationTitle: labels.title,
+      notificationBody: labels.body,
+      notificationColor: '#c2603f',
+    },
+  }
 }
 
 let liveTick: ReturnType<typeof setInterval> | null = null
@@ -118,7 +150,7 @@ async function rampBackgroundUpdates(untilMs: number): Promise<void> {
   const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
   if (!running) return
   await AsyncStorage.setItem(LIVE_UNTIL_KEY, String(untilMs))
-  await Location.startLocationUpdatesAsync(LOCATION_TASK, taskOptions('live', await storedLabels()))
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, await reconfigureOptions('live'))
   startLiveTick()
 }
 
@@ -128,7 +160,7 @@ async function relaxBackgroundUpdates(): Promise<void> {
   await AsyncStorage.removeItem(LIVE_UNTIL_KEY).catch(() => {})
   const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
   if (!running) return
-  await Location.startLocationUpdatesAsync(LOCATION_TASK, taskOptions('saver', await storedLabels()))
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, await reconfigureOptions('saver'))
 }
 
 /** Extend ramped mode from the DB while a watcher's heartbeat keeps the
@@ -164,7 +196,9 @@ export async function respondToLiveWake(): Promise<void> {
     if (!isSharingEnabled(mine)) return
     const until = await fetchMyLiveWindowMs()
     if (until <= Date.now()) return
-    await rampBackgroundUpdates(until)
+    // The ramp is an optimisation; the burst is what moves the watcher's map
+    // NOW. A failed ramp must not cost the burst.
+    await rampBackgroundUpdates(until).catch(() => {})
     await runLiveBurst(Math.min(LIVE_BURST_MS, until - Date.now()))
   } catch {
     // best-effort — the watcher's next stale-check heartbeat re-fires the wake
@@ -186,7 +220,12 @@ async function readBattery(): Promise<number | null> {
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (error) return
   const locations = (data as { locations?: Location.LocationObject[] } | undefined)?.locations
-  const loc = locations?.[locations.length - 1]
+  // The NEWEST fix, by its own timestamp — a deferred batch is not guaranteed
+  // to be delivered in order, and writing an older fix last moves the pin back.
+  const loc = locations?.reduce<Location.LocationObject | undefined>(
+    (best, l) => (!best || l.timestamp >= best.timestamp ? l : best),
+    undefined,
+  )
   if (!loc) return
   try {
     // Honor a pause/stop that happened while we were backgrounded: if sharing is
@@ -303,13 +342,31 @@ export async function startBackgroundUpdates(labels: FgLabels): Promise<void> {
  *  departure alerts about you — with the app looking perfectly healthy, because
  *  `sharing` is still true in the database.
  *
+ *  ANDROID ALSO RE-APPLIES THE OPTIONS when the task is already registered.
+ *  "Registered" is not "running properly" there: when the OS kills the process,
+ *  LocationTaskService is redelivered into a headless process, and expo-location
+ *  refuses to start a foreground service from the background ("Foreground
+ *  location task cannot be started while the app is in the background!") — so
+ *  the task survives but the service doesn't, and fixes drop to Android's
+ *  background throttle of a few per hour. Nothing brings the service back until
+ *  the options are set again FROM THE FOREGROUND, which is what this is. The
+ *  same call upgrades a registration an older build left with older options
+ *  (registrations persist across app updates). Keeps the live cadence if a
+ *  watcher has this device ramped.
+ *
  *  Returns true if it actually had to restart, so the caller can prime a fresh
  *  fix and put the stale pin right immediately. */
 export async function resumeBackgroundUpdatesIfSharing(labels: FgLabels): Promise<boolean> {
+  await AsyncStorage.setItem(BG_LABELS_KEY, JSON.stringify(labels)).catch(() => {})
   const already = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
-  if (already) return false
+  if (already && Platform.OS !== 'android') return false
   const mine = await fetchMyLocation().catch(() => null)
   if (!isSharingEnabled(mine)) return false
+  if (already) {
+    const mode = (await isLiveRamped()) ? 'live' : 'saver'
+    await Location.startLocationUpdatesAsync(LOCATION_TASK, taskOptions(mode, labels))
+    return false
+  }
   await startBackgroundUpdates(labels)
   return true
 }
