@@ -108,6 +108,18 @@ describe('D — background task handler (headless)', () => {
 })
 
 describe('F — live wake', () => {
+  // The live burst streams for up to 20 s of real time. Fast-forward ONLY long
+  // waits (> 1 s) so the watch window can be generous — a short window raced
+  // module loading on a busy machine and made these tests flaky.
+  const realSetTimeout = global.setTimeout
+  beforeEach(() => {
+    jest.spyOn(global, 'setTimeout').mockImplementation(((fn: (...a: unknown[]) => void, ms?: number, ...args: unknown[]) =>
+      realSetTimeout(fn, ms && ms > 1000 ? 0 : ms, ...args)) as unknown as typeof setTimeout)
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
   function watchedBy(ms: number) {
     world().db.location_live_requests = [
       { requester_email: 'wife@example.com', target_email: ME, expires_at: new Date(Date.now() + ms).toISOString() },
@@ -116,7 +128,7 @@ describe('F — live wake', () => {
 
   it('F1 respondToLiveWake captures a fresh fix and writes it when sharing', async () => {
     seedSharing(true)
-    watchedBy(1_500)
+    watchedBy(60_000)
     world().position = fix(28.0, -82.0, Date.now())
     const { mod } = headlessTask()
     await mod.respondToLiveWake()
@@ -129,7 +141,7 @@ describe('F — live wake', () => {
 
   it('F2 respondToLiveWake writes nothing when sharing is off', async () => {
     seedSharing(false)
-    watchedBy(1_500)
+    watchedBy(60_000)
     const { mod } = headlessTask()
     await mod.respondToLiveWake()
     expect(positionWrites()).toEqual([])
@@ -153,7 +165,7 @@ describe('F — live wake', () => {
     ['job-wrapped', androidJob],
   ])('F3 an Android data-only live-wake push (%s), delivered headless, ends in a written fix', async (_n, data) => {
     seedSharing(true)
-    watchedBy(1_500)
+    watchedBy(60_000)
     world().position = fix(28.1, -82.1, Date.now())
     jest.resetModules()
     jest.isolateModules(() => {
@@ -172,7 +184,7 @@ describe('F — live wake', () => {
 
   it('F5 background live wake on Android: the ramp cannot take the service with it, and the burst still writes', async () => {
     seedSharing(true)
-    watchedBy(1_500)
+    watchedBy(60_000)
     world().position = fix(28.2, -82.2, Date.now())
     const { mod, name } = headlessTask()
     // The background task is already running (started from the foreground earlier).

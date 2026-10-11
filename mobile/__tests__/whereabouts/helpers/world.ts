@@ -34,6 +34,8 @@ export interface World {
   calls: string[]
   /** expo-location's AppForegroundedSingleton: false in a headless/background JS context. */
   foregrounded: boolean
+  /** lib/features WHEREABOUTS_ENABLED for this run (the suite tests the feature, so ON by default). */
+  whereabouts: boolean
   // backend
   sessionEmail: string | null
   db: Record<string, Row[]>
@@ -58,6 +60,7 @@ export function freshWorld(): World {
     notificationTaskRegistered: null,
     calls: [],
     foregrounded: true,
+    whereabouts: true,
     sessionEmail: ME,
     db: {},
     writes: [],

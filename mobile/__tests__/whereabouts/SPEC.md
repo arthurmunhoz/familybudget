@@ -105,6 +105,20 @@ Run in a fresh module registry (headless has no in-memory state from the UI).
 - F5 In the background (P7) a failed ramp doesn't cost the burst's fix.
 - F6 Relaxing after a watch, in the background, really returns to the saver cadence.
 
+### G. Switched OFF on Android (v1 default) — `disabled.android.test.ts`
+- G1 Default config: `extra.whereaboutsAndroid` false; no location / FGS
+  permission declared; all four location permissions BLOCKED (strips library
+  declarations); expo-location's Android background + service flags false;
+  `LocationTaskService` removed from the manifest; iOS config unchanged;
+  `WHEREABOUTS_ANDROID=1` restores every declaration.
+- G2 Not visible: no hub tile (the rest intact); a `/location` push tap doesn't navigate.
+- G3 No background work, even leftovers from an earlier build: a delivered fix
+  writes nothing and retires the task; a geofence crossing records nothing; a
+  live-wake captures nothing; launch tears down leftover location updates and
+  fences and starts nothing — without touching the account-wide `sharing` flag.
+
+The other sections run with the switch ON (the feature's own behaviour).
+
 ## Needs a real device (can't be proven in Jest)
 - Samsung "Sleeping apps"/battery optimisation killing the service; the
   persistent notification actually showing; OEM-specific kill behaviour.

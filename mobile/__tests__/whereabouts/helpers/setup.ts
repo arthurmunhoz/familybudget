@@ -160,6 +160,15 @@ jest.mock('expo-notifications', () =>
 
 jest.mock('@/lib/supabase', () => require('./fakeSupabase'))
 
+// The build-time switch (app.config.js → extra.whereaboutsAndroid). A getter so
+// a test can flip it with world().whereabouts before loading the app modules.
+jest.mock('@/lib/features', () => ({
+  __esModule: true,
+  get WHEREABOUTS_ENABLED() {
+    return mockWorld().whereabouts
+  },
+}))
+
 jest.mock('expo-battery', () =>
   mockModule({
     getBatteryLevelAsync: jest.fn(async () => 0.8),

@@ -22,6 +22,7 @@ import * as Location from 'expo-location'
 import { supabase } from './supabase'
 import { fetchMyLocation, isSharingEnabled, upsertMyPosition } from './location'
 import { useAuth } from './auth'
+import { WHEREABOUTS_ENABLED } from './features'
 import type { MemberLocation } from './types'
 
 const LIVE_WINDOW_S = 45 // one heartbeat keeps the target live this long
@@ -142,7 +143,8 @@ export function useLiveResponder(): void {
 
   // Am I currently being watched? (any unexpired request aimed at me)
   useEffect(() => {
-    if (!myEmailAddr) return
+    // Switched off on this platform (lib/features.ts): never become live.
+    if (!myEmailAddr || !WHEREABOUTS_ENABLED) return
     let cancelled = false
     let expiryTimer: ReturnType<typeof setTimeout> | null = null
 

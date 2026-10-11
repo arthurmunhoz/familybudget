@@ -37,6 +37,42 @@ const googleServicesFile =
   process.env.GOOGLE_SERVICES_JSON ??
   (fs.existsSync(GOOGLE_SERVICES) ? './google-services.json' : undefined)
 
+// WHEREABOUTS ON ANDROID — the one switch. OFF for the first Play release
+// (2026-10): Android v1 ships without the family map. With it off, the Android
+// build declares NO location permission and NO location foreground service
+// (they're stripped from every library's manifest, Mapbox's and
+// expo-location's included), so Play asks for no location declarations, and
+// the JS hides the feature (`src/lib/features.ts` reads `extra.whereaboutsAndroid`).
+// To bring it back: set this to true and rebuild. `WHEREABOUTS_ANDROID=1|0`
+// overrides it for a one-off build without a commit. iOS is never affected.
+const WHEREABOUTS_ON_ANDROID =
+  process.env.WHEREABOUTS_ANDROID != null ? process.env.WHEREABOUTS_ANDROID === '1' : false
+
+const ANDROID_LOCATION_PERMISSIONS = [
+  'android.permission.ACCESS_COARSE_LOCATION',
+  'android.permission.ACCESS_FINE_LOCATION',
+  'android.permission.ACCESS_BACKGROUND_LOCATION',
+  'android.permission.FOREGROUND_SERVICE_LOCATION',
+]
+
+/** With Whereabouts off on Android, drop expo-location's foreground service
+ *  from the merged manifest. A declared `foregroundServiceType="location"`
+ *  service is itself something Play asks you to justify, even if never started. */
+function withoutAndroidLocationService(config) {
+  const { withAndroidManifest } = require('expo/config-plugins')
+  return withAndroidManifest(config, (mod) => {
+    const manifest = mod.modResults.manifest
+    manifest.$ = { ...manifest.$, 'xmlns:tools': 'http://schemas.android.com/tools' }
+    const app = manifest.application?.[0]
+    if (app) {
+      const name = 'expo.modules.location.services.LocationTaskService'
+      app.service = (app.service ?? []).filter((s) => s.$?.['android:name'] !== name)
+      app.service.push({ $: { 'android:name': name, 'tools:node': 'remove' } })
+    }
+    return mod
+  })
+}
+
 module.exports = ({ config }) => {
   const ios = config.ios ?? {}
   const android = config.android ?? {}
@@ -72,14 +108,22 @@ module.exports = ({ config }) => {
       permissions: Array.from(
         new Set([
           ...(android.permissions ?? []),
-          'android.permission.ACCESS_COARSE_LOCATION',
-          'android.permission.ACCESS_FINE_LOCATION',
-          'android.permission.ACCESS_BACKGROUND_LOCATION',
-          'android.permission.FOREGROUND_SERVICE',
-          'android.permission.FOREGROUND_SERVICE_LOCATION',
+          ...(WHEREABOUTS_ON_ANDROID
+            ? [...ANDROID_LOCATION_PERMISSIONS, 'android.permission.FOREGROUND_SERVICE']
+            : []),
         ]),
       ),
+      // `blockedPermissions` becomes tools:node="remove", which also strips the
+      // permissions that LIBRARY manifests (Mapbox, expo-location) declare.
+      ...(WHEREABOUTS_ON_ANDROID
+        ? {}
+        : {
+            blockedPermissions: Array.from(
+              new Set([...(android.blockedPermissions ?? []), ...ANDROID_LOCATION_PERMISSIONS]),
+            ),
+          }),
     },
+    extra: { ...(config.extra ?? {}), whereaboutsAndroid: WHEREABOUTS_ON_ANDROID },
     plugins: [
       ...(config.plugins ?? []),
       // Keychain storage for the Supabase auth session (see lib/secureSessionStore.ts).
@@ -91,10 +135,12 @@ module.exports = ({ config }) => {
             'One Roof shows where your household is and shares your location with them.',
           locationAlwaysAndWhenInUsePermission:
             'One Roof keeps your location up to date for your household — even in the background.',
-          isAndroidBackgroundLocationEnabled: true,
+          isAndroidBackgroundLocationEnabled: WHEREABOUTS_ON_ANDROID,
+          isAndroidForegroundServiceEnabled: WHEREABOUTS_ON_ANDROID,
           isIosBackgroundLocationEnabled: true,
         },
       ],
+      ...(WHEREABOUTS_ON_ANDROID ? [] : [withoutAndroidLocationService]),
       [
         '@rnmapbox/maps',
         {

@@ -15,6 +15,7 @@ import * as TaskManager from 'expo-task-manager'
 import { reloadPetCareWidget, writeAckStatus } from './widget'
 import { captureLiveFixIfSharing } from './location'
 import { respondToLiveWake } from './locationTask'
+import { WHEREABOUTS_ENABLED } from './features'
 
 const BACKGROUND_NOTIFICATION_TASK = 'oneroof-background-notification'
 
@@ -88,14 +89,18 @@ function handleAckPayload(data: unknown): void {
  *    (expo-notifications RemoteMessageSerializer). When the delivery goes
  *    through expo's JobScheduler path instead, that same message arrives
  *    wrapped one level down, under `notification`. */
+type Obj = Record<string, unknown>
+const asObj = (v: unknown): Obj | null => (v && typeof v === 'object' ? (v as Obj) : null)
+
 export function notificationTaskPayload(data: unknown): unknown {
-  if (!data || typeof data !== 'object') return undefined
-  const d = data as Record<string, any>
-  const ios = d.notification?.request?.content?.data
+  const d = asObj(data)
+  if (!d) return undefined
+  const ios = asObj(asObj(asObj(d.notification)?.request)?.content)?.data
   if (ios) return ios
-  for (const message of [d, d.notification]) {
-    if (!message || typeof message !== 'object') continue
-    const fcm = message.data && typeof message.data === 'object' ? message.data : message
+  for (const candidate of [d, d.notification]) {
+    const message = asObj(candidate)
+    if (!message) continue
+    const fcm = asObj(message.data) ?? message
     const raw = fcm.dataString ?? fcm.body
     if (typeof raw === 'string') {
       try {
@@ -146,6 +151,10 @@ function routeFromNotification(response: Notifications.NotificationResponse | nu
   // Only our own in-app routes. An absolute URL from a payload is not something
   // to hand to the router.
   if (!url.startsWith('/')) return
+  // Whereabouts switched off here (lib/features.ts): a place alert from an
+  // iPhone household member still carries '/location' — open the app as-is
+  // rather than bouncing through a route that redirects home.
+  if (!WHEREABOUTS_ENABLED && url.startsWith('/location')) return
   // A cold start routes before the first screen has mounted, so let the
   // navigator settle rather than pushing into nothing.
   setTimeout(() => {
@@ -169,7 +178,7 @@ export function registerBackgroundNotifications(): void {
   Notifications.addNotificationReceivedListener((notification) => {
     const payload = notification.request.content.data
     handleAckPayload(payload)
-    if (isLiveWake(payload)) void captureLiveFixIfSharing()
+    if (isLiveWake(payload) && WHEREABOUTS_ENABLED) void captureLiveFixIfSharing()
   })
   Notifications.addNotificationResponseReceivedListener(routeFromNotification)
   // The listener above only sees taps that happen while the app is running. A

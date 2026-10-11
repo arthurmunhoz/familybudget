@@ -15,6 +15,8 @@ import {
   Wrench,
 } from 'lucide-react-native'
 
+import { WHEREABOUTS_ENABLED } from './features'
+
 export interface HubApp {
   id: string
   name: string
@@ -23,7 +25,7 @@ export interface HubApp {
   description: string
 }
 
-export const APPS: HubApp[] = [
+const ALL_APPS: HubApp[] = [
   { id: 'pings', name: 'Nudges', icon: Bell, route: '/pings', description: 'A quick nudge to the family' },
   { id: 'location', name: 'Whereabouts', icon: MapPin, route: '/location', description: 'See where everyone is' },
   { id: 'calendar', name: 'Calendar', icon: CalendarDays, route: '/calendar', description: 'Shared family schedule' },
@@ -34,6 +36,11 @@ export const APPS: HubApp[] = [
   { id: 'family', name: 'Family', icon: Users, route: '/family', description: 'Everyone’s info at a glance' },
   { id: 'calc', name: 'Calculator', icon: Calculator, route: '/calc', description: 'Split bills, tips & deals' },
 ]
+
+/** The hub's apps for THIS build. Whereabouts drops out where it's switched off
+ *  (Android v1 — see lib/features.ts); a saved hub order or hidden-list that
+ *  still names 'location' is harmless, it just matches nothing. */
+export const APPS: HubApp[] = ALL_APPS.filter((a) => a.id !== 'location' || WHEREABOUTS_ENABLED)
 
 /** Shown on the hub only for admins (profile.is_admin). */
 export const ADMIN_APP: HubApp = {

@@ -37,15 +37,18 @@ CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 W, H = 1080, 1920
 
 # Lead with the differentiators. Keep them short — this is a rail, not a page.
+# Android v1 ships without Whereabouts (PLAY-STORE-RELEASE.md §0b) — when it
+# returns, lead with "See your family on a live map" and add
+# "Know the moment they get home" (raw/README.md has both shots).
 CAPTIONS = {
-    "01": "See your family on a live map",
-    "02": "Everything for your home, in one app",
-    "03": "Snap a receipt, log the spending",
-    "04": "A shopping list that syncs as you shop",
-    "05": "Know the moment they get home",
-    "06": "Never miss a vet date again",
-    "07": "One tap: “dinner’s ready”",
-    "08": "IDs and insurance, always with you",
+    "01": "Everything for your home, in one app",
+    "02": "Snap a receipt, log the spending",
+    "03": "A shopping list that syncs as you shop",
+    "04": "Everyone’s plans in one calendar",
+    "05": "Never miss a vet date again",
+    "06": "One tap: “dinner’s ready”",
+    "07": "IDs and insurance, always with you",
+    "08": "Split the bill in seconds",
 }
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8"><style>

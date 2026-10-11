@@ -27,6 +27,7 @@ import {
 import { fetchMyLiveWindowMs } from './liveLocation'
 import { rearmGeofencesIfStale } from './placesTask'
 import { DICTS, detectLang } from './i18n'
+import { WHEREABOUTS_ENABLED } from './features'
 
 export const LOCATION_TASK = 'oneroof-location-updates'
 
@@ -82,7 +83,8 @@ async function isLiveRamped(): Promise<boolean> {
 async function reconfigureOptions(mode: 'saver' | 'live'): Promise<Location.LocationTaskOptions> {
   const opts = taskOptions(mode, await storedLabels())
   if (Platform.OS === 'android' && AppState.currentState !== 'active') {
-    const { foregroundService: _service, ...rest } = opts
+    const rest = { ...opts }
+    delete rest.foregroundService
     return rest
   }
   return opts
@@ -191,6 +193,7 @@ async function manageLiveRamp(): Promise<void> {
  *  watcher's map moves immediately. No-op if not sharing or nobody is actually
  *  watching (a stale/duplicate push). */
 export async function respondToLiveWake(): Promise<void> {
+  if (!WHEREABOUTS_ENABLED) return
   try {
     const mine = await fetchMyLocation()
     if (!isSharingEnabled(mine)) return
@@ -219,6 +222,12 @@ async function readBattery(): Promise<number | null> {
 // headless background wake) before any start call.
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (error) return
+  // Switched off on this platform (lib/features.ts) but an earlier build left
+  // the task registered: retire it instead of reporting.
+  if (!WHEREABOUTS_ENABLED) {
+    await stopBackgroundUpdates().catch(() => {})
+    return
+  }
   const locations = (data as { locations?: Location.LocationObject[] } | undefined)?.locations
   // The NEWEST fix, by its own timestamp — a deferred batch is not guaranteed
   // to be delivered in order, and writing an older fix last moves the pin back.

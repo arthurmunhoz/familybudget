@@ -373,6 +373,21 @@ implementation lives in `src/apps/<id>/`. Nested routes use folders
 Live family map (route `/location`, hub tile "Whereabouts"). **Native-only**: the
 map (`@rnmapbox/maps`) and background location (`expo-location` +
 `expo-task-manager`) need a dev build + Mapbox tokens — see `WHEREABOUTS-SETUP.md`.
+- **OFF on Android for v1 (2026-10-11) — one switch, both layers.**
+  `WHEREABOUTS_ON_ANDROID` in `app.config.js` strips the Android location
+  permissions (`blockedPermissions`, which also removes Mapbox's and
+  expo-location's library declarations) and expo-location's location
+  foreground service (inline config plugin), and publishes
+  `extra.whereaboutsAndroid`; `src/lib/features.ts` → `WHEREABOUTS_ENABLED`
+  reads it back. JS gates: the hub registry (`APPS`), Hub's `SafetyBanner`, the
+  `/location` route (redirects home), `useLocationSync`/`useGeofenceSync` (tear
+  down leftovers from earlier builds instead of syncing), `useLiveResponder`,
+  both task callbacks, `respondToLiveWake`, and `/location` push taps. A NEW
+  Whereabouts entry point (a link from another screen, a new background hook)
+  must check `WHEREABOUTS_ENABLED` too — `disabled.android.test.ts` covers the
+  existing ones. Never gate on `Platform.OS` directly: the switch is what turns
+  it back on. Play-side consequences and the re-enable checklist:
+  `PLAY-STORE-RELEASE.md` §0b.
 - `member_locations` (migration 065) — one row per member: latest fix + `sharing`
   / `paused_until`. Household-scoped RLS + Realtime. **Sharing is OFF by default
   (opt-in); we null coordinates on stop/pause so no stale location leaks.**

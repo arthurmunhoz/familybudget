@@ -15,6 +15,7 @@ import * as TaskManager from 'expo-task-manager'
 
 import { fetchMyLocation, isSharingEnabled } from './location'
 import { fetchPlaces, recordPlaceEvent } from './places'
+import { WHEREABOUTS_ENABLED } from './features'
 
 export const GEOFENCE_TASK = 'oneroof-place-geofences'
 
@@ -84,7 +85,9 @@ TaskManager.defineTask(GEOFENCE_TASK, async ({ data, error }) => {
     region?: { identifier?: string }
   }
   const placeId = region?.identifier
-  if (!placeId) return
+  // Switched off on this platform (lib/features.ts): a fence an earlier build
+  // armed must not record crossings. useGeofenceSync tears them down.
+  if (!placeId || !WHEREABOUTS_ENABLED) return
   try {
     // Respect sharing: if I've turned location off or paused it, my crossings
     // are nobody's business.

@@ -13,6 +13,7 @@ import TodaySection from './TodaySection'
 import InviteBanner from './InviteBanner'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
+import { WHEREABOUTS_ENABLED } from '../lib/features'
 import { useAuth } from '../lib/auth'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
@@ -121,7 +122,7 @@ export default function Hub() {
         {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
         <NudgesBanner />
         {/* An active safety radius — tap to manage or stop it. */}
-        <SafetyBanner />
+        {WHEREABOUTS_ENABLED && <SafetyBanner />}
         {/* Household of one — where to find the invite code. Last of the
             banners: a live nudge or a running safety watch is time-sensitive
             and should sit above a standing suggestion. On a brand-new

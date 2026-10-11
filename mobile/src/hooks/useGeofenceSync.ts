@@ -15,13 +15,20 @@ import { useEffect } from 'react'
 import { AppState } from 'react-native'
 
 import { useAuth } from '@/lib/auth'
-import { syncGeofences } from '@/lib/placesTask'
+import { WHEREABOUTS_ENABLED } from '@/lib/features'
+import { stopGeofences, syncGeofences } from '@/lib/placesTask'
 
 export function useGeofenceSync(): void {
   const { profile } = useAuth()
   const email = profile?.email
 
   useEffect(() => {
+    // Switched off on this platform (lib/features.ts): drop any fences an
+    // earlier build armed, and never arm new ones.
+    if (!WHEREABOUTS_ENABLED) {
+      void stopGeofences().catch(() => {})
+      return
+    }
     // Wait for auth. Signed out, syncGeofences reads a null member_locations row,
     // reads that as "not sharing", and TEARS DOWN the existing regions — so
     // calling it during a cold start would unregister everything.

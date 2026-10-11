@@ -31,7 +31,10 @@ function plugin(config, name) {
   return null
 }
 
-const cfg = resolvedConfig({ GOOGLE_SERVICES_JSON: path.join(ROOT, 'app.json') })
+// The feature's own native config, as built when Whereabouts is switched ON for
+// Android (WHEREABOUTS_ON_ANDROID / WHEREABOUTS_ANDROID=1). The OFF build — the
+// Android v1 default — is covered in disabled.android.test.ts.
+const cfg = resolvedConfig({ GOOGLE_SERVICES_JSON: path.join(ROOT, 'app.json'), WHEREABOUTS_ANDROID: '1' })
 const android = cfg.android ?? {}
 const fs = require('fs')
 const declared = (android.permissions ?? []).map((p) => p.replace(/^android\.permission\./, ''))

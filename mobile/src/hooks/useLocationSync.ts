@@ -22,7 +22,8 @@ import { AppState } from 'react-native'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { captureAndUpload } from '@/lib/location'
-import { resumeBackgroundUpdatesIfSharing } from '@/lib/locationTask'
+import { WHEREABOUTS_ENABLED } from '@/lib/features'
+import { resumeBackgroundUpdatesIfSharing, stopBackgroundUpdates } from '@/lib/locationTask'
 
 export function useLocationSync(): void {
   const { profile } = useAuth()
@@ -30,6 +31,13 @@ export function useLocationSync(): void {
   const email = profile?.email
 
   useEffect(() => {
+    // Switched off on this platform (Android v1 — lib/features.ts): make sure
+    // nothing an earlier build registered keeps reporting. Local only — the
+    // member's `sharing` flag is account-wide and may be another device's.
+    if (!WHEREABOUTS_ENABLED) {
+      void stopBackgroundUpdates().catch(() => {})
+      return
+    }
     // Wait for auth: the check reads this member's own row, and signed out
     // there isn't one to read.
     if (!email) return

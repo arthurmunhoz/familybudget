@@ -32,6 +32,58 @@ the tester list so you can add people without a new release.
 
 ---
 
+## 0b. Android v1 ships WITHOUT Whereabouts (decided 2026-10-11)
+
+Arthur's call: the first Play release leaves the family map out. The feature is
+built and tested (`__tests__/whereabouts/`, incl. the Android background fixes
+of 2026-09-28) — it's switched off, not deleted. iOS keeps it.
+
+**The switch:** `WHEREABOUTS_ON_ANDROID` in `mobile/app.config.js` (currently
+`false`). Off, it does two things together, which is why it's one switch:
+- **Native** — the Android build declares no location permission
+  (`ACCESS_FINE/COARSE/BACKGROUND_LOCATION`, `FOREGROUND_SERVICE_LOCATION` are
+  `blockedPermissions`, which also strips the ones Mapbox and expo-location
+  declare) and no location foreground service (a config plugin removes
+  expo-location's `LocationTaskService`). So **§3.1 does not apply to v1**, and
+  the Data Safety form has no location (§3.2).
+- **JS** — `src/lib/features.ts` reads it back (`extra.whereaboutsAndroid`): no
+  hub tile, no Safety Radius banner, `/location` redirects home, and no
+  background location / geofence / live-mode work — including tearing down
+  anything an earlier test APK registered on the phone.
+`__tests__/whereabouts/disabled.android.test.ts` pins all of that.
+
+**What it does NOT touch:** a member's `member_locations.sharing` flag is
+account-wide (it may be another device's), so it's left as is; and place-alert
+pushes from iPhone members still reach Android watchers who subscribed earlier
+(a tap just opens the app).
+
+**Listing assets were changed to match** — Play rejects a listing that shows a
+feature the app doesn't have: short + full description (§4), the feature
+graphic (Calculator tile replaces Whereabouts), and the screenshot list
+(`store/screenshots/raw/README.md`).
+
+**To bring it back on Android:**
+1. `WHEREABOUTS_ON_ANDROID = true` in `app.config.js` → new build (native config;
+   no OTA path). `WHEREABOUTS_ANDROID=1` does the same for a one-off build.
+2. Do §3.1 (background-location declaration + demo video — the shot list is
+   there) and add precise location + Mapbox back to Data Safety (§3.2).
+3. Restore the listing copy below and the two map screenshots
+   (`store/screenshots/raw/README.md`), and put the Whereabouts tile back on the
+   feature graphic (`git log -- mobile/store/play-feature-graphic.html`).
+4. Run `DEVICE-TEST.md` on a real Android phone before submitting.
+
+Parked listing copy for that release:
+
+```
+Short (80): Shared calendar, shopping list, budget, pets and a family map — under one roof
+
+• WHEREABOUTS — see your family on a live map with real drive-time ETAs, and get a heads-up when someone reaches or leaves a place that matters: home, work, class, the vet. Sharing is OFF until you turn it on, you can pause it whenever you like, and it is only ever visible to your own household.
+
+(Plus list) • Safety Radius — draw a zone around someone and know the moment they leave it
+```
+
+---
+
 ## 1.0 The Android package name is NOT the iOS bundle id ← read before any build
 
 `android.package` is **`one.roof.family.organizer`**. The iOS bundle id stays
@@ -342,6 +394,9 @@ Worth knowing so you don't go looking:
 
 ### 3.1 Background location declaration ← highest rejection risk
 
+> **Not for v1** — the Android v1 build declares no location at all (§0b).
+> Keep this for the release that switches Whereabouts on.
+
 You request `ACCESS_BACKGROUND_LOCATION`, which triggers Play's **Permissions
 declaration form** and a genuinely strict review. It needs:
 
@@ -408,10 +463,14 @@ foreground-service notification text is `location.fg.title` / `location.fg.body`
 ### 3.2 Data Safety form
 
 The longest form. Based on what the app actually does, you're declaring collection
-of: email + name, profile photos, **precise location**, **photos and documents**,
+of: email + name, profile photos, **photos and documents**,
 budget/spending amounts, pet records, calendar events, and a push token (device
-identifier). Both *precise location* and *financial info* count as sensitive
-categories.
+identifier). *Financial info* counts as a sensitive category.
+
+> **v1 (§0b): no location.** The Android v1 build has no location permission, so
+> don't declare location and leave Mapbox out of the table below. When
+> Whereabouts ships on Android, add **precise location** (sensitive) and the
+> Mapbox row back.
 
 Third parties data is shared with or processed by — all of which must be listed:
 
@@ -419,7 +478,7 @@ Third parties data is shared with or processed by — all of which must be liste
 |---|---|---|
 | Supabase | everything | backend / storage (first-party processor) |
 | Anthropic | receipt & bill **photos** | `api/scan-receipt.ts`, `api/scan-bill.ts` vision scanning |
-| Mapbox | location | map tiles + Directions ETAs |
+| Mapbox | location | map tiles + Directions ETAs — **not in v1 (§0b)** |
 | Google Calendar | calendar events | opt-in two-way sync |
 | RevenueCat | purchase data | subscription entitlement |
 | Expo / FCM | push token | notification delivery |
@@ -620,17 +679,20 @@ Two constraints baked into the layout, worth keeping if you restyle it:
   Play disallows it in graphic assets, which is why the Plus trial appears only
   in the description.
 
-### Short description (80 max) — 78
+### Short description (80 max) — 75
 
 ```
-Shared calendar, shopping list, budget, pets and a family map — under one roof
+Shared calendar, shopping list, budget, pets and documents — under one roof
 ```
 
-### Full description (4000 max) — 2840
+### Full description (4000 max) — 2463
 
 Written for Play, not pasted from Apple. Four things had to change, and they're
 the things to preserve if you edit it:
 
+- **No feature Android v1 doesn't have.** That now includes Whereabouts and
+  Safety Radius (§0b) — their copy is parked there for the release that brings
+  them back.
 - **No iOS-only features.** Apple's copy sells Home-Screen widgets, Apple
   Calendar sync and a "Face ID–locked vault". None of those exist on Android —
   widgets and Apple Calendar aren't built, and the lock is a fingerprint or face
@@ -659,8 +721,6 @@ WHAT'S INSIDE
 
 • SHARED CALENDAR — everyone's plans in one place, color-coded by person, with birthdays, anniversaries and renewal reminders.
 
-• WHEREABOUTS — see your family on a live map with real drive-time ETAs, and get a heads-up when someone reaches or leaves a place that matters: home, work, class, the vet. Sharing is OFF until you turn it on, you can pause it whenever you like, and it is only ever visible to your own household.
-
 • PET CARE — a shared daily checklist, so "did anyone feed the dogs?" stops being a question. Track medications and recurring care, log weight over time, and keep vet visits and vaccines with a reminder before the next one is due.
 
 • DOCUMENTS — IDs, insurance, registrations and renewal dates kept together, so the number you need on a trip isn't buried in an old email.
@@ -688,7 +748,6 @@ Every new household starts with 30 days of Plus included, no card needed. Plus a
 • A fingerprint or face lock on the Document Vault
 • Split a bill by item, straight from a photo
 • Multiple budgets, and private budgets only you can see
-• Safety Radius — draw a zone around someone and know the moment they leave it
 • Up to 12 people in your household
 
 One subscription covers the whole home: you pay per household, never per person.
@@ -801,6 +860,8 @@ Not blockers; they're parity gaps you should know about before someone reports t
   covers new households in the meantime, but a household whose trial lapses before
   billing is live has no way to pay — so finish §1.5 before the first closed
   testers hit day 30.
+- **No Whereabouts on Android v1** (§0b) — a deliberate scope cut, switched off
+  in one place and ready to return.
 - **`ACTIVITY_RECOGNITION`** may be requested by `expo-location` on Android. If it
   shows up in the merged manifest and you don't need it, block it rather than
   explaining it on a form.
