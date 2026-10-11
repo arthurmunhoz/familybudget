@@ -6,7 +6,6 @@ import { type ReactNode, useMemo, useState } from 'react'
 import {
   Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +16,6 @@ import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { File } from 'expo-file-system'
-import DateTimePicker from '@react-native-community/datetimepicker'
 import { Camera, User, X } from 'lucide-react-native'
 
 import { supabase } from '@/lib/supabase'
@@ -27,6 +25,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useTheme, sp, radius, fonts } from '@/theme/theme'
 import { Btn, Field, Txt } from '@/components/ui'
+import { PickerSheet } from '@/components/PickerSheet'
 import type { MemberProfile, Profile } from '@/lib/types'
 import { BLOOD_TYPES, EDIT_FIELDS } from './familyShared'
 import {
@@ -616,27 +615,23 @@ export function EditProfile({
                   <Txt variant="faint">{t('family.removePhoto')}</Txt>
                 </Pressable>
               ) : null}
-              {showDate ? (
-                <DateTimePicker
-                  value={birthdayDate}
-                  mode="date"
-                  maximumDate={new Date()}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event, date) => {
-                    if (Platform.OS !== 'ios') setShowDate(false)
-                    if (event.type === 'dismissed') return
-                    if (date) {
-                      const y = date.getFullYear()
-                      const m = String(date.getMonth() + 1).padStart(2, '0')
-                      const d = String(date.getDate()).padStart(2, '0')
-                      set('birthday', `${y}-${m}-${d}`)
-                    }
-                  }}
-                />
-              ) : null}
-              {Platform.OS === 'ios' && showDate ? (
-                <Btn title={t('common.close')} variant="secondary" onPress={() => setShowDate(false)} />
-              ) : null}
+              {/* Its own pop-up, not wheels pushed into the form. Nested in this
+                  Modal's tree on purpose (a sibling Modal won't present on iOS);
+                  wheels rather than a calendar grid — a birthday is decades back. */}
+              <PickerSheet
+                visible={showDate}
+                mode="date"
+                iosDisplay="spinner"
+                value={birthdayDate}
+                maximumDate={new Date()}
+                onChange={(date) => {
+                  const y = date.getFullYear()
+                  const m = String(date.getMonth() + 1).padStart(2, '0')
+                  const d = String(date.getDate()).padStart(2, '0')
+                  set('birthday', `${y}-${m}-${d}`)
+                }}
+                onClose={() => setShowDate(false)}
+              />
             </View>
 
             {/* blood type chips */}

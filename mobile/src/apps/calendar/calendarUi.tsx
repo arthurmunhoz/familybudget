@@ -1,13 +1,11 @@
 // Small shared pieces for the Calendar module: a selectable pill chip, an
-// owner chip (color dot + label), and a time field that opens the native
-// @react-native-community/datetimepicker in time mode. Date entry reuses the
-// pets module's DateField via re-export so the look stays consistent.
+// owner chip (color dot + label), and a time field that opens the native time
+// picker in a PickerSheet (its own pop-up, never inline in the form). Date
+// entry reuses the pets module's DateField so the look stays consistent.
 import { useState, type ReactNode } from 'react'
-import { Platform, Pressable, View } from 'react-native'
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker'
+import { Pressable, View } from 'react-native'
 
+import { PickerSheet } from '@/components/PickerSheet'
 import { Txt } from '@/components/ui'
 import { formatTime } from '@/lib/calendar'
 import { radius, sp, useTheme } from '@/theme/theme'
@@ -82,40 +80,32 @@ export function TimeField({
   locale: string
   onChange: (hhmm: string) => void
 }) {
-  const { c, dark } = useTheme()
+  const { c } = useTheme()
   const [open, setOpen] = useState(false)
-
-  function handle(event: DateTimePickerEvent, date?: Date) {
-    if (Platform.OS === 'android') setOpen(false)
-    if (event.type === 'dismissed') return
-    if (date) onChange(toHHMM(date))
-  }
 
   return (
     <View style={{ gap: 6, flex: 1 }}>
       <Txt variant="label">{label}</Txt>
       <Pressable
-        onPress={() => setOpen((o) => !o)}
+        onPress={() => setOpen(true)}
         style={{
           backgroundColor: c.card,
           borderRadius: radius.md,
           borderWidth: 1,
-          borderColor: c.border,
+          borderColor: open ? c.accent : c.border,
           paddingHorizontal: sp.md,
           paddingVertical: 12,
         }}
       >
         <Txt style={{ color: c.text }}>{formatTime(value, locale)}</Txt>
       </Pressable>
-      {open && (
-        <DateTimePicker
-          mode="time"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          value={parseTime(value)}
-          onChange={handle}
-          themeVariant={dark ? 'dark' : 'light'}
-        />
-      )}
+      <PickerSheet
+        visible={open}
+        mode="time"
+        value={parseTime(value)}
+        onChange={(d) => onChange(toHHMM(d))}
+        onClose={() => setOpen(false)}
+      />
     </View>
   )
 }
