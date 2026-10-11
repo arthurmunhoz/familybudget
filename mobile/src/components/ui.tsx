@@ -7,7 +7,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   Animated,
   ScrollView,
   StyleSheet,
@@ -19,6 +18,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native'
+import { Pressable } from './Pressable'
 import type { ScrollViewProps } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context'
 import { ChevronLeft, Sparkles } from 'lucide-react-native'

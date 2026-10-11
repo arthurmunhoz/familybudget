@@ -1,7 +1,8 @@
 // Edit sheet — rename a document and change its category / owner. The file
 // bytes are immutable (content-addressed path); this only updates the row.
 import { useState } from 'react'
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { X } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'

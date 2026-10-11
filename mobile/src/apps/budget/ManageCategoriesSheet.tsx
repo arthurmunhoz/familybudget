@@ -13,12 +13,12 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { Plus, RotateCcw, Trash2, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'

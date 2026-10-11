@@ -364,6 +364,16 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     punctual, and a stale Undo that silently no-ops is worse than none.
     **PetCare's `MarkTaskDoneIntent` has no such guard** — it's reversible in the
     app, so it was left alone; revisit if that stops being true.
+- **A button whose `disabled` can change must use `@/components/Pressable`,
+  never react-native's.** On Android (RN 0.85, New Architecture) a flip of
+  `disabled` on an existing view can be lost — accessibilityState.disabled is
+  what calls view.setEnabled() — so the button LOOKS enabled while the native
+  view stays enabled=false and finger taps are dropped. It blocked every
+  Android signup at Onboarding's Continue (2026-10-11, seen with
+  `uiautomator dump` on a Galaxy S9+). The wrapper keys on `disabled`, so each
+  flip mounts a fresh native view; `Btn` already uses it.
+  `__tests__/pressable.test.tsx` fails if a file with a disabled Pressable
+  imports react-native's.
 - **Date/time pickers open in their own sheet, never inline in a form.**
   `@/components/PickerSheet` (iOS bottom sheet + Done; Android's native dialog)
   for times and one-off dates; Money's `DatePickerModal` and Pet Care's

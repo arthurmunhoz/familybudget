@@ -2,7 +2,8 @@
 // AdminHousehold page. Reuses admin_user_activity (30d) and the admin RLS
 // exception on allowed_users/households.
 import { useState } from 'react'
-import { Alert, Pressable, Switch, TextInput, View } from 'react-native'
+import { Alert, Switch, TextInput, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
 import { Award, Trash2, X } from 'lucide-react-native'
 

@@ -6,7 +6,8 @@
 // Gated behind One Roof Plus like Google. iOS-only — there is no Apple calendar
 // API on the web, so the PWA can't offer this.
 import { useEffect, useState } from 'react'
-import { Alert, Pressable, View } from 'react-native'
+import { Alert, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { router } from 'expo-router'
 
 import { AppHeader, Btn, Card, Loader, Screen, Txt } from '@/components/ui'

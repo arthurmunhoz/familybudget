@@ -5,7 +5,8 @@
 // it can't be a child of the form. The state has to be shared between the two,
 // hence a controller the HOST owns and hands to both (`usePetIdentity`).
 import { useEffect, useState } from 'react'
-import { Alert, Animated, Pressable, StyleSheet, View } from 'react-native'
+import { Alert, Animated, StyleSheet, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'

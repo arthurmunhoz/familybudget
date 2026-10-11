@@ -3,7 +3,8 @@
 // no separate "edit" step. Below the editor: that pet's event history
 // (read-only) and a delete-pet action.
 import { useRef, useState } from 'react'
-import { Alert, Animated, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Alert, Animated, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Scale, Trash2 } from 'lucide-react-native'

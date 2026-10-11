@@ -3,7 +3,8 @@
 // and the entry list (grouped by day when sorting by date). The bottom bar adds
 // an entry or scans a receipt photo. RN port of budget/MonthDetail.tsx.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native'
+import { ActivityIndicator, Alert, ScrollView, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'

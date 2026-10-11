@@ -6,12 +6,12 @@ import { type ReactNode, useMemo, useState } from 'react'
 import {
   Alert,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'

@@ -5,7 +5,8 @@
 // Calendar screen picks up pulled events via its calendar_events Realtime
 // subscription, so no explicit refresh is needed here.
 import { useEffect, useState } from 'react'
-import { Alert, Pressable, View } from 'react-native'
+import { Alert, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { router } from 'expo-router'
 
 import { AppHeader, Btn, Card, Loader, Screen, Txt } from '@/components/ui'

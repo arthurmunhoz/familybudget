@@ -14,7 +14,8 @@
 // Preset MANAGEMENT lives in the ⚙️ Nudge-settings modal, not here — this
 // screen is only for sending. `presets` is owned by the screen and passed in.
 import { useMemo, useRef, useState } from 'react'
-import { Alert, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Alert, Modal, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { Check, ChevronDown, ChevronUp, Send, Sparkles } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'

@@ -4,7 +4,8 @@
 // presets is a deliberate, dismissable pick, which is what a modal is actually
 // for.
 import { useEffect, useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Modal, ScrollView, StyleSheet, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X } from 'lucide-react-native'
 

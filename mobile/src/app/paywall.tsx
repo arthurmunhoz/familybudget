@@ -3,7 +3,8 @@
 // plan and subscribe, restore prior purchases (Apple-required), and links to the
 // Terms + Privacy. Reached via router.push('/paywall') from gated features.
 import { useState } from 'react'
-import { Alert, Linking, Pressable, ScrollView, View } from 'react-native'
+import { Alert, Linking, ScrollView, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { Check, Sparkles, X } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases'

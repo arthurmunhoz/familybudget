@@ -15,13 +15,13 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   SectionList,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronLeft, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
 
