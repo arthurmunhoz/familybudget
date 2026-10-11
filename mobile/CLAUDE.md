@@ -189,8 +189,13 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     claimed dismisses; a tap on a button still lands), and `<DismissKeyboard>`
     from `@/components/ui` for the fixed chrome AROUND the scrollers — headers,
     backgrounds, and lists too full to leave a gap to tap. `Screen` wraps its
-    whole body in one, so plain screens get it for free; ShoppingList wraps its
-    header + list by hand because it doesn't use `Screen`. It can also BE a
+    HEADER in one (its scroller dismisses through `keyboardShouldPersistTaps`);
+    ShoppingList wraps its header + list by hand because it doesn't use `Screen`.
+    **Never wrap a scroller in it if you can avoid it, and it only claims a
+    touch while the keyboard is up** — it used to be a Pressable that claimed
+    every unclaimed touch, and around a ScrollView that swallowed every drag
+    starting on plain text or a non-button card: Admin → household could only
+    be scrolled from a text field (2026-10-11, iPhone). It can also BE a
     sheet panel rather than wrap one — pass the panel's own style and delete the
     `View` it replaces, which is how SafetyRadiusSheet, PresetEditor and the
     rename dialog in Months got covered (none of them has a scroller around
@@ -359,6 +364,11 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     punctual, and a stale Undo that silently no-ops is worse than none.
     **PetCare's `MarkTaskDoneIntent` has no such guard** — it's reversible in the
     app, so it was left alone; revisit if that stops being true.
+- **Date/time pickers open in their own sheet, never inline in a form.**
+  `@/components/PickerSheet` (iOS bottom sheet + Done; Android's native dialog)
+  for times and one-off dates; Money's `DatePickerModal` and Pet Care's
+  `DateField` are the same shape. An inline iOS spinner pushed Save down the
+  page in the calendar event form (2026-10-11).
 - Icons: `lucide-react-native`. Images: `expo-image` + `@/lib/signedUrls`. Dates:
   `@react-native-community/datetimepicker`. Camera/photos: `expo-image-picker` +
   `expo-image-manipulator`. Files: `expo-document-picker` + `expo-file-system`

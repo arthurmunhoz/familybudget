@@ -56,12 +56,18 @@ export function Txt({
  *  you could not move a form up to read what you were typing without losing
  *  the keyboard, which is the opposite of what scrolling is for.
  *
- *  It is safe to wrap a whole page in: a Pressable only ever sees taps that
- *  NOTHING else claimed — buttons, rows and text fields win the responder
- *  first — and a scroll gesture takes the responder away on its first move, so
- *  this never fires mid-drag. Scrollers cover their own inert space through
- *  `keyboardShouldPersistTaps="handled"`; this covers the fixed chrome around
- *  them (headers, backgrounds) and lists too full to leave a gap to tap.
+ *  It only claims a touch while the keyboard is UP. Buttons, rows and text
+ *  fields still win the responder first, as with any parent. But a wrapper
+ *  that claimed EVERY unclaimed touch (it used to be a Pressable) took the
+ *  touches that start on inert content INSIDE a scroller it wraps — plain
+ *  text, a non-button card, a section header — and the scroller never saw the
+ *  drag. "A scroll gesture takes the responder away on its first move" was the
+ *  assumption, and on iOS it is false: Admin → household could only be
+ *  scrolled by starting the drag on a text field (2026-10-11). With the
+ *  keyboard down there is nothing to dismiss, so it now stands aside entirely.
+ *  Prefer not to wrap a scroller at all: scrollers cover their own inert space
+ *  through `keyboardShouldPersistTaps="handled"`; this is for the fixed chrome
+ *  around them (headers, backgrounds) and sheet panels.
  *  `accessible={false}` keeps it out of VoiceOver — it is not a control.
  *
  *  `style` is applied as-is and nothing is assumed, so this can either WRAP a
@@ -75,9 +81,14 @@ export function DismissKeyboard({
   style?: StyleProp<ViewStyle>
 }) {
   return (
-    <Pressable accessible={false} onPress={() => Keyboard.dismiss()} style={style}>
+    <View
+      accessible={false}
+      style={style}
+      onStartShouldSetResponder={() => Keyboard.isVisible()}
+      onResponderRelease={() => Keyboard.dismiss()}
+    >
       {children}
-    </Pressable>
+    </View>
   )
 }
 
@@ -114,8 +125,14 @@ export function Screen({
   const tail = useBottomGap(sp.xxl)
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={edges}>
-      <DismissKeyboard style={{ flex: 1 }}>
-      {header ? <View style={inner}>{header}</View> : null}
+      {/* Tap-to-dismiss covers the fixed HEADER only — never a scroller. A
+          Pressable wrapped AROUND a ScrollView claims every touch that starts
+          on inert content (plain text, a non-button card), and the scroll view
+          then never sees the drag: Admin → household could only be scrolled by
+          starting the drag on a text field (2026-10-11). Inside the scroller,
+          keyboardShouldPersistTaps="handled" already dismisses on a tap that
+          no child claims, so the body needs no wrapper at all. */}
+      {header ? <DismissKeyboard style={inner}>{header}</DismissKeyboard> : null}
       {scroll ? (
         // `padding` is what makes the keyboard's top edge the bottom of the
         // page: the KAV grows a bottom pad the height of the keyboard, so the
@@ -143,7 +160,6 @@ export function Screen({
       ) : (
         <View style={[{ flex: 1 }, inner]}>{children}</View>
       )}
-      </DismissKeyboard>
     </SafeAreaView>
   )
 }
