@@ -303,18 +303,18 @@ exactly like App Store ones.
 | EAS env (prod/preview/dev, plaintext) | `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` (`goog_…`, publishable) |
 | App copy | On Android the paywall's Terms link is Google Play's terms, and the restore / auto-renew lines say "Google account" / "Google Play → Payments & subscriptions" instead of "Apple ID" (`*Android` i18n keys) |
 
-**Still to do (owner):**
-1. Google Cloud project **`one-roof`** (`one-roof-500903`, the hotmail account — the
-   Firebase project isn't visible to it) already has the Play Android Developer,
-   Play Developer Reporting and Pub/Sub APIs enabled and a service account
-   `revenuecat@one-roof-500903.iam.gserviceaccount.com`. It still needs roles
-   **Pub/Sub Admin + Monitoring Viewer** and a **JSON key**.
-2. Play Console → Users and permissions → invite that email with *View app
-   information*, *View financial data* and *Manage orders and subscriptions* on One Roof.
-3. RevenueCat → One Roof (Play Store) → upload the JSON → Save, then connect
-   **Google developer notifications** (real-time renew/cancel events). Google can
-   take up to ~36 h to accept new credentials; until then RevenueCat's product
-   status reads "Could not check".
+**Service account + notifications (done 2026-10-13):** Google Cloud project
+**`one-roof`** (`one-roof-500903`, the hotmail account — the Firebase project isn't
+visible to it) has the Play Android Developer, Play Developer Reporting and Pub/Sub
+APIs enabled and service account `revenuecat@one-roof-500903.iam.gserviceaccount.com`
+(Pub/Sub Admin + Monitoring Viewer). In Play Console it holds account-level *View app
+information*, *View financial data* and **Manage orders and subscriptions** — without
+that last one RevenueCat reads the catalog fine but fails "Can validate Google Play
+subscription purchases". Real-time developer notifications publish to
+`projects/one-roof-500903/topics/Play-Store-Notifications` (Play → Monetization
+setup); a test notification reached RevenueCat.
+
+**Still to do:**
 4. Ship a build (the key is compile-time — no `expo-updates`) to the **internal**
    track and buy with a **license tester** (Play Console → Settings → License
    testing) — sideloaded APKs can't reach Play Billing (`getOfferings()` returns
