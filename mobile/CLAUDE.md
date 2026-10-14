@@ -1103,6 +1103,10 @@ translated via `t()` keys. **Exception:** the app name "One Roof" only. No hardc
 When adding new UI, add the keys to all 3 language files (en/es/pt) in `@/lib/i18n` first,
 then import `useI18n` in the component and wrap strings: `{t('namespace.key')}` or 
 `title={t('namespace.key', {param})}`.
+**Copy that names an iOS-only thing (Face ID, Apple ID, Apple Calendar, the App
+Store) needs an Android wording**: add `<key>Android` to all 3 dicts and render
+`t(platformKey('<key>'))` (`@/lib/i18n`), which picks the variant on Android only.
+The paywall, Settings' Plus list and restore alerts, and the vault lock use it.
 
 ## Coding standards
 
