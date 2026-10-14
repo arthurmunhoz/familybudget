@@ -45,7 +45,7 @@ import { APPS } from '@/lib/apps'
 import { useAuth } from '@/lib/auth'
 import { usePlus, memberLimit, MEMBER_LIMIT_PLUS } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
-import { LANGUAGES, type TKey } from '@/lib/i18n'
+import { LANGUAGES, platformKey, type TKey } from '@/lib/i18n'
 import { getPushEnabled, registerForPush } from '@/lib/notifications'
 import {
   fetchCurrentWeather,
@@ -636,7 +636,7 @@ export default function Settings() {
         ok ? t('settings.restoredTitle') : t('settings.nothingRestoreTitle'),
         ok
           ? t('settings.restoredBody')
-          : t(Platform.OS === 'android' ? 'settings.nothingRestoreBodyAndroid' : 'settings.nothingRestoreBody'),
+          : t(platformKey('settings.nothingRestoreBody')),
       )
     } catch {
       Alert.alert(t('settings.restoreFailedTitle'), t('settings.restoreFailedBody'))
@@ -748,7 +748,7 @@ export default function Settings() {
               <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
               <View style={{ gap: sp.sm }}>
                 {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.key} icon={f.icon} label={t(f.key)} included />
+                  <FeatureRow key={f.key} icon={f.icon} label={t(platformKey(f.key))} included />
                 ))}
               </View>
             </Card>
@@ -763,7 +763,7 @@ export default function Settings() {
               </Txt>
               <View style={{ gap: sp.sm }}>
                 {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.key} icon={f.icon} label={t(f.key)} />
+                  <FeatureRow key={f.key} icon={f.icon} label={t(platformKey(f.key))} />
                 ))}
               </View>
             </Card>

@@ -12,7 +12,7 @@ import { PACKAGE_TYPE, type PurchasesPackage } from 'react-native-purchases'
 import { Btn, Card, Txt } from '@/components/ui'
 import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
-import type { TKey } from '@/lib/i18n'
+import { platformKey, type TKey } from '@/lib/i18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { GLASS, GlassWash } from '@/theme/glass'
@@ -40,6 +40,16 @@ const BENEFIT_KEYS: TKey[] = [
   'settings.plusFeatureVault',
   'settings.plusFeatureSupport',
 ]
+
+/** Length in days of a FREE intro offer (both stores report a free trial as a
+ *  zero-price intro), or null for a paid intro or a period not expressible in
+ *  days. "R$0.00 intro, then renews" is what the raw intro price reads as. */
+function freeTrialDays(intro: { price: number; periodUnit: string; periodNumberOfUnits: number }): number | null {
+  if (intro.price !== 0) return null
+  if (intro.periodUnit === 'DAY') return intro.periodNumberOfUnits
+  if (intro.periodUnit === 'WEEK') return intro.periodNumberOfUnits * 7
+  return null
+}
 
 function periodLabel(pkg: PurchasesPackage, t: (key: TKey) => string): string {
   switch (pkg.packageType) {
@@ -105,7 +115,7 @@ export default function Paywall() {
         ok ? t('paywall.restoredTitle') : t('paywall.nothingRestoreTitle'),
         ok
           ? t('paywall.restoredBody')
-          : t(Platform.OS === 'android' ? 'paywall.nothingRestoreBodyAndroid' : 'paywall.nothingRestoreBody'),
+          : t(platformKey('paywall.nothingRestoreBody')),
       )
       if (ok) router.back()
     } catch {
@@ -152,7 +162,7 @@ export default function Paywall() {
           {BENEFIT_KEYS.map((k) => (
             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
               <Check size={18} color={c.income} />
-              <Txt style={{ flex: 1 }}>{t(k)}</Txt>
+              <Txt style={{ flex: 1 }}>{t(platformKey(k))}</Txt>
             </View>
           ))}
         </Card>
@@ -204,6 +214,7 @@ export default function Paywall() {
               {packages.map((pkg) => {
                 const active = chosen?.identifier === pkg.identifier
                 const intro = pkg.product.introPrice
+                const trialDays = intro ? freeTrialDays(intro) : null
                 return (
                   <Pressable
                     key={pkg.identifier}
@@ -221,7 +232,9 @@ export default function Paywall() {
                   >
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Txt style={{ fontWeight: '700' }}>{periodLabel(pkg, t)}</Txt>
-                      {intro ? (
+                      {trialDays ? (
+                        <Txt variant="faint">{t('paywall.freeTrialDays', { n: trialDays })}</Txt>
+                      ) : intro ? (
                         <Txt variant="faint">
                           {t('paywall.introThenRenews', { price: intro.priceString })}
                         </Txt>
@@ -257,7 +270,7 @@ export default function Paywall() {
         ) : null}
 
         <Txt variant="faint" style={{ textAlign: 'center' }}>
-          {t(Platform.OS === 'android' ? 'paywall.legalAndroid' : 'paywall.legal')}
+          {t(platformKey('paywall.legal'))}
         </Txt>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: sp.lg }}>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)}>

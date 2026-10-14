@@ -1,4 +1,5 @@
 import * as Localization from 'expo-localization'
+import { Platform } from 'react-native'
 import { en } from './en'
 import { es } from './es'
 import { pt } from './pt'
@@ -23,4 +24,13 @@ export function detectLang(): Lang {
   if (code.startsWith('pt')) return 'pt'
   if (code.startsWith('es')) return 'es'
   return 'en'
+}
+
+/** The Android wording of a string when one exists (`<key>Android`), else the
+ *  key itself. For copy that names an iOS-only thing — Face ID, Apple ID, Apple
+ *  Calendar — which is simply wrong on an Android phone. */
+export function platformKey(key: TKey): TKey {
+  if (Platform.OS !== 'android') return key
+  const alt = `${key}Android`
+  return alt in en ? (alt as TKey) : key
 }

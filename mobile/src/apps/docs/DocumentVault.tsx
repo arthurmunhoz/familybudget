@@ -21,7 +21,7 @@ import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
-import type { TKey } from '@/lib/i18n'
+import { platformKey, type TKey } from '@/lib/i18n'
 import { formatDay } from '@/lib/format'
 import { getSignedUrl } from '@/lib/signedUrls'
 import { track } from '@/lib/analytics'
@@ -105,7 +105,7 @@ export default function DocumentVault() {
     // Prove it's the owner before turning the lock on (mirrors the PWA).
     try {
       const r = await LocalAuthentication.authenticateAsync({
-        promptMessage: t('vault.lockTitle'),
+        promptMessage: t(platformKey('vault.lockTitle')),
         cancelLabel: t('common.cancel'),
       })
       if (!r.success) {
@@ -382,14 +382,14 @@ export default function DocumentVault() {
         >
           <Lock size={20} color={lockOn ? c.accent : c.textFaint} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt style={{ fontWeight: '600' }}>{t('vault.lockTitle')}</Txt>
-            <Txt variant="faint">{t('vault.lockDesc')}</Txt>
+            <Txt style={{ fontWeight: '600' }}>{t(platformKey('vault.lockTitle'))}</Txt>
+            <Txt variant="faint">{t(platformKey('vault.lockDesc'))}</Txt>
           </View>
           <Switch
             value={lockOn}
             onValueChange={toggleLock}
             trackColor={{ true: c.accent }}
-            accessibilityLabel={lockOn ? t('vault.disableLock') : t('vault.enableLock')}
+            accessibilityLabel={lockOn ? t(platformKey('vault.disableLock')) : t(platformKey('vault.enableLock'))}
           />
         </View>
       ) : null}
