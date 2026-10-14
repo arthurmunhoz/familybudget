@@ -634,7 +634,9 @@ export default function Settings() {
       const ok = await restore()
       Alert.alert(
         ok ? t('settings.restoredTitle') : t('settings.nothingRestoreTitle'),
-        ok ? t('settings.restoredBody') : t('settings.nothingRestoreBody'),
+        ok
+          ? t('settings.restoredBody')
+          : t(Platform.OS === 'android' ? 'settings.nothingRestoreBodyAndroid' : 'settings.nothingRestoreBody'),
       )
     } catch {
       Alert.alert(t('settings.restoreFailedTitle'), t('settings.restoreFailedBody'))

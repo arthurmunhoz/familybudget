@@ -3,7 +3,7 @@
 // plan and subscribe, restore prior purchases (Apple-required), and links to the
 // Terms + Privacy. Reached via router.push('/paywall') from gated features.
 import { useState } from 'react'
-import { Alert, Linking, ScrollView, View } from 'react-native'
+import { Alert, Linking, Platform, ScrollView, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { Check, Sparkles, X } from 'lucide-react-native'
 import { router } from 'expo-router'
@@ -19,8 +19,13 @@ import { GLASS, GlassWash } from '@/theme/glass'
 import { useSchemePref } from '@/theme/scheme-pref'
 
 const PRIVACY_URL = 'https://one-roof-app.vercel.app/privacy.html'
-// Apple's standard EULA is an accepted Terms of Use for IAP.
-const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
+// Apple's standard EULA is an accepted Terms of Use for IAP; on Android the
+// purchase runs under Google Play's terms instead, and Apple's page would be a
+// dead end there.
+const TERMS_URL =
+  Platform.OS === 'android'
+    ? 'https://play.google.com/about/play-terms/'
+    : 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
 
 // Localized benefit keys, highest-value first. Shares the settings.plusFeature*
 // keys with the Settings Plus card so both surfaces stay in sync; the support
@@ -98,7 +103,9 @@ export default function Paywall() {
       const ok = await restore()
       Alert.alert(
         ok ? t('paywall.restoredTitle') : t('paywall.nothingRestoreTitle'),
-        ok ? t('paywall.restoredBody') : t('paywall.nothingRestoreBody'),
+        ok
+          ? t('paywall.restoredBody')
+          : t(Platform.OS === 'android' ? 'paywall.nothingRestoreBodyAndroid' : 'paywall.nothingRestoreBody'),
       )
       if (ok) router.back()
     } catch {
@@ -250,7 +257,7 @@ export default function Paywall() {
         ) : null}
 
         <Txt variant="faint" style={{ textAlign: 'center' }}>
-          {t('paywall.legal')}
+          {t(Platform.OS === 'android' ? 'paywall.legalAndroid' : 'paywall.legal')}
         </Txt>
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: sp.lg }}>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)}>

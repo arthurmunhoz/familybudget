@@ -282,72 +282,48 @@ a trial on an existing household (admin only). Pass a negative number to simulat
 lapse — e.g. `select public.admin_start_trial('<household-uuid>', -1);`. It refuses
 to overwrite a real purchase, so it can't resurrect a lapsed paid plan.
 
-### 1.5 Plus purchasing has no Android path ✅ code done / ⚠️ console work remains
+### 1.5 Plus on Android ✅ wired 2026-10-13 / ⚠️ service-account hand-off + one build left
 
-`src/lib/purchases.ts` now picks the store key by platform
-(`EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` on Android, iOS key on iOS) instead of
-returning early off iOS. With no key for the running platform it still degrades to
-"free, paywall unavailable" rather than crashing.
+`src/lib/purchases.ts` picks the store key by platform
+(`EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` on Android, the iOS key on iOS); with no key
+for the running platform it degrades to "free, paywall unavailable". The server
+needs no changes: `api/revenuecat-webhook.ts` keys off `app_user_id` =
+`household_id` and only records `store`, and the RevenueCat webhook is set to
+**All apps, Production + Sandbox**, so Play events land in `household_subscriptions`
+exactly like App Store ones.
 
-Also fixed in passing: Settings' "Manage subscription" was hardcoded to
-`apps.apple.com`, which on Android opens a page the user has no account on. It's
-now per-platform (`STORE_SUBSCRIPTIONS_URL`), and a trial shows "Keep One Roof Plus"
-→ paywall instead, since a server-granted trial has no store subscription to manage.
+**What exists now (all done 2026-10-13):**
 
-**Still yours to do:**
-1. Play Console → create the subscription products (monthly + annual, matching the
-   product ids you'll map in RevenueCat).
-2. RevenueCat → add a Play Store app, upload a Google Cloud service-account JSON
-   with Play Developer API access, map the products to the `plus` entitlement.
-3. Add the key as an **EAS env var**, not just to `.env.local` — a gitignored
-   `.env.local` is invisible to cloud builds and the key would inline as
-   `undefined`, shipping the paywall dark (this is what blanked the map, see §4c):
-   ```
-   npx eas env:create --name EXPO_PUBLIC_REVENUECAT_ANDROID_KEY --value <key> \
-     --environment production --environment preview --environment development \
-     --visibility plaintext --scope project
-   ```
-   ⚠️ `EXPO_PUBLIC_REVENUECAT_IOS_KEY` is **also absent** from all three EAS
-   environments — check whether the shipped App Store build was produced locally
-   (where `.env.local` is read) before assuming iOS billing is wired on EAS.
+| Where | What |
+|---|---|
+| Play Console → Subscriptions | `one_roof_plus` with base plans **`monthly`** (USD 4.99 / BRL 7.00, backwards compatible) and **`yearly`** (USD 39.99 / BRL 50.00), plus offer **`free-trial-7d`** on yearly (7-day free trial, "never had this subscription"). All **Active**. Other countries are Play's auto-conversion of the USD price. |
+| RevenueCat → Apps | **One Roof (Play Store)**, package `one.roof.family.organizer` |
+| RevenueCat → Products | `one_roof_plus:monthly`, `one_roof_plus:yearly`, both attached to entitlement **`plus`** (NOT "One Roof Pro" — that one is the Test Store's) |
+| RevenueCat → Offerings → `default` | `$rc_monthly` → `one_roof_plus:monthly`, `$rc_annual` → `one_roof_plus:yearly` (Lifetime has no Play product, so Android simply doesn't show it) |
+| EAS env (prod/preview/dev, plaintext) | `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` (`goog_…`, publishable) |
+| App copy | On Android the paywall's Terms link is Google Play's terms, and the restore / auto-renew lines say "Google account" / "Google Play → Payments & subscriptions" instead of "Apple ID" (`*Android` i18n keys) |
 
-> **Purchases cannot be tested on a sideloaded APK.** Google Play Billing only
-> talks to a build Play itself recognises — matching package name *and* signature.
-> On a sideloaded build the SDK configures fine but `getOfferings()` returns
-> nothing, so the paywall correctly reads "unavailable". Real purchase testing
-> needs the AAB on an internal-testing track plus a license-tested account.
-> The **trial** needs none of that and tests fine on a sideloaded APK.
+**Still to do (owner):**
+1. Google Cloud project **`one-roof`** (`one-roof-500903`, the hotmail account — the
+   Firebase project isn't visible to it) already has the Play Android Developer,
+   Play Developer Reporting and Pub/Sub APIs enabled and a service account
+   `revenuecat@one-roof-500903.iam.gserviceaccount.com`. It still needs roles
+   **Pub/Sub Admin + Monitoring Viewer** and a **JSON key**.
+2. Play Console → Users and permissions → invite that email with *View app
+   information*, *View financial data* and *Manage orders and subscriptions* on One Roof.
+3. RevenueCat → One Roof (Play Store) → upload the JSON → Save, then connect
+   **Google developer notifications** (real-time renew/cancel events). Google can
+   take up to ~36 h to accept new credentials; until then RevenueCat's product
+   status reads "Could not check".
+4. Ship a build (the key is compile-time — no `expo-updates`) to the **internal**
+   track and buy with a **license tester** (Play Console → Settings → License
+   testing) — sideloaded APKs can't reach Play Billing (`getOfferings()` returns
+   nothing and the paywall reads "unavailable"). Confirm a `household_subscriptions`
+   row with `store = 'PLAY_STORE'` appears.
 
-`src/lib/purchases.ts` hard-returns off iOS:
-
-```ts
-const IOS_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? ''
-if (configured || Platform.OS !== 'ios' || !IOS_KEY) return
-```
-
-So an Android build behaves as permanently free. That degrades gracefully (no
-crash, no paywall — `plus.tsx` is explicit about this), so it is **not a blocker
-for a closed-test build**, but you can't sell Plus on Android until it's wired.
-
-The good news: **the server needs no changes.** `api/revenuecat-webhook.ts` keys
-off `app_user_id` = `household_id` and branches only on event type — it records
-`store` but never switches on it. Google Play events will flow through the existing
-webhook untouched.
-
-To enable it:
-1. Play Console → create the subscription products with **the same product IDs**
-   you'd want RevenueCat to map to the `plus` entitlement.
-2. RevenueCat → add a Play Store app, upload a Google Cloud service-account JSON
-   with Play Developer API access, map the products to the `plus` entitlement.
-3. Add `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` to `eas.json` env (or as an EAS secret)
-   and branch `configurePurchases()` on `Platform.OS` to pick the right key.
-4. Play requires digital subscriptions to use **Google Play Billing** — which
-   RevenueCat uses — so no policy issue, but you must have at least one active
-   subscription product before the listing can reference paid features.
-
-> Note: `MEMBER_LIMIT_FREE = 4` still applies on Android, so a free Android
-> household is capped at 4 members with no way to upgrade until this lands.
-> That's a support question waiting to happen — decide deliberately.
+The iOS key (`EXPO_PUBLIC_REVENUECAT_IOS_KEY`) is still NOT on EAS — iOS builds have
+been local Xcode archives since July (they read `.env.local`). Add it before the
+next EAS iOS build or that build ships the paywall dark.
 
 ### 1.6 Verify after `expo prebuild` (can't be confirmed from config alone)
 
@@ -856,10 +832,9 @@ Not blockers; they're parity gaps you should know about before someone reports t
 - **No Apple Calendar sync** (`isAppleCalendarAvailable` is iOS-gated). Google
   Calendar sync works and is the relevant one on Android — but it's Plus-gated, so
   it's unreachable until §1.5 lands.
-- **Plus is unreachable until the Play products exist** (§1.5). The 30-day trial
-  covers new households in the meantime, but a household whose trial lapses before
-  billing is live has no way to pay — so finish §1.5 before the first closed
-  testers hit day 30.
+- **Plus on Android needs a build carrying the RevenueCat key** (§1.5). Products,
+  offering and key are in place; build 10 predates the key, so its paywall reads
+  "unavailable". The 30-day trial covers new households until the next build.
 - **No Whereabouts on Android v1** (§0b) — a deliberate scope cut, switched off
   in one place and ready to return.
 - **`ACTIVITY_RECOGNITION`** may be requested by `expo-location` on Android. If it
