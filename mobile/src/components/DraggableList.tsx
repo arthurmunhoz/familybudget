@@ -5,13 +5,15 @@
 // Rows are absolutely positioned by their index * rowHeight; a shared
 // `positions` map (id → index) is the source of truth while dragging. Long-press
 // picks a row up (so a short tap still reaches the row's own Pressables, and a
-// short vertical swipe still scrolls a parent ScrollView); dragging past a
+// vertical swipe still scrolls a parent ScrollView — the pan FAILS once the
+// finger moves ~10pt before the hold completes); dragging past a
 // neighbour reindexes the map and the others spring to their new slots. On
 // release the final order is committed to JS via onReorder.
 //
 // IMPORTANT: for gestures to work inside a RN <Modal>, the modal's content must
-// be wrapped in <GestureHandlerRootView> — the app-root one doesn't reach into a
-// modal's separate native hierarchy.
+// be wrapped in <GestureHandlerRootView> — the app-root one (_layout) doesn't
+// reach into a modal's separate native hierarchy. Outside a modal, never add
+// one: a root nested inside a ScrollView can block that ScrollView's pan.
 import { type ReactNode, useEffect } from 'react'
 import { View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -133,8 +135,11 @@ function Row({
     },
   )
 
+  // 350ms, not shorter: a finger that rests a moment before scrolling (a slow,
+  // deliberate scroll) used to lift a row at 180ms instead of moving the page —
+  // and this list fills most of Settings. iOS's own long-press is 500ms.
   const pan = Gesture.Pan()
-    .activateAfterLongPress(180)
+    .activateAfterLongPress(350)
     .onStart(() => {
       dragging.value = true
       startTop.value = top.value

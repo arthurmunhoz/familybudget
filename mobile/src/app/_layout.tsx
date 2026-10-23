@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Fraunces_600SemiBold, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 import {
   HankenGrotesk_400Regular,
@@ -110,7 +111,14 @@ function Chrome() {
       {/* GLASS skin: paint the color wash behind everything and make the
           navigator's screen backgrounds transparent so it shows through. When
           GLASS is off this whole block is inert and the app is untouched. */}
-      <View style={{ flex: 1 }}>
+      {/* The app-wide gesture root, which react-native-gesture-handler expects
+          at the top of the tree. There was none: the only root on Settings was
+          one wrapped around the hub-apps DraggableList INSIDE the page's
+          ScrollView, and a root's recognizer can block every recognizer above it
+          — the scroll view's pan included — which is how Settings could stop
+          scrolling (2026-10-22). Modals still need their own (a RN <Modal> is a
+          separate native hierarchy this one doesn't reach). */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
         {GLASS ? <GlassWash dark={isDark} scheme={scheme} /> : null}
         <Stack
           screenOptions={{
@@ -120,7 +128,7 @@ function Chrome() {
         >
           <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         </Stack>
-      </View>
+      </GestureHandlerRootView>
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>
   );

@@ -1,14 +1,19 @@
 import type { PetCareTask, PetEvent, PetTaskDone, PetTaskIcon } from './types'
 
 /**
- * The most recent event per (pet, type, title). Re-logging a recurring
- * treatment retires the previous one's due date — so only the latest counts.
+ * The most recent event per (pet, title). Re-logging a recurring treatment
+ * retires the previous one's due date — so only the latest counts. The TYPE is
+ * deliberately not part of the key: the same treatment gets saved as a vaccine
+ * one time and a medication the next (real data: Aninha's "Leptospirosis
+ * vaccine"), and keying on it split one series in two, leaving the first
+ * reminder overdue forever however many times the dose was logged again.
+ * Titles match ignoring case and runs of whitespace.
  * Input must be sorted newest-first (event_date desc).
  */
 export function latestPerKey(events: PetEvent[]): PetEvent[] {
   const latest = new Map<string, PetEvent>()
   for (const e of events) {
-    const key = `${e.pet_id}|${e.type}|${e.title.trim().toLowerCase()}`
+    const key = `${e.pet_id}|${e.title.trim().replace(/\s+/g, ' ').toLowerCase()}`
     if (!latest.has(key)) latest.set(key, e)
   }
   return [...latest.values()]

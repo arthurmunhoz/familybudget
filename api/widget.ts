@@ -165,12 +165,13 @@ function formatTime(hhmm: string, locale: string): string {
   })
 }
 
-/** Latest event per (pet, type, title) that is due today or already past.
+/** Latest event per (pet, title) that is due today or already past — same
+ *  series rule as mobile/src/lib/petCare.ts latestPerKey.
  *  Input must be sorted newest-first (event_date desc). */
 function overdueEvents(events: PetEvent[], today: string): PetEvent[] {
   const latest = new Map<string, PetEvent>()
   for (const e of events) {
-    const key = `${e.pet_id}|${e.type}|${e.title.trim().toLowerCase()}`
+    const key = `${e.pet_id}|${e.title.trim().replace(/\s+/g, ' ').toLowerCase()}`
     if (!latest.has(key)) latest.set(key, e)
   }
   return [...latest.values()]

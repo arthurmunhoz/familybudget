@@ -270,13 +270,16 @@ function nextOcc(startISO: string, recurrence: string, today: string): string {
   return cur
 }
 
-/** Latest event per (pet, type, title) — re-logging a treatment retires the
- *  previous due date. Events must arrive newest-first. */
+/** Latest event per (pet, title) — re-logging a treatment retires the previous
+ *  due date. Same rule as mobile/src/lib/petCare.ts latestPerKey: type is NOT in
+ *  the key (one treatment gets saved as a vaccine once and a medication the
+ *  next) and titles match ignoring case and whitespace runs. Events must arrive
+ *  newest-first. */
 function latestPerKey(events: PetEvent[]): PetEvent[] {
   const seen = new Set<string>()
   const out: PetEvent[] = []
   for (const e of events) {
-    const key = `${e.pet_id}|${e.type}|${e.title.trim().toLowerCase()}`
+    const key = `${e.pet_id}|${e.title.trim().replace(/\s+/g, ' ').toLowerCase()}`
     if (seen.has(key)) continue
     seen.add(key)
     out.push(e)
@@ -310,7 +313,10 @@ export default async function handler(req: any, res: any) {
     db
       .from('pet_events')
       .select('pet_id, type, title, event_date, next_due')
-      .not('next_due', 'is', null)
+      // ALL events, not just those with a next_due: the latest log of a
+      // treatment decides whether it's still due, and a final dose logged with
+      // no next date must retire the series. Filtering here hid that dose and
+      // kept pushing the previous one's stale reminder.
       .order('event_date', { ascending: false }),
     db
       .from('calendar_events')

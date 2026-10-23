@@ -18,7 +18,6 @@ import {
   View,
   type LayoutChangeEvent,
 } from 'react-native'
-import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { router, useLocalSearchParams } from 'expo-router'
 import {
   Award,
@@ -898,41 +897,39 @@ export default function Settings() {
         {/* Which apps show on the hub, and in what order */}
         <View style={{ gap: sp.sm }}>
           <Txt variant="label">{t('settings.apps')}</Txt>
-          <GestureHandlerRootView>
-            <Card>
-              <DraggableList
-                data={orderedApps}
-                rowHeight={52}
-                onReorder={setAppOrder}
-                renderItem={(app) => {
-                  const hidden = hiddenApps.includes(app.id)
-                  return (
-                    <View
-                      style={{
-                        height: 52,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: sp.md,
-                        paddingHorizontal: sp.xs,
-                        opacity: hidden ? 0.45 : 1,
-                      }}
-                    >
-                      <GripVertical size={16} color={c.textFaint} />
-                      <app.icon size={18} color={c.accent} />
-                      <Txt style={{ flex: 1, fontWeight: '500' }} numberOfLines={1}>
-                        {t(`app.${app.id}.name` as TKey)}
-                      </Txt>
-                      <Switch
-                        value={!hidden}
-                        onValueChange={() => toggleApp(app.id)}
-                        trackColor={{ true: c.income, false: c.surface2 }}
-                      />
-                    </View>
-                  )
-                }}
-              />
-            </Card>
-          </GestureHandlerRootView>
+          <Card>
+            <DraggableList
+              data={orderedApps}
+              rowHeight={52}
+              onReorder={setAppOrder}
+              renderItem={(app) => {
+                const hidden = hiddenApps.includes(app.id)
+                return (
+                  <View
+                    style={{
+                      height: 52,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: sp.md,
+                      paddingHorizontal: sp.xs,
+                      opacity: hidden ? 0.45 : 1,
+                    }}
+                  >
+                    <GripVertical size={16} color={c.textFaint} />
+                    <app.icon size={18} color={c.accent} />
+                    <Txt style={{ flex: 1, fontWeight: '500' }} numberOfLines={1}>
+                      {t(`app.${app.id}.name` as TKey)}
+                    </Txt>
+                    <Switch
+                      value={!hidden}
+                      onValueChange={() => toggleApp(app.id)}
+                      trackColor={{ true: c.income, false: c.surface2 }}
+                    />
+                  </View>
+                )
+              }}
+            />
+          </Card>
           <Txt variant="faint">{t('settings.appsHint')}</Txt>
         </View>
 

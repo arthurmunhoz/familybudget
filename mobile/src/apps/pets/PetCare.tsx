@@ -384,7 +384,7 @@ export default function PetCare() {
    *  editable before saving.
    *
    *  Nothing has to clear the old reminder: reminderEvents only ever considers
-   *  the LATEST event per (pet, type, title), so saving this one retires the
+   *  the LATEST event per (pet, title), so saving this one retires the
    *  previous due date on its own and the old entry stays in history as the log
    *  it is. The flip side of that key: the title is what the series is matched
    *  on, so editing it in the sheet before saving starts a SEPARATE series and

@@ -37,9 +37,15 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   device-verified working). Reorder needs `react-native-draggable-flatlist`? No:
   it uses `useAnimatedGestureHandler`, REMOVED in reanimated 4 (we're on 4.3.1) —
   DraggableList is a small custom sortable on the modern `Gesture.Pan` +
-  reanimated-4 APIs instead. Gestures inside a RN `<Modal>` need the modal's
-  content wrapped in `<GestureHandlerRootView>` (the app-root one doesn't reach
-  a modal's separate native hierarchy) — see `NudgeSettings.tsx`.
+  reanimated-4 APIs instead. The app-wide `<GestureHandlerRootView>` lives in
+  `_layout` (added 2026-10-23 — there was none, and the only root on Settings
+  sat INSIDE its ScrollView around the hub-apps list, where a root's recognizer
+  can block the scroll view's pan: Settings "couldn't scroll"). Gestures inside
+  a RN `<Modal>` still need the modal's content wrapped in its own root (the
+  app one doesn't reach a modal's separate native hierarchy) — see
+  `NudgeSettings.tsx`. Never add one anywhere else, least of all inside a
+  scroller. DraggableList picks a row up after a 350 ms hold; shorter lifted
+  rows when a finger rested a moment before scrolling.
 - **Theme** `@/theme/theme`: `useTheme()` → `{ dark, c }`; tokens `c` =
   bg/card/cardActive/surface/surface2/text/textMuted/textFaint/accent/accentSoft/
   income/expense/border (Warm Hearth, light+dark, follows system). Also `sp`,
@@ -297,6 +303,14 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   about without a device.
 - **i18n** `@/hooks/useI18n`: `useI18n()` → `{ t, lang, setLang }`. Dicts in
   `@/lib/i18n` (en/es/pt) are the PWA dicts copied verbatim — add keys to all 3.
+- **Pet event reminders are a SERIES per (pet, title)** — `latestPerKey` in
+  `lib/petCare.ts`, and the same rule in `api/send-digest.ts` and
+  `api/widget.ts`: the newest log of a treatment decides its next due, titles
+  match ignoring case/whitespace, and TYPE is NOT in the key (one treatment got
+  saved as a vaccine one year and a medication the next, which split it into two
+  series and left the first reminder overdue forever). The digest must fetch
+  ALL events, not just those with a `next_due` — a final dose logged with no
+  next date is what ends a series. `__tests__/petCare.test.ts` pins this.
 - **Pure logic copied from the PWA** lives in `@/lib/` (types, format, calendar,
   categories, petCare, stores, signedUrls, pings) — keep them in sync with the PWA
   or, post-cutover, treat these as the source of truth.
