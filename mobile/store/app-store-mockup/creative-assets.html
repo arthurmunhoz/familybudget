@@ -1,0 +1,74 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>One Roof creative assets</title><style>
+/* App Store Connect → Asset Library → "Creative Assets": the product-page
+   HEADER (21:9, 3840x1646) and the SEARCH RESULT (3:2, 3840x2560). Rendered at
+   2x from a 1920-wide CSS canvas by render.sh; ?view=header|search.
+   Apple's rules: no transparency, keep the focal point CENTRED (the header is
+   cropped differently per device/orientation), 4+ content, no prices / URLs /
+   ©. The icon, name and Get button sit right under the header, so the header
+   carries mood + one line, not the icon or a feature list.
+   The phones are the bottom of the live listing screenshots (assets/hi-*.png)
+   with their captions cropped off; the near-black page matches their own
+   background so the feathered crops disappear into it. */
+@font-face { font-family:'Fraunces'; src:url('fraunces.woff2') format('woff2-variations'); font-weight:100 900; }
+@font-face { font-family:'Hanken'; src:url('hanken.woff2') format('woff2-variations'); font-weight:100 900; }
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { --bg:#171615; --paper:#fbf6f0; --muted:#c9b9ab; --clay:#d9764f; }
+html,body { overflow:hidden; background:var(--bg); }
+.stage { position:relative; overflow:hidden; width:1920px; background:var(--bg);
+  background-image:
+    radial-gradient(42% 60% at 50% 100%, rgba(194,96,63,.38) 0%, rgba(194,96,63,0) 70%),
+    radial-gradient(30% 50% at 8% 0%, rgba(194,96,63,.16) 0%, rgba(194,96,63,0) 70%),
+    radial-gradient(30% 50% at 92% 0%, rgba(194,96,63,.16) 0%, rgba(194,96,63,0) 70%); }
+body.header .stage { height:823px; }
+body.search .stage { height:1280px; }
+
+.copy { position:absolute; left:0; right:0; text-align:center; z-index:2; }
+.roof { display:block; margin:0 auto; }
+.headline { font-family:'Fraunces'; font-weight:700; color:var(--paper); letter-spacing:-1.5px; line-height:1.04; }
+.headline em { font-style:normal; color:var(--clay); }
+.sub { font-family:'Hanken'; font-weight:500; color:var(--muted); }
+
+/* a phone crop: the screenshot's lower part, feathered on every edge */
+.crop { position:absolute; background-repeat:no-repeat; background-size:100% auto;
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0%, #000 26%, #000 100%),
+    linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  -webkit-mask-composite:source-in; mask-composite:intersect; }
+.c1 { background-image:url('assets/hi-1.png'); }
+.c2 { background-image:url('assets/hi-2.png'); }
+.c3 { background-image:url('assets/hi-3.png'); }
+
+/* header: one line up top, three phones rising from the bottom edge */
+body.header .copy { top:84px; }
+body.header .roof { width:220px; margin-bottom:22px; }
+body.header .headline { font-size:84px; }
+body.header .sub { display:none; }
+body.header .crop { width:500px; height:600px; bottom:-150px; background-position:0 -270px; }
+body.header .c1 { left:calc(50% - 720px); transform:rotate(-4deg); }
+body.header .c2 { left:calc(50% - 250px); bottom:-110px; z-index:1; }
+body.header .c3 { left:calc(50% + 220px); transform:rotate(4deg); }
+
+/* search result: the app screens are the point — big, centred, one short line */
+body.search .copy { top:86px; }
+body.search .roof { display:none; }
+body.search .headline { font-size:88px; }
+body.search .sub { font-size:36px; margin-top:22px; }
+body.search .crop { width:660px; height:1060px; bottom:-120px; background-position:0 -400px; }
+body.search .c1 { left:calc(50% - 930px); transform:rotate(-3deg); }
+body.search .c2 { left:calc(50% - 330px); bottom:-90px; z-index:1; }
+body.search .c3 { left:calc(50% + 270px); transform:rotate(3deg); }
+</style></head>
+<body>
+<script>document.body.className = new URLSearchParams(location.search).get('view') || 'header';</script>
+<div class="stage">
+  <div class="copy">
+    <svg class="roof" viewBox="0 0 456 116" fill="none" stroke="#d9764f" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><path d="M14 102 L228 15 L442 102"/></svg>
+    <h1 class="headline">Your whole family, <em>under one roof.</em></h1>
+    <p class="sub">Calendar, map, shopping, money and pets — shared.</p>
+  </div>
+  <div class="crop c1"></div>
+  <div class="crop c2"></div>
+  <div class="crop c3"></div>
+</div>
+</body></html>

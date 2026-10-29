@@ -1,0 +1,200 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>One Roof App Store mockup</title><style>
+/* Marketing mockup of One Roof's App Store listing: the search-result row and
+   the product-page header, each inside an iPhone frame, on the Warm Hearth
+   paper. Copy and numbers mirror the LIVE US listing (id6786347512) as of
+   2026-10-29 — no star rating is shown because the listing has none yet; don't
+   invent one. Rendered by render.sh; ?view=combined|search|header. */
+@font-face { font-family:'Fraunces'; src:url('fraunces.woff2') format('woff2-variations'); font-weight:100 900; }
+@font-face { font-family:'Hanken'; src:url('hanken.woff2') format('woff2-variations'); font-weight:100 900; }
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { --paper:#fbf6f0; --ink:#2b2521; --muted:#6f6259; --faint:#8c8076; --clay:#c2603f;
+  --ios-blue:#007aff; --ios-gray:#8a8a8e; --ios-fill:#efeff4; --ios-sep:#e3e3e8; }
+html,body { overflow:hidden; background:var(--paper); }
+.stage { position:relative; background:var(--paper);
+  background-image:
+    radial-gradient(55% 75% at 96% 0%, rgba(194,96,63,.20) 0%, rgba(194,96,63,0) 62%),
+    radial-gradient(60% 80% at 0% 100%, rgba(194,96,63,.12) 0%, rgba(194,96,63,0) 62%); }
+
+/* ---- layouts ---- */
+body.combined .stage { width:1600px; height:1000px; }
+body.combined .copy { position:absolute; left:96px; top:50%; transform:translateY(-50%); width:470px; }
+body.combined .phone.search { position:absolute; left:660px; top:78px; }
+body.combined .phone.header { position:absolute; left:1110px; top:122px; }
+body.search .stage, body.header .stage { width:560px; height:1000px; }
+body.search .copy, body.header .copy { display:none; }
+body.search .phone.header, body.header .phone.search { display:none; }
+body.search .phone, body.header .phone { position:absolute; left:75px; top:78px; }
+
+/* ---- marketing copy ---- */
+.lockup { display:flex; align-items:center; gap:16px; margin-bottom:30px; }
+.lockup img { width:64px; height:64px; border-radius:15px; box-shadow:0 4px 14px rgba(43,37,33,.16); }
+.lockup span { font-family:'Fraunces'; font-weight:700; font-size:34px; color:var(--ink); letter-spacing:-.5px; }
+.headline { font-family:'Fraunces'; font-weight:700; font-size:66px; line-height:1.02; color:var(--ink); letter-spacing:-1.6px; }
+.headline em { font-style:normal; color:var(--clay); }
+.rule { width:74px; height:5px; border-radius:3px; background:var(--clay); margin:30px 0 24px; }
+.sub { font-family:'Hanken'; font-weight:500; font-size:25px; line-height:1.4; color:var(--muted); }
+.search-pill { margin-top:34px; display:inline-flex; align-items:center; gap:12px; padding:15px 24px 15px 20px;
+  background:#fff; border-radius:999px; box-shadow:0 4px 16px rgba(43,37,33,.10); border:1px solid rgba(43,37,33,.06);
+  font-family:'Hanken'; font-weight:600; font-size:22px; color:var(--ink); }
+.search-pill svg { color:var(--faint); }
+
+/* ---- iPhone frame ---- */
+.phone { width:410px; height:844px; border-radius:62px; background:#1d1b1a; padding:11px;
+  box-shadow:0 40px 80px -20px rgba(43,37,33,.38), 0 0 0 2px #3a3633 inset; }
+.screen { position:relative; width:100%; height:100%; border-radius:52px; overflow:hidden; background:#fff;
+  font-family:-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif; color:#000; }
+.island { position:absolute; top:11px; left:50%; transform:translateX(-50%); width:118px; height:34px; border-radius:20px; background:#000; z-index:3; }
+.status { height:54px; display:flex; align-items:center; justify-content:space-between; padding:6px 34px 0 40px;
+  font-weight:600; font-size:16px; letter-spacing:-.2px; }
+.status .icons { display:flex; gap:6px; align-items:center; }
+.fade { position:absolute; left:0; right:0; bottom:0; height:120px; background:linear-gradient(rgba(255,255,255,0), #fff); }
+.homebar { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); width:134px; height:5px; border-radius:3px; background:#000; z-index:3; }
+
+/* ---- App Store bits ---- */
+.icon { border-radius:22.5%; display:block; box-shadow:0 0 0 .5px rgba(0,0,0,.12); }
+.get { background:var(--ios-fill); color:var(--ios-blue); font-weight:700; font-size:15px; border-radius:999px;
+  padding:6px 0; width:74px; text-align:center; letter-spacing:.2px; }
+.iap { font-size:9px; color:var(--ios-gray); text-align:center; margin-top:4px; line-height:1.15; }
+
+/* search screen */
+.s-title { font-size:34px; font-weight:700; letter-spacing:.3px; padding:2px 18px 8px; }
+.s-bar { display:flex; align-items:center; gap:10px; padding:0 18px 12px; }
+.s-field { flex:1; display:flex; align-items:center; gap:7px; height:38px; background:#eeeef0; border-radius:11px; padding:0 9px;
+  font-size:17px; color:#000; }
+.s-field svg { color:var(--ios-gray); flex:none; }
+.s-field .caret { width:2px; height:21px; background:var(--ios-blue); margin-left:-5px; border-radius:1px; }
+.s-field .clear { margin-left:auto; }
+.s-cancel { color:var(--ios-blue); font-size:17px; }
+.result { padding:6px 18px 0; }
+.r-row { display:flex; align-items:center; gap:12px; }
+.r-row .meta { flex:1; min-width:0; }
+.r-name { font-size:16px; font-weight:600; letter-spacing:-.2px; }
+.r-sub { font-size:13px; color:var(--ios-gray); margin-top:2px; }
+.r-cat { font-size:11px; color:var(--ios-gray); margin-top:4px; display:flex; align-items:center; gap:4px; }
+.shots { display:flex; gap:9px; margin-top:14px; }
+.shots img { width:calc((100% - 18px) / 3); aspect-ratio:630/1363; object-fit:cover; border-radius:13px;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.14); }
+.sep { height:.5px; background:var(--ios-sep); margin:20px 0 16px; }
+.ghost { display:flex; align-items:center; gap:12px; opacity:.55; }
+.ghost .g-icon { width:62px; height:62px; border-radius:14px; background:#ececf0; }
+.ghost-shots { opacity:.55; }
+.ghost-shots i { width:calc((100% - 18px) / 3); aspect-ratio:630/1363; border-radius:13px; background:#ececf0; }
+.ghost .g-lines { flex:1; } .ghost .g-lines i { display:block; height:11px; border-radius:6px; background:#ececf0; margin:5px 0; }
+
+/* product header screen */
+.nav { display:flex; justify-content:space-between; align-items:center; padding:2px 16px 10px; color:var(--ios-blue); font-size:17px; }
+.nav .back { display:flex; align-items:center; gap:3px; }
+.hero { display:flex; gap:16px; padding:4px 18px 0; }
+.hero .meta { flex:1; display:flex; flex-direction:column; min-width:0; }
+.h-name { font-size:21px; font-weight:700; letter-spacing:-.3px; line-height:1.15; }
+.h-sub { font-size:14px; color:var(--ios-gray); margin-top:3px; }
+.h-actions { margin-top:auto; display:flex; align-items:center; gap:8px; }
+.h-actions .get { background:var(--ios-blue); color:#fff; }
+.h-actions .iap { text-align:left; margin:0; }
+.info { display:flex; margin:22px 0 0; padding:0 4px; border-top:.5px solid var(--ios-sep); border-bottom:.5px solid var(--ios-sep); }
+.info > div { flex:none; width:96px; text-align:center; padding:12px 0 11px; position:relative; }
+.info > div + div::before { content:''; position:absolute; left:0; top:22px; bottom:22px; width:.5px; background:var(--ios-sep); }
+.info .k { font-size:10px; font-weight:600; color:var(--ios-gray); letter-spacing:.4px; text-transform:uppercase; }
+.info .v { font-size:20px; font-weight:700; color:#6d6d72; margin:5px 0 2px; line-height:1; height:22px; display:flex; align-items:center; justify-content:center; }
+.info .d { font-size:11.5px; color:var(--ios-gray); white-space:nowrap; }
+.section { padding:18px 18px 0; }
+.section h3 { font-size:21px; font-weight:700; letter-spacing:-.2px; }
+.section .row { display:flex; justify-content:space-between; font-size:14px; color:var(--ios-gray); margin-top:4px; }
+.section p { font-size:14.5px; line-height:1.38; margin-top:8px; color:#1c1c1e; }
+.section .more { color:var(--ios-blue); }
+.big-shots { display:flex; gap:10px; padding:18px 0 0 18px; }
+.big-shots img { width:226px; flex:none; aspect-ratio:630/1363; border-radius:20px; box-shadow:0 0 0 .5px rgba(0,0,0,.14); }
+</style></head>
+<body>
+<script>document.body.className = new URLSearchParams(location.search).get('view') || 'combined';</script>
+<div class="stage">
+
+  <div class="copy">
+    <div class="lockup"><img src="assets/icon.png" alt=""><span>One Roof</span></div>
+    <h1 class="headline">Your whole family, <em>on the App Store.</em></h1>
+    <div class="rule"></div>
+    <p class="sub">Calendar, whereabouts, shopping, money, pets and documents — one shared app for the whole house.</p>
+    <div class="search-pill">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Search “One Roof”
+    </div>
+  </div>
+
+  <!-- Search results -->
+  <div class="phone search"><div class="screen">
+    <div class="island"></div>
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0zM3.5 7a6.3 6.3 0 0 1 9 0l1.5-1.5a8.4 8.4 0 0 0-12 0zM.4 3.9a10.7 10.7 0 0 1 15.2 0L16 3.5"/></svg>
+      <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="#000" opacity=".4"/><rect x="2" y="2" width="20" height="9" rx="2"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" opacity=".4"/></svg>
+    </span></div>
+    <div class="s-title">Search</div>
+    <div class="s-bar">
+      <div class="s-field">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>one roof</span><span class="caret"></span>
+        <svg class="clear" width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#8e8e93"/><path d="m8.5 8.5 7 7m0-7-7 7" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <span class="s-cancel">Cancel</span>
+    </div>
+    <div class="result">
+      <div class="r-row">
+        <img class="icon" src="assets/icon.png" width="62" height="62" alt="">
+        <div class="meta">
+          <div class="r-name">One Roof: Family Organizer</div>
+          <div class="r-sub">Everything your family needs</div>
+          <div class="r-cat">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+            Utilities
+          </div>
+        </div>
+        <div><div class="get">Get</div><div class="iap">In-App<br>Purchases</div></div>
+      </div>
+      <div class="shots">
+        <img src="assets/shot-1.png" alt=""><img src="assets/shot-2.png" alt=""><img src="assets/shot-3.png" alt="">
+      </div>
+      <div class="sep"></div>
+      <div class="ghost"><div class="g-icon"></div><div class="g-lines"><i style="width:62%"></i><i style="width:44%"></i></div></div>
+      <div class="shots ghost-shots"><i></i><i></i><i></i></div>
+    </div>
+    <div class="fade"></div><div class="homebar"></div>
+  </div></div>
+
+  <!-- Product page header -->
+  <div class="phone header"><div class="screen">
+    <div class="island"></div>
+    <div class="status"><span>9:41</span><span class="icons">
+      <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0zM3.5 7a6.3 6.3 0 0 1 9 0l1.5-1.5a8.4 8.4 0 0 0-12 0zM.4 3.9a10.7 10.7 0 0 1 15.2 0L16 3.5"/></svg>
+      <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="#000" opacity=".4"/><rect x="2" y="2" width="20" height="9" rx="2"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" opacity=".4"/></svg>
+    </span></div>
+    <div class="nav">
+      <span class="back"><svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2 2 10l8 8"/></svg>Search</span>
+      <svg width="20" height="24" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v15M7 7l5-5 5 5M6 12H4v14h16V12h-2"/></svg>
+    </div>
+    <div class="hero">
+      <img class="icon" src="assets/icon.png" width="118" height="118" alt="">
+      <div class="meta">
+        <div class="h-name">One Roof: Family Organizer</div>
+        <div class="h-sub">Everything your family needs</div>
+        <div class="h-actions"><div class="get">Get</div><div class="iap">In-App<br>Purchases</div></div>
+      </div>
+    </div>
+    <div class="info">
+      <div><div class="k">Age</div><div class="v">4+</div><div class="d">Years Old</div></div>
+      <div><div class="k">Category</div><div class="v"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6d6d72" stroke-width="2.2" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div><div class="d">Utilities</div></div>
+      <div><div class="k">Developer</div><div class="v"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6d6d72" stroke-width="2.2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></div><div class="d">Arthur R. Munhoz</div></div>
+      <div><div class="k">Language</div><div class="v">EN</div><div class="d">English</div></div>
+    </div>
+    <div class="section">
+      <h3>What’s New</h3>
+      <div class="row"><span>Version 1.4.1</span><span>1d ago</span></div>
+      <p>Settings and other long screens now scroll smoothly from anywhere you start the drag. Time and birthday pickers open in their own sheet… <span class="more">more</span></p>
+    </div>
+    <div class="big-shots"><img src="assets/shot-1.png" alt=""><img src="assets/shot-2.png" alt=""></div>
+    <div class="fade"></div><div class="homebar"></div>
+  </div></div>
+
+</div>
+</body></html>
