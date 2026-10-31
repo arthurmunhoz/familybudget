@@ -302,7 +302,11 @@ export function Field({
   style,
   onFocus,
   ...rest
-}: TextInputProps & { label?: string }) {
+}: TextInputProps & {
+  label?: string
+  /** Forwarded to the TextInput (via `rest`) — e.g. to focus it from a modal's onShow. */
+  ref?: Ref<TextInput>
+}) {
   const { c } = useTheme()
   // Inside a <KeyboardScroll>, focusing scrolls this row into view above the
   // keyboard. Inert everywhere else — see components/KeyboardScroll.tsx.
