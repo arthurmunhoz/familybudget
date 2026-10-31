@@ -46,11 +46,11 @@ shoot header   560 1000 app-store-header.png
 # App Store Connect creative assets (Asset Library → Upload Creative Assets).
 # Exact sizes are Apple's; JPEG/PNG with NO alpha, so flatten after the shot.
 cp "$here/creative-assets.html" "$tmp/creative.html"
-creative() { # view cssW cssH out
+creative() { # view cssW cssH out lang
   "$chrome" --headless=new --disable-gpu --hide-scrollbars \
     --force-device-scale-factor=2 --allow-file-access-from-files \
     --virtual-time-budget=3000 \
-    --window-size="$2,$3" --screenshot="$tmp/raw.png" "file://$tmp/creative.html?view=$1" 2>/dev/null
+    --window-size="$2,$3" --screenshot="$tmp/raw.png" "file://$tmp/creative.html?view=$1&lang=$5" 2>/dev/null
   python3 - "$tmp/raw.png" "$here/$4" "$(( $2 * 2 ))" "$(( $3 * 2 ))" <<'PY'
 import sys
 from PIL import Image
@@ -60,5 +60,9 @@ im.save(sys.argv[2], "PNG", optimize=True)
 print("wrote", sys.argv[2], im.size, im.mode)
 PY
 }
-creative header 1920 823  creative-header-3840x1646.png
-creative search 1920 1280 creative-search-3840x2560.png
+# English keeps the unsuffixed names it was first uploaded under; ES/PT get -es/-pt.
+for lang in en es pt; do
+  sfx=""; [ "$lang" = en ] || sfx="-$lang"
+  creative header 1920 823  "creative-header-3840x1646$sfx.png" "$lang"
+  creative search 1920 1280 "creative-search-3840x2560$sfx.png" "$lang"
+done

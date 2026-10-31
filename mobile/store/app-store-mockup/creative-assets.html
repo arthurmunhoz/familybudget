@@ -60,7 +60,6 @@ body.search .c2 { left:calc(50% - 330px); bottom:-90px; z-index:1; }
 body.search .c3 { left:calc(50% + 270px); transform:rotate(3deg); }
 </style></head>
 <body>
-<script>document.body.className = new URLSearchParams(location.search).get('view') || 'header';</script>
 <div class="stage">
   <div class="copy">
     <svg class="roof" viewBox="0 0 456 116" fill="none" stroke="#d9764f" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><path d="M14 102 L228 15 L442 102"/></svg>
@@ -71,4 +70,21 @@ body.search .c3 { left:calc(50% + 270px); transform:rotate(3deg); }
   <div class="crop c2"></div>
   <div class="crop c3"></div>
 </div>
+<script>
+// ?view=header|search  ?lang=en|es|pt — one asset per App Store localization.
+// The phones stay English: they're the live listing's own screenshots.
+const q = new URLSearchParams(location.search);
+document.body.className = q.get('view') || 'header';
+const COPY = {
+  es: ['Toda tu familia, ', 'bajo un mismo techo.', 'Calendario, mapa, compras, dinero y mascotas — compartidos.'],
+  pt: ['Toda a sua família, ', 'sob o mesmo teto.', 'Calendário, mapa, compras, dinheiro e pets — tudo compartilhado.'],
+};
+const lang = q.get('lang') || 'en';
+if (COPY[lang]) {
+  const [lead, em, sub] = COPY[lang];
+  document.documentElement.lang = lang;
+  document.querySelector('.headline').replaceChildren(lead, Object.assign(document.createElement('em'), { textContent: em }));
+  document.querySelector('.sub').textContent = sub;
+}
+</script>
 </body></html>
