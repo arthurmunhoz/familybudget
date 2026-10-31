@@ -30,6 +30,7 @@ import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
 import { readCache, useRevalidateOnForeground, writeCache } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import {
   enqueueOp,
   flushShoppingOutbox,
@@ -226,7 +227,18 @@ export default function ShoppingList() {
   // the SectionList re-rendered too, and the whole add bar (store chips included)
   // visibly stuttered on its way up. The keyboard's own frame already covers the
   // home-indicator area, so keeping the trim costs 5pt of gap and nothing else.
-  const addBarPaddingBottom = Math.max(Math.round(insets.bottom / 2), sp.xs)
+  // useBottomGap: half the inset on iOS (what this always was), ALL of it on
+  // Android, where the navigation bar hides whatever sits under it.
+  const addBarPaddingBottom = useBottomGap(sp.xs)
+  // Android doesn't resize the window for the keyboard (edge-to-edge), so the
+  // KeyboardAvoidingView below has to lift the bar there too. It measures the
+  // keyboard against the bar's frame, which reaches the screen's bottom edge —
+  // so the overlap it computes includes the navigation bar the padding above
+  // already clears. This offset takes that back out (keeping the sp.xs gap),
+  // so the field lands just above the keyboard rather than a bar-height over
+  // it. If the window ever does resize, the overlap comes out as 0 and the bar
+  // simply sits where layout put it.
+  const addBarKeyboardOffset = Platform.OS === 'android' ? -(addBarPaddingBottom - sp.xs) : 0
 
   // Editing an existing store (rename / recolor / delete) inside the sheet.
   const [editingStore, setEditingStore] = useState<ShoppingStore | null>(null)
@@ -732,7 +744,8 @@ export default function ShoppingList() {
 
       {/* Add bar: store chips + text field, pinned above the keyboard. */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
+        keyboardVerticalOffset={addBarKeyboardOffset}
         style={styles.addBarWrap}
       >
         <View
@@ -740,10 +753,11 @@ export default function ShoppingList() {
             styles.addBar,
             {
               backgroundColor: c.bg,
-              // Hug the bottom edge: HALF the safe-area inset (floored), the
-              // same trim NewItemButton uses, so the row's curved outer corners
-              // sit near the screen's own corner instead of floating above the
-              // full home-indicator gap. Constant — see addBarPaddingBottom.
+              // Hug the bottom edge: on iOS HALF the safe-area inset (floored),
+              // the same trim NewItemButton uses, so the row's curved outer
+              // corners sit near the screen's own corner instead of floating
+              // above the full home-indicator gap; on Android the whole
+              // navigation bar. Constant — see addBarPaddingBottom.
               paddingBottom: addBarPaddingBottom,
             },
           ]}

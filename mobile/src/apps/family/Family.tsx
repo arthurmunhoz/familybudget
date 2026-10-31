@@ -8,6 +8,7 @@
 import { useMemo, useRef, useState } from 'react'
 import {
   Animated,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -180,7 +181,12 @@ export default function Family() {
                 <View
                   style={{
                     flex: 1,
-                    backgroundColor: c.card,
+                    // Opaque on Android: `elevation` paints its shadow BEHIND
+                    // the view, and through the glass skin's translucent c.card
+                    // it showed as a grey band framing the card's contents.
+                    // iOS's layer shadow doesn't bleed through, so it keeps the
+                    // glass card.
+                    backgroundColor: Platform.OS === 'android' ? c.sheet : c.card,
                     borderRadius: radius.lg,
                     padding: sp.lg,
                     borderWidth: StyleSheet.hairlineWidth,
