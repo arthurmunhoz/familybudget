@@ -4,10 +4,15 @@
 // location, notes. Inserts/updates calendar_events (household_id/created_by are
 // stamped by column defaults under RLS). Google-sourced rows are read-only and
 // never reach this form.
+//
+// Keyboard: the sheet sits on top of the keyboard (useSheetLift) and the
+// fields scroll in a <KeyboardScroll>, which brings the focused one into view.
+// Without either, Location and Notes were typed blind under the keyboard.
 import { useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, Switch, View } from 'react-native'
+import { Alert, Modal, Pressable, Switch, View } from 'react-native'
 import { X } from 'lucide-react-native'
 
+import { KeyboardScroll } from '@/components/KeyboardScroll'
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
@@ -16,6 +21,7 @@ import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { CalendarEvent, EventKind, EventRecurrence, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
+import { useSheetLift } from '@/hooks/useSheetLift'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { DateField } from '@/apps/pets/petUi'
 import { OwnerChip, Pill, TimeField } from './calendarUi'
@@ -61,6 +67,7 @@ export default function EventForm({
 }) {
   const { c } = useTheme()
   const bottomGap = useBottomGap(sp.xl)
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
   const { t } = useI18n()
   const [saving, setSaving] = useState(false)
   const set = (patch: Partial<EventDraft>) => setDraft({ ...draft, ...patch })
@@ -102,10 +109,16 @@ export default function EventForm({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+      <View
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+        onLayout={onRootLayout}
+      >
         <View
           style={{
-            maxHeight: '90%',
+            // Against what the keyboard leaves, so the sheet never grows
+            // behind it.
+            maxHeight: room * 0.9,
+            marginBottom: lift,
             backgroundColor: c.sheet,
             borderTopLeftRadius: radius.lg,
             borderTopRightRadius: radius.lg,
@@ -127,10 +140,11 @@ export default function EventForm({
             </Pressable>
           </View>
 
-          <ScrollView
-            style={{ flexGrow: 0 }}
+          <KeyboardScroll
+            // flexShrink so the fields yield to the sheet's max height once the
+            // keyboard has taken half the screen; flexGrow 0 keeps it a sheet.
+            style={{ flexGrow: 0, flexShrink: 1 }}
             contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
-            keyboardShouldPersistTaps="handled"
           >
             <Field
               value={draft.title}
@@ -298,9 +312,18 @@ export default function EventForm({
               onChangeText={(v) => set({ notes: v })}
               placeholder={t('calendar.notesPlaceholder')}
             />
-          </ScrollView>
+          </KeyboardScroll>
 
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap, gap: sp.md }}>
+          <View
+            style={{
+              paddingHorizontal: sp.lg,
+              paddingTop: sp.md,
+              // iOS with no keyboard: clear the home indicator. Otherwise the
+              // sheet already sits above the keyboard / navigation bar.
+              paddingBottom: clearOfBars ? sp.lg : bottomGap,
+              gap: sp.md,
+            }}
+          >
             <Btn
               title={editing ? t('common.saveChanges') : t('calendar.saveEvent')}
               onPress={save}

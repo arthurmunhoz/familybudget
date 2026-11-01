@@ -286,11 +286,17 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   else. Use it for any tall form in a modal (`PetForm` is the reference).
   Two things it relies on:
   - **The host must put the sheet above the keyboard**, because KeyboardScroll
-    treats its own layout height as the visible window. Don't hardcode that
-    lift: RN gives an Android modal's dialog `SOFT_INPUT_ADJUST_RESIZE`, so its
-    window shrinks by itself, while an iOS modal's doesn't move. `PetForm`
-    measures the difference (root height now vs. at rest) and makes up only
-    what the platform didn't. A flat `marginBottom: kb` double-lifts Android.
+    treats its own layout height as the visible window. Use
+    **`useSheetLift()`** (`@/hooks/useSheetLift`): `onRootLayout` on the modal's
+    root, `marginBottom: lift` + `maxHeight: room * share` on the sheet.
+    It measures (root height now vs. at rest) and makes up only what the
+    platform didn't. Under edge-to-edge an Android modal's window does NOT
+    shrink for the keyboard (verified on the S9+, 2026-10-31) and draws BEHIND
+    the navigation bar, while RN reports only the keyboard height ABOVE that
+    bar — so the lift is keyboard + nav bar there, and the sheet also sits
+    above the nav bar with no keyboard. `CityPickerSheet` and the calendar
+    `EventForm` use it. `PetForm` still has the older inline version, which
+    lifts by the keyboard alone and so falls a nav bar short on Android.
   - **`Screen` already handles the plain-screen case** with its
     KeyboardAvoidingView; KeyboardScroll is for modals, where KAV mis-measures
     (same reason `useKeyboardHeight` exists).

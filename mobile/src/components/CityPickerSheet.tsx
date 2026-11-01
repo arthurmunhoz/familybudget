@@ -4,30 +4,19 @@
 // Settings. Settings' Weather section still owns the fuller job (seeing current
 // conditions, changing the city, removing it).
 //
-// Keyboard: the sheet sits ON TOP of the keyboard, with the lift MEASURED the
-// way PetForm does it — compare the root's height now against its height with
-// no keyboard and make up only what the platform didn't. This used to be a
-// KeyboardAvoidingView, iOS-only, on the assumption that Android shrinks the
-// modal's window by itself; under edge-to-edge it doesn't, and the whole sheet
-// (field included) stayed behind the keyboard.
+// Keyboard: the sheet sits ON TOP of the keyboard (and on Android above the
+// navigation bar) via useSheetLift. This used to be a KeyboardAvoidingView,
+// iOS-only, on the assumption that Android shrinks the modal's window by
+// itself; under edge-to-edge it doesn't, and the whole sheet (field included)
+// stayed behind the keyboard.
 import { useEffect, useRef, useState } from 'react'
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  type TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Modal, Pressable, ScrollView, StyleSheet, type TextInput, View } from 'react-native'
 import { MapPin, X } from 'lucide-react-native'
 
 import { Field, Txt } from './ui'
 import { useI18n } from '../hooks/useI18n'
 import { useBottomGap } from '../hooks/useBottomGap'
-import { useKeyboardHeight } from '../hooks/useKeyboardHeight'
+import { useSheetLift } from '../hooks/useSheetLift'
 import { radius, sp, useTheme } from '../theme/theme'
 import { saveHomeLocation, searchCities, type HomeLocation } from '../lib/weather'
 import type { TKey } from '../lib/i18n'
@@ -36,9 +25,7 @@ export function CityPickerSheet({ onClose, onSaved }: { onClose: () => void; onS
   const { t } = useI18n()
   const { c } = useTheme()
   const bottomGap = useBottomGap(sp.xl)
-  const insets = useSafeAreaInsets()
-  const win = useWindowDimensions()
-  const kb = useKeyboardHeight()
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
   const inputRef = useRef<TextInput>(null)
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<HomeLocation[]>([])
@@ -70,24 +57,6 @@ export function CityPickerSheet({ onClose, onSaved }: { onClose: () => void; onS
     }
   }, [query])
 
-  // How much of the modal the keyboard covers. Android reports the keyboard's
-  // height ABOVE the navigation bar, but this edge-to-edge modal draws behind
-  // that bar, so the keyboard's top edge is a nav bar higher still; iOS's
-  // height is already measured from the screen's bottom edge. Whatever the
-  // window itself gave up for the keyboard (`absorbed`) is subtracted, so a
-  // device that does resize the modal doesn't get lifted twice.
-  const [rootH, setRootH] = useState(0)
-  const [restH, setRestH] = useState(0) // root height with no keyboard up
-  const available = rootH || win.height
-  const absorbed = restH ? Math.max(0, restH - available) : 0
-  // Android's navigation bar, whatever the user has it set to (3 buttons,
-  // gesture pill, hidden = 0). The sheet sits ABOVE it rather than padding its
-  // content clear of it, so the bar never draws over the sheet itself. iOS's
-  // home indicator is an overlay, so there the sheet keeps reaching the edge.
-  const navBar = Platform.OS === 'android' ? insets.bottom : 0
-  const covered = kb > 0 ? kb + navBar : 0
-  const lift = Math.max(navBar, covered - absorbed)
-
   async function pick(loc: HomeLocation) {
     await saveHomeLocation(loc)
     onSaved()
@@ -106,17 +75,13 @@ export function CityPickerSheet({ onClose, onSaved }: { onClose: () => void; onS
     >
       <View
         style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-        onLayout={(e) => {
-          const h = e.nativeEvent.layout.height
-          setRootH(h)
-          if (kb === 0) setRestH(h)
-        }}
+        onLayout={onRootLayout}
       >
         <View
           style={{
             // Against what the keyboard leaves, so the sheet never grows
             // behind it.
-            maxHeight: (available - lift) * 0.88,
+            maxHeight: room * 0.88,
             marginBottom: lift,
             backgroundColor: c.sheet,
             borderTopLeftRadius: radius.lg,
@@ -147,10 +112,9 @@ export function CityPickerSheet({ onClose, onSaved }: { onClose: () => void; onS
             style={{ flexGrow: 0, flexShrink: 1 }}
             contentContainerStyle={{
               paddingHorizontal: sp.lg,
-              // iOS: clear the home indicator, except while the keyboard is up
-              // (the sheet sits on it then). Android: the sheet is already
-              // above the navigation bar or the keyboard, so just a margin.
-              paddingBottom: kb > 0 || Platform.OS === 'android' ? sp.lg : bottomGap,
+              // iOS with no keyboard: clear the home indicator. Otherwise the
+              // sheet already sits above the keyboard / navigation bar.
+              paddingBottom: clearOfBars ? sp.lg : bottomGap,
               gap: sp.md,
             }}
             keyboardShouldPersistTaps="handled"
