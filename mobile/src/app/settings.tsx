@@ -14,10 +14,10 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Switch,
   View,
   type LayoutChangeEvent,
 } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { router, useLocalSearchParams } from 'expo-router'
 import {
   Award,
@@ -653,7 +653,7 @@ export default function Settings() {
           : r.reason === 'no-project'
             ? 'settings.pushNoProject'
             : r.reason === 'denied'
-              ? 'settings.pushDenied'
+              ? platformKey('settings.pushDenied')
               : 'settings.pushFailed',
     )
   }
@@ -920,10 +920,9 @@ export default function Settings() {
                     <Txt style={{ flex: 1, fontWeight: '500' }} numberOfLines={1}>
                       {t(`app.${app.id}.name` as TKey)}
                     </Txt>
-                    <Switch
+                    <Toggle
                       value={!hidden}
                       onValueChange={() => toggleApp(app.id)}
-                      trackColor={{ true: c.income, false: c.surface2 }}
                     />
                   </View>
                 )
@@ -966,7 +965,7 @@ export default function Settings() {
             {pushOn ? (
               <Pressable onPress={() => Linking.openSettings()}>
                 <Txt style={{ color: c.accent, fontFamily: fonts.semibold }}>
-                  {t('settings.manageInIos')}
+                  {t(platformKey('settings.manageInIos'))}
                 </Txt>
               </Pressable>
             ) : (

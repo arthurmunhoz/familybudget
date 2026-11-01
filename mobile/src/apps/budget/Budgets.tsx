@@ -14,9 +14,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   View,
 } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Camera, Check, ChevronDown, ChevronRight, Lock, X } from 'lucide-react-native'
@@ -305,10 +305,9 @@ export default function Budgets() {
                           {t('budget.privateHint')}
                         </Txt>
                       </View>
-                      <Switch
+                      <Toggle
                         value={isPrivate}
                         onValueChange={setIsPrivate}
-                        trackColor={{ true: c.income, false: c.surface2 }}
                       />
                     </View>
                   </>

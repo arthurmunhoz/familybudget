@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { X } from 'lucide-react-native'
+import { X, type LucideIcon } from 'lucide-react-native'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -107,8 +107,13 @@ export default function EditSheet({
 
             <ChipRow>
               {CATEGORIES.map((cat) => (
-                <Chip key={cat.id} active={category === cat.id} onPress={() => setCategory(cat.id)}>
-                  {cat.icon} {t(`docCat.${cat.id}` as TKey)}
+                <Chip
+                  key={cat.id}
+                  active={category === cat.id}
+                  onPress={() => setCategory(cat.id)}
+                  Icon={cat.Icon}
+                >
+                  {t(`docCat.${cat.id}` as TKey)}
                 </Chip>
               ))}
             </ChipRow>
@@ -165,26 +170,32 @@ function ChipRow({ children }: { children: React.ReactNode }) {
 function Chip({
   active,
   onPress,
+  Icon,
   children,
 }: {
   active: boolean
   onPress: () => void
+  /** Drawn before the label, in the label's colour. */
+  Icon?: LucideIcon
   children: React.ReactNode
 }) {
   const { c } = useTheme()
+  const color = active ? c.onAccent : c.textMuted
   return (
     <Pressable
       onPress={onPress}
       style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: radius.pill,
         backgroundColor: active ? c.accent : c.surface,
       }}
     >
-      <Txt style={{ color: active ? c.onAccent : c.textMuted, fontWeight: '600', fontSize: 14 }}>
-        {children}
-      </Txt>
+      {Icon ? <Icon size={15} color={color} /> : null}
+      <Txt style={{ color, fontWeight: '600', fontSize: 14 }}>{children}</Txt>
     </Pressable>
   )
 }

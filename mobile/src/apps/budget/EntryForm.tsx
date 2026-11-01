@@ -14,10 +14,10 @@ import {
   Modal,
   Platform,
   ScrollView,
-  Switch,
   TextInput,
   View,
 } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { Pressable } from '@/components/Pressable'
 import { Plus, SlidersHorizontal, X } from 'lucide-react-native'
 
@@ -589,10 +589,9 @@ export default function EntryForm({
                 <Txt>{t('entry.recurring')}</Txt>
                 <Txt variant="faint">{t('entry.recurringHint')}</Txt>
               </View>
-              <Switch
+              <Toggle
                 value={recurring}
                 onValueChange={setRecurring}
-                trackColor={{ true: c.accent, false: c.surface2 }}
                 accessibilityLabel={t('entry.recurring')}
               />
             </View>

@@ -4,7 +4,8 @@
 // all of this: only the owner can insert/delete rows, and only for people in the
 // same household. The toggles here are UX, not the security boundary.
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
@@ -128,11 +129,10 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
                     </Txt>
                   </View>
                   {isOwner ? (
-                    <Switch
+                    <Toggle
                       value={on}
                       onValueChange={(v) => void toggle(p.email, v)}
                       disabled={busy !== null}
-                      trackColor={{ true: c.income, false: c.surface2 }}
                     />
                   ) : null}
                 </View>

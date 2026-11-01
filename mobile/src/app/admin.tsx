@@ -3,7 +3,8 @@
 // admin_app_usage/time, admin_recent_errors) — RLS + the security-definer guards
 // keep this cross-household data admin-only.
 import { useCallback, useMemo, useState } from 'react'
-import { Alert, ScrollView, Switch, TextInput, View } from 'react-native'
+import { Alert, ScrollView, TextInput, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { Pressable } from '@/components/Pressable'
 import { Redirect, router, useFocusEffect } from 'expo-router'
 import { Activity, BarChart3, Bug, ChevronRight, Home, LayoutGrid, Plus, X, type LucideIcon } from 'lucide-react-native'
@@ -235,11 +236,10 @@ export default function Admin() {
               gating + server limits). {planBusy ? 'Updating…' : ''}
             </Txt>
           </View>
-          <Switch
+          <Toggle
             value={isPlus}
             onValueChange={togglePlus}
             disabled={planBusy}
-            trackColor={{ true: c.accent }}
           />
         </View>
       </Card>

@@ -8,7 +8,8 @@
 // Play requirement (PLAY-STORE-RELEASE.md §3.1), not a nicety. Don't call
 // ensureBackgroundPermission() from here without it.
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, Switch, View } from 'react-native'
+import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChevronRight } from 'lucide-react-native'
 
@@ -276,12 +277,10 @@ export function SharingControls({
               ) : null}
             </View>
             {busy ? <ActivityIndicator color={c.accent} style={{ marginRight: sp.sm }} /> : null}
-            <Switch
+            <Toggle
               value={on}
               onValueChange={onToggle}
               disabled={busy}
-              trackColor={{ true: c.accent, false: c.surface2 }}
-              thumbColor="#ffffff"
             />
           </View>
 

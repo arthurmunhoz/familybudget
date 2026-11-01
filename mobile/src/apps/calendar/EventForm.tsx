@@ -9,7 +9,8 @@
 // fields scroll in a <KeyboardScroll>, which brings the focused one into view.
 // Without either, Location and Notes were typed blind under the keyboard.
 import { useState } from 'react'
-import { Alert, Modal, Pressable, Switch, View } from 'react-native'
+import { Alert, Modal, Pressable, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { X } from 'lucide-react-native'
 
 import { KeyboardScroll } from '@/components/KeyboardScroll'
@@ -202,10 +203,9 @@ export default function EventForm({
               }}
             >
               <Txt>{t('calendar.allDay')}</Txt>
-              <Switch
+              <Toggle
                 value={draft.allDay}
                 onValueChange={(v) => set({ allDay: v })}
-                trackColor={{ true: c.accent }}
               />
             </View>
 
@@ -295,10 +295,9 @@ export default function EventForm({
               }}
             >
               <Txt>🔔 {t('calendar.remind')}</Txt>
-              <Switch
+              <Toggle
                 value={draft.remind}
                 onValueChange={(v) => set({ remind: v })}
-                trackColor={{ true: c.accent }}
               />
             </View>
 

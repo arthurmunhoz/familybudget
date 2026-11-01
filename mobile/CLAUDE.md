@@ -32,6 +32,9 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 ## Conventions (reuse these — don't reinvent)
 - **UI primitives** `@/components/ui`: `Screen`, `AppHeader`, `Card`, `Btn`,
   `Field`, `Txt({variant})`, `EmptyState`, `Loader`. Build every screen from these.
+  **On/off switches are `@/components/Toggle`, never react-native's `Switch`** —
+  one look app-wide (Android: accent thumb, soft-accent track on / neutral off;
+  iOS: accent track), and it takes no colour props so screens can't drift again.
   Also `@/components/Toast` (self-dismissing confirmation, feed it a NEW object
   each time) and `@/components/DraggableList` (long-press-to-drag sortable —
   device-verified working). Reorder needs `react-native-draggable-flatlist`? No:

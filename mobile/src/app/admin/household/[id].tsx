@@ -2,7 +2,8 @@
 // AdminHousehold page. Reuses admin_user_activity (30d) and the admin RLS
 // exception on allowed_users/households.
 import { useState } from 'react'
-import { Alert, Switch, TextInput, View } from 'react-native'
+import { Alert, TextInput, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { Pressable } from '@/components/Pressable'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
 import { Award, Trash2, X } from 'lucide-react-native'
@@ -253,11 +254,10 @@ export default function AdminHousehold() {
                   {planBusy ? ' · updating…' : ''}
                 </Txt>
               </View>
-              <Switch
+              <Toggle
                 value={isPlus}
                 onValueChange={setPlan}
                 disabled={planBusy}
-                trackColor={{ true: c.accent }}
               />
             </View>
           </Card>

@@ -5,7 +5,8 @@
 // save it. Radius is a small preset set: iOS enforces a ~100 m floor on
 // geofences, so finer-grained control would be a lie.
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import * as Location from 'expo-location'
 import { router } from 'expo-router'
 import { LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react-native'
@@ -84,11 +85,9 @@ function ToggleRow({
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: sp.md }}>
       <Txt style={{ fontFamily: fonts.medium, fontSize: 14, color: c.text, flex: 1 }}>{label}</Txt>
-      <Switch
+      <Toggle
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ true: c.accent, false: c.surface2 }}
-        thumbColor="#ffffff"
       />
     </View>
   )

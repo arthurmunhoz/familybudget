@@ -4,7 +4,8 @@
 // the pencil opens the details sheet (rename / recategorise / delete). The bottom
 // bar picks a file (images + PDF only) → shows the UploadSheet.
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Alert, Pressable, ScrollView, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
@@ -14,7 +15,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
-import { ChevronRight, FileText, Lock, Pencil } from 'lucide-react-native'
+import { ChevronRight, FileText, Lock, Pencil, type LucideIcon } from 'lucide-react-native'
 
 import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -385,10 +386,9 @@ export default function DocumentVault() {
             <Txt style={{ fontWeight: '600' }}>{t(platformKey('vault.lockTitle'))}</Txt>
             <Txt variant="faint">{t(platformKey('vault.lockDesc'))}</Txt>
           </View>
-          <Switch
+          <Toggle
             value={lockOn}
             onValueChange={toggleLock}
-            trackColor={{ true: c.accent }}
             accessibilityLabel={lockOn ? t(platformKey('vault.disableLock')) : t(platformKey('vault.enableLock'))}
           />
         </View>
@@ -448,8 +448,13 @@ export default function DocumentVault() {
           {t('common.all')}
         </FilterChip>
         {CATEGORIES.map((cat) => (
-          <FilterChip key={cat.id} active={filter === cat.id} onPress={() => setFilter(cat.id)}>
-            {cat.icon} {t(`docCat.${cat.id}` as TKey)}
+          <FilterChip
+            key={cat.id}
+            active={filter === cat.id}
+            onPress={() => setFilter(cat.id)}
+            Icon={cat.Icon}
+          >
+            {t(`docCat.${cat.id}` as TKey)}
           </FilterChip>
         ))}
       </ScrollView>
@@ -466,11 +471,11 @@ export default function DocumentVault() {
           {groups.map((group) => (
             <View key={group.cat} style={{ gap: sp.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                <GroupIcon cat={group.cat} />
                 <Txt
                   variant="label"
                   style={{ textTransform: 'uppercase', letterSpacing: 0.5, color: c.textFaint }}
                 >
-                  {CATEGORIES.find((cat) => cat.id === group.cat)?.icon}{' '}
                   {t(`docCat.${group.cat}` as TKey)}
                 </Txt>
                 <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
@@ -573,10 +578,12 @@ function DocRow({
         </View>
       </Pressable>
       {/* Two trailing controls that must not read as one: the pencil is a real
-          BUTTON (bordered, raised off the card) going to the details sheet; the
-          chevron is the flat affordance for the row's own tap. Giving the
-          pencil a box is what separates them — as two bare glyphs side by side
-          they looked like a single control. */}
+          BUTTON (a soft accent tile) going to the details sheet; the chevron is
+          the flat affordance for the row's own tap. Giving the pencil a box is
+          what separates them — as two bare glyphs side by side they looked
+          like a single control. No shadow: on Android `elevation` paints
+          behind the view, and through this translucent fill it read as an
+          ugly inner shadow (same trap as the Family card). */}
       <Pressable
         onPress={onEdit}
         hitSlop={8}
@@ -587,23 +594,14 @@ function DocRow({
             width: 34,
             height: 34,
             borderRadius: radius.md,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: c.border,
-            backgroundColor: c.surface,
+            backgroundColor: c.accentSoft,
             alignItems: 'center',
             justifyContent: 'center',
-            // Lifts it off the card so it reads as pressable rather than
-            // decorative — the "floating" the chevron deliberately lacks.
-            shadowColor: '#000',
-            shadowOpacity: 0.12,
-            shadowRadius: 3,
-            shadowOffset: { width: 0, height: 1 },
-            elevation: 2,
           },
           pressed && { opacity: 0.6 },
         ]}
       >
-        <Pencil size={16} color={c.text} />
+        <Pencil size={16} color={c.accent} />
       </Pressable>
       {/* Opens the document, same as the row body — a chevron that did nothing
           when tapped would be a lie about what it points at. */}
@@ -614,29 +612,43 @@ function DocRow({
   )
 }
 
+/** A group header's category glyph. Module scope (not inline in the map) so it
+ *  isn't a component re-created on every render. */
+function GroupIcon({ cat }: { cat: DocCategory }) {
+  const { c } = useTheme()
+  const Icon = CAT_LUCIDE[cat] ?? FileText
+  return <Icon size={14} color={c.textFaint} />
+}
+
 function FilterChip({
   active,
   onPress,
+  Icon,
   children,
 }: {
   active: boolean
   onPress: () => void
+  /** Drawn before the label, in the label's colour. */
+  Icon?: LucideIcon
   children: React.ReactNode
 }) {
   const { c } = useTheme()
+  const color = active ? c.onAccent : c.textMuted
   return (
     <Pressable
       onPress={onPress}
       style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: radius.pill,
         backgroundColor: active ? c.accent : c.surface,
       }}
     >
-      <Txt style={{ color: active ? c.onAccent : c.textMuted, fontWeight: '600', fontSize: 14 }}>
-        {children}
-      </Txt>
+      {Icon ? <Icon size={15} color={color} /> : null}
+      <Txt style={{ color, fontWeight: '600', fontSize: 14 }}>{children}</Txt>
     </Pressable>
   )
 }

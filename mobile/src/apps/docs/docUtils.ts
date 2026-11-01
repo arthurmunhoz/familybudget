@@ -14,6 +14,10 @@ import type { DocCategory } from '@/lib/types'
 
 /** The document categories, in display order, each with an emoji + an outline
  *  icon (used for the per-document type glyph in the list). */
+// The app draws `Icon` (Lucide), never `icon`: 🪪 is Emoji 14, missing from
+// older Android emoji fonts, and on those a chip reading "🪪 IDs" rendered the
+// glyph and then dropped the whole label after it (seen on a Galaxy S9+,
+// Android 10). The emoji stays as data for parity with the PWA.
 export const CATEGORIES: { id: DocCategory; icon: string; Icon: LucideIcon }[] = [
   { id: 'ids', icon: '🪪', Icon: IdCard },
   { id: 'insurance', icon: '🛡️', Icon: ShieldCheck },

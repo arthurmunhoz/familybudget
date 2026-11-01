@@ -2,7 +2,8 @@
 // A bottom-sheet Modal. Moved out of PingComposer so the Nudge-settings modal
 // owns preset management and the composer is just for sending.
 import { useState } from 'react'
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, Switch, TextInput, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View } from 'react-native'
+import { Toggle } from '@/components/Toggle'
 import { X } from 'lucide-react-native'
 
 import { Btn, DismissKeyboard, Txt } from '@/components/ui'
@@ -125,7 +126,7 @@ export function PresetEditor({
                 {t('pings.highPriorityHint')}
               </Txt>
             </View>
-            <Switch value={high} onValueChange={setHigh} trackColor={{ true: c.expense }} />
+            <Toggle value={high} onValueChange={setHigh} />
           </View>
 
           <Btn
