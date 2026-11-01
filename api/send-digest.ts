@@ -1,6 +1,8 @@
 // Vercel Cron target: once a day it pushes each household a single "morning
-// digest" notification covering pet-care items that are due/overdue and
-// important dates coming up. Triggered by the cron entry in vercel.json.
+// digest" notification covering pet-care items that are due/overdue (event
+// reminders AND every-N-days routines) and important dates coming up.
+// Triggered by the cron entry in vercel.json. A digest with pet items links to
+// '/pets?overdue=1', which opens the app's overdue sheet (Done on each item).
 //
 // Env required (Vercel project settings):
 //   CRON_SECRET               — Vercel sends it as `Authorization: Bearer …`;
@@ -161,6 +163,8 @@ type PetEvent = {
   event_date: string
   next_due: string | null
 }
+type PetTask = { id: string; pet_id: string; title: string; icon: string; interval_days: number | null }
+type PetTaskDone = { task_id: string; done_on: string }
 type CalEvent = {
   household_id: string
   title: string
@@ -217,6 +221,17 @@ const TYPE_ICON: Record<string, string> = {
   medication: '💊',
   grooming: '✂️',
   other: '📝',
+}
+// Routine icons (mobile/src/apps/pets/petUi.tsx CARE_ICONS ids).
+const TASK_ICON: Record<string, string> = {
+  bowl: '🦴',
+  walk: '🐾',
+  treat: '🍪',
+  pill: '💊',
+  bath: '🛁',
+  nails: '✂️',
+  teeth: '🦷',
+  paw: '🐾',
 }
 const DATE_ICON: Record<string, string> = {
   birthday: '🎂',
@@ -308,7 +323,7 @@ export default async function handler(req: any, res: any) {
   const today = todayUTC()
 
   // Pull everything once, then group in memory (the data set is tiny).
-  const [petsRes, eventsRes, datesRes, subsRes, settingsRes, expoRes] = await Promise.all([
+  const [petsRes, eventsRes, tasksRes, doneRes, datesRes, subsRes, settingsRes, expoRes] = await Promise.all([
     db.from('pets').select('id, name, emoji, household_id'),
     db
       .from('pet_events')
@@ -318,6 +333,10 @@ export default async function handler(req: any, res: any) {
       // no next date must retire the series. Filtering here hid that dose and
       // kept pushing the previous one's stale reminder.
       .order('event_date', { ascending: false }),
+    // Every-N-days routines (bath, nails…). Due = latest completion + interval;
+    // 400 days of completions covers the longest sane (yearly) interval.
+    db.from('pet_care_tasks').select('id, pet_id, title, icon, interval_days').eq('kind', 'interval'),
+    db.from('pet_task_done').select('task_id, done_on').gte('done_on', addDaysUTC(today, -400)),
     db
       .from('calendar_events')
       .select('household_id, title, kind, start_date, recurrence, reminder_minutes'),
@@ -328,6 +347,12 @@ export default async function handler(req: any, res: any) {
 
   const pets = (petsRes.data ?? []) as Pet[]
   const events = (eventsRes.data ?? []) as PetEvent[]
+  const tasks = (tasksRes.data ?? []) as PetTask[]
+  const lastDone = new Map<string, string>()
+  for (const d of (doneRes.data ?? []) as PetTaskDone[]) {
+    const prev = lastDone.get(d.task_id)
+    if (!prev || d.done_on > prev) lastDone.set(d.task_id, d.done_on)
+  }
   const dates = (datesRes.data ?? []) as CalEvent[]
   const subs = (subsRes.data ?? []) as Subscription[]
   // Each recipient gets the digest in their own chosen language (default en).
@@ -370,6 +395,19 @@ export default async function handler(req: any, res: any) {
     list.push({ icon: TYPE_ICON[e.type] ?? '📝', name: pet.name, title: e.title, days })
     petRemindersByHousehold.set(pet.household_id, list)
   }
+  // Routines due today or overdue. Same rule as the app (routineStatus): a
+  // routine that was never completed has no due date yet, so it's left out
+  // rather than announced as due on day one.
+  for (const task of tasks) {
+    const last = lastDone.get(task.id)
+    const pet = petById.get(task.pet_id)
+    if (!last || !pet || !task.interval_days) continue
+    const days = daysBetween(today, addDaysUTC(last, task.interval_days))
+    if (days > 0) continue
+    const list = petRemindersByHousehold.get(pet.household_id) ?? []
+    list.push({ icon: TASK_ICON[task.icon] ?? '🐾', name: pet.name, title: task.title, days })
+    petRemindersByHousehold.set(pet.household_id, list)
+  }
 
   // Important-date reminders at the lead-day marks, keyed by household.
   const dateRemindersByHousehold = new Map<string, DateReminder[]>()
@@ -406,7 +444,10 @@ export default async function handler(req: any, res: any) {
     households++
 
     // Deep-link to the most relevant screen (same for everyone in the household).
-    const link = petR.length && dateR.length ? '/' : petR.length ? '/pets' : '/calendar'
+    // Pet items win: '/pets?overdue=1' opens the overdue sheet, where each one
+    // can be marked done from the notification tap. Builds that predate the
+    // sheet ignore the query and just open Pet Care.
+    const link = petR.length ? '/pets?overdue=1' : '/calendar'
 
     // Build the digest title/body in a given recipient's language.
     const build = (email: string) => {

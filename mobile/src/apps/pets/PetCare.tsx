@@ -9,6 +9,8 @@
 //     Done logs today and rolls the next due automatically.
 //   • History — pet_events (vet visits, vaccines…), add/edit/delete kept via
 //     the existing EventForm.
+// Opened with ?overdue=1 (the daily digest's notification tap), it also shows
+// the OverdueSheet: everything due across all pets, each with a one-tap Done.
 // The routine itself is configurable per pet (RoutineSheet). Every mutation
 // also feeds the Pet Care home-screen widget: a fresh App Group snapshot +
 // a best-effort ?action=petcare-notify so OTHER members' widgets reload ASAP.
@@ -22,7 +24,7 @@ import {
   useWindowDimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { Image } from 'expo-image'
 import { Check, ChevronLeft, ChevronRight, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
@@ -34,7 +36,14 @@ import { useI18n } from '@/hooks/useI18n'
 import { useToday } from '@/hooks/useToday'
 import { track } from '@/lib/analytics'
 import { addDaysISO, daysBetweenISO, formatDay, shortName, todayISO } from '@/lib/format'
-import { dailyChecklist, overdueEvents, reminderEvents, routineStatus } from '@/lib/petCare'
+import {
+  dailyChecklist,
+  overdueCare,
+  overdueEvents,
+  reminderEvents,
+  routineStatus,
+  type OverdueCare,
+} from '@/lib/petCare'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetEvent, PetTaskDone } from '@/lib/types'
@@ -47,6 +56,7 @@ import { speciesEmoji } from './petMeta'
 import EventForm, { type EventDraft } from './EventForm'
 import PetForm from './PetForm'
 import { RoutineSheet } from './RoutineSheet'
+import { OverdueSheet } from './OverdueSheet'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 const HISTORY_PREVIEW = 5
@@ -151,7 +161,23 @@ export default function PetCare() {
   const [draft, setDraft] = useState<EventDraft>(emptyDraft)
   // Optimistic overlay for checklist taps, cleared when fresh data lands.
   const [overlay, setOverlay] = useState<Record<string, boolean>>({})
+  // Routines whose Done was just tapped: the button shows done at once instead
+  // of waiting on the insert AND the refetch (which read as a frozen app).
+  // Cleared with the overlay when fresh data lands, or on failure.
+  const [routineMarked, setRoutineMarked] = useState<Record<string, true>>({})
   const [toast, setToast] = useState<ToastData | null>(null)
+  // The overdue sheet's contents as they were when it opened (null = closed).
+  const [overdueSheet, setOverdueSheet] = useState<OverdueCare[] | null>(null)
+  // ?overdue=1 arrives from a notification tap — on a fresh mount, or on this
+  // screen already open. `seenOverdue` notices the param changing (adjusted
+  // during render, not in an effect); `overduePending` waits for data.
+  const { overdue: overdueParam } = useLocalSearchParams<{ overdue?: string }>()
+  const [seenOverdue, setSeenOverdue] = useState<string | undefined>(undefined)
+  const [overduePending, setOverduePending] = useState(false)
+  if (overdueParam !== seenOverdue) {
+    setSeenOverdue(overdueParam)
+    if (overdueParam === '1') setOverduePending(true)
+  }
 
   // The selector starts big and shrinks as the list scrolls up (JS-driven —
   // these feed layout props, which the native driver can't animate). Safe to
@@ -205,6 +231,7 @@ export default function PetCare() {
     // fresh `{}` is always a new reference and would keep the cycle alive on
     // its own if any dependency ever churns again.
     setOverlay((prev) => (Object.keys(prev).length ? {} : prev))
+    setRoutineMarked((prev) => (Object.keys(prev).length ? {} : prev))
   }, [done, selectedDay])
 
   // useCachedQuery fetches on MOUNT only, so returning to this (still-mounted)
@@ -301,6 +328,18 @@ export default function PetCare() {
     return map
   }, [pets, tasks, done, events, today])
 
+  /** Everything due today or overdue, across all pets — the overdue sheet's
+   *  live list (see OverdueSheet for why it also gets a snapshot). */
+  const overdueNow = useMemo(
+    () => overdueCare(pets.map((p) => p.id), tasks, done, events, today),
+    [pets, tasks, done, events, today],
+  )
+  if (overduePending && !loading) {
+    setOverduePending(false)
+    // Nothing left to do (someone already handled it) → no sheet at all.
+    if (overdueNow.length) setOverdueSheet(overdueNow)
+  }
+
   // Feed the home-screen widget an up-to-date snapshot on every data change.
   useEffect(() => {
     if (loading) return
@@ -356,13 +395,63 @@ export default function PetCare() {
 
   /** "Done" on an interval routine: log today, which rolls the next due. */
   async function markRoutineDone(task: PetCareTask) {
+    if (routineMarked[task.id]) return
+    setRoutineMarked((m) => ({ ...m, [task.id]: true }))
     const { error } = await supabase.from('pet_task_done').insert({ task_id: task.id, done_on: today })
     if (error && error.code !== '23505') {
+      setRoutineMarked((m) => {
+        const next = { ...m }
+        delete next[task.id]
+        return next
+      })
       Alert.alert(t('pets.saveFailed'))
       return
     }
     track('petcare.task_done', { title: task.title, pet: petById[task.pet_id]?.name })
     afterMutation()
+  }
+
+  /** Done, from the overdue sheet — logged straight away, no form. A routine
+   *  gets today's completion (exactly what its Done does on the screen). An
+   *  event reminder gets a fresh entry dated today with the next due rolled
+   *  forward by the interval the last one used — what "Mark done" + Save does
+   *  via logAgain, minus the sheet. The old log's notes stay with it: they
+   *  describe that visit, not this one. */
+  async function completeOverdue(item: OverdueCare): Promise<boolean> {
+    if (item.kind === 'routine') {
+      const { error } = await supabase.from('pet_task_done').insert({ task_id: item.task.id, done_on: today })
+      if (error && error.code !== '23505') {
+        Alert.alert(t('pets.saveFailed'))
+        return false
+      }
+      track('petcare.task_done', { title: item.title, pet: petById[item.petId]?.name, from: 'overdue' })
+    } else {
+      if (!profile) return false
+      const ev = item.event
+      const interval = ev.next_due ? daysBetweenISO(ev.event_date, ev.next_due) : 0
+      const { error } = await supabase.from('pet_events').insert({
+        pet_id: ev.pet_id,
+        type: ev.type,
+        title: ev.title,
+        notes: null,
+        event_date: today,
+        next_due: interval > 0 ? addDaysISO(today, interval) : null,
+        added_by: profile.email,
+      })
+      if (error) {
+        Alert.alert(t('pets.saveFailed'))
+        return false
+      }
+      track('pet.event_logged', { title: ev.title, kind: ev.type, from: 'overdue' })
+    }
+    afterMutation()
+    return true
+  }
+
+  function closeOverdueSheet() {
+    setOverdueSheet(null)
+    // Drop the param so a later notification tap can open the sheet again.
+    router.setParams({ overdue: undefined })
   }
 
   function dueText(dueIn: number): { text: string; color: string } {
@@ -794,21 +883,47 @@ export default function PetCare() {
                             {lastDone ? ` · ${formatDay(lastDone)}` : ''}
                           </Txt>
                         </View>
-                        <Txt style={{ fontSize: 12, fontWeight: '600', color }}>{text}</Txt>
-                        <Pressable
-                          onPress={() => void markRoutineDone(task)}
-                          accessibilityLabel={`${t('common.done')} ${task.title}`}
-                          style={{
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: radius.pill,
-                            backgroundColor: urgent ? c.accent : c.surface,
-                          }}
-                        >
-                          <Txt style={{ fontSize: 12, fontWeight: '700', color: urgent ? c.onAccent : c.textMuted }}>
-                            {t('common.done')}
-                          </Txt>
-                        </Pressable>
+                        {routineMarked[task.id] ? (
+                          // Just marked: confirm on the spot. The due text and
+                          // this button come back from fresh data a beat later.
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: radius.pill,
+                              backgroundColor: c.income,
+                            }}
+                          >
+                            {/* White on the income green, like the checklist ticks. */}
+                            <Check size={13} strokeWidth={3} color="#ffffff" />
+                            <Txt style={{ fontSize: 12, fontWeight: '700', color: '#ffffff' }}>
+                              {t('common.done')}
+                            </Txt>
+                          </View>
+                        ) : (
+                          <>
+                            <Txt style={{ fontSize: 12, fontWeight: '600', color }}>{text}</Txt>
+                            <Pressable
+                              onPress={() => void markRoutineDone(task)}
+                              accessibilityLabel={`${t('common.done')} ${task.title}`}
+                              style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 6,
+                                borderRadius: radius.pill,
+                                backgroundColor: urgent ? c.accent : c.surface,
+                              }}
+                            >
+                              <Txt
+                                style={{ fontSize: 12, fontWeight: '700', color: urgent ? c.onAccent : c.textMuted }}
+                              >
+                                {t('common.done')}
+                              </Txt>
+                            </Pressable>
+                          </>
+                        )}
                       </View>
                     )
                   })
@@ -985,6 +1100,16 @@ export default function PetCare() {
       )}
 
       <Toast data={toast} />
+
+      {overdueSheet ? (
+        <OverdueSheet
+          items={overdueSheet}
+          current={overdueNow}
+          petById={petById}
+          onDone={completeOverdue}
+          onClose={closeOverdueSheet}
+        />
+      ) : null}
 
       {showPetForm ? (
         <PetForm

@@ -443,6 +443,9 @@ export const en = {
   'pets.inDays': 'in {days}d',
   'pets.lastDone': 'last',
   'pets.markDone': 'Done',
+  'pets.overdueSheetTitle': 'Pet care overdue',
+  'pets.overdueSheetHint': 'Mark what’s already done — the next date is set automatically.',
+  'pets.overdueAllDone': 'All caught up!',
   'pets.next': 'next',
   'pets.noPets': 'No pets yet.',
   'pets.noPetsHint':

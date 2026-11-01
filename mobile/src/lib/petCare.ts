@@ -92,6 +92,46 @@ export function routineStatus(
     .sort((a, b) => a.dueIn - b.dueIn)
 }
 
+/** One thing that's due today or overdue, either kind — what the overdue sheet
+ *  (opened from the daily digest's notification) lists with a Done button. */
+export type OverdueCare =
+  | { kind: 'event'; key: string; petId: string; title: string; dueIn: number; event: PetEvent }
+  | { kind: 'routine'; key: string; petId: string; title: string; dueIn: number; task: PetCareTask }
+
+/** Everything due today or overdue across the given pets, most overdue first.
+ *  Same rules as the rest of Pet Care (and api/send-digest.ts): an event
+ *  reminder is the latest log per (pet, title) with a next_due on or before
+ *  today; a routine counts once it has been completed at least once.
+ *  `events` must be newest-first (latestPerKey). */
+export function overdueCare(
+  petIds: string[],
+  tasks: PetCareTask[],
+  done: PetTaskDone[],
+  events: PetEvent[],
+  today: string,
+): OverdueCare[] {
+  const known = new Set(petIds)
+  const out: OverdueCare[] = []
+  for (const event of overdueEvents(events, today)) {
+    if (!known.has(event.pet_id)) continue
+    out.push({
+      kind: 'event',
+      key: `event:${event.id}`,
+      petId: event.pet_id,
+      title: event.title,
+      dueIn: isoDiff(today, event.next_due!),
+      event,
+    })
+  }
+  for (const petId of petIds) {
+    for (const r of routineStatus(tasks, done, petId, today)) {
+      if (r.dueIn > 0 || r.lastDone === null) continue
+      out.push({ kind: 'routine', key: `task:${r.task.id}`, petId, title: r.task.title, dueIn: r.dueIn, task: r.task })
+    }
+  }
+  return out.sort((a, b) => a.dueIn - b.dueIn)
+}
+
 /** Default routine seeded when a pet is created — every item is editable or
  *  deletable afterwards. Titles are i18n KEYS (petcare.tpl.*), resolved by the
  *  caller with t() before insert. */

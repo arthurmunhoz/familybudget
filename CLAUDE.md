@@ -222,9 +222,14 @@ morning notification per household. Pieces:
   defaults (don't pass them from the client).
 - `api/send-digest.ts` — Vercel **Cron** target (`vercel.json` → daily 11:00
   UTC ≈ 8am BRT / 7am ET). Reads every household with the **service role**
-  (bypasses RLS), collects pet events due/overdue + calendar special dates
+  (bypasses RLS), collects pet events due/overdue AND every-N-days routines
+  due/overdue (`pet_care_tasks` + latest `pet_task_done`; never-completed
+  routines are skipped, same as the app) + calendar special dates
   (birthdays/anniversaries/renewals) at 7d/1d/day-of lead marks + plain events
-  with a reminder due today, sends via `web-push`, prunes 404/410 subscriptions.
+  with a reminder due today, sends via `web-push` and Expo, prunes 404/410
+  subscriptions. Any pet item makes the link `/pets?overdue=1`: on iOS/Android
+  that opens Pet Care's `OverdueSheet` (one-tap Done per item); the PWA and
+  older native builds just ignore the query and open Pet Care.
 - Env (Vercel only): `VITE_VAPID_PUBLIC_KEY` (also needed at BUILD time for the
   client), `VAPID_PRIVATE_KEY`, `CRON_SECRET` (Cron sends it as a Bearer token;
   the route rejects anything else), `SUPABASE_SERVICE_ROLE_KEY`. Generate VAPID

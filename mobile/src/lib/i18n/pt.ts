@@ -436,6 +436,9 @@ export const pt: Record<keyof typeof en, string> = {
   'pets.inDays': 'em {days}d',
   'pets.lastDone': 'última vez',
   'pets.markDone': 'Feito',
+  'pets.overdueSheetTitle': 'Cuidados atrasados',
+  'pets.overdueSheetHint': 'Marque o que já foi feito — a próxima data é definida automaticamente.',
+  'pets.overdueAllDone': 'Tudo em dia!',
   'pets.next': 'próx.',
   'pets.noPets': 'Nenhum pet ainda.',
   'pets.noPetsHint':
