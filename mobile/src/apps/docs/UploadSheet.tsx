@@ -6,6 +6,8 @@ import { useState } from 'react'
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { X, type LucideIcon } from 'lucide-react-native'
+import { File } from 'expo-file-system'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 
 import { Btn, Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -15,7 +17,7 @@ import { supabase } from '@/lib/supabase'
 import type { DocCategory, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { radius, sp, useTheme } from '@/theme/theme'
-import { CATEGORIES, formatBytes, randomUUID } from './docUtils'
+import { CATEGORIES, THUMB_WIDTH, formatBytes, randomUUID, thumbPathFor } from './docUtils'
 
 export interface PickedFile {
   name: string
@@ -25,6 +27,25 @@ export interface PickedFile {
   bytes: Uint8Array
   mime: string
   ext: string
+  /** Local image to draw the list thumbnail from: the photo itself, or a
+   *  multi-page scan's FIRST page. Absent for a picked PDF (nothing on-device
+   *  can render one), which then shows a typed placeholder in the list. */
+  thumbUri?: string
+}
+
+/** Best-effort: a small JPEG of the document at its derived thumb path. Never
+ *  throws — a missing thumbnail only means the list shows a placeholder. */
+async function uploadThumb(srcUri: string, filePath: string) {
+  try {
+    const ref = await ImageManipulator.manipulate(srcUri).resize({ width: THUMB_WIDTH }).renderAsync()
+    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.6 })
+    const bytes = new Uint8Array(await new File(out.uri).arrayBuffer())
+    await supabase.storage
+      .from('documents')
+      .upload(thumbPathFor(filePath), bytes, { contentType: 'image/jpeg', cacheControl: '604800' })
+  } catch {
+    /* no thumbnail — the list falls back */
+  }
 }
 
 export default function UploadSheet({
@@ -71,6 +92,8 @@ export default function UploadSheet({
       Alert.alert(t('docs.uploadFailed'))
       return
     }
+    // Before the row, so the list that reloads on save already finds it.
+    if (file.thumbUri) await uploadThumb(file.thumbUri, path)
     const { error: dbError } = await supabase.from('documents').insert({
       title: title.trim(),
       category,
@@ -83,7 +106,7 @@ export default function UploadSheet({
     setUploading(false)
     if (dbError) {
       // Roll back the orphaned object if the row couldn't be written.
-      await supabase.storage.from('documents').remove([path])
+      await supabase.storage.from('documents').remove([path, thumbPathFor(path)])
       Alert.alert(t('docs.saveFailed'))
       return
     }

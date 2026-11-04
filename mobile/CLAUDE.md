@@ -104,6 +104,12 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `sheet === card` outside the glass skin, so it's a no-op for Warm Hearth.
   - Under GLASS, `c.bg` is TRANSPARENT (that's how the wash shows). Never use it
     as a foreground/inverse colour — the toast's label did and vanished.
+  - **Every stack screen paints its OWN wash** (`screenLayout` in `_layout`),
+    on top of the root one. Transparent screens alone let the screen beneath
+    show through: Android 13+'s default push keeps the old screen opaque,
+    shifted −10%, under the new one for the whole 450 ms transition (and leaves
+    it if the transition is cut short) — a tester saw Settings drawn over the
+    Hub (2026-11). Don't drop the per-screen wash to "save a layer".
 - **Collapsing headers: shrink something OUTSIDE the scroll view, never inside
   it.** `Screen` takes an `onScroll` (its scroller is an `Animated.ScrollView`,
   so a native-driven `Animated.event` attaches) and a `header`, which renders
@@ -911,6 +917,14 @@ rebuild to actually scan; the camera string lives in
 the `expo-image-picker` plugin's `cameraPermission` (which overrides
 `ios.infoPlist`) AND the scanner plugin's own `cameraPermission` — keep both in
 sync.
+- **List thumbnails** live at a DERIVED path, `<household>/thumbs/<uuid>.jpg`
+  (`thumbPathFor` in `docUtils`) — no `documents` column. `UploadSheet` writes a
+  320px JPEG best-effort from `PickedFile.thumbUri` (the photo, or a multi-page
+  scan's first page); a picked PDF has none (nothing on-device renders PDFs) and
+  shows a typed tile. The list signs every thumb path in ONE batch; a path with
+  no object comes back without a URL, which is how "no thumb" is detected. Image
+  docs without a thumb (PWA, older builds) fall back to the image itself. Delete
+  removes the thumb with the file.
 - **AUTO-SHUTTER isn't configurable.** VisionKit auto-captures by default and
   exposes NO public API for the capture mode — the user toggles Auto/Manual in
   the scanner UI (VisionKit remembers it for the session). Defaulting it OFF

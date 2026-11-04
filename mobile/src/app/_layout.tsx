@@ -120,11 +120,30 @@ function Chrome() {
           separate native hierarchy this one doesn't reach). */}
       <GestureHandlerRootView style={{ flex: 1 }}>
         {GLASS ? <GlassWash dark={isDark} scheme={scheme} /> : null}
+        {/* Every screen ALSO paints its own wash (screenLayout). Transparent
+            screens alone let the one underneath show through whenever both are
+            in the hierarchy — and on Android 13+ the default push keeps the old
+            screen fully opaque, shifted -10%, under the new one for the whole
+            450 ms transition (react-native-screens' rns_default_* anims), and
+            leaves it there if the transition is interrupted. A tester's Galaxy
+            showed Settings drawn over the Hub exactly like that (2026-11).
+            Same fix the paywall route already had: each screen is its own
+            opaque backing. The root wash stays for the gaps between screens. */}
         <Stack
           screenOptions={{
             headerShown: false,
             ...(GLASS ? { contentStyle: { backgroundColor: 'transparent' } } : {}),
           }}
+          screenLayout={
+            GLASS
+              ? ({ children }) => (
+                  <View style={{ flex: 1 }}>
+                    <GlassWash dark={isDark} scheme={scheme} />
+                    {children}
+                  </View>
+                )
+              : undefined
+          }
         >
           <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         </Stack>

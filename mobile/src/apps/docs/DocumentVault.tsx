@@ -15,6 +15,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
+import { Image } from 'expo-image'
 import { ChevronRight, FileText, Lock, Pencil, type LucideIcon } from 'lucide-react-native'
 
 import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
@@ -24,13 +25,13 @@ import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { platformKey, type TKey } from '@/lib/i18n'
 import { formatDay } from '@/lib/format'
-import { getSignedUrl } from '@/lib/signedUrls'
+import { getSignedUrl, getSignedUrls } from '@/lib/signedUrls'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { DocCategory, FamilyDocument } from '@/lib/types'
 import { biometricAvailable, isVaultLockEnabled, setVaultLockEnabled } from '@/lib/vaultLock'
 import { radius, sp, useTheme } from '@/theme/theme'
-import { CATEGORIES, CAT_LUCIDE, formatBytes } from './docUtils'
+import { CATEGORIES, CAT_LUCIDE, formatBytes, isImageDoc, thumbPathFor } from './docUtils'
 import UploadSheet, { type PickedFile } from './UploadSheet'
 import EditSheet from './EditSheet'
 
@@ -135,6 +136,30 @@ export default function DocumentVault() {
     return (data ?? []) as FamilyDocument[]
   })
 
+  // Thumbnail URLs, one batched signing call for the whole list. Each doc asks
+  // for its derived thumb; an IMAGE doc also asks for its own file, which is the
+  // fallback for images uploaded before thumbnails existed (or from the PWA).
+  // A path with no object simply comes back without a URL — that's how a
+  // missing thumb is detected, so no `documents` column is needed.
+  const [thumbs, setThumbs] = useState<Record<string, string>>({})
+  const thumbKey = docs.map((d) => d.id).join(',')
+  useEffect(() => {
+    if (!docs.length) return
+    let active = true
+    const paths = docs.flatMap((d) =>
+      isImageDoc(d.mime_type, d.file_path) ? [thumbPathFor(d.file_path), d.file_path] : [thumbPathFor(d.file_path)],
+    )
+    getSignedUrls(paths)
+      .then((urls) => {
+        if (active) setThumbs(urls)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the doc ids, not the array identity
+  }, [thumbKey])
+
   // Member first name for a doc's owner — used by the person chips and the row
   // subtitle. 'shared' is the sentinel owner for household-wide documents.
   const nameOf = (ownerEmail: string) => {
@@ -218,7 +243,7 @@ export default function DocumentVault() {
       const buffer = await new File(uri).arrayBuffer()
       const bytes = new Uint8Array(buffer)
       const size = bytes.byteLength
-      setPending({ name: asset.name, uri, size, bytes, mime, ext })
+      setPending({ name: asset.name, uri, size, bytes, mime, ext, thumbUri: isImage ? uri : undefined })
     } catch {
       Alert.alert(t('docs.uploadFailed'))
     } finally {
@@ -243,6 +268,7 @@ export default function DocumentVault() {
         bytes,
         mime: 'image/jpeg',
         ext: 'jpg',
+        thumbUri: out.uri,
       })
     } catch {
       Alert.alert(t('docs.uploadFailed'))
@@ -258,9 +284,11 @@ export default function DocumentVault() {
     setPicking(true)
     try {
       const pdf = await PDFDocument.create()
+      let firstPage: string | undefined
       for (const uri of uris) {
         const ref = await ImageManipulator.manipulate(uri).resize({ width: 2048 }).renderAsync()
         const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
+        firstPage ??= out.uri
         const bytes = new Uint8Array(await new File(out.uri).arrayBuffer())
         const img = await pdf.embedJpg(bytes)
         const page = pdf.addPage([img.width, img.height])
@@ -278,6 +306,7 @@ export default function DocumentVault() {
         bytes: pdfBytes,
         mime: 'application/pdf',
         ext: 'pdf',
+        thumbUri: firstPage,
       })
     } catch {
       Alert.alert(t('docs.uploadFailed'))
@@ -350,7 +379,7 @@ export default function DocumentVault() {
         text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
-          await supabase.storage.from('documents').remove([doc.file_path])
+          await supabase.storage.from('documents').remove([doc.file_path, thumbPathFor(doc.file_path)])
           await supabase.from('documents').delete().eq('id', doc.id)
           track('doc.deleted', { title: doc.title, category: doc.category })
           setEditing(null)   // the sheet is open on the row we just removed
@@ -486,6 +515,7 @@ export default function DocumentVault() {
                   key={doc.id}
                   doc={doc}
                   ownerName={person === 'all' ? nameOf(doc.owner_email) : null}
+                  thumbs={thumbs}
                   opening={opening === doc.id}
                   onOpen={() => openDoc(doc)}
                   onEdit={() => setEditing(doc)}
@@ -535,6 +565,7 @@ export default function DocumentVault() {
 function DocRow({
   doc,
   ownerName,
+  thumbs,
   opening,
   onOpen,
   onEdit,
@@ -542,13 +573,14 @@ function DocRow({
   doc: FamilyDocument
   /** Owner's first name, shown in the subtitle only in the "Everyone" view. */
   ownerName?: string | null
+  /** Signed URLs by storage path (thumbs + image fallbacks), from the screen. */
+  thumbs: Record<string, string>
   opening: boolean
   onOpen: () => void
   onEdit: () => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const Icon = CAT_LUCIDE[doc.category] ?? FileText
   return (
     <View
       style={{
@@ -557,8 +589,9 @@ function DocRow({
         gap: sp.md,
         backgroundColor: c.card,
         borderRadius: radius.md,
-        paddingHorizontal: sp.lg,
-        paddingVertical: sp.md,
+        paddingLeft: sp.sm + 2,
+        paddingRight: sp.lg,
+        paddingVertical: sp.sm + 2,
         opacity: opening ? 0.6 : 1,
       }}
     >
@@ -566,7 +599,7 @@ function DocRow({
         onPress={onOpen}
         style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, flex: 1, minWidth: 0 }}
       >
-        <Icon size={20} color={c.textMuted} />
+        <DocThumb doc={doc} thumbs={thumbs} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
             {doc.title}
@@ -608,6 +641,61 @@ function DocRow({
       <Pressable onPress={onOpen} hitSlop={8} accessibilityLabel={t('common.openName', { name: doc.title })}>
         <ChevronRight size={20} color={c.textFaint} />
       </Pressable>
+    </View>
+  )
+}
+
+const THUMB_W = 44
+const THUMB_H = 56
+
+/** The row's preview: the document's own thumbnail (portrait, like a page),
+ *  else — for images with no thumb yet — the image itself, else a typed tile
+ *  (category glyph + "PDF"). The tile is always drawn UNDER the image, so a
+ *  slow or failed load shows the placeholder rather than an empty box.
+ *  `cacheKey` is the storage path, which is content-addressed: the signed URL
+ *  changes every 24 h, the bytes never do, so each thumb downloads once per
+ *  device instead of once per token. Module scope — see GroupIcon. */
+function DocThumb({ doc, thumbs }: { doc: FamilyDocument; thumbs: Record<string, string> }) {
+  const { c } = useTheme()
+  const Icon = CAT_LUCIDE[doc.category] ?? FileText
+  const thumbPath = thumbPathFor(doc.file_path)
+  const src = thumbs[thumbPath]
+    ? { uri: thumbs[thumbPath], cacheKey: thumbPath }
+    : isImageDoc(doc.mime_type, doc.file_path) && thumbs[doc.file_path]
+      ? { uri: thumbs[doc.file_path], cacheKey: doc.file_path }
+      : null
+  const isPdf = doc.mime_type === 'application/pdf' || doc.file_path.toLowerCase().endsWith('.pdf')
+  return (
+    <View
+      style={{
+        width: THUMB_W,
+        height: THUMB_H,
+        borderRadius: radius.sm,
+        overflow: 'hidden',
+        backgroundColor: c.surface,
+        borderWidth: 1,
+        borderColor: c.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+      }}
+    >
+      <Icon size={18} color={c.textFaint} />
+      {isPdf ? (
+        <Txt style={{ fontSize: 9, fontWeight: '700', letterSpacing: 0.5, color: c.textFaint }}>PDF</Txt>
+      ) : null}
+      {src ? (
+        <Image
+          source={src}
+          recyclingKey={src.cacheKey}
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          contentPosition="top"
+          transition={150}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
     </View>
   )
 }

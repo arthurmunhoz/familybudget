@@ -51,3 +51,24 @@ export function randomUUID(): string {
     return v.toString(16)
   })
 }
+
+// ---- Thumbnails -------------------------------------------------------------
+// A document's list thumbnail lives at a path DERIVED from its file path —
+// `<household>/thumbs/<uuid>.jpg` — so it needs no `documents` column (no
+// migration, and the PWA/older builds that never write one keep working: a
+// missing thumb just falls back). Keyed on the file's uuid, not its category
+// folder, so recategorising a document can't orphan it. The household prefix
+// keeps it inside the bucket's storage policy.
+export const THUMB_WIDTH = 320
+
+export function thumbPathFor(filePath: string): string {
+  const [household] = filePath.split('/')
+  const base = (filePath.split('/').pop() ?? '').replace(/\.[^.]+$/, '')
+  return `${household}/thumbs/${base}.jpg`
+}
+
+export function isImageDoc(mime: string | null | undefined, filePath: string): boolean {
+  if (mime?.startsWith('image/')) return true
+  const ext = (filePath.split('.').pop() ?? '').toLowerCase()
+  return ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif'].includes(ext)
+}
