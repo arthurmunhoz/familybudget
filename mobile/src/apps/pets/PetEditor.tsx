@@ -165,7 +165,8 @@ export function PetEditor({
   dock?: { clearOfBars: boolean }
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.lg)
+  // Half the inset: the docked Save's curved corners meet the display's.
+  const bottomGap = useBottomGap(sp.xs)
   const { t, lang } = useI18n()
   // Default unit for empty measures: imperial for English, metric otherwise.
   const metric = lang !== 'en'
@@ -313,6 +314,7 @@ export function PetEditor({
       onPress={save}
       disabled={!name.trim()}
       loading={saving}
+      curveBottom
     />
   )
 

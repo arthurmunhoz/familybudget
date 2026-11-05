@@ -10,12 +10,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Modal, Pressable, StyleSheet, View } from 'react-native'
 import { Toggle } from '@/components/Toggle'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChevronRight } from 'lucide-react-native'
+import { useBottomGap } from '@/hooks/useBottomGap'
+import { Clock, EyeOff, Lock, Moon, Pause, Radio } from 'lucide-react-native'
 
 import { Btn, Txt } from '@/components/ui'
 import type { ToastData } from '@/components/Toast'
-import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { captureAndUpload, isPaused, pauseSharing, resumeSharing, setSharing } from '@/lib/location'
@@ -29,6 +28,8 @@ import {
 import type { MemberLocation } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { LocationDisclosure } from './LocationDisclosure'
+import { GroupLabel, SheetHead } from './sheetParts'
+import { FEATURE } from './onCard'
 
 /** Local 12-hour clock without depending on Intl being present on Android. */
 function clock(d: Date): string {
@@ -39,18 +40,31 @@ function clock(d: Date): string {
   return `${h}:${m} ${ampm}`
 }
 
-function PauseRow({ label, onPress }: { label: string; onPress: () => void }) {
-  const { c } = useTheme()
+/** A pause choice as a tile (icon + label), two side by side. */
+function PauseTile({ label, icon, onPress }: { label: string; icon: React.ReactNode; onPress: () => void }) {
+  const { c, dark } = useTheme()
+  const tint = FEATURE.sharing
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
       style={({ pressed }) => [
-        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+        {
+          flex: 1,
+          borderRadius: 20,
+          padding: sp.md,
+          gap: sp.sm,
+          backgroundColor: tint + (dark ? '26' : '14'),
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: tint + '40',
+        },
         pressed && { opacity: 0.6 },
       ]}
     >
-      <Txt style={{ fontFamily: fonts.medium, fontSize: 15, color: c.text }}>{label}</Txt>
-      <ChevronRight size={18} color={c.textFaint} />
+      <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: c.card, alignItems: 'center', justifyContent: 'center' }}>
+        {icon}
+      </View>
+      <Txt style={{ fontFamily: fonts.display, fontSize: 16, lineHeight: 20, color: c.text }}>{label}</Txt>
     </Pressable>
   )
 }
@@ -68,10 +82,9 @@ export function SharingControls({
   onToast: (t: ToastData) => void
   onClose: () => void
 }) {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
-  const insets = useSafeAreaInsets()
-  const { profiles } = useAuth()
+  const bottomGap = useBottomGap(sp.xs)
 
   const [on, setOn] = useState(!!myLocation?.sharing)
   const [pausedUntil, setPausedUntil] = useState<Date | null>(
@@ -230,62 +243,71 @@ export function SharingControls({
     return d
   }
 
+  const tint = FEATURE.sharing
+  const stateLine = busy
+    ? on
+      ? t('location.share.turningOn')
+      : t('location.share.turningOff')
+    : !on
+      ? t('location.share.off')
+      : pausedUntil
+        ? t('location.share.pausedUntil', { time: clock(pausedUntil) })
+        : householdName
+          ? t('location.share.visibleTo', { name: householdName })
+          : t('location.share.toggle')
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
         <View
           style={{
             backgroundColor: c.sheet,
-            borderTopLeftRadius: 22,
-            borderTopRightRadius: 22,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
             padding: sp.lg,
-            paddingBottom: insets.bottom + sp.lg,
+            // Half of iOS's inset (Done's curve meets the screen's), all of
+            // Android's navigation bar.
+            paddingBottom: bottomGap,
             gap: sp.md,
           }}
         >
-          <View>
-            <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 22, color: c.text }}>{t('location.share.title')}</Txt>
-            <Txt variant="muted">{t('location.share.subtitle')}</Txt>
-          </View>
+          <SheetHead
+            title={t('location.share.title')}
+            sub={stateLine}
+            tint={on ? tint : '#8A8F98'}
+            icon={on ? <Radio size={24} color="#fff" /> : <EyeOff size={24} color="#fff" />}
+            onClose={onClose}
+          />
 
-          {/* Master toggle */}
+          {/* The master switch, as the sheet's main card: the state in big
+              type, the switch beside it. */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: c.surface,
-              borderRadius: radius.md,
-              padding: sp.md,
+              gap: sp.md,
+              backgroundColor: on ? tint + (dark ? '2E' : '17') : c.card,
+              borderRadius: 22,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: on ? tint + '55' : c.border,
+              padding: sp.lg,
             }}
           >
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 19, lineHeight: 24, color: c.text }}>
                 {on ? t('location.share.toggle') : t('location.share.off')}
               </Txt>
-              {/* While an action runs, say so where the reassurance line goes —
-                  turning sharing on can wait on an OS prompt and a network
-                  write, and silence there is what made people tap twice. */}
-              {busy ? (
-                <Txt variant="muted" style={{ fontSize: 12 }}>
-                  {on ? t('location.share.turningOn') : t('location.share.turningOff')}
-                </Txt>
-              ) : on && householdName ? (
-                <Txt variant="muted" style={{ fontSize: 12 }}>
-                  {t('location.share.visibleTo', { name: householdName })}
-                </Txt>
-              ) : null}
+              <Txt variant="muted" style={{ fontSize: 13, marginTop: 2 }}>
+                {t('location.share.subtitle')}
+              </Txt>
             </View>
-            {busy ? <ActivityIndicator color={c.accent} style={{ marginRight: sp.sm }} /> : null}
-            <Toggle
-              value={on}
-              onValueChange={onToggle}
-              disabled={busy}
-            />
+            {busy ? <ActivityIndicator color={tint} /> : null}
+            <Toggle value={on} onValueChange={onToggle} disabled={busy} />
           </View>
 
           {permDenied ? (
-            <View style={{ backgroundColor: c.accentSoft, borderRadius: radius.md, padding: sp.md, gap: 6 }}>
+            <View style={{ backgroundColor: c.accentSoft, borderRadius: 18, padding: sp.md, gap: 6 }}>
               <Txt variant="muted" style={{ fontSize: 13 }}>
                 {t('location.share.permBody')}
               </Txt>
@@ -300,35 +322,65 @@ export function SharingControls({
           {/* Pause / resume — only meaningful while sharing is on */}
           {on ? (
             pausedUntil ? (
-              <View style={{ backgroundColor: c.surface, borderRadius: radius.md, padding: sp.md, gap: sp.sm }}>
-                <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: sp.md,
+                  backgroundColor: '#F2A93B' + (dark ? '26' : '1F'),
+                  borderRadius: 22,
+                  padding: sp.md,
+                }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: c.card, alignItems: 'center', justifyContent: 'center' }}>
+                  <Pause size={18} color="#C8862A" />
+                </View>
+                <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 16, lineHeight: 21, color: c.text }}>
                   {t('location.share.pausedUntil', { time: clock(pausedUntil) })}
                 </Txt>
-                <Btn
-                  title={t('location.share.resume')}
-                  variant="secondary"
+                <Pressable
                   onPress={() => gate('resume')}
-                  loading={busy}
                   disabled={busy}
-                />
+                  accessibilityRole="button"
+                  style={({ pressed }) => ({
+                    paddingHorizontal: 14,
+                    height: 36,
+                    borderRadius: radius.pill,
+                    backgroundColor: tint,
+                    justifyContent: 'center',
+                    opacity: pressed || busy ? 0.7 : 1,
+                  })}
+                >
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 13.5, color: '#fff' }}>{t('location.share.resume')}</Txt>
+                </Pressable>
               </View>
             ) : (
-              <>
-                <Txt variant="label">{t('location.share.break')}</Txt>
-                <View style={{ backgroundColor: c.surface, borderRadius: radius.md, paddingHorizontal: sp.md }}>
-                  <PauseRow label={t('location.share.pause1h')} onPress={() => run(() => doPause(in1h()))} />
-                  <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
-                  <PauseRow label={t('location.share.pauseTonight')} onPress={() => run(() => doPause(endOfToday()))} />
+              <View>
+                <GroupLabel>{t('location.share.break')}</GroupLabel>
+                <View style={{ flexDirection: 'row', gap: sp.sm }}>
+                  <PauseTile
+                    label={t('location.share.pause1h')}
+                    icon={<Clock size={18} color={tint} />}
+                    onPress={() => run(() => doPause(in1h()))}
+                  />
+                  <PauseTile
+                    label={t('location.share.pauseTonight')}
+                    icon={<Moon size={18} color={tint} />}
+                    onPress={() => run(() => doPause(endOfToday()))}
+                  />
                 </View>
-              </>
+              </View>
             )
           ) : null}
 
-          <Txt variant="faint" style={{ lineHeight: 18 }}>
-            {t('location.share.note')}
-          </Txt>
+          <View style={{ flexDirection: 'row', gap: sp.sm, alignItems: 'flex-start' }}>
+            <Lock size={14} color={c.textFaint} style={{ marginTop: 2 }} />
+            <Txt variant="faint" style={{ flex: 1, lineHeight: 18 }}>
+              {t('location.share.note')}
+            </Txt>
+          </View>
 
-          <Btn title={t('common.done')} onPress={onClose} />
+          <Btn title={t('common.done')} onPress={onClose} curveBottom />
         </View>
       </View>
 

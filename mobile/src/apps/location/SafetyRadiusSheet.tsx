@@ -11,11 +11,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Modal, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { router } from 'expo-router'
-import { Check, ShieldCheck, Sparkles, X } from 'lucide-react-native'
+import { Check, ShieldCheck, Sparkles } from 'lucide-react-native'
 
 import { Btn, DismissKeyboard, Txt } from '@/components/ui'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
-import { FormRow, FormSection, NumberBox, SelectRow, UnitButton } from '@/components/form'
+import { NumberBox, UnitButton } from '@/components/form'
 import { useI18n } from '@/hooks/useI18n'
 import { usePlus } from '@/lib/plus'
 import { useSheetLift } from '@/hooks/useSheetLift'
@@ -41,7 +41,11 @@ import type { MemberLocation, Profile, SafetyWatch } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
 import { pickOn } from '@/theme/contrast'
-import { MemberAvatar } from './locationUi'
+import { MemberAvatar, Pulse } from './locationUi'
+import { FeatureButton, GroupLabel, SheetHead } from './sheetParts'
+import { FEATURE } from './onCard'
+import { GradientBox } from '@/components/home/GradientBox'
+import { shade } from '@/components/home/palette'
 
 const CUSTOM = 'custom'
 
@@ -84,9 +88,10 @@ function StatusRow({
   )
 }
 
-/** A member to pick for the watch: avatar, name, and a check circle — filled
- *  (action + onAction) when picked, an empty ring when not. */
-function PickRow({
+/** A member to pick for the watch: a big avatar and name, ringed and
+ *  checked in the Safety colour when picked. Tiles, not rows (2026-11) —
+ *  choosing people is the heart of this sheet. */
+function PersonTile({
   name,
   avatarPath,
   color,
@@ -100,32 +105,29 @@ function PickRow({
   onPress: () => void
 }) {
   const { c } = useTheme()
+  const tint = FEATURE.safety
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: on }}
       accessibilityLabel={name}
-      style={({ pressed }) => [styles.personRow, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [styles.personTile, pressed && { opacity: 0.6 }]}
     >
-      <MemberAvatar name={name} avatarPath={avatarPath} color={color} size={34} />
-      <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: c.text }} numberOfLines={1}>
-        {name}
-      </Txt>
-      <View
-        style={{
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          borderWidth: on ? 0 : 2,
-          borderColor: c.border,
-          backgroundColor: on ? c.action : 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {on ? <Check size={14} color={c.onAction} strokeWidth={3} /> : null}
+      <View style={[styles.ring, { borderColor: on ? tint : 'transparent' }]}>
+        <MemberAvatar name={name} avatarPath={avatarPath} color={color} size={56} ring={false} />
+        {on ? (
+          <View style={[styles.badge, { backgroundColor: tint, borderColor: c.sheet }]}>
+            <Check size={12} color="#fff" strokeWidth={3.2} />
+          </View>
+        ) : null}
       </View>
+      <Txt
+        style={{ fontFamily: on ? fonts.semibold : fonts.body, fontSize: 13, color: on ? c.text : c.textMuted, textAlign: 'center' }}
+        numberOfLines={1}
+      >
+        {name.split(' ')[0]}
+      </Txt>
     </Pressable>
   )
 }
@@ -181,8 +183,8 @@ export function SafetyRadiusSheet({
   onChanged: () => void
   onClose: () => void
 }) {
-  const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.lg)
+  const { c, dark } = useTheme()
+  const bottomGap = useBottomGap(sp.xs)
   const { t } = useI18n()
   const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
 
@@ -333,23 +335,14 @@ export function SafetyRadiusSheet({
             { backgroundColor: c.sheet, maxHeight: room * 0.92, marginBottom: lift },
           ]}
         >
-          <View style={styles.sheetHead}>
-            <ShieldCheck size={22} color={c.accent} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: c.text }}>{t('location.safety.title')}</Txt>
-              <Txt variant="muted" style={{ fontSize: 13 }}>
-                {t('location.safety.subtitle')}
-              </Txt>
-            </View>
-            <Pressable
-              onPress={onClose}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.close')}
-              style={[styles.close, { backgroundColor: c.surface }]}
-            >
-              <X size={16} color={c.textMuted} />
-            </Pressable>
+          <View style={{ paddingHorizontal: sp.lg, paddingBottom: sp.md }}>
+            <SheetHead
+              title={t('location.safety.title')}
+              sub={watch ? endsInLabel : t('location.safety.subtitle')}
+              tint={FEATURE.safety}
+              icon={<ShieldCheck size={24} color="#fff" />}
+              onClose={onClose}
+            />
           </View>
 
           <KeyboardScroll
@@ -359,80 +352,112 @@ export function SafetyRadiusSheet({
             showsVerticalScrollIndicator={false}
           >
             {watch ? (
-              /* ── Active: live status per watched member ── */
-              <FormSection title={t('location.safety.active', { count: watch.watched.length })} footer={endsInLabel}>
-                {watch.watched.map((email) => {
-                  const p = profiles.find((x) => x.email === email)
-                  const loc = locByEmail.get(email)
-                  const live = isSharingLive(loc) ? loc : null
-                  const out = live ? isOutside(watch, { lat: live.lat, lng: live.lng }) : false
-                  const dist = live
-                    ? formatDistance(
-                        haversineMeters(
-                          { lat: watch.center_lat, lng: watch.center_lng },
-                          { lat: live.lat, lng: live.lng },
-                        ),
-                      )
-                    : '—'
-                  return (
-                    <StatusRow
-                      key={email}
-                      name={p?.display_name ?? email.split('@')[0]}
-                      avatarPath={avatars[email]}
-                      color={colors[email] ?? c.accent}
-                      dist={dist}
-                      out={out}
-                    />
-                  )
-                })}
-              </FormSection>
+              /* ── Active: a teal hero (who and how long), then each person ── */
+              <>
+                <GradientBox colors={[FEATURE.safety, shade(FEATURE.safety, -0.25)]} radius={22} style={styles.hero}>
+                  <Pulse>
+                    <ShieldCheck size={26} color="#fff" />
+                  </Pulse>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 25, color: '#fff' }}>
+                      {t('location.safety.active', { count: watch.watched.length })}
+                    </Txt>
+                    <Txt style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.88)' }}>
+                      {formatDistance(watch.radius_m)} · {endsInLabel}
+                    </Txt>
+                  </View>
+                </GradientBox>
+                <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                  {watch.watched.map((email, i) => {
+                    const p = profiles.find((x) => x.email === email)
+                    const loc = locByEmail.get(email)
+                    const live = isSharingLive(loc) ? loc : null
+                    const out = live ? isOutside(watch, { lat: live.lat, lng: live.lng }) : false
+                    const dist = live
+                      ? formatDistance(
+                          haversineMeters(
+                            { lat: watch.center_lat, lng: watch.center_lng },
+                            { lat: live.lat, lng: live.lng },
+                          ),
+                        )
+                      : '—'
+                    return (
+                      <View key={email} style={{ borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderColor: c.border }}>
+                        <StatusRow
+                          name={p?.display_name ?? email.split('@')[0]}
+                          avatarPath={avatars[email]}
+                          color={colors[email] ?? c.accent}
+                          dist={dist}
+                          out={out}
+                        />
+                      </View>
+                    )
+                  })}
+                </View>
+              </>
             ) : (
               /* ── Setup: pick people + radius, centred on me ── */
               <>
                 {!myLive ? <Txt variant="muted">{t('location.safety.needLocation')}</Txt> : null}
 
-                <FormSection title={t('location.safety.pickPeople')}>
-                  {others.map((p) => (
-                    <PickRow
-                      key={p.email}
-                      name={p.display_name}
-                      avatarPath={avatars[p.email]}
-                      color={colors[p.email] ?? c.accent}
-                      on={picked.includes(p.email)}
-                      onPress={() => toggle(p.email)}
-                    />
-                  ))}
-                </FormSection>
-
-                <FormSection title={t('location.safety.radius')}>
-                  {/* Three round presets + Custom, as one picker row: four
-                      segments wrapped "Personalizado" in pt/es. */}
-                  <SelectRow
-                    label={t('location.places.radius')}
-                    value={custom ? CUSTOM : String(radiusM)}
-                    options={radiusOptions}
-                    onChange={(v) => {
-                      if (!v) return
-                      if (v === CUSTOM) {
-                        setCustom(true)
-                      } else {
-                        setCustom(false)
-                        setRadiusM(Number(v))
-                      }
-                    }}
-                  />
-                  {custom ? (
-                    <FormRow label={t('location.stat.distance')}>
-                      <NumberBox value={customValue} onChangeText={setCustomValue} width={72} />
-                      <UnitButton
-                        title={t('family.unit')}
-                        value={unitId}
-                        options={units.map((u) => ({ value: u.id, label: u.label }))}
-                        onChange={setUnitId}
+                <View>
+                  <GroupLabel>{t('location.safety.pickPeople')}</GroupLabel>
+                  <View style={[styles.card, styles.tiles, { backgroundColor: c.card, borderColor: c.border }]}>
+                    {others.map((p) => (
+                      <PersonTile
+                        key={p.email}
+                        name={p.display_name}
+                        avatarPath={avatars[p.email]}
+                        color={colors[p.email] ?? c.accent}
+                        on={picked.includes(p.email)}
+                        onPress={() => toggle(p.email)}
                       />
-                    </FormRow>
-                  ) : null}
-                </FormSection>
+                    ))}
+                  </View>
+                </View>
+
+                <View>
+                  <GroupLabel>{t('location.safety.radius')}</GroupLabel>
+                  <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, padding: sp.md, gap: sp.md }]}>
+                    {/* The round presets + Custom as chips in the Safety colour. */}
+                    <View style={styles.chips}>
+                      {radiusOptions.map((o) => {
+                        const on = o.value === CUSTOM ? custom : !custom && Number(o.value) === radiusM
+                        return (
+                          <Pressable
+                            key={o.value}
+                            onPress={() => {
+                              if (o.value === CUSTOM) setCustom(true)
+                              else {
+                                setCustom(false)
+                                setRadiusM(Number(o.value))
+                              }
+                            }}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: on }}
+                            style={({ pressed }) => [
+                              styles.chip,
+                              { backgroundColor: on ? FEATURE.safety : FEATURE.safety + (dark ? '2E' : '1A'), opacity: pressed ? 0.7 : 1 },
+                            ]}
+                          >
+                            <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: on ? '#fff' : FEATURE.safety }}>{o.label}</Txt>
+                          </Pressable>
+                        )
+                      })}
+                    </View>
+                    {custom ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                        <NumberBox value={customValue} onChangeText={setCustomValue} width={80} />
+                        <UnitButton
+                          title={t('family.unit')}
+                          value={unitId}
+                          options={units.map((u) => ({ value: u.id, label: u.label }))}
+                          onChange={setUnitId}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
 
                 {/* Their allowance is already gone: say so here rather than
                     letting them pick people and a radius and then bouncing them
@@ -461,15 +486,17 @@ export function SafetyRadiusSheet({
             ]}
           >
             {watch ? (
-              <Btn title={t('location.safety.stop')} variant="danger" onPress={stop} loading={busy} />
+              <Btn title={t('location.safety.stop')} variant="danger" onPress={stop} loading={busy} curveBottom />
             ) : spent ? (
-              <Btn title={t('location.safety.getPlus')} onPress={toPaywall} />
+              <Btn title={t('location.safety.getPlus')} onPress={toPaywall} curveBottom />
             ) : (
-              <Btn
+              <FeatureButton
+                tint={FEATURE.safety}
                 title={t('location.safety.start')}
+                icon={<ShieldCheck size={18} color="#fff" />}
                 onPress={start}
                 disabled={!myLive || !picked.length || !effectiveRadius}
-                loading={busy}
+                busy={busy}
               />
             )}
           </View>
@@ -498,5 +525,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: sp.md,
     paddingVertical: 8,
   },
-  footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm, borderTopWidth: StyleSheet.hairlineWidth },
+  footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm },
+  card: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', paddingVertical: sp.md, paddingHorizontal: sp.sm },
+  personTile: { width: '25%', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  ring: { padding: 3, borderRadius: 34, borderWidth: 2.5 },
+  badge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
+  chip: { paddingHorizontal: 14, height: 36, borderRadius: R.pill, justifyContent: 'center' },
 })

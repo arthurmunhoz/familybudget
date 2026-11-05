@@ -3,7 +3,7 @@
 // pet's position in the household's alphabetical roster — so each pet keeps a
 // consistent color across the calendar and the upcoming list even before anyone
 // picks one.
-import type { Pet } from '@/lib/types'
+import type { PetEventType, Pet } from '@/lib/types'
 
 export const PET_PALETTE = [
   '#c2603f', // clay (brand)
@@ -32,4 +32,15 @@ export function petColorMap(sortedPets: Pet[]): Record<string, string> {
     out[p.id] = petColor(p, i)
   })
   return out
+}
+
+
+/** A colour per event type for Pet Care's tiles and rows (2026-11): a vet
+ *  visit reads blue, a vaccine purple, meds pink — at a glance, not by label. */
+export const TYPE_COLOR: Record<PetEventType, string> = {
+  vet: '#4C7BF4',
+  vaccine: '#8E6CF0',
+  medication: '#E0609B',
+  grooming: '#16A3A8',
+  other: '#7C8597',
 }

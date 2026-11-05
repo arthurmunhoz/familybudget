@@ -93,7 +93,7 @@ src/
                            which auto-opens the form) → Months (period history,
                            reached from the card's period pill) → MonthDetail
                            (+ EntryForm, SummaryChart). EntryForm is amount-first
-                           with category chips + an "All" grid that can create
+                           with a short category strip + an "All" sheet that can create
                            household custom_categories (migration 042; entries
                            store the uuid as text — always resolve icons/names
                            via categoryById(id, customCats, catOverrides)) and a

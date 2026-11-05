@@ -19,6 +19,32 @@ export function latestPerKey(events: PetEvent[]): PetEvent[] {
   return [...latest.values()]
 }
 
+/** One recurring thing a pet gets ("Heartworm pill"): every time it was
+ *  logged, newest first. Same key as latestPerKey — title ignoring case and
+ *  spacing, NOT type. Series are ordered by their latest entry, newest first.
+ *  Pet Care lists these instead of a raw log (owner, 2026-11). */
+export interface EventSeries {
+  key: string
+  latest: PetEvent
+  entries: PetEvent[]
+}
+
+export function eventSeries(events: PetEvent[]): EventSeries[] {
+  const map = new Map<string, PetEvent[]>()
+  for (const e of events) {
+    const key = `${e.pet_id}|${e.title.trim().replace(/\s+/g, ' ').toLowerCase()}`
+    const list = map.get(key)
+    if (list) list.push(e)
+    else map.set(key, [e])
+  }
+  return [...map.entries()]
+    .map(([key, list]) => {
+      const entries = [...list].sort((a, b) => b.event_date.localeCompare(a.event_date))
+      return { key, latest: entries[0], entries }
+    })
+    .sort((a, b) => b.latest.event_date.localeCompare(a.latest.event_date))
+}
+
 /** Latest events that carry a next_due date, soonest first. */
 export function reminderEvents(events: PetEvent[]): PetEvent[] {
   return latestPerKey(events)

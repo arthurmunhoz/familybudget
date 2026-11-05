@@ -9,11 +9,12 @@
 // generic swatches. That's the one thing a hand-drawn mock (which is what the
 // Appearance picker uses, because a colour scheme IS its colours) can't do for a
 // map style.
+import { SheetHead } from './sheetParts'
 import { useState } from 'react'
 import { Modal, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
-import { Check, X } from 'lucide-react-native'
+import { Check } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -139,26 +140,19 @@ export function MapModePicker({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.cancel')} />
         <View
           style={{
             backgroundColor: c.sheet,
-            borderTopLeftRadius: 22,
-            borderTopRightRadius: 22,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
             padding: sp.lg,
-            paddingBottom: insets.bottom + sp.lg,
+            paddingBottom: insets.bottom + sp.md,
             gap: sp.md,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-            <Txt style={{ flex: 1, fontFamily: fonts.displaySemi, fontSize: 20, color: c.text }} numberOfLines={1}>
-              {t('location.mapMode.title')}
-            </Txt>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-              <X size={20} color={c.textMuted} />
-            </Pressable>
-          </View>
+          <SheetHead title={t('location.mapMode.title')} onClose={onClose} />
 
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
             {MODES.map((m) => (

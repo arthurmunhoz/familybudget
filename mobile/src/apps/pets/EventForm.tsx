@@ -8,7 +8,7 @@
 // Keyboard: the sheet is lifted above the keyboard (useSheetLift) and the
 // fields scroll in a <KeyboardScroll> — KeyboardAvoidingView mis-measures
 // inside a Modal.
-import { Alert, Modal, StyleSheet, View } from 'react-native'
+import { Alert, Modal, StyleSheet, TextInput, View } from 'react-native'
 import { X } from 'lucide-react-native'
 
 import { FormSection, SelectRow } from '@/components/form'
@@ -22,7 +22,7 @@ import type { TKey } from '@/lib/i18n'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '@/lib/types'
-import { sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 import { DangerRow, DayRow, InputRow } from '@/apps/calendar/calendarUi'
 import { TYPES } from './petUi'
 
@@ -56,7 +56,8 @@ export default function EventForm({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const bottomGap = useBottomGap(sp.lg)
+  // Half the inset: the docked Save's curved corners meet the display's.
+  const bottomGap = useBottomGap(sp.xs)
   const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
   const set = (patch: Partial<EventDraft>) => setDraft({ ...draft, ...patch })
 
@@ -90,8 +91,26 @@ export default function EventForm({
         {/* the dimmed area above the sheet dismisses on tap */}
         <Pressable style={{ flex: 1 }} onPress={onClose} accessible={false} />
         <View style={[styles.sheet, { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift }]}>
+          {/* The event's name leads, large and typed in place — the same
+              header as the document editor (2026-11). */}
           <View style={styles.sheetHead}>
-            <Txt variant="h2">{editingEvent ? t('pets.editEvent') : t('pets.newEvent')}</Txt>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: c.textMuted }}>
+                {editingEvent ? t('pets.editEvent') : t('pets.newEvent')}
+              </Txt>
+              <TextInput
+                value={draft.title}
+                onChangeText={(v) => set({ title: v })}
+                placeholder={draft.type === 'medication' ? t('pets.titleMedPlaceholder') : t('pets.titlePlaceholder')}
+                placeholderTextColor={c.textFaint}
+                autoFocus={!editingEvent}
+                multiline
+                blurOnSubmit
+                returnKeyType="done"
+                accessibilityLabel={t('pets.titlePlaceholder')}
+                style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, padding: 0, marginTop: 2 }}
+              />
+            </View>
             <Pressable
               onPress={onClose}
               hitSlop={10}
@@ -110,14 +129,6 @@ export default function EventForm({
             showsVerticalScrollIndicator={false}
           >
             <FormSection>
-              <InputRow
-                title
-                value={draft.title}
-                onChangeText={(v) => set({ title: v })}
-                placeholder={
-                  draft.type === 'medication' ? t('pets.titleMedPlaceholder') : t('pets.titlePlaceholder')
-                }
-              />
               <SelectRow
                 label={t('pets.pet')}
                 value={draft.pet}
@@ -183,6 +194,7 @@ export default function EventForm({
               title={editingEvent ? t('common.saveChanges') : t('pets.saveEvent')}
               onPress={save}
               disabled={!canSave}
+              curveBottom
             />
           </View>
         </View>
@@ -204,7 +216,8 @@ const styles = StyleSheet.create({
   },
   sheetHead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: sp.md,
     justifyContent: 'space-between',
     paddingHorizontal: sp.lg,
     paddingBottom: sp.md,

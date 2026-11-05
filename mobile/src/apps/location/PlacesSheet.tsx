@@ -4,7 +4,7 @@
 // shows up the moment someone's device reports it.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { Crosshair, Plus } from 'lucide-react-native'
+import { Bell, Crosshair, LogIn, LogOut, MapPin, Plus } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -13,10 +13,12 @@ import { formatDistance } from '@/lib/location'
 import { fetchMyPlaceWatches, fetchPlaceEvents, fetchPlaces } from '@/lib/places'
 import type { Place, PlaceEvent, PlaceWatch, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { fonts, radius as R, sheetRadius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
 import { Segmented } from '@/apps/budget/shared'
 import { timeAgo } from './locationUi'
 import { PlaceForm } from './PlaceForm'
+import { FeatureButton, SheetHead } from './sheetParts'
+import { FEATURE } from './onCard'
 
 export function PlacesSheet({
   profiles,
@@ -36,8 +38,8 @@ export function PlacesSheet({
    *  sheet on the way — the map is the thing you asked to look at. */
   onShowOnMap: (place: Place) => void
 }) {
-  const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
+  const { c, dark } = useTheme()
+  const bottomGap = useBottomGap(sp.xs)
   const { t } = useI18n()
 
   const [tab, setTab] = useState<'places' | 'activity'>('places')
@@ -99,37 +101,44 @@ export function PlacesSheet({
     onChanged()
   }
 
+  const tint = FEATURE.places
+  const soft = tint + (dark ? '2E' : '1A')
+  const watchedCount = places.filter((p) => watches[p.id]).length
+  const sub =
+    tab === 'activity'
+      ? t('location.places.subtitle')
+      : places.length
+        ? t('location.places.count', { n: places.length, w: watchedCount })
+        : t('location.places.subtitle')
+
   return (
     <>
       <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.done')} />
           <View
             style={{
               // c.sheet, not c.card — the glass skin's card is translucent.
               backgroundColor: c.sheet,
-              borderTopLeftRadius: 22,
-              borderTopRightRadius: 22,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
               paddingTop: sp.lg,
               paddingHorizontal: sp.lg,
-              // Only HALF of iOS's inset, so the button's curved bottom sits
-              // down in the screen's corner instead of floating clear of it —
-              // but the WHOLE of Android's navigation bar, which would
-              // otherwise cover the footer. useBottomGap does both; sp.xl is
-              // the floor when there's no system bar at all.
+              // Half of iOS's inset (the button's curve meets the screen's),
+              // all of Android's navigation bar — useBottomGap does both.
               paddingBottom: bottomGap,
               gap: sp.md,
-              // Fit the content (a household with 1 place gets a short sheet),
-              // capped so a long list still leaves the map visible.
-              maxHeight: '85%',
+              // Fit the content, capped so a long list still leaves map visible.
+              maxHeight: '88%',
             }}
           >
-            <View>
-              <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 22, color: c.text }}>
-                {t('location.places.title')}
-              </Txt>
-              <Txt variant="muted">{t('location.places.subtitle')}</Txt>
-            </View>
+            <SheetHead
+              title={t('location.places.title')}
+              sub={sub}
+              tint={tint}
+              icon={<MapPin size={24} color="#fff" />}
+              onClose={onClose}
+            />
 
             <Segmented<'places' | 'activity'>
               value={tab}
@@ -141,159 +150,126 @@ export function PlacesSheet({
             />
 
             {tab === 'places' ? (
-              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: sp.lg }}>
-                {places.map((p) => (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => setEditing(p)}
-                    style={({ pressed }) => [
-                      {
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: sp.md,
-                        paddingVertical: 11,
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderColor: c.border,
-                      },
-                      pressed && { opacity: 0.6 },
-                    ]}
-                  >
-                    <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: R.md,
-                        backgroundColor: c.surface,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Txt style={{ fontSize: 19 }}>{p.icon}</Txt>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }} numberOfLines={1}>
-                        {p.name}
-                      </Txt>
-                      <Txt variant="muted" style={{ fontSize: 12 }} numberOfLines={1}>
-                        {watchLabel(p.id)} · {formatDistance(p.radius_m)}
-                      </Txt>
-                    </View>
-                    {/* Frame this place on the map. Icon-only and muted on
-                        purpose: tapping the ROW still means edit, and this
-                        shouldn't compete with that. A nested Pressable takes the
-                        touch itself, so it doesn't open the editor as well. */}
-                    <Pressable
-                      onPress={() => onShowOnMap(p)}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('location.places.showOnMap')}
-                      style={({ pressed }) => [
-                        {
-                          width: 34,
-                          height: 34,
-                          borderRadius: R.md,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        },
-                        pressed && { opacity: 0.5 },
-                      ]}
-                    >
-                      <Crosshair size={17} color={c.textMuted} />
-                    </Pressable>
-                  </Pressable>
-                ))}
-
-                {!places.length ? (
+              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: sp.sm }}>
+                {places.length ? (
+                  <View style={[st.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                    {places.map((p, i) => {
+                      const w = watches[p.id]
+                      return (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => setEditing(p)}
+                          style={({ pressed }) => [
+                            st.row,
+                            { borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderColor: c.border },
+                            pressed && { opacity: 0.6 },
+                          ]}
+                        >
+                          <View style={[st.tile, { backgroundColor: soft }]}>
+                            <Txt style={{ fontSize: 21 }}>{p.icon}</Txt>
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                            <Txt style={{ fontFamily: fonts.display, fontSize: 17, lineHeight: 21, color: c.text }} numberOfLines={1}>
+                              {p.name}
+                            </Txt>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              {/* MY subscription: a coloured bell when I'm told,
+                                  a faint line when I'm not. */}
+                              {w ? (
+                                <View style={[st.pill, { backgroundColor: soft }]}>
+                                  <Bell size={11} color={tint} />
+                                  <Txt style={{ fontSize: 11.5, fontFamily: fonts.semibold, color: tint }} numberOfLines={1}>
+                                    {watchLabel(p.id)}
+                                  </Txt>
+                                </View>
+                              ) : (
+                                <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={1}>
+                                  {watchLabel(p.id)}
+                                </Txt>
+                              )}
+                              <Txt variant="faint" style={{ fontSize: 12 }}>
+                                · {formatDistance(p.radius_m)}
+                              </Txt>
+                            </View>
+                          </View>
+                          {/* Frame this place on the map. The ROW still means
+                              edit; this nested Pressable takes its own touch. */}
+                          <Pressable
+                            onPress={() => onShowOnMap(p)}
+                            hitSlop={10}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('location.places.showOnMap')}
+                            style={({ pressed }) => [st.round, { backgroundColor: c.surface }, pressed && { opacity: 0.5 }]}
+                          >
+                            <Crosshair size={16} color={c.text} />
+                          </Pressable>
+                        </Pressable>
+                      )
+                    })}
+                  </View>
+                ) : (
                   <View style={{ alignItems: 'center', gap: 6, paddingVertical: sp.xl }}>
-                    <Txt variant="h2" style={{ textAlign: 'center' }}>
+                    <Txt style={{ fontFamily: fonts.display, fontSize: 20, textAlign: 'center', color: c.text }}>
                       {t('location.places.empty')}
                     </Txt>
                     <Txt variant="muted" style={{ textAlign: 'center' }}>
                       {t('location.places.emptyBody')}
                     </Txt>
                   </View>
-                ) : null}
+                )}
               </ScrollView>
             ) : (
-              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: sp.lg }}>
-                {events.map((e) => {
-                  const place = placeById.get(e.place_id)
-                  const who = nameFor(e.user_email)
-                  const line =
-                    e.type === 'arrive'
-                      ? t('location.activity.arrived', { name: who, place: place?.name ?? '' })
-                      : t('location.activity.left', { name: who, place: place?.name ?? '' })
-                  return (
-                    <View
-                      key={e.id}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: sp.sm,
-                        paddingVertical: 10,
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderColor: c.border,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 9,
-                          height: 9,
-                          borderRadius: 5,
-                          backgroundColor: colors[e.user_email] ?? c.action,
-                        }}
-                      />
-                      <Txt style={{ flex: 1, fontSize: 14, color: c.text }} numberOfLines={1}>
-                        {place?.icon ? `${place.icon} ` : ''}
-                        {line}
-                      </Txt>
-                      <Txt variant="faint" style={{ fontSize: 11 }}>
-                        {timeAgo(e.at, t)}
-                      </Txt>
-                    </View>
-                  )
-                })}
-                {!events.length ? (
+              <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: sp.sm }}>
+                {events.length ? (
+                  <View style={[st.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                    {events.map((e, i) => {
+                      const place = placeById.get(e.place_id)
+                      const who = nameFor(e.user_email)
+                      const arrive = e.type === 'arrive'
+                      const line = arrive
+                        ? t('location.activity.arrived', { name: who, place: place?.name ?? '' })
+                        : t('location.activity.left', { name: who, place: place?.name ?? '' })
+                      const mc = colors[e.user_email] ?? c.action
+                      return (
+                        <View
+                          key={e.id}
+                          style={[st.row, { borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderColor: c.border }]}
+                        >
+                          {/* The member's colour; the arrow says which way. */}
+                          <View style={[st.tile, { backgroundColor: mc + (dark ? '33' : '22') }]}>
+                            {arrive ? <LogIn size={17} color={mc} /> : <LogOut size={17} color={mc} />}
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Txt style={{ fontSize: 14.5, color: c.text }} numberOfLines={2}>
+                              {place?.icon ? `${place.icon} ` : ''}
+                              {line}
+                            </Txt>
+                            <Txt variant="faint" style={{ fontSize: 12 }}>
+                              {timeAgo(e.at, t)}
+                            </Txt>
+                          </View>
+                        </View>
+                      )
+                    })}
+                  </View>
+                ) : (
                   <View style={{ alignItems: 'center', paddingVertical: sp.xl }}>
                     <Txt variant="muted" style={{ textAlign: 'center' }}>
                       {t('location.activity.empty')}
                     </Txt>
                   </View>
-                ) : null}
+                )}
               </ScrollView>
             )}
 
-            {/* Pinned footer — a dashed outline whose BOTTOM corners follow the
-                iPhone's screen curve, matching Pet Care's "Add task". Pinned
-                rather than sitting at the end of the list, so a household with
-                a lot of places doesn't have to scroll to add another. */}
+            {/* Pinned, so a household with many places needn't scroll to add one. */}
             {tab === 'places' ? (
-              <Pressable
+              <FeatureButton
+                tint={tint}
+                title={t('location.places.add')}
+                icon={<Plus size={18} color="#fff" strokeWidth={2.6} />}
                 onPress={() => setEditing('new')}
-                accessibilityRole="button"
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    paddingVertical: 14,
-                    borderTopLeftRadius: R.md,
-                    borderTopRightRadius: R.md,
-                    borderBottomLeftRadius: sheetRadius,
-                    borderBottomRightRadius: sheetRadius,
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    borderColor: c.textFaint,
-                  },
-                  pressed && { opacity: 0.6 },
-                ]}
-              >
-                <Plus size={16} color={c.textMuted} />
-                <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.textMuted }}>
-                  {t('location.places.add')}
-                </Txt>
-              </Pressable>
+              />
             ) : null}
           </View>
         </View>
@@ -316,3 +292,11 @@ export function PlacesSheet({
     </>
   )
 }
+
+const st = StyleSheet.create({
+  card: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.md, paddingVertical: 11 },
+  tile: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: R.pill, flexShrink: 1 },
+  round: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+})

@@ -20,17 +20,25 @@ type Step = 0 | 1 | 2 | 3
 const STEPS = 4
 const SUMMARY: Step = 3
 
-export function EvenSplitWizard() {
+export function EvenSplitWizard({
+  initial,
+}: {
+  /** Prefill from the ask bar; with a total AND a head count, open on the summary. */
+  initial?: { bill?: number; people?: number; tip?: number }
+} = {}) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const [step, setStep] = useState<Step>(0)
+  const prefilled = !!(initial?.bill && initial?.people)
+  const [step, setStep] = useState<Step>(prefilled ? SUMMARY : initial?.bill ? 1 : 0)
   const [dir, setDir] = useState<1 | -1>(1)
   // Set when a summary row sent us back to one step — "Continue" then returns.
   const [editing, setEditing] = useState(false)
 
-  const [bill, setBill] = useState('')
-  const [people, setPeople] = useState(2)
-  const [tip, setTip] = useState<Tip>({ kind: 'pct', pct: 20 })
+  const [bill, setBill] = useState(initial?.bill ? String(initial.bill) : '')
+  const [people, setPeople] = useState(initial?.people ? Math.max(1, Math.round(initial.people)) : 2)
+  // Asked through the ask bar, "no tip said" means no tip; the plain wizard
+  // keeps suggesting 20%.
+  const [tip, setTip] = useState<Tip>({ kind: 'pct', pct: initial?.tip ?? (initial?.bill ? 0 : 20) })
 
   const b = num(bill)
   const tipPct = tip.kind === 'pct' ? tip.pct : 0

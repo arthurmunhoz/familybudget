@@ -16,7 +16,7 @@ import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { useSheetLift } from '@/hooks/useSheetLift'
 import type { Pet } from '@/lib/types'
-import { sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 import { PetEditor } from './PetEditor'
 import { PetHero, usePetIdentity } from './petIdentity'
 
@@ -50,7 +50,11 @@ export default function PetForm({
           ]}
         >
           <View style={styles.sheetHead}>
-            <Txt variant="h2">{pet ? t('pets.editPet') : t('pets.addPet')}</Txt>
+            {/* Same header as the other Pet Care sheets: a tracked label
+                (the photo and the name below it are the real title). */}
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}>
+              {pet ? t('pets.editPet') : t('pets.addPet')}
+            </Txt>
             <Pressable
               onPress={onClose}
               hitSlop={10}

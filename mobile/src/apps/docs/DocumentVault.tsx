@@ -1,64 +1,48 @@
-// Document Vault — the module's main screen (RN port of the PWA DocumentVault).
-// Documents grouped by category, each row showing a title + a category type
-// icon. Tapping a row opens the file via a signed URL in the in-app browser;
-// the pencil opens the details sheet (rename / recategorise / delete). The bottom
-// bar picks a file (images + PDF only) → shows the UploadSheet.
+// Document Vault — the module's main screen (2026-11 restyle in the Home's
+// language): a big title with the count under it in faded type, round top-bar
+// buttons (back; the Face ID lock as a toggle), owners and types as TILES
+// instead of chip walls, each type's documents as ONE rounded card, and the
+// add actions docked at the bottom — Scan (the camera art, like Money's scan
+// button) and Choose file — on the bottom button's curve (useScreenCorner).
+// Tapping a row opens the file (signed URL, in-app browser); "…" or a long
+// press opens the details sheet (rename / recategorise / REPLACE the file /
+// delete). Scanning and picking live in docPicker.
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, View } from 'react-native'
-import { Toggle } from '@/components/Toggle'
+import { Alert, ScrollView, StyleSheet, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import * as DocumentPicker from 'expo-document-picker'
-import * as ImagePicker from 'expo-image-picker'
-import { PDFDocument } from 'pdf-lib'
-import { File } from 'expo-file-system'
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
 import { Image } from 'expo-image'
-import { ChevronRight, FileText, Lock, Pencil, type LucideIcon } from 'lucide-react-native'
+import { ChevronLeft, FileText, FolderLock, House, Lock, LockOpen, MoreHorizontal, Upload, Users } from 'lucide-react-native'
 
-import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
+import { EmptyState, Loader, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { CameraArt } from '@/apps/budget/CameraArt'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
+import { useScreenCorner } from '@/hooks/useScreenCorner'
 import { platformKey, type TKey } from '@/lib/i18n'
 import { formatDay } from '@/lib/format'
+import { memberColor } from '@/lib/calendar'
 import { getSignedUrl, getSignedUrls } from '@/lib/signedUrls'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { DocCategory, FamilyDocument } from '@/lib/types'
 import { biometricAvailable, isVaultLockEnabled, setVaultLockEnabled } from '@/lib/vaultLock'
-import { radius, sp, useTheme } from '@/theme/theme'
-import { CATEGORIES, CAT_LUCIDE, formatBytes, isImageDoc, thumbPathFor } from './docUtils'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { CATEGORIES, CAT_COLOR, CAT_LUCIDE, formatBytes, isImageDoc, thumbPathFor } from './docUtils'
+import { pickFile, scanDocument } from './docPicker'
 import UploadSheet, { type PickedFile } from './UploadSheet'
 import EditSheet from './EditSheet'
 
-const MAX_SIZE = 20 * 1024 * 1024 // bucket limit
-const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif']
-
-// The scanner is a native TurboModule whose spec calls getEnforcing() AT IMPORT,
-// which THROWS — crashing the whole route — when the native binary lacks it
-// (Expo Go, or before a native rebuild). A static top-level import therefore
-// takes the screen down on load. Requiring it lazily inside try/catch turns that
-// into a graceful `null`, so callers fall back to a plain camera capture.
-type Scanner = {
-  scanDocument: (opts: {
-    croppedImageQuality?: number
-  }) => Promise<{ scannedImages?: string[]; status: string }>
-}
-function loadScanner(): Scanner | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('react-native-document-scanner-plugin').default as Scanner
-  } catch {
-    return null
-  }
-}
-
 export default function DocumentVault() {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
   const { isPlus } = usePlus()
@@ -198,165 +182,17 @@ export default function DocumentVault() {
       }))
   }, [visible])
 
-  async function pickFile() {
+  // Adding: scan (VisionKit) or choose a file — docPicker shares this with
+  // EditSheet's "Replace file".
+  async function add(how: 'scan' | 'file') {
     if (picking || !profile) return
-    // The Document Vault is free to use — only the Face ID lock is Plus.
     setPicking(true)
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf'],
-        copyToCacheDirectory: true,
-        multiple: false,
-      })
-      if (result.canceled || !result.assets[0]) return
-      const asset = result.assets[0]
-      const initialSize = asset.size ?? new File(asset.uri).size ?? 0
-      if (initialSize > MAX_SIZE) {
-        Alert.alert(t('docs.tooBig', { size: formatBytes(initialSize) }))
-        return
-      }
-      const rawExt = (asset.name.split('.').pop() ?? '').toLowerCase()
-      const isImage = (asset.mimeType?.startsWith('image/') ?? false) || IMAGE_EXTS.includes(rawExt)
-      // The bucket only accepts image/* + application/pdf, so when the picker
-      // doesn't report a type, infer it from the extension.
-      let uri = asset.uri
-      let ext = rawExt || (isImage ? 'jpg' : 'pdf')
-      let mime =
-        asset.mimeType ||
-        (ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`)
-      // Downscale big photos before upload (cap the long edge ~2048px, re-encode
-      // JPEG) — keeps the vault light and uploads fast. Only for images clearly
-      // over ~0.6MB, so small screenshots and all PDFs upload untouched (avoids
-      // upscaling / needless recompression). Falls back to the original on error.
-      if (isImage && initialSize > 600 * 1024) {
-        try {
-          const ref = await ImageManipulator.manipulate(asset.uri).resize({ width: 2048 }).renderAsync()
-          const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
-          uri = out.uri
-          ext = 'jpg'
-          mime = 'image/jpeg'
-        } catch {
-          /* keep the original file if manipulation fails */
-        }
-      }
-      // Read the (possibly downscaled) file's bytes for upload (SDK 56 File API).
-      const buffer = await new File(uri).arrayBuffer()
-      const bytes = new Uint8Array(buffer)
-      const size = bytes.byteLength
-      setPending({ name: asset.name, uri, size, bytes, mime, ext, thumbUri: isImage ? uri : undefined })
-    } catch {
-      Alert.alert(t('docs.uploadFailed'))
+      const file = how === 'scan' ? await scanDocument(t) : await pickFile(t)
+      if (file) setPending(file)
     } finally {
       setPicking(false)
     }
-  }
-
-  // Shared tail for a captured/scanned image: downscale (2048px long edge, JPEG)
-  // then hand off to the UploadSheet — the user names it there (default title
-  // comes from `name`). Same path a file-picked image already takes.
-  async function uploadImageUri(uri: string) {
-    setPicking(true)
-    try {
-      const ref = await ImageManipulator.manipulate(uri).resize({ width: 2048 }).renderAsync()
-      const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
-      const buffer = await new File(out.uri).arrayBuffer()
-      const bytes = new Uint8Array(buffer)
-      setPending({
-        name: `${t('docs.scanName')}.jpg`,
-        uri: out.uri,
-        size: bytes.byteLength,
-        bytes,
-        mime: 'image/jpeg',
-        ext: 'jpg',
-        thumbUri: out.uri,
-      })
-    } catch {
-      Alert.alert(t('docs.uploadFailed'))
-    } finally {
-      setPicking(false)
-    }
-  }
-
-  // Build a single multi-page PDF from the scanned page images — each page
-  // downscaled + JPEG-compressed, then embedded (pdf-lib, pure JS). One document
-  // with N pages, rather than N separate rows.
-  async function uploadPagesAsPdf(uris: string[]) {
-    setPicking(true)
-    try {
-      const pdf = await PDFDocument.create()
-      let firstPage: string | undefined
-      for (const uri of uris) {
-        const ref = await ImageManipulator.manipulate(uri).resize({ width: 2048 }).renderAsync()
-        const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.7 })
-        firstPage ??= out.uri
-        const bytes = new Uint8Array(await new File(out.uri).arrayBuffer())
-        const img = await pdf.embedJpg(bytes)
-        const page = pdf.addPage([img.width, img.height])
-        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height })
-      }
-      const pdfBytes = await pdf.save()
-      if (pdfBytes.byteLength > MAX_SIZE) {
-        Alert.alert(t('docs.tooBig', { size: formatBytes(pdfBytes.byteLength) }))
-        return
-      }
-      setPending({
-        name: `${t('docs.scanName')}.pdf`,
-        uri: '',
-        size: pdfBytes.byteLength,
-        bytes: pdfBytes,
-        mime: 'application/pdf',
-        ext: 'pdf',
-        thumbUri: firstPage,
-      })
-    } catch {
-      Alert.alert(t('docs.uploadFailed'))
-    } finally {
-      setPicking(false)
-    }
-  }
-
-  // Scan a document with the OS document scanner (VisionKit on iOS): live edge
-  // detection, auto-capture, and perspective-corrected crop, across as many
-  // pages as the user captures. One page → a JPEG image; multiple → one PDF.
-  async function scanDocument() {
-    if (picking || !profile) return
-    // Native module absent (Expo Go, or before a native rebuild) — degrade to a
-    // plain camera capture so the feature still works, minus edge detection.
-    const scanner = loadScanner()
-    if (!scanner) return takePhoto()
-    let images: string[]
-    try {
-      const { scannedImages, status } = await scanner.scanDocument({ croppedImageQuality: 100 })
-      if (status !== 'success' || !scannedImages?.length) return // user cancelled
-      images = scannedImages
-    } catch {
-      return takePhoto()
-    }
-    if (images.length === 1) await uploadImageUri(images[0])
-    else await uploadPagesAsPdf(images)
-  }
-
-  // Fallback capture when the document scanner's native module isn't available.
-  async function takePhoto() {
-    const perm = await ImagePicker.requestCameraPermissionsAsync()
-    if (!perm.granted) {
-      Alert.alert(t('docs.cameraDenied'))
-      return
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 1 })
-    if (result.canceled || !result.assets[0]) return
-    await uploadImageUri(result.assets[0].uri)
-  }
-
-  // The "Add document" button offers both paths — scan a document (auto-cropped),
-  // or pick an existing file (image/PDF). Alert chooser matches the scan flows.
-  function startAdd() {
-    if (picking || !profile) return
-    Alert.alert(t('docs.addDoc'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('docs.scanDoc'), onPress: scanDocument },
-      { text: t('docs.chooseFile'), onPress: pickFile },
-    ])
   }
 
   async function openDoc(doc: FamilyDocument) {
@@ -389,147 +225,204 @@ export default function DocumentVault() {
     ])
   }
 
+  const corner = useScreenCorner()
+  const bottomGap = useBottomGap(sp.xs)
+  const memberEmails = profiles.map((p) => p.email)
+  const countFor = (cat: DocCategory | 'all') =>
+    docs.filter((d) => (cat === 'all' || d.category === cat) && (person === 'all' || d.owner_email === person)).length
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader title={t('docs.title')} />
-      </View>
-
-      {/* Face ID lock toggle — only where the device supports biometrics */}
-      {canLock ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: sp.md,
-            marginHorizontal: sp.lg,
-            marginBottom: sp.md,
-            paddingHorizontal: sp.md,
-            paddingVertical: 10,
-            borderRadius: radius.md,
-            backgroundColor: c.card,
-          }}
+      {/* top bar: back, and the Face ID lock as a round toggle */}
+      <View style={s.topBar}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          hitSlop={8}
+          style={[s.round, { backgroundColor: c.card, borderColor: c.border }]}
         >
-          <Lock size={20} color={lockOn ? c.accent : c.textFaint} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt style={{ fontWeight: '600' }}>{t(platformKey('vault.lockTitle'))}</Txt>
-            <Txt variant="faint">{t(platformKey('vault.lockDesc'))}</Txt>
-          </View>
-          <Toggle
-            value={lockOn}
-            onValueChange={toggleLock}
+          <ChevronLeft size={22} color={c.text} />
+        </Pressable>
+        {canLock ? (
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityState={{ checked: lockOn }}
             accessibilityLabel={lockOn ? t(platformKey('vault.disableLock')) : t(platformKey('vault.enableLock'))}
-          />
-        </View>
-      ) : null}
-
-      {/* person filter — only for households with more than one member (nothing
-          to narrow otherwise). Everyone · each member · Shared. */}
-      {profiles.length > 1 ? (
-        <>
-          <Txt variant="label" style={{ paddingHorizontal: sp.lg, paddingBottom: 4 }}>
-            {t('docs.owner')}
-          </Txt>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0, flexShrink: 0 }}
-            contentContainerStyle={{
-              paddingHorizontal: sp.lg,
-              gap: sp.sm,
-              paddingBottom: sp.sm,
-              alignItems: 'center',
-            }}
+            accessibilityHint={t(platformKey('vault.lockDesc'))}
+            onPress={() => toggleLock(!lockOn)}
+            hitSlop={8}
+            style={[
+              s.round,
+              lockOn ? { backgroundColor: c.action, borderColor: c.action } : { backgroundColor: c.card, borderColor: c.border },
+            ]}
           >
-            <FilterChip active={person === 'all'} onPress={() => setPerson('all')}>
-              {t('common.everyone')}
-            </FilterChip>
-            {profiles.map((p) => (
-              <FilterChip key={p.email} active={person === p.email} onPress={() => setPerson(p.email)}>
-                {nameOf(p.email)}
-              </FilterChip>
-            ))}
-            <FilterChip active={person === 'shared'} onPress={() => setPerson('shared')}>
-              {t('docs.shared')}
-            </FilterChip>
-          </ScrollView>
-        </>
-      ) : null}
-
-      {/* category filter — flexGrow:0 stops the horizontal ScrollView from
-          filling the parent's height (which would stretch the chips tall);
-          alignItems:center keeps each chip at its natural height. */}
-      <Txt variant="label" style={{ paddingHorizontal: sp.lg, paddingBottom: 4 }}>
-        {t('docs.type')}
-      </Txt>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, flexShrink: 0 }}
-        contentContainerStyle={{
-          paddingHorizontal: sp.lg,
-          gap: sp.sm,
-          paddingBottom: sp.md,
-          alignItems: 'center',
-        }}
-      >
-        <FilterChip active={filter === 'all'} onPress={() => setFilter('all')}>
-          {t('common.all')}
-        </FilterChip>
-        {CATEGORIES.map((cat) => (
-          <FilterChip
-            key={cat.id}
-            active={filter === cat.id}
-            onPress={() => setFilter(cat.id)}
-            Icon={cat.Icon}
-          >
-            {t(`docCat.${cat.id}` as TKey)}
-          </FilterChip>
-        ))}
-      </ScrollView>
+            {lockOn ? <Lock size={18} color={c.onAction} /> : <LockOpen size={18} color={c.textMuted} />}
+          </Pressable>
+        ) : null}
+      </View>
 
       {loading ? (
         <Loader />
-      ) : visible.length === 0 ? (
-        <EmptyState title={t('docs.empty')} subtitle={t('docs.emptyHint')} />
       ) : (
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.lg }}
-        >
-          {groups.map((group) => (
-            <View key={group.cat} style={{ gap: sp.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                <GroupIcon cat={group.cat} />
-                <Txt
-                  variant="label"
-                  style={{ textTransform: 'uppercase', letterSpacing: 0.5, color: c.textFaint }}
-                >
-                  {t(`docCat.${group.cat}` as TKey)}
-                </Txt>
-                <View style={{ height: 1, flex: 1, backgroundColor: c.border }} />
-                <Txt variant="faint">{group.docs.length}</Txt>
-              </View>
-              {group.docs.map((doc) => (
-                <DocRow
-                  key={doc.id}
-                  doc={doc}
-                  ownerName={person === 'all' ? nameOf(doc.owner_email) : null}
-                  thumbs={thumbs}
-                  opening={opening === doc.id}
-                  onOpen={() => openDoc(doc)}
-                  onEdit={() => setEditing(doc)}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.lg }}>
+          <Txt style={s.bigTitle}>{t('docs.title')}</Txt>
+          <Txt style={[s.bigTitle, { color: c.textFaint }]}>
+            {visible.length === 1 ? t('docs.countOne') : t('docs.countMany', { n: visible.length })}
+          </Txt>
+
+          {/* whose — only for households of more than one */}
+          {profiles.length > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginHorizontal: -sp.lg, marginTop: sp.lg }}
+              contentContainerStyle={{ paddingHorizontal: sp.lg, gap: sp.sm }}
+            >
+              <OwnerPill active={person === 'all'} label={t('common.everyone')} onPress={() => setPerson('all')}>
+                <Users size={14} color="#fff" />
+              </OwnerPill>
+              {profiles.map((p) => {
+                const tint = memberColor(p.email, memberEmails)
+                return (
+                  <OwnerPill
+                    key={p.email}
+                    active={person === p.email}
+                    label={nameOf(p.email)}
+                    tint={tint}
+                    onPress={() => setPerson(p.email)}
+                  >
+                    <Txt style={{ color: '#fff', fontSize: 12, fontFamily: fonts.semibold }}>
+                      {nameOf(p.email).charAt(0).toUpperCase()}
+                    </Txt>
+                  </OwnerPill>
+                )
+              })}
+              <OwnerPill active={person === 'shared'} label={t('docs.shared')} tint="#3D9B5C" onPress={() => setPerson('shared')}>
+                <House size={13} color="#fff" />
+              </OwnerPill>
+            </ScrollView>
+          ) : null}
+
+          {/* what kind — tiles with each type's count */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -sp.lg, marginTop: sp.md }}
+            contentContainerStyle={{ paddingHorizontal: sp.lg, gap: 10 }}
+          >
+            <TypeTile
+              label={t('common.all')}
+              count={countFor('all')}
+              active={filter === 'all'}
+              onPress={() => setFilter('all')}
+              icon={
+                <GradientBox colors={APP_GRADIENT.docs} radius={10} style={s.tileIcon}>
+                  <FolderLock size={16} color="#fff" />
+                </GradientBox>
+              }
+            />
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.Icon
+              return (
+                <TypeTile
+                  key={cat.id}
+                  label={t(`docCat.${cat.id}` as TKey)}
+                  count={countFor(cat.id)}
+                  active={filter === cat.id}
+                  onPress={() => setFilter(cat.id)}
+                  icon={
+                    <View style={[s.tileIcon, { borderRadius: 10, backgroundColor: CAT_COLOR[cat.id] + '22' }]}>
+                      <Icon size={16} color={CAT_COLOR[cat.id]} />
+                    </View>
+                  }
                 />
-              ))}
-            </View>
-          ))}
+              )
+            })}
+          </ScrollView>
+
+          {visible.length === 0 ? (
+            <EmptyState title={t('docs.empty')} subtitle={t('docs.emptyHint')} />
+          ) : (
+            groups.map((group) => {
+              const Icon = CAT_LUCIDE[group.cat] ?? FileText
+              return (
+                <View key={group.cat}>
+                  <View style={s.groupHead}>
+                    <Icon size={14} color={CAT_COLOR[group.cat]} />
+                    <Txt style={[s.groupLabel, { color: c.textMuted }]}>
+                      {t(`docCat.${group.cat}` as TKey)} · {group.docs.length}
+                    </Txt>
+                  </View>
+                  {/* the type's documents as ONE rounded card */}
+                  <View style={[s.groupCard, { backgroundColor: c.card, borderColor: c.border }]}>
+                    {group.docs.map((doc, i) => (
+                      <DocRow
+                        key={doc.id}
+                        doc={doc}
+                        first={i === 0}
+                        ownerName={person === 'all' ? nameOf(doc.owner_email) : null}
+                        thumbs={thumbs}
+                        opening={opening === doc.id}
+                        onOpen={() => openDoc(doc)}
+                        onEdit={() => setEditing(doc)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )
+            })
+          )}
         </ScrollView>
       )}
 
-      {/* Bottom action — in NORMAL flow (not an absolute overlay), so the doc
-          list ends AT the button instead of scrolling underneath it. The branch
-          above is flex:1, so this stays pinned to the bottom in every state. */}
-      <NewItemButton label={t('docs.addDoc')} onPress={startAdd} loading={picking} />
+      {/* Add: Scan (the camera art) + Choose file, docked in normal flow so the
+          list ends at them; outer bottom corners on the bottom button's curve. */}
+      <View
+        style={[
+          s.dock,
+          { paddingBottom: corner ? corner.bottom : bottomGap, paddingHorizontal: corner ? corner.side : sp.lg },
+        ]}
+      >
+        <Pressable
+          onPress={() => add('scan')}
+          disabled={picking}
+          accessibilityRole="button"
+          accessibilityLabel={t('docs.scanDoc')}
+          style={({ pressed }) => [
+            s.dockBtn,
+            {
+              flex: 1,
+              backgroundColor: c.card,
+              borderColor: c.border,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderBottomLeftRadius: corner?.radius ?? 18,
+              opacity: picking ? 0.5 : pressed ? 0.75 : 1,
+            },
+          ]}
+        >
+          <CameraArt opacity={dark ? 0.55 : 0.24} />
+          <Txt style={{ fontFamily: fonts.display, fontSize: 16 }}>{t('docs.scan')}</Txt>
+        </Pressable>
+        <Pressable
+          onPress={() => add('file')}
+          disabled={picking}
+          accessibilityRole="button"
+          accessibilityLabel={t('docs.chooseFile')}
+          style={({ pressed }) => [
+            s.dockBtn,
+            {
+              flex: 1,
+              backgroundColor: c.action,
+              borderBottomRightRadius: corner?.radius ?? 18,
+              opacity: picking ? 0.5 : pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <Upload size={18} color={c.onAction} />
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 15.5, color: c.onAction }}>{t('docs.chooseFileShort')}</Txt>
+        </Pressable>
+      </View>
 
       {pending && profile && (
         <UploadSheet
@@ -537,7 +430,7 @@ export default function DocumentVault() {
           profile={profile}
           profiles={profiles}
           defaultCategory={filter !== 'all' ? filter : 'other'}
-          defaultOwner={profile.email}
+          defaultOwner={person !== 'all' ? person : profile.email}
           onClose={() => setPending(null)}
           onSaved={() => {
             setPending(null)
@@ -546,10 +439,12 @@ export default function DocumentVault() {
         />
       )}
 
-      {editing && (
+      {editing && profile && (
         <EditSheet
           doc={editing}
           profiles={profiles}
+          householdId={profile.household_id}
+          thumbUrl={thumbs[thumbPathFor(editing.file_path)] ?? (isImageDoc(editing.mime_type, editing.file_path) ? thumbs[editing.file_path] : undefined)}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null)
@@ -562,8 +457,11 @@ export default function DocumentVault() {
   )
 }
 
+/** One document in its type's card: thumbnail, title, whose · date · size,
+ *  and "…" for the details. Tap opens; long-press also opens the details. */
 function DocRow({
   doc,
+  first,
   ownerName,
   thumbs,
   opening,
@@ -571,6 +469,7 @@ function DocRow({
   onEdit,
 }: {
   doc: FamilyDocument
+  first: boolean
   /** Owner's first name, shown in the subtitle only in the "Everyone" view. */
   ownerName?: string | null
   /** Signed URLs by storage path (thumbs + image fallbacks), from the screen. */
@@ -582,71 +481,43 @@ function DocRow({
   const { c } = useTheme()
   const { t } = useI18n()
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: sp.md,
-        backgroundColor: c.card,
-        borderRadius: radius.md,
-        paddingLeft: sp.sm + 2,
-        paddingRight: sp.lg,
-        paddingVertical: sp.sm + 2,
-        opacity: opening ? 0.6 : 1,
-      }}
-    >
-      <Pressable
-        onPress={onOpen}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, flex: 1, minWidth: 0 }}
-      >
-        <DocThumb doc={doc} thumbs={thumbs} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
-            {doc.title}
-          </Txt>
-          <Txt variant="faint" numberOfLines={1}>
-            {ownerName ? `${ownerName} · ` : ''}
-            {formatDay(doc.created_at.slice(0, 10))} · {formatBytes(doc.size_bytes)}
-          </Txt>
-        </View>
-      </Pressable>
-      {/* Two trailing controls that must not read as one: the pencil is a real
-          BUTTON (a soft accent tile) going to the details sheet; the chevron is
-          the flat affordance for the row's own tap. Giving the pencil a box is
-          what separates them — as two bare glyphs side by side they looked
-          like a single control. No shadow: on Android `elevation` paints
-          behind the view, and through this translucent fill it read as an
-          ugly inner shadow (same trap as the Family card). */}
-      <Pressable
-        onPress={onEdit}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.editName', { name: doc.title })}
-        style={({ pressed }) => [
-          {
-            width: 34,
-            height: 34,
-            borderRadius: radius.md,
-            backgroundColor: c.accentSoft,
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          pressed && { opacity: 0.6 },
-        ]}
-      >
-        <Pencil size={16} color={c.accent} />
-      </Pressable>
-      {/* Opens the document, same as the row body — a chevron that did nothing
-          when tapped would be a lie about what it points at. */}
-      <Pressable onPress={onOpen} hitSlop={8} accessibilityLabel={t('common.openName', { name: doc.title })}>
-        <ChevronRight size={20} color={c.textFaint} />
-      </Pressable>
+    <View>
+      {/* hairline between rows, inset past the thumbnail like the Home lists */}
+      {!first ? <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border, marginLeft: 74 }} /> : null}
+      <View style={[s.row, { opacity: opening ? 0.6 : 1 }]}>
+        <Pressable
+          onPress={onOpen}
+          onLongPress={onEdit}
+          delayLongPress={400}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, flex: 1, minWidth: 0 }}
+        >
+          <DocThumb doc={doc} thumbs={thumbs} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={{ fontFamily: fonts.medium, fontSize: 15.5 }} numberOfLines={1}>
+              {doc.title}
+            </Txt>
+            <Txt variant="faint" numberOfLines={1} style={{ marginTop: 2 }}>
+              {ownerName ? `${ownerName} · ` : ''}
+              {formatDay(doc.created_at.slice(0, 10))} · {formatBytes(doc.size_bytes)}
+            </Txt>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={onEdit}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('docs.more', { name: doc.title })}
+          style={({ pressed }) => [s.more, { backgroundColor: c.surface }, pressed && { opacity: 0.6 }]}
+        >
+          <MoreHorizontal size={18} color={c.text} />
+        </Pressable>
+      </View>
     </View>
   )
 }
 
-const THUMB_W = 44
-const THUMB_H = 56
+const THUMB_W = 46
+const THUMB_H = 60
 
 /** The row's preview: the document's own thumbnail (portrait, like a page),
  *  else — for images with no thumb yet — the image itself, else a typed tile
@@ -670,7 +541,7 @@ function DocThumb({ doc, thumbs }: { doc: FamilyDocument; thumbs: Record<string,
       style={{
         width: THUMB_W,
         height: THUMB_H,
-        borderRadius: radius.sm,
+        borderRadius: 10,
         overflow: 'hidden',
         backgroundColor: c.surface,
         borderWidth: 1,
@@ -700,43 +571,103 @@ function DocThumb({ doc, thumbs }: { doc: FamilyDocument; thumbs: Record<string,
   )
 }
 
-/** A group header's category glyph. Module scope (not inline in the map) so it
- *  isn't a component re-created on every render. */
-function GroupIcon({ cat }: { cat: DocCategory }) {
-  const { c } = useTheme()
-  const Icon = CAT_LUCIDE[cat] ?? FileText
-  return <Icon size={14} color={c.textFaint} />
-}
-
-function FilterChip({
+/** A person in the owner strip: avatar (their calendar colour) + name. */
+function OwnerPill({
   active,
+  label,
+  tint,
   onPress,
-  Icon,
   children,
 }: {
   active: boolean
+  label: string
+  tint?: string
   onPress: () => void
-  /** Drawn before the label, in the label's colour. */
-  Icon?: LucideIcon
   children: React.ReactNode
 }) {
   const { c } = useTheme()
-  const color = active ? c.onAction : c.textMuted
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: radius.pill,
-        backgroundColor: active ? c.action : c.surface,
-      }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={[
+        s.pill,
+        {
+          backgroundColor: active ? c.cardActive : c.card,
+          borderColor: active ? c.action : c.border,
+          borderWidth: active ? 2 : StyleSheet.hairlineWidth,
+        },
+      ]}
     >
-      {Icon ? <Icon size={15} color={color} /> : null}
-      <Txt style={{ color, fontWeight: '600', fontSize: 14 }}>{children}</Txt>
+      <View style={[s.pillAvatar, { backgroundColor: tint ?? c.action }]}>{children}</View>
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14 }}>{label}</Txt>
     </Pressable>
   )
 }
+
+/** A document type as a tile: its icon, name and how many there are. */
+function TypeTile({
+  label,
+  count,
+  icon,
+  active,
+  onPress,
+}: {
+  label: string
+  count: number
+  icon: React.ReactNode
+  active: boolean
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={({ pressed }) => [
+        s.tile,
+        {
+          backgroundColor: c.card,
+          borderColor: active ? c.action : c.border,
+          borderWidth: active ? 2 : StyleSheet.hairlineWidth,
+          opacity: count === 0 && !active ? 0.55 : pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      {icon}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'stretch' }}>
+        <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 13 }} numberOfLines={1}>
+          {label}
+        </Txt>
+        {count ? <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: c.textMuted }}>{count}</Txt> : null}
+      </View>
+    </Pressable>
+  )
+}
+
+const s = StyleSheet.create({
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: sp.lg, paddingVertical: sp.sm },
+  round: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  bigTitle: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingLeft: 6, paddingRight: 14, borderRadius: radius.pill },
+  pillAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  tile: { width: 100, height: 84, borderRadius: 20, padding: 11, justifyContent: 'space-between' },
+  tileIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: sp.xl, marginBottom: sp.sm, paddingHorizontal: 2 },
+  groupLabel: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase' },
+  groupCard: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.md, paddingVertical: 10 },
+  more: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  dock: { flexDirection: 'row', gap: 10, paddingTop: sp.sm },
+  dockBtn: {
+    height: 56,
+    borderRadius: 18,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+})

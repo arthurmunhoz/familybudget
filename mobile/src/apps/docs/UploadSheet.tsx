@@ -9,8 +9,6 @@ import { useState } from 'react'
 import { Alert, Modal, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { X } from 'lucide-react-native'
-import { File } from 'expo-file-system'
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 
 import { Btn, Txt } from '@/components/ui'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
@@ -23,7 +21,8 @@ import { supabase } from '@/lib/supabase'
 import type { DocCategory, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, sp, useTheme } from '@/theme/theme'
-import { CATEGORIES, THUMB_WIDTH, formatBytes, randomUUID, thumbPathFor } from './docUtils'
+import { CATEGORIES, formatBytes, randomUUID, thumbPathFor } from './docUtils'
+import { uploadThumb } from './docPicker'
 
 export interface PickedFile {
   name: string
@@ -37,21 +36,6 @@ export interface PickedFile {
    *  multi-page scan's FIRST page. Absent for a picked PDF (nothing on-device
    *  can render one), which then shows a typed placeholder in the list. */
   thumbUri?: string
-}
-
-/** Best-effort: a small JPEG of the document at its derived thumb path. Never
- *  throws — a missing thumbnail only means the list shows a placeholder. */
-async function uploadThumb(srcUri: string, filePath: string) {
-  try {
-    const ref = await ImageManipulator.manipulate(srcUri).resize({ width: THUMB_WIDTH }).renderAsync()
-    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.6 })
-    const bytes = new Uint8Array(await new File(out.uri).arrayBuffer())
-    await supabase.storage
-      .from('documents')
-      .upload(thumbPathFor(filePath), bytes, { contentType: 'image/jpeg', cacheControl: '604800' })
-  } catch {
-    /* no thumbnail — the list falls back */
-  }
 }
 
 export default function UploadSheet({

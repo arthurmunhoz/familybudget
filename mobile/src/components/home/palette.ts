@@ -45,3 +45,14 @@ export function budgetLook(id: string): (typeof BUDGET_GRADIENTS)[number] {
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
   return BUDGET_GRADIENTS[h % BUDGET_GRADIENTS.length]
 }
+
+/** Darken (amt < 0) or lighten (amt > 0) a #rrggbb colour — for a gradient's
+ *  second stop from one brand colour (a pet's tag colour, say). */
+export function shade(hex: string, amt: number): string {
+  const n = parseInt(hex.replace('#', '').slice(0, 6), 16)
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(amt < 0 ? v * (1 + amt) : v + (255 - v) * amt)))
+  const r = ch((n >> 16) & 255)
+  const g = ch((n >> 8) & 255)
+  const b = ch(n & 255)
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
+}

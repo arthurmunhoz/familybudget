@@ -28,6 +28,17 @@ export const CATEGORIES: { id: DocCategory; icon: string; Icon: LucideIcon }[] =
   { id: 'other', icon: '📦', Icon: FileText },
 ]
 
+/** A colour per category for its tile and group icon (2026-11 restyle). */
+export const CAT_COLOR: Record<DocCategory, string> = {
+  ids: '#4C7BF4',
+  insurance: '#16A3A8',
+  medical: '#E0609B',
+  pets: '#F2603A',
+  home: '#3D9B5C',
+  receipts: '#8E6CF0',
+  other: '#7C8597',
+}
+
 export const CAT_ICON = Object.fromEntries(CATEGORIES.map((c) => [c.id, c.icon])) as Record<
   DocCategory,
   string

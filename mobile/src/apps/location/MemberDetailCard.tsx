@@ -24,9 +24,9 @@
 // ETA / reverse-geocode / live-mode hooks can live in here rather than being
 // hoisted — a household of ten doesn't fire ten Directions requests.
 import { useEffect, useRef, useState } from 'react'
-import { Linking, Pressable, View } from 'react-native'
+import { Linking, Pressable, StyleSheet, View } from 'react-native'
 import * as Location from 'expo-location'
-import { Bell, Navigation, Phone, X } from 'lucide-react-native'
+import { BatteryFull, BatteryLow, BatteryMedium, BatteryWarning, Bell, Navigation, Phone, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -41,56 +41,64 @@ import {
 import { useWatchLive } from '@/lib/liveLocation'
 import { placeAt } from '@/lib/places'
 import type { MemberLocation, Place, Profile } from '@/lib/types'
-import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp } from '@/theme/theme'
+import { ON_CARD } from './onCard'
 import {
   CARD_H,
   CARD_W_EXPANDED,
-  FLOAT_SHADOW,
   MemberAvatar,
+  MemberCardShell,
   WatchingChip,
   timeAgo,
 } from './locationUi'
 
-/** One compact stat. The ETA tile is `primary` so it reads first. */
-function Stat({ label, value, primary }: { label: string; value: string; primary?: boolean }) {
-  const { c } = useTheme()
+/** One stat, set straight on the gradient — no tile (owner, 2026-11: boxed
+ *  stats looked like the action buttons under them). Columns are split by
+ *  thin vertical rules instead. The ETA is `primary`: a size up. */
+function Stat({ label, value, primary, icon }: { label: string; value: string; primary?: boolean; icon?: React.ReactNode }) {
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: primary ? c.accentSoft : c.surface,
-        borderRadius: radius.md,
-        paddingVertical: 6,
-        alignItems: 'center',
-      }}
-    >
-      {/* Explicit lineHeight, here and below: the card is a FIXED 168pt and the
-          display font's natural line box is tall enough to overflow the budget.
-          Pinning it keeps the layout independent of font metrics. */}
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Explicit lineHeights: the card is a FIXED 168pt (see the budget at
+          the top) and the display font's natural line box would overflow it. */}
       <Txt
-        style={{ fontFamily: fonts.display, fontSize: 17, lineHeight: 21, color: primary ? c.accent : c.text }}
+        style={{ fontFamily: fonts.display, fontSize: primary ? 21 : 17, lineHeight: primary ? 25 : 21, color: ON_CARD.text }}
         numberOfLines={1}
       >
         {value}
       </Txt>
-      <Txt
-        style={{
-          fontFamily: fonts.semibold,
-          fontSize: 8,
-          lineHeight: 10,
-          color: c.textMuted,
-          textTransform: 'uppercase',
-          letterSpacing: 0.4,
-        }}
-      >
-        {label}
-      </Txt>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+        {icon}
+        <Txt
+          style={{
+            fontFamily: fonts.semibold,
+            fontSize: 8.5,
+            lineHeight: 11,
+            color: ON_CARD.muted,
+            textTransform: 'uppercase',
+            letterSpacing: 0.6,
+          }}
+        >
+          {label}
+        </Txt>
+      </View>
     </View>
   )
 }
 
-/** One small icon action. Nav hand-offs carry their service's brand colour so
- *  they're told apart at a glance (we don't ship their trademarked logos). */
+/** A tiny battery beside the BATTERY label (owner, 2026-11): the drawing
+ *  follows the level, white like the rest of the card, a soft red when low. */
+function BatteryGlyph({ level }: { level: number }) {
+  const color = level <= 15 ? '#FFB4A8' : ON_CARD.muted
+  const Icon = level <= 15 ? BatteryWarning : level <= 40 ? BatteryLow : level <= 75 ? BatteryMedium : BatteryFull
+  return <Icon size={11} color={color} strokeWidth={2.4} />
+}
+
+/** The subtle vertical rule between stats. */
+function Rule() {
+  return <View style={{ width: StyleSheet.hairlineWidth * 2, alignSelf: 'stretch', marginVertical: 6, backgroundColor: 'rgba(255,255,255,0.35)' }} />
+}
+
+/** One action pill on the gradient: icon + label side by side. */
 function IconAction({
   icon,
   label,
@@ -100,7 +108,6 @@ function IconAction({
   label: string
   onPress: () => void
 }) {
-  const { c } = useTheme()
   return (
     <Pressable
       onPress={onPress}
@@ -109,20 +116,19 @@ function IconAction({
       style={({ pressed }) => [
         {
           flex: 1,
-          backgroundColor: c.surface,
-          borderRadius: radius.md,
-          paddingVertical: 5,
+          flexDirection: 'row',
+          backgroundColor: ON_CARD.soft,
+          borderRadius: radius.pill,
+          height: 36,
           alignItems: 'center',
-          gap: 2,
+          justifyContent: 'center',
+          gap: 5,
           opacity: pressed ? 0.7 : 1,
         },
       ]}
     >
       {icon}
-      <Txt
-        style={{ fontFamily: fonts.semibold, fontSize: 10, lineHeight: 12, color: c.text }}
-        numberOfLines={1}
-      >
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, lineHeight: 15, color: ON_CARD.text }} numberOfLines={1}>
         {label}
       </Txt>
     </Pressable>
@@ -166,7 +172,6 @@ export function MemberDetailCard({
    *  width before we've grown into it. */
   onLaidOut?: (x: number) => void
 }) {
-  const { c } = useTheme()
   const { t } = useI18n()
 
   const live = isSharingLive(location) ? location : null
@@ -240,110 +245,102 @@ export function MemberDetailCard({
   const battText = live && live.battery != null ? `${live.battery}%` : '—'
 
   return (
-    <View
-      onLayout={(e) => onLaidOut?.(e.nativeEvent.layout.x)}
-      style={{
-        width: CARD_W_EXPANDED,
-        height: CARD_H,
-        // c.sheet, NOT c.surface — this floats straight on the map, and surface
-        // is translucent under the glass skin (10% white in Dusk), which would
-        // let the tiles show through the text. Same rule as any map panel.
-        backgroundColor: c.sheet,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: c.accent,
-        padding: sp.md,
-        gap: sp.sm,
-        ...FLOAT_SHADOW,
-      }}
-    >
-      {/* Header: who, where, and a way back to the compact card. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-        <MemberAvatar name={profile.display_name} avatarPath={avatarPath} color={color} size={40} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-            <Txt
-              style={{ fontFamily: fonts.semibold, fontSize: 14, lineHeight: 18, color: c.text, flexShrink: 1 }}
-              numberOfLines={1}
-            >
-              {isMe ? t('location.you') : profile.display_name}
+    <View onLayout={(e) => onLaidOut?.(e.nativeEvent.layout.x)}>
+      {/* The same gradient card as the collapsed one, only wider — the person's
+          colour carries over from their pin and their small card. */}
+      <MemberCardShell color={color} width={CARD_W_EXPANDED} height={CARD_H} style={{ padding: sp.md, gap: sp.sm }}>
+        {/* Header: who, where, and a way back to the compact card. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+          <MemberAvatar name={profile.display_name} avatarPath={avatarPath} color={color} size={40} ringColor={ON_CARD.ring} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Txt
+                style={{ fontFamily: fonts.display, fontSize: 16, lineHeight: 19, color: ON_CARD.text, flexShrink: 1 }}
+                numberOfLines={1}
+              >
+                {isMe ? t('location.you') : profile.display_name}
+              </Txt>
+              {watched ? <WatchingChip light /> : null}
+            </View>
+            <Txt style={{ fontSize: 11.5, lineHeight: 14, color: ON_CARD.muted }} numberOfLines={1}>
+              {live
+                ? `${where} · ${timeAgo(live.updated_at, t)}`
+                : isPaused(location)
+                  ? t('location.status.paused')
+                  : t('location.status.off')}
             </Txt>
-            {watched ? <WatchingChip /> : null}
           </View>
-          <Txt variant="muted" style={{ fontSize: 11, lineHeight: 14 }} numberOfLines={1}>
-            {live
-              ? `${where} · ${timeAgo(live.updated_at, t)}`
-              : isPaused(location)
-                ? t('location.status.paused')
-                : t('location.status.off')}
-          </Txt>
+          <Pressable
+            onPress={onCollapse}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
+            // Top corner, not centred on the 40pt avatar row — centring read
+            // as sagging. A soft round button so it reads on any member colour.
+            style={{
+              alignSelf: 'flex-start',
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              backgroundColor: ON_CARD.soft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <X size={14} color={ON_CARD.text} />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={onCollapse}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          // Top-aligned, not centred on the row. The row's height comes from the
-          // 40pt avatar, so centring put this 17pt glyph ~23pt below the card's
-          // top while everything else starts at the 12pt padding — it read as
-          // sagging. Flush to the top makes the inset 12 from the top and 12
-          // from the right: an actual corner.
-          style={{ alignSelf: 'flex-start' }}
-        >
-          <X size={17} color={c.textMuted} />
-        </Pressable>
-      </View>
 
-      {live && !isMe ? (
-        <>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {/* ETA leads — Arthur's call, and it's the thing you open this for. */}
-            <Stat label={t('location.stat.eta')} value={etaText} primary />
-            <Stat label={t('location.stat.distance')} value={distText} />
-            <Stat label={t('location.stat.battery')} value={battText} />
-          </View>
-          {/* Three actions, not five. The map apps used to sit here as separate
-              icon buttons, which made each one narrow enough that the glyph had
-              to carry the meaning — unreadable at this size. They live behind
-              "Navigate" now, which buys the remaining buttons enough width for a
-              legible label. */}
-          <View style={{ flexDirection: 'row', gap: 6, marginTop: 'auto' }}>
-            <IconAction
-              // c.text like its neighbours: the accent was the only thing
-              // different about this button, which read as "switched on" —
-              // exactly the false state the header buttons had. All three of
-              // these do the same kind of thing, so they look the same.
-              icon={<Navigation size={16} color={c.text} />}
-              label={t('location.action.navigate')}
-              onPress={onNavigate}
-            />
-            <IconAction
-              icon={<Bell size={16} color={c.text} />}
-              label={t('location.action.nudge')}
-              onPress={onNudge}
-            />
-            {phone ? (
-              <IconAction
-                icon={<Phone size={16} color={c.text} />}
-                label={t('location.action.call')}
-                onPress={() => void Linking.openURL(`tel:${phone}`)}
+        {live && !isMe ? (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', height: 43 }}>
+              {/* ETA leads — Arthur's call, and it's the thing you open this for. */}
+              <Stat label={t('location.stat.eta')} value={etaText} primary />
+              <Rule />
+              <Stat label={t('location.stat.distance')} value={distText} />
+              <Rule />
+              <Stat
+                label={t('location.stat.battery')}
+                value={battText}
+                icon={live?.battery != null ? <BatteryGlyph level={live.battery} /> : null}
               />
-            ) : null}
+            </View>
+            {/* Three actions, not five: the map apps live behind "Navigate" so
+                these keep enough width for a readable label. */}
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 'auto' }}>
+              <IconAction
+                icon={<Navigation size={14} color={ON_CARD.text} />}
+                label={t('location.action.navigate')}
+                onPress={onNavigate}
+              />
+              <IconAction
+                icon={<Bell size={14} color={ON_CARD.text} />}
+                label={t('location.action.nudge')}
+                onPress={onNudge}
+              />
+              {phone ? (
+                <IconAction
+                  icon={<Phone size={14} color={ON_CARD.text} />}
+                  label={t('location.action.call')}
+                  onPress={() => void Linking.openURL(`tel:${phone}`)}
+                />
+              ) : null}
+            </View>
+          </>
+        ) : (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: sp.sm }}>
+            <Navigation size={20} color={ON_CARD.muted} />
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 12.5, color: ON_CARD.text, textAlign: 'center' }}>
+              {isPaused(location)
+                ? t('location.member.pausedTitle', { name: profile.display_name })
+                : t('location.member.offTitle', { name: profile.display_name })}
+            </Txt>
+            <Txt style={{ fontSize: 10.5, color: ON_CARD.muted, textAlign: 'center' }} numberOfLines={2}>
+              {t('location.member.offBody')}
+            </Txt>
           </View>
-        </>
-      ) : (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: sp.sm }}>
-          <Navigation size={20} color={c.textFaint} />
-          <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, color: c.text, textAlign: 'center' }}>
-            {isPaused(location)
-              ? t('location.member.pausedTitle', { name: profile.display_name })
-              : t('location.member.offTitle', { name: profile.display_name })}
-          </Txt>
-          <Txt variant="faint" style={{ fontSize: 10, textAlign: 'center' }} numberOfLines={2}>
-            {t('location.member.offBody')}
-          </Txt>
-        </View>
-      )}
+        )}
+      </MemberCardShell>
     </View>
   )
 }

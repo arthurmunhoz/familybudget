@@ -2,7 +2,7 @@
 // avatar (photo or initials) used both as a map pin and in lists, a small
 // battery chip, the pulsing "Watching" badge, and a localized "time ago" helper.
 import { useEffect, useRef, useState } from 'react'
-import { Animated, StyleSheet, View } from 'react-native'
+import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Image } from 'expo-image'
 import { ShieldCheck } from 'lucide-react-native'
 
@@ -11,6 +11,8 @@ import { useI18n } from '@/hooks/useI18n'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { pickOn } from '@/theme/contrast'
 import { Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { shade } from '@/components/home/palette'
 import type { TKey } from '@/lib/i18n'
 
 /** Roster card geometry, shared by the collapsed card, the expanded detail card
@@ -48,6 +50,35 @@ export const FLOAT_SHADOW = {
   shadowOffset: { width: 0, height: 5 },
   elevation: 6,
 } as const
+
+/** The roster card's body (2026-11, the Home's gradient-card look): the
+ *  member's colour as a diagonal gradient — the same colour as their pin —
+ *  with white type on it. The shadow sits on an outer view because the
+ *  gradient clips (overflow hidden), which would swallow an iOS shadow. */
+export function MemberCardShell({
+  color,
+  width,
+  height,
+  children,
+  style,
+}: {
+  color: string
+  width: number
+  height: number
+  children: React.ReactNode
+  style?: StyleProp<ViewStyle>
+}) {
+  return (
+    <View style={[{ width, height, borderRadius: radius.lg, ...FLOAT_SHADOW }, style]}>
+      <GradientBox
+        colors={[shade(color, -0.02), shade(color, -0.3)]}
+        radius={radius.lg}
+        style={StyleSheet.absoluteFill}
+      />
+      {children}
+    </View>
+  )
+}
 
 // Distinct, warm-leaning member colors that read on both Paper and Dusk.
 export const MEMBER_PALETTE = [
@@ -88,12 +119,15 @@ export function MemberAvatar({
   color,
   size = 44,
   ring = true,
+  ringColor,
 }: {
   name: string
   avatarPath?: string | null
   color: string
   size?: number
   ring?: boolean
+  /** Ring colour; defaults to the sheet (white on a gradient card). */
+  ringColor?: string
 }) {
   const { c } = useTheme()
   const [url, setUrl] = useState<string | null>(null)
@@ -121,7 +155,7 @@ export function MemberAvatar({
         borderRadius: size / 2,
         backgroundColor: color,
         borderWidth: border,
-        borderColor: c.sheet,
+        borderColor: ringColor ?? c.sheet,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
@@ -146,9 +180,11 @@ function batteryColor(level: number, c: ReturnType<typeof useTheme>['c']): strin
 }
 
 /** Small battery gauge + percentage; green / amber / red by level. */
-export function BatteryChip({ level }: { level: number }) {
+export function BatteryChip({ level, light }: { level: number; light?: boolean }) {
   const { c } = useTheme()
-  const color = batteryColor(level, c)
+  // On a gradient card the gauge is white unless the level is low enough to
+  // need its warning colour.
+  const color = light && level > 30 ? '#fff' : batteryColor(level, c)
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <View
@@ -171,7 +207,9 @@ export function BatteryChip({ level }: { level: number }) {
           }}
         />
       </View>
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.textMuted }}>{level}%</Txt>
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: light ? 'rgba(255,255,255,0.92)' : c.textMuted }}>
+        {level}%
+      </Txt>
     </View>
   )
 }
@@ -250,9 +288,10 @@ export function Pulse({ children }: { children: React.ReactNode }) {
 
 /** "Watching" badge — softly pulses so an active Safety Radius reads as ongoing
  *  activity rather than a static label. */
-export function WatchingChip() {
+export function WatchingChip({ light }: { light?: boolean } = {}) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const fg = light ? '#fff' : c.accent
   return (
     <Pulse>
       <View
@@ -260,14 +299,14 @@ export function WatchingChip() {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 3,
-          backgroundColor: c.accentSoft,
+          backgroundColor: light ? 'rgba(255,255,255,0.22)' : c.accentSoft,
           borderRadius: radius.pill,
           paddingHorizontal: 7,
           paddingVertical: 2,
         }}
       >
-        <ShieldCheck size={10} color={c.accent} />
-        <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: c.accent }}>
+        <ShieldCheck size={10} color={fg} />
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 9, color: fg }}>
           {t('location.card.watching')}
         </Txt>
       </View>

@@ -12,16 +12,17 @@
 // Native-only: the map (@rnmapbox/maps) and background location need a dev build
 // + EXPO_PUBLIC_MAPBOX_TOKEN — see mobile/WHEREABOUTS-SETUP.md.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, View } from 'react-native'
+import { router, useLocalSearchParams } from 'expo-router'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Localization from 'expo-localization'
 import * as Location from 'expo-location'
 import Mapbox, { Camera, FillLayer, LineLayer, MapView, MarkerView, ShapeSource } from '@rnmapbox/maps'
 import {
+  ChevronLeft,
+  CircleHelp,
   MapPin,
   Crosshair,
-  Landmark,
   Layers,
   Settings2,
   ShieldAlert,
@@ -30,7 +31,7 @@ import {
   X,
 } from 'lucide-react-native'
 
-import { AppHeader, Txt } from '@/components/ui'
+import { Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -62,6 +63,7 @@ import {
   CARD_W,
   FLOAT_SHADOW,
   MemberAvatar,
+  MemberCardShell,
   Pulse,
   ROSTER_BOTTOM_GAP,
   ROSTER_SHADOW_PAD,
@@ -77,6 +79,9 @@ import { NudgePicker } from './NudgePicker'
 import { PlacesSheet } from './PlacesSheet'
 import { SafetyRadiusSheet } from './SafetyRadiusSheet'
 import { SharingControls } from './SharingControls'
+import { WhereaboutsIntro } from './WhereaboutsIntro'
+import { FEATURE, ON_CARD } from './onCard'
+import { useWhereaboutsIntro } from './introSeen'
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? ''
 // Optional custom Mapbox Studio styles (e.g. a Warm Hearth theme). If only the
@@ -141,6 +146,7 @@ async function fetchMemberMeta(): Promise<{
 function HeaderButton({
   icon,
   label,
+  tint,
   active,
   badge,
   onPress,
@@ -148,14 +154,18 @@ function HeaderButton({
   /** Rendered with the resolved foreground colour. */
   icon: (color: string) => React.ReactNode
   label: string
+  /** The feature's own colour (its icon and a soft fill). */
+  tint: string
   /** The thing this opens is running right now → pulse the glyph. */
   active?: boolean
   /** Plus sparkle for a gated feature. */
   badge?: boolean
   onPress: () => void
 }) {
-  const { c } = useTheme()
-  const glyph = icon(active ? c.accent : c.text)
+  const { c, dark } = useTheme()
+  const glyph = icon(tint)
+  // A NAMED chip, not a bare glyph (owner, 2026-11): a shield and a building
+  // on their own didn't tell anyone that Places and the Safety radius exist.
   return (
     <Pressable
       onPress={onPress}
@@ -164,22 +174,24 @@ function HeaderButton({
       accessibilityState={{ selected: !!active }}
       style={({ pressed }) => [
         {
-          width: 36,
-          height: 36,
-          borderRadius: radius.md,
+          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: c.surface,
+          gap: 7,
+          height: 38,
+          paddingHorizontal: 14,
+          borderRadius: radius.pill,
+          backgroundColor: tint + (dark ? '2E' : '1A'),
+          borderWidth: active ? 1.5 : 0,
+          borderColor: tint,
         },
         pressed && { opacity: 0.7 },
       ]}
     >
       {active ? <Pulse>{glyph}</Pulse> : glyph}
-      {badge ? (
-        <View style={{ position: 'absolute', top: -4, right: -4 }}>
-          <Sparkles size={12} color={c.accent} />
-        </View>
-      ) : null}
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
+        {label}
+      </Txt>
+      {badge ? <Sparkles size={12} color={tint} /> : null}
     </Pressable>
   )
 }
@@ -212,103 +224,94 @@ function MemberCard({
   /** Your own sharing state, shown in place of the location line. */
   sharing?: 'on' | 'paused' | 'off'
 }) {
-  const { c } = useTheme()
   const { t } = useI18n()
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       // No selected-state border: on first load nothing should look "picked".
-      style={({ pressed }) => [
-        {
-          width: CARD_W,
-          height: CARD_H,
-          // c.sheet, NOT c.surface — these float straight on the map now, and
-          // surface is translucent under the glass skin (10% white in Dusk),
-          // which would leave the card all but invisible over the tiles.
-          backgroundColor: c.sheet,
-          borderRadius: radius.lg,
-          paddingVertical: sp.md,
-          paddingHorizontal: sp.sm,
-          alignItems: 'center',
-          gap: 5,
-          ...FLOAT_SHADOW,
-        },
-        pressed && { opacity: 0.7 },
-      ]}
+      style={({ pressed }) => [pressed && { opacity: 0.85 }]}
     >
-      <MemberAvatar name={name} avatarPath={avatarPath} color={color} size={44} />
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.text }} numberOfLines={1}>
-        {name}
-      </Txt>
-      {/* YOUR card says nothing about where you ARE — you already know, and that
-          line was spending the card's best row telling you so. What you can't
-          see without asking is whether you're currently sharing, so that's what
-          it says instead. No battery: the phone already has one on screen. */}
-      {onSettings ? (
-        // Sits in the same slot as everyone else's location line, so your card
-        // keeps the roster's rhythm instead of leaving a hole in the middle.
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-          <View
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: 4,
-              backgroundColor:
-                sharing === 'on' ? c.income : sharing === 'paused' ? '#c8862a' : c.textFaint,
-            }}
-          />
-          <Txt
-            variant="muted"
-            style={{ fontSize: 11, flexShrink: 1, textAlign: 'center' }}
-            numberOfLines={2}
-          >
-            {t(
-              sharing === 'on'
-                ? 'location.status.sharing'
-                : sharing === 'paused'
-                  ? 'location.status.paused'
-                  : 'location.status.off',
-            )}
-          </Txt>
-        </View>
-      ) : (
-        <Txt variant="muted" style={{ fontSize: 11, textAlign: 'center' }} numberOfLines={2}>
-          {status}
+      {/* A gradient card in the member's colour — the same colour as their pin,
+          so a card and a pin read as one person (owner, 2026-11: the plain
+          cards looked like a settings list on top of the map). */}
+      <MemberCardShell
+        color={color}
+        width={CARD_W}
+        height={CARD_H}
+        style={{ paddingVertical: sp.md, paddingHorizontal: sp.sm, alignItems: 'center', gap: 4 }}
+      >
+        <MemberAvatar name={name} avatarPath={avatarPath} color={color} size={48} ringColor={ON_CARD.ring} />
+        <Txt
+          style={{ fontFamily: fonts.display, fontSize: 16, lineHeight: 20, color: ON_CARD.text, marginTop: 2 }}
+          numberOfLines={1}
+        >
+          {name}
         </Txt>
-      )}
-      <View style={{ marginTop: 'auto', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
-        {watched ? <WatchingChip /> : null}
+        {/* YOUR card says nothing about where you ARE — you already know. What
+            you can't see without asking is whether you're sharing, so that's
+            what it says, in the slot everyone else's location line uses. No
+            battery: the phone already has one on screen. */}
         {onSettings ? (
-          // Nested Pressable, so it takes its own tap without also firing the
-          // card underneath (which frames you on the map).
-          <Pressable
-            onPress={onSettings}
-            accessibilityRole="button"
-            accessibilityLabel={t('location.card.manage')}
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 5,
-                alignSelf: 'stretch',
-                backgroundColor: c.accentSoft,
-                borderRadius: radius.md,
-                paddingVertical: 7,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Settings2 size={13} color={c.accent} />
-            <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.accent }} numberOfLines={1}>
-              {t('location.card.sharing')}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                borderWidth: 1.5,
+                borderColor: '#fff',
+                backgroundColor: sharing === 'on' ? '#3DDC84' : sharing === 'paused' ? '#F2C14E' : 'transparent',
+              }}
+            />
+            <Txt style={{ fontSize: 11.5, lineHeight: 15, color: ON_CARD.muted, flexShrink: 1, textAlign: 'center' }} numberOfLines={2}>
+              {t(
+                sharing === 'on'
+                  ? 'location.status.sharing'
+                  : sharing === 'paused'
+                    ? 'location.status.paused'
+                    : 'location.status.off',
+              )}
             </Txt>
-          </Pressable>
-        ) : battery != null ? (
-          <BatteryChip level={battery} />
-        ) : null}
-      </View>
+          </View>
+        ) : (
+          <Txt style={{ fontSize: 11.5, lineHeight: 15, color: ON_CARD.muted, textAlign: 'center' }} numberOfLines={2}>
+            {status}
+          </Txt>
+        )}
+        <View style={{ marginTop: 'auto', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
+          {watched ? <WatchingChip light /> : null}
+          {onSettings ? (
+            // Nested Pressable, so it takes its own tap without also firing the
+            // card underneath (which frames you on the map).
+            <Pressable
+              onPress={onSettings}
+              accessibilityRole="button"
+              accessibilityLabel={t('location.card.manage')}
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 5,
+                  alignSelf: 'stretch',
+                  backgroundColor: ON_CARD.soft,
+                  borderRadius: radius.pill,
+                  paddingVertical: 7,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Settings2 size={13} color={ON_CARD.text} />
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 11.5, color: ON_CARD.text }} numberOfLines={1}>
+                {t('location.card.sharing')}
+              </Txt>
+            </Pressable>
+          ) : battery != null ? (
+            <BatteryChip level={battery} light />
+          ) : null}
+        </View>
+      </MemberCardShell>
     </Pressable>
   )
 }
@@ -356,6 +359,7 @@ export default function Whereabouts() {
   /** Bumped each time a map style finishes loading, to re-key our own sources. */
   const [styleEpoch, setStyleEpoch] = useState(0)
   const [placesOpen, setPlacesOpen] = useState(false)
+  const intro = useWhereaboutsIntro()
   const [safetyOpen, setSafetyOpen] = useState(false)
   // Arriving from the Hub's safety banner (?safety=1) opens the sheet straight
   // away, so managing/stopping a running watch is one tap from the home screen.
@@ -784,32 +788,52 @@ export default function Whereabouts() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader
-          title={t('app.location.name')}
-          right={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-              {/* Safety radius — a Plus feature: the sparkle marks it, a non-Plus
-                  tap goes to the paywall, and the button fills while a watch runs. */}
-              <HeaderButton
-                label={t('location.safety.title')}
-                active={!!activeWatch}
-                badge={isFree}
-                icon={(col) => <ShieldCheck size={19} color={col} />}
-                // Free users open the sheet too — they get one 30-minute watch a
-                // day, so bouncing them straight to the paywall would sell a
-                // feature they already partly have. The sheet states the limit,
-                // and the paywall comes up only once it's actually spent.
-                onPress={() => setSafetyOpen(true)}
-              />
-              <HeaderButton
-                label={t('location.places.title')}
-                icon={(col) => <Landmark size={19} color={col} />}
-                onPress={() => setPlacesOpen(true)}
-              />
-            </View>
-          }
-        />
+      {/* Home-style header: round back, big title, "?" for the intro; the
+          features as NAMED chips under it (owner, 2026-11). */}
+      <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.xs, paddingBottom: sp.md, gap: sp.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            hitSlop={8}
+            style={({ pressed }) => [styles.round, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+          >
+            <ChevronLeft size={22} color={c.text} />
+          </Pressable>
+          <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 28, lineHeight: 33, color: c.text }} numberOfLines={1}>
+            {t('app.location.name')}
+          </Txt>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('location.intro.open')}
+            onPress={intro.show}
+            hitSlop={8}
+            style={({ pressed }) => [styles.round, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+          >
+            <CircleHelp size={20} color={c.text} />
+          </Pressable>
+        </View>
+        <View style={{ flexDirection: 'row', gap: sp.sm }}>
+          {/* Safety radius — a Plus feature: the sparkle marks it. Free users open
+              the sheet too — they get 30 minutes a day, so bouncing them straight
+              to the paywall would sell a feature they already partly have. While a
+              watch runs the chip is outlined and its glyph pulses. */}
+          <HeaderButton
+            label={t('location.safety.title')}
+            tint={FEATURE.safety}
+            active={!!activeWatch}
+            badge={isFree}
+            icon={(col) => <ShieldCheck size={17} color={col} />}
+            onPress={() => setSafetyOpen(true)}
+          />
+          <HeaderButton
+            label={t('location.places.title')}
+            tint={FEATURE.places}
+            icon={(col) => <MapPin size={17} color={col} />}
+            onPress={() => setPlacesOpen(true)}
+          />
+        </View>
       </View>
 
       <View style={{ flex: 1 }}>
@@ -1212,7 +1236,24 @@ export default function Whereabouts() {
         />
       ) : null}
 
+      {/* First visit (and the "?"): what this screen can do. Never alongside
+          another sheet — sibling Modals fail to present on iOS. */}
+      {intro.open && !nudgeFor && !navFor && !mapModeOpen && !safetyOpen && !placesOpen && !sharingOpen ? (
+        <WhereaboutsIntro onClose={intro.close} />
+      ) : null}
+
       <Toast data={toast} />
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  round: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

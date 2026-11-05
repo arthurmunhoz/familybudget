@@ -51,6 +51,7 @@ export type EventName =
   | 'push.fanout.retried'
   // Documents
   | 'doc.uploaded'
+  | 'doc.replaced'
   | 'doc.opened'
   | 'doc.deleted'
   // Calendar
@@ -91,6 +92,7 @@ export const SEMANTIC_EVENTS: EventName[] = [
   'pet.weight_logged',
   'nudge.sent',
   'doc.uploaded',
+  'doc.replaced',
   'doc.opened',
   'doc.deleted',
   'calendar.created',

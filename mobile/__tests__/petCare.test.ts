@@ -67,3 +67,20 @@ describe('pet care reminders', () => {
     expect(reminderEvents(newestFirst([a, b, c]))).toHaveLength(3)
   })
 })
+
+import { eventSeries } from '@/lib/petCare'
+
+describe('eventSeries', () => {
+  const ev = (id: string, title: string, date: string) =>
+    ({ id, pet_id: 'p1', title, event_date: date, type: 'medication', next_due: null }) as never
+  it('groups by title ignoring case and spacing, newest first', () => {
+    const s = eventSeries([
+      ev('1', 'Heartworm pill', '2026-11-04'),
+      ev('2', 'Flea treatment', '2026-11-04'),
+      ev('3', 'heartworm  Pill', '2026-08-14'),
+      ev('4', 'Rabies booster', '2025-11-04'),
+    ])
+    expect(s.map((x) => x.latest.title)).toEqual(['Heartworm pill', 'Flea treatment', 'Rabies booster'])
+    expect(s[0].entries.map((e) => e.id)).toEqual(['1', '3'])
+  })
+})

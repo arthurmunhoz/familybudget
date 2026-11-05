@@ -25,6 +25,7 @@ import { APP_GRADIENT } from './home/palette'
 import { GradientBox } from './home/GradientBox'
 import { useAppPrefs } from '../hooks/useAppPrefs'
 import { useBottomGap } from '../hooks/useBottomGap'
+import { useScreenCorner } from '../hooks/useScreenCorner'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { WHEREABOUTS_ENABLED } from '../lib/features'
 import { useAuth } from '../lib/auth'
@@ -44,7 +45,11 @@ export default function Hub() {
   const [asking, setAsking] = useState(false)
   const [askKey, setAskKey] = useState(0)
   const [askListen, setAskListen] = useState(false)
-  const dockGap = useBottomGap(sp.md)
+  // On a Face ID iPhone the dock takes the bottom button's geometry
+  // (useScreenCorner); Android keeps the plain floating bar.
+  const corner = useScreenCorner()
+  const bottomGap = useBottomGap(sp.md)
+  const dockGap = corner ? corner.bottom : bottomGap
 
   const { hiddenApps, appOrder } = useAppPrefs()
   // Hidden apps drop out; ordered ids come first (registry order for the rest);
@@ -185,8 +190,25 @@ export default function Hub() {
       </ScrollView>
 
       {/* the household, always within reach */}
-      <View pointerEvents="box-none" style={[styles.dockWrap, { bottom: dockGap }]}>
-        <View style={[styles.dock, { backgroundColor: c.sheet, borderColor: c.border }]}>
+      <View
+        pointerEvents="box-none"
+        style={[styles.dockWrap, { bottom: dockGap }, corner ? { left: corner.side, right: corner.side } : null]}
+      >
+        <View
+          style={[
+            styles.dock,
+            { backgroundColor: c.sheet, borderColor: c.border },
+            corner
+              ? {
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  borderBottomLeftRadius: corner.radius,
+                  borderBottomRightRadius: corner.radius,
+                  paddingRight: 14,
+                }
+              : null,
+          ]}
+        >
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.dockRow}>
             {members.map((p) => {
               const tint = memberColor(p.email, memberEmails)

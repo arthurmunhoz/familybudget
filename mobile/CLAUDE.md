@@ -79,7 +79,12 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   budget cards → budget screen (`TrendCard` received-vs-spent per period +
   plain period rows) → period (hero, "Where it went" stacked bar + top 5
   categories, Entries with a segmented sort, bottom: Scan receipt + New entry
-  in the budget gradient).
+  in the budget gradient). A revamped screen should feel like the Home all
+  the way through, not just in one card (owner, 2026-11): a big display title
+  with its state in the same faded type under it ("Shopping / 6 to buy."),
+  round top-bar buttons, tiles instead of chips for the main filter, rows of a
+  section grouped into ONE rounded card, uppercase tracked section labels, and
+  the input as a floating capsule (Shopping is the reference).
 - **The ask bar (`components/home/AskSheet` + `lib/assistant`).** The server
   only UNDERSTANDS (`/api/suggest-ping?action=assistant` → `{intent, items,
   store, scope, person, date, reply}`, Claude Haiku, structured output); the
@@ -89,7 +94,32 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   household-wide events, all, or a named member; pet care due shows on today).
   `localParse` covers the two common phrasings offline / before a deploy — keep
   `__tests__/assistant.test.ts` green when touching it. New intent = schema +
-  `understand` branch + an executor here + an answer view in AskSheet.
+  `understand` branch + an executor here + an answer view (AnswerViews).
+  Intents today: shopping (add — asks WHICH list when none matches, never
+  invents one —, list, find, check, remove), agenda (a day or a PERIOD via
+  `date_end`), add event, add money / summary, nudge (sent only on a tap),
+  pets due, family details, open app, split a bill (asks equal vs by item;
+  opens `/calc/even?bill=&people=&tip=` prefilled), discount. Claude gets the
+  open shopping items as context so questions match across languages; where
+  the local parser sees a period or a utility phrasing, it overrides an older
+  server's weaker answer (see `understand`).
+  **Voice timing:** the recogniser starts at once but the UI says "one
+  moment" (`starting`) until the first mic VOLUME reading proves audio is
+  flowing — then the start chime + "listening" (the cue to talk). The iOS
+  session runs in mode `default`, not the module's `measurement` (which
+  turns output down — faint, late-sounding chimes). Every way out of the
+  sheet goes through `closeSheet` → `voice.cancel()`, which plays the stop
+  chime and aborts.
+  **It's a conversation (2026-11):** while the sheet is open, each finished
+  turn moves up as the question + a one-line summary of the answer
+  (`summarize` in AskSheet — written for the user AND sent to Claude), and
+  `history` (last 6 turns) rides along on every request so follow-ups resolve
+  ("o que tem no Walmart?" → "tira o leite", "e amanhã?", "e a Lola?").
+  Tapping the mic after an answer commits the turn first; "New chat" clears.
+  A new Answer kind needs a `summarize` case (tsc enforces the switch).
+  `pets_due` takes a `pet` and includes today's daily-routine items not yet
+  ticked (`petsDue`: overdue, then the routine in its order, then due today),
+  so "what's next for Lola?" leads with the first undone thing.
 - **`@/components/PhotoHero`** — the full-bleed, swipeable photo header used
   by Pet Care and Family (one page per pet / member; name + badge on the photo,
   side arrows with a tiny avatar of the neighbour, page dots, shrinks with a
@@ -377,6 +407,26 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   about without a device.
 - **i18n** `@/hooks/useI18n`: `useI18n()` → `{ t, lang, setLang }`. Dicts in
   `@/lib/i18n` (en/es/pt) are the PWA dicts copied verbatim — add keys to all 3.
+- **Pet Care shows ONE "Care" list for everything that repeats** (2026-11,
+  `apps/pets/CareCards` `CareGrid`): interval routines (`pet_care_tasks`,
+  Done records today) AND events carrying a `next_due` (`pet_events` — a
+  check-up, a vaccine, a monthly pill; Done opens the event form prefilled).
+  The data stays in its two tables (the digest, the widget and the server read
+  both); only the screen is unified, and a name present in both shows once —
+  the one due sooner. There is no "Coming up" any more. Below it, "Events"
+  lists one row per event series (`eventSeries`), tap → its history sheet.
+  The docked buttons add a vet visit or a vaccine through **`VisitForm`** (pet
+  and type FIXED — you're on that pet's page and tapped that button): name in
+  place with quick picks (vaccines by species, `visitPresets.ts`), date, next
+  due as chips (or a date), notes. It also edits / logs again vet & vaccine
+  events; other types (older meds, grooming) still open `EventForm`. A next
+  due puts it in Care.
+  Every Pet Care sheet (RoutineSheet + its task editor, OverdueSheet,
+  EventForm, the series sheet, PetForm) shares one look: tracked uppercase
+  label, display title with its state faded under it, rows on ONE rounded
+  card with icon tiles tinted in the pet's / event type's colour, and the
+  docked primary button following the screen curve — in the PET'S colour in
+  the routine sheets (`TintButton`). Cadence copy is `careText.everyLabel`.
 - **Pet event reminders are a SERIES per (pet, title)** — `latestPerKey` in
   `lib/petCare.ts`, and the same rule in `api/send-digest.ts` and
   `api/widget.ts`: the newest log of a treatment decides its next due, titles
@@ -938,138 +988,21 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     nothing else wants. Their SIZE can't be changed — `@rnmapbox/maps` exposes
     only `logoEnabled`/`logoPosition` and `attributionEnabled`/
     `attributionPosition`, so the (i) is already as small as it comes.
-  - **Header buttons all look identical** (`HeaderButton`): same fill, glyph in
-    `c.text`. An `active` fill was tried and removed — Places has no active state
-    at all, so next to a filled Safety Radius it read as disabled, and
-    `c.textMuted` on the translucent glass surface looked switched off in Dusk.
-    Activity is shown by pulsing the GLYPH instead (`Pulse` in `locationUi`).
-- Not yet: location history (7-day retention, must be clearly surfaced to users)
-  and driving/SOS check-in; a map-drag picker for placing/moving a place.
-
-## AI / server endpoints
-Native calls the deployed Vercel API via `process.env.EXPO_PUBLIC_API_BASE`
-(`https://one-roof-app.vercel.app`) with `Authorization: Bearer <session token>`:
-`/api/scan-receipt` (Budget), `/api/suggest-ping` (Nudges), and `/api/ack-ping`
-(silent push to a nudge's sender when acked — see the widget note above). The
-Nudges *widget* itself talks to `/api/widget-nudge` directly from Swift, using
-a per-device widget token instead of a Supabase session (migration 045); the
-Today widget uses the same token against `/api/widget?action=today` to pull
-today's agenda on its own timeline. Both are served by one `api/widget.ts` —
-`/api/widget-nudge` is a `vercel.json` rewrite onto it, kept forever because the
-shipped App Store build posts to that exact URL. Push fan-out and Google
-Calendar sync still need server work (see the TODO doc).
-
-**`api/` is NOT covered by any build gate** — `tsconfig.app.json` only includes
-`src`, and Vercel compiles the functions at deploy. Type-check a new/changed
-function by hand before committing:
-```
-npx tsc --noEmit --ignoreConfig --esModuleInterop --skipLibCheck \
-  --module esnext --moduleResolution bundler --target es2022 --strict \
-  --types node api/<file>.ts
-```
-**And `api/` is capped at 12 files on Vercel Hobby — it is currently AT 12.** A
-new endpoint must fold into an existing function behind `?action=`; see the root
-`CLAUDE.md` "Build, deploy, git".
-
-## Verifying changes (no simulator in this harness)
-There is no browser/simulator in the agent harness. The gate is:
-```
-cd mobile && npx tsc --noEmit            # types
-cd mobile && npx expo export --platform ios --output-dir /tmp/x   # Metro bundle resolves all imports
-cd mobile && npm test && npx tsc --noEmit -p __tests__           # Whereabouts behaviour tests (Jest, Android preset)
-```
-All must pass before committing. The Jest suite (`__tests__/whereabouts/`,
-spec in its `SPEC.md`) fakes expo-location / task-manager / notifications and
-Supabase over a shared `world()` and models Android's headless boot; it
-proves JS contracts only. `DEVICE-TEST.md` next to it is the two-phone
-protocol for what only a device can show. Real on-device behavior (auth, camera, Face ID,
-push, layout) must be checked by a human on a simulator/device — say so, don't
-claim it's verified. For a NATIVE dependency + config plugin (below), also run
-`npx expo config --type introspect --json` to confirm the plugin applies and the
-resulting infoPlist is right — that catches a broken plugin without a full
-prebuild (which regenerates `ios/` + needs pods; do it on a real machine, not to
-validate config — see "Regenerating native code" below).
-
-**Document scanning (Documents app)**: `react-native-document-scanner-plugin`
-(config plugin in `app.json`) wraps VisionKit's `VNDocumentCameraViewController`
-on iOS — live edge detection, auto-capture, perspective-corrected crop.
-`DocumentVault`'s `scanDocument()` calls it, then runs the SAME downscale
-(2048px, JPEG 0.7) + `UploadSheet` handoff as a picked image. It's a NATIVE
-TurboModule (New Arch), absent in Expo Go / before a rebuild. **Its spec calls
-`getEnforcing('DocumentScanner')` AT IMPORT, which THROWS when the native binary
-lacks it — a static top-level `import` crashes the whole Documents route on
-load** (real crash, hit on device before the rebuild). So it's loaded LAZILY via
-`loadScanner()` (a guarded `require` inside try/catch → `null` when absent);
-NEVER reintroduce a static import. `scanDocument` falls back to a plain
-`expo-image-picker` camera capture (`takePhoto`) when the module is null or the
-scan throws, and only treats `status === 'success'` as a real scan (else the
-user cancelled). Multi-page → one PDF via `pdf-lib` (pure JS). Needs a native
-rebuild to actually scan; the camera string lives in
-the `expo-image-picker` plugin's `cameraPermission` (which overrides
-`ios.infoPlist`) AND the scanner plugin's own `cameraPermission` — keep both in
-sync.
-- **List thumbnails** live at a DERIVED path, `<household>/thumbs/<uuid>.jpg`
-  (`thumbPathFor` in `docUtils`) — no `documents` column. `UploadSheet` writes a
-  320px JPEG best-effort from `PickedFile.thumbUri` (the photo, or a multi-page
-  scan's first page); a picked PDF has none (nothing on-device renders PDFs) and
-  shows a typed tile. The list signs every thumb path in ONE batch; a path with
-  no object comes back without a URL, which is how "no thumb" is detected. Image
-  docs without a thumb (PWA, older builds) fall back to the image itself. Delete
-  removes the thumb with the file.
-- **AUTO-SHUTTER isn't configurable.** VisionKit auto-captures by default and
-  exposes NO public API for the capture mode — the user toggles Auto/Manual in
-  the scanner UI (VisionKit remembers it for the session). Defaulting it OFF
-  would mean swapping VisionKit for a custom (WeScan/OpenCV) scanner, or a
-  fragile private-API view-hierarchy hack — don't, without asking.
-
-## Regenerating native code (`ios/` is gitignored — CNG)
-`ios/` and `android/` are generated, not committed, so a native rebuild is
-`prebuild`. Two failures bite EVERY time on this machine — use this exact recipe:
-```
-LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx expo prebuild -p ios --clean
-LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 npx pod-install       # if you used --no-install
-```
-- **`--clean`** (regenerate from scratch) is REQUIRED. Prebuilding over an
-  existing `ios/` makes `@bacons/apple-targets` try to *update* the
-  `OneRoofWidgets` target and crash (`Cannot read properties of undefined
-  (reading 'removeFromProject')`). Clean makes it *create* the target instead.
-  Safe because `ios/` is gitignored — all native config is in `app.json` /
-  `app.config.js` / `targets/widgets/`.
-- **`LANG`/`LC_ALL` UTF-8** avoids a CocoaPods 1.17 + Ruby 4.0 crash
-  (`Unicode Normalization not appropriate for ASCII-8BIT`) when the shell locale
-  isn't UTF-8.
-- Then build: `npx expo run:ios`, or open `ios/OneRoof.xcworkspace` in Xcode.
-
-## `EXPO_PUBLIC_*` vars: `.env.local` is INVISIBLE to EAS builds
-A cloud EAS build uploads only **git-tracked** files, and `.env.local` is
-gitignored — so a var that lives only there inlines as `undefined` and the feature
-**ships dark with no build error and no warning**. This is the native twin of the
-web app's "Vercel sensitive vars aren't exposed to the build" trap (see the root
-`CLAUDE.md`), and it has already bitten once: the first Android build shipped with a
-blank Whereabouts map because `EXPO_PUBLIC_MAPBOX_TOKEN` was in `.env.local` and
-nowhere else, while `RNMAPBOX_DOWNLOAD_TOKEN` *was* on EAS — so the native SDK
-built fine and only the runtime token was missing, which looks like a broken map
-rather than a missing env var.
-- **Before blaming the code, check what the builder actually sees:**
-  `npx eas env:list --environment preview` (also `production`, `development`).
-- Add one with `npx eas env:create --name X --value Y --environment production
-  --environment preview --environment development --visibility plaintext
-  --scope project`. `eas.json`'s per-profile `env` block is the other valid home;
-  EAS env vars are preferred for anything you'd rather not commit.
-- **Visibility: `plaintext` for `EXPO_PUBLIC_*`.** They are compiled into the JS
-  bundle and readable by anyone with the APK, so `secret` buys no security and only
-  makes the value unverifiable afterwards. Reserve `secret` for build-time
-  credentials that never reach the client (`RNMAPBOX_DOWNLOAD_TOKEN`).
-- **There is no `expo-updates` in this project**, so an env-var fix CANNOT be shipped
-  over the air — every change needs a full rebuild.
-- `.env.example` is tracked and lists every var plus which ones EAS needs; keep it
-  current when adding one.
-- **A gitignored FILE that `app.config.js` points at is not uploaded either** — EAS
-  warns "not checked in to your repository and won't be uploaded to the builder" and
-  then builds WITHOUT it, succeeding. Ship such files as an EAS **file** env var
-  (`--type file`), which materialises them on the builder and exposes the path as
-  `process.env.<NAME>`; `google-services.json` is wired exactly this way. Read the
-  env var first and fall back to the on-disk file so local prebuilds still work.
+  - **Header (2026-11, Home style):** round back + big title + a "?" that
+    reopens the intro, and the features as NAMED chips under it (`HeaderButton`
+    = icon + label in the feature's own colour; a running Safety watch outlines
+    its chip and pulses the glyph). Bare glyphs hid Places and the Safety radius
+    from new users. **First visit shows `WhereaboutsIntro`** (four rows, one
+    button; seen-state per device in `introSeen.ts`, bump its key to re-show) —
+    never rendered alongside another sheet (sibling Modals). Member cards wash
+    in the member's colour (same as their pin) over the opaque `c.sheet`.
+  - **Roster cards are gradient cards in the member's colour**
+    (`MemberCardShell`, white type from `onCard.ts`), collapsed and expanded;
+    the expanded card's stats sit on the gradient split by thin vertical
+    rules (NOT boxed — boxes read as buttons), the actions are pills. Heights
+    are unchanged (CARD_H budget). Every Whereabouts sheet uses `sheetParts`
+    (`SheetHead`, `FeatureButton`, `GroupLabel`) and its feature's colour
+    from `FEATURE` (places orange, safety teal, sharing purple).
   - **`eas build --local` hits this too, and the on-disk fallback does NOT save
     you.** A local build copies the project to a temp dir the same way the
     uploader does, so the gitignored file is left behind — and the EAS secret is

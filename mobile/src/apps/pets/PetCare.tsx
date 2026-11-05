@@ -18,9 +18,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Animated, Pressable, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
-import { Check, ChevronLeft, ChevronRight, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
+import { PawPrint, Plus, Stethoscope, Syringe } from 'lucide-react-native'
+import { useScreenCorner } from '@/hooks/useScreenCorner'
 
-import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
+import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
 import { PhotoHero, type HeroItem } from '@/components/PhotoHero'
 import { useAuth } from '@/lib/auth'
@@ -36,24 +37,29 @@ import {
   reminderEvents,
   routineStatus,
   type OverdueCare,
+  eventSeries,
 } from '@/lib/petCare'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { supabase } from '@/lib/supabase'
-import type { Pet, PetCareTask, PetEvent, PetTaskDone } from '@/lib/types'
+import type { Pet, PetCareTask, PetEvent, PetEventType, PetTaskDone } from '@/lib/types'
 import { File, Paths } from 'expo-file-system'
 
 import { APP_GROUP, reloadPetCareWidget, syncPetCareWidget, type PetCareWidgetPet } from '@/lib/widget'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
+import { TodayCard, CareGrid, EventsCard, EventSeriesSheet, type CareItem } from './CareCards'
 import { CARE_ICONS, TYPE_ICON } from './petUi'
+import { petColor, petColorMap, TYPE_COLOR } from './petColors'
+import { GradientBox } from '@/components/home/GradientBox'
+import { shade } from '@/components/home/palette'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { speciesEmoji } from './petMeta'
 import EventForm, { type EventDraft } from './EventForm'
+import VisitForm from './VisitForm'
 import PetForm from './PetForm'
 import { RoutineSheet } from './RoutineSheet'
 import { OverdueSheet } from './OverdueSheet'
-import { petColor } from './petColors'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
-const HISTORY_PREVIEW = 5
 
 /** Local HH:MM for a timestamptz — when a task was checked off. */
 function doneTime(iso: string): string {
@@ -139,7 +145,6 @@ export default function PetCare() {
   const [selectedPet, setSelectedPet] = useState<string | null>(null)
   // Which day the Today card shows — today by default, chevrons browse the past.
   const [selectedDay, setSelectedDay] = useState(todayISO())
-  const [showAllHistory, setShowAllHistory] = useState(false)
   const [showPetForm, setShowPetForm] = useState(false)
   // Which section's editor is open (each pencil opens ONLY its own group).
   const [routineOpen, setRoutineOpen] = useState<'daily' | 'interval' | null>(null)
@@ -260,6 +265,9 @@ export default function PetCare() {
   }, [petsSorted, selectedPet])
 
   const pet = selectedPet ? (petById[selectedPet] ?? null) : null
+  // The pet's own colour (the same one its photo page uses) tints its cards.
+  const petTint = pet ? petColor(pet, petsSorted.findIndex((p) => p.id === pet.id)) : c.accent
+  const dockGap = useBottomGap(sp.xs)
 
   const checklist = useMemo(
     () => (pet ? dailyChecklist(tasks, done, pet.id, selectedDay) : []),
@@ -271,6 +279,18 @@ export default function PetCare() {
   )
   const petTasks = useMemo(() => (pet ? tasks.filter((tk) => tk.pet_id === pet.id) : []), [tasks, pet])
   const history = useMemo(() => (pet ? events.filter((e) => e.pet_id === pet.id) : []), [events, pet])
+  // The pet's events grouped into series ("Heartworm pill" ×5) for the Events
+  // card; the open series is kept by KEY so it refreshes after an edit/delete.
+  const series = useMemo(() => eventSeries(history), [history])
+  const [seriesKey, setSeriesKey] = useState<string | null>(null)
+
+  const openSeries = series.find((x) => x.key === seriesKey) ?? null
+  /** Leave the history sheet, THEN act: two Modals can't be up at once on
+   *  iOS (the second silently never presents). */
+  const fromSeries = (fn: () => void) => {
+    setSeriesKey(null)
+    setTimeout(fn, 380)
+  }
 
   /** This pet's events that carry a next-due date, soonest first. `events` is
    *  fetched newest-first, which is what latestPerKey (inside reminderEvents)
@@ -279,6 +299,48 @@ export default function PetCare() {
     () => (pet ? reminderEvents(events.filter((e) => e.pet_id === pet.id)) : []),
     [events, pet],
   )
+
+  /** The Care grid: interval routines + events carrying a next-due date, as
+   *  one list, soonest first. The same name in both (a "Flea treatment"
+   *  routine AND flea-treatment events with a next due) shows ONCE — the one
+   *  due sooner — so the pet's care never reads twice. */
+  const careItems = useMemo<CareItem[]>(() => {
+    const norm = (x: string) => x.trim().replace(/\s+/g, ' ').toLowerCase()
+    const items: CareItem[] = [
+      ...routines.map(({ task, dueIn }) => ({
+        kind: 'routine' as const,
+        key: `r:${task.id}`,
+        title: task.title,
+        Icon: CARE_ICONS[task.icon] ?? PawPrint,
+        color: petTint,
+        interval: Math.max(1, task.interval_days ?? 1),
+        dueIn,
+        task,
+      })),
+      ...dueEvents.map((e) => {
+        const gap = daysBetweenISO(e.event_date, e.next_due!)
+        return {
+          kind: 'event' as const,
+          key: `e:${e.id}`,
+          title: e.title,
+          Icon: TYPE_ICON[e.type],
+          color: TYPE_COLOR[e.type],
+          interval: gap > 0 ? gap : null,
+          dueIn: daysBetweenISO(today, e.next_due!),
+          next: e.next_due!,
+          event: e,
+          seriesKey: `${e.pet_id}|${norm(e.title)}`,
+        }
+      }),
+    ]
+    const byName = new Map<string, CareItem>()
+    for (const it of items) {
+      const k = norm(it.title)
+      const had = byName.get(k)
+      if (!had || it.dueIn < had.dueIn) byName.set(k, it)
+    }
+    return [...byName.values()].sort((x, y) => x.dueIn - y.dueIn)
+  }, [routines, dueEvents, today, petTint])
 
   /** Overdue count per pet — drives the red dot on the chips. Counts overdue
    *  EVENT reminders as well as routines: this screen only ever shows one pet,
@@ -431,9 +493,11 @@ export default function PetCare() {
     return { text: t('pets.inDays', { days: dueIn }), color: dueIn <= 3 ? c.accent : c.income }
   }
 
-  function openNewEvent() {
+  /** A vet visit or a vaccine for the pet on screen — opens VisitForm (pet
+   *  and type fixed). Give it a "next due" and it joins the Care grid. */
+  function openNewEvent(type: PetEventType = 'vet') {
     setEditingEvent(null)
-    setDraft({ ...emptyDraft, pet: selectedPet ?? pets[0]?.id ?? '', date: todayISO() })
+    setDraft({ ...emptyDraft, type, pet: selectedPet ?? pets[0]?.id ?? '', date: todayISO() })
     setShowEventForm(true)
   }
 
@@ -491,11 +555,6 @@ export default function PetCare() {
       },
     ])
   }
-
-  const allDone =
-    selectedDay === today &&
-    checklist.length > 0 &&
-    checklist.every(({ task, done: d }) => (overlay[task.id] ?? !!d))
 
   const hasPets = !loading && pets.length > 0
   const heroItems: HeroItem[] = petsSorted.map((p, i) => ({
@@ -562,7 +621,7 @@ export default function PetCare() {
 
         <Animated.ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl * 2, gap: sp.md }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: 0, paddingBottom: sp.xl }}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
             useNativeDriver: false,
           })}
@@ -570,426 +629,101 @@ export default function PetCare() {
         >
           {pet ? (
             <>
-              {/* Today */}
-              <Card style={{ gap: 2 }}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: sp.sm,
-                  }}
-                >
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
-                    {t('petcare.dailyRoutine')}
-                  </Txt>
-                  <Pressable onPress={() => setRoutineOpen('daily')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
-                    <Pencil size={15} color={c.textFaint} />
-                  </Pressable>
-                </View>
+              <TodayCard
+                title={t('petcare.dailyRoutine')}
+                tint={petTint}
+                rows={checklist.map(({ task, done: d }) => ({
+                  task,
+                  done: d ?? null,
+                  isDone: overlay[task.id] ?? !!d,
+                  who: d ? `${nameFor(d.done_by)} · ${doneTime(d.created_at)}` : null,
+                }))}
+                dayLabel={
+                  selectedDay === today
+                    ? t('petcare.today')
+                    : selectedDay === addDaysISO(today, -1)
+                      ? t('pings.yesterday')
+                      : formatDay(selectedDay)
+                }
+                isToday={selectedDay === today}
+                canGoForward={selectedDay < today}
+                onPrev={() => setSelectedDay(addDaysISO(selectedDay, -1))}
+                onNext={() => setSelectedDay(addDaysISO(selectedDay, 1))}
+                onToday={() => setSelectedDay(todayISO())}
+                onToggle={(row) => void toggleDaily(row.task, row.done)}
+                onEdit={() => setRoutineOpen('daily')}
+                emptyText={t('petcare.noDaily')}
+              />
 
-                {/* day selector — its own band, separated from title and list */}
-                <View style={{ height: 1, backgroundColor: c.border }} />
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingVertical: sp.sm,
-                  }}
-                >
-                  <Pressable
-                    onPress={() => setSelectedDay(addDaysISO(selectedDay, -1))}
-                    hitSlop={10}
-                    accessibilityLabel={t('petcare.prevDay')}
-                    style={{ paddingHorizontal: sp.sm }}
-                  >
-                    <ChevronLeft size={20} color={c.textMuted} />
-                  </Pressable>
-                  <Pressable onPress={() => setSelectedDay(todayISO())} hitSlop={6}>
-                    <Txt
-                      style={{
-                        fontSize: 14,
-                        fontWeight: '600',
-                        color: selectedDay === today ? c.text : c.accent,
-                      }}
-                    >
-                      {selectedDay === today
-                        ? t('petcare.today')
-                        : selectedDay === addDaysISO(today, -1)
-                          ? t('pings.yesterday')
-                          : formatDay(selectedDay)}
-                    </Txt>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setSelectedDay(addDaysISO(selectedDay, 1))}
-                    hitSlop={10}
-                    accessibilityLabel={t('petcare.nextDay')}
-                    disabled={selectedDay >= today}
-                    style={{ paddingHorizontal: sp.sm, opacity: selectedDay < today ? 1 : 0.25 }}
-                  >
-                    <ChevronRight size={20} color={c.textMuted} />
-                  </Pressable>
-                </View>
-                <View style={{ height: 1, backgroundColor: c.border, marginBottom: sp.xs }} />
+              {/* Care: everything that repeats, routines and dated events alike. */}
+              <CareGrid
+                title={t('petcare.care')}
+                items={careItems}
+                marked={routineMarked}
+                dueText={dueText}
+                onDoneRoutine={(task) => void markRoutineDone(task)}
+                onDoneEvent={logAgain}
+                onOpenEvent={setSeriesKey}
+                onEdit={() => setRoutineOpen('interval')}
+                emptyText={t('petcare.noRoutines')}
+              />
 
-                {checklist.length === 0 ? (
-                  <View style={{ gap: sp.sm, paddingTop: sp.sm }}>
-                    <Txt variant="muted">{t('petcare.noDaily')}</Txt>
-                    <Btn title={t('petcare.editRoutine')} variant="secondary" onPress={() => setRoutineOpen('daily')} />
-                  </View>
-                ) : (
-                  <>
-                    {checklist.map(({ task, done: d }, i) => {
-                      const isDone = overlay[task.id] ?? !!d
-                      const Icon = CARE_ICONS[task.icon] ?? PawPrint
-                      return (
-                        <Pressable
-                          key={task.id}
-                          onPress={() => void toggleDaily(task, d)}
-                          accessibilityRole="checkbox"
-                          accessibilityState={{ checked: isDone }}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: sp.md,
-                            paddingVertical: 9,
-                            borderTopWidth: i === 0 ? 0 : 1,
-                            borderTopColor: c.border,
-                          }}
-                        >
-                          {/* Icon beside the title, checkbox on the right (2026-11):
-                              the row reads as "what" first, and the tick sits
-                              where the thumb lands. */}
-                          <Icon size={18} color={isDone ? c.textFaint : c.accent} />
-                          <Txt
-                            style={{
-                              flex: 1,
-                              fontWeight: '500',
-                              color: isDone ? c.textMuted : c.text,
-                              textDecorationLine: isDone ? 'line-through' : 'none',
-                            }}
-                            numberOfLines={1}
-                          >
-                            {task.title}
-                          </Txt>
-                          {d ? (
-                            <Txt variant="faint" style={{ fontSize: 11 }}>
-                              {nameFor(d.done_by)} · {doneTime(d.created_at)}
-                            </Txt>
-                          ) : null}
-                          <View
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 12,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: isDone ? c.income : 'transparent',
-                              borderWidth: isDone ? 0 : 1.5,
-                              borderColor: c.textFaint,
-                            }}
-                          >
-                            {isDone ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
-                          </View>
-                        </Pressable>
-                      )
-                    })}
-                    {allDone ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 6 }}>
-                        <Check size={14} color={c.income} strokeWidth={3} />
-                        <Txt style={{ color: c.income, fontWeight: '600', fontSize: 13 }}>
-                          {t('petcare.allDoneToday')}
-                        </Txt>
-                      </View>
-                    ) : null}
-                  </>
-                )}
-              </Card>
-
-              {/* Care routines */}
-              <Card style={{ gap: 2 }}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: sp.sm,
-                  }}
-                >
-                  <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
-                    {t('petcare.routines')}
-                  </Txt>
-                  <Pressable onPress={() => setRoutineOpen('interval')} hitSlop={10} accessibilityLabel={t('petcare.editRoutine')}>
-                    <Pencil size={15} color={c.textFaint} />
-                  </Pressable>
-                </View>
-                {routines.length === 0 ? (
-                  <View style={{ gap: sp.sm, paddingTop: sp.sm }}>
-                    <Txt variant="muted">{t('petcare.noRoutines')}</Txt>
-                    <Btn title={t('petcare.editRoutine')} variant="secondary" onPress={() => setRoutineOpen('interval')} />
-                  </View>
-                ) : (
-                  routines.map(({ task, dueIn, lastDone }, i) => {
-                    const Icon = CARE_ICONS[task.icon] ?? PawPrint
-                    const urgent = dueIn <= 0
-                    const { text, color } = dueText(dueIn)
-                    return (
-                      <View
-                        key={task.id}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: sp.md,
-                          paddingVertical: 9,
-                          borderTopWidth: i === 0 ? 0 : 1,
-                          borderTopColor: c.border,
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: radius.md,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: urgent ? c.accentSoft : c.surface,
-                          }}
-                        >
-                          <Icon size={16} color={urgent ? c.expense : c.accent} />
-                        </View>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
-                            {task.title}
-                          </Txt>
-                          <Txt variant="faint" style={{ fontSize: 11 }}>
-                            {t('petcare.every', { days: task.interval_days ?? 0 })}
-                            {lastDone ? ` · ${formatDay(lastDone)}` : ''}
-                          </Txt>
-                        </View>
-                        {routineMarked[task.id] ? (
-                          // Just marked: confirm on the spot. The due text and
-                          // this button come back from fresh data a beat later.
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4,
-                              paddingHorizontal: 12,
-                              paddingVertical: 6,
-                              borderRadius: radius.pill,
-                              backgroundColor: c.income,
-                            }}
-                          >
-                            {/* White on the income green, like the checklist ticks. */}
-                            <Check size={13} strokeWidth={3} color="#ffffff" />
-                            <Txt style={{ fontSize: 12, fontWeight: '700', color: '#ffffff' }}>
-                              {t('common.done')}
-                            </Txt>
-                          </View>
-                        ) : (
-                          <>
-                            <Txt style={{ fontSize: 12, fontWeight: '600', color }}>{text}</Txt>
-                            <Pressable
-                              onPress={() => void markRoutineDone(task)}
-                              accessibilityLabel={`${t('common.done')} ${task.title}`}
-                              style={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                borderRadius: radius.pill,
-                                backgroundColor: urgent ? c.action : c.surface,
-                              }}
-                            >
-                              <Txt
-                                style={{ fontSize: 12, fontWeight: '700', color: urgent ? c.onAction : c.textMuted }}
-                              >
-                                {t('common.done')}
-                              </Txt>
-                            </Pressable>
-                          </>
-                        )}
-                      </View>
-                    )
-                  })
-                )}
-              </Card>
-
-              {/* Coming up — the events carrying a next-due date. Until this
-                  existed a due date was announced on the Hub and then had
-                  nowhere to be acted on: Pet Care showed the event in History
-                  with its date and no hint it was due, so the only way to
-                  clear it was to hand-copy the event into a new one. Hidden
-                  when the pet has no reminders at all — an empty card here
-                  would just push the routines up the screen for nothing. */}
-              {dueEvents.length > 0 ? (
-                <Card style={{ gap: 2 }}>
-                  <Txt
-                    variant="label"
-                    style={{
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.5,
-                      marginLeft: sp.xs,
-                      marginBottom: sp.sm,
-                    }}
-                  >
-                    {t('pets.comingUp')}
-                  </Txt>
-                  {dueEvents.map((e, i) => {
-                    const Icon = TYPE_ICON[e.type]
-                    const dueIn = daysBetweenISO(today, e.next_due!)
-                    const { text, color } = dueText(dueIn)
-                    // Only offer "Done" once it's actually due — re-logging a
-                    // treatment early would roll the next due date forward from
-                    // today and quietly shorten the interval.
-                    const due = dueIn <= 0
-                    return (
-                      <View
-                        key={e.id}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: sp.md,
-                          paddingVertical: 8,
-                          borderTopWidth: i === 0 ? 0 : 1,
-                          borderTopColor: c.border,
-                        }}
-                      >
-                        <Icon size={16} color={due ? color : c.textMuted} />
-                        <Pressable
-                          onPress={() => openEditEvent(e)}
-                          style={{ flex: 1, minWidth: 0 }}
-                          accessibilityLabel={e.title}
-                        >
-                          <Txt style={{ fontWeight: '500', fontSize: 14 }} numberOfLines={1}>
-                            {e.title}
-                          </Txt>
-                          {/* Due rows say so HERE, because the right-hand slot
-                              is taken by the Done button for exactly those —
-                              putting the state in the badge would mean the one
-                              case that matters ("overdue 6d") is the one case
-                              that doesn't show it. */}
-                          <Txt
-                            variant="faint"
-                            style={due ? { fontSize: 11, color, fontWeight: '700' } : { fontSize: 11 }}
-                          >
-                            {due ? text : `${t('pets.next')} ${formatDay(e.next_due!)}`}
-                          </Txt>
-                        </Pressable>
-                        {due ? (
-                          <Pressable
-                            onPress={() => logAgain(e)}
-                            hitSlop={8}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4,
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
-                              borderRadius: radius.pill,
-                              backgroundColor: c.action,
-                            }}
-                          >
-                            <Check size={13} strokeWidth={3} color={c.onAction} />
-                            <Txt style={{ fontSize: 12, fontWeight: '700', color: c.onAction }}>
-                              {t('pets.markDone')}
-                            </Txt>
-                          </Pressable>
-                        ) : (
-                          <Txt style={{ fontSize: 12, fontWeight: '700', color }}>{text}</Txt>
-                        )}
-                      </View>
-                    )
-                  })}
-                </Card>
-              ) : null}
-
-              {/* History — the log-event action lives HERE (it only ever adds
-                  history entries), not in a global bottom bar. */}
-              <Card style={{ gap: 2 }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: sp.sm,
-                    }}
-                  >
-                    <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: sp.xs }}>
-                      {t('pets.history')}
-                    </Txt>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                      {history.length > HISTORY_PREVIEW ? (
-                        <Pressable onPress={() => setShowAllHistory((v) => !v)} hitSlop={8}>
-                          <Txt style={{ color: c.textMuted, fontWeight: '600', fontSize: 12 }}>
-                            {showAllHistory ? t('common.close') : t('petcare.seeAll')}
-                          </Txt>
-                        </Pressable>
-                      ) : null}
-                      <Pressable
-                        onPress={openNewEvent}
-                        hitSlop={8}
-                        style={{
-                          paddingHorizontal: 10,
-                          paddingVertical: 5,
-                          borderRadius: radius.pill,
-                          backgroundColor: c.accentSoft,
-                        }}
-                      >
-                        <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 12 }}>
-                          {t('petcare.logEvent')}
-                        </Txt>
-                      </Pressable>
-                    </View>
-                  </View>
-                  {history.length === 0 ? (
-                    <Txt variant="muted" style={{ paddingTop: sp.sm }}>
-                      {t('petcare.noHistory')}
-                    </Txt>
-                  ) : null}
-                  {(showAllHistory ? history : history.slice(0, HISTORY_PREVIEW)).map((e, i) => {
-                    const Icon = TYPE_ICON[e.type]
-                    return (
-                      <Pressable
-                        key={e.id}
-                        onPress={() => openEditEvent(e)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: sp.md,
-                          paddingVertical: 8,
-                          borderTopWidth: i === 0 ? 0 : 1,
-                          borderTopColor: c.border,
-                        }}
-                      >
-                        <Icon size={16} color={c.textMuted} />
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Txt style={{ fontWeight: '500', fontSize: 14 }} numberOfLines={1}>
-                            {e.title}
-                          </Txt>
-                          <Txt variant="faint" style={{ fontSize: 11 }}>
-                            {formatDay(e.event_date)}
-                          </Txt>
-                        </View>
-                        <Pressable onPress={() => removeEvent(e)} hitSlop={8} accessibilityLabel={t('common.delete')}>
-                          <Trash2 size={15} color={c.textFaint} />
-                        </Pressable>
-                      </Pressable>
-                    )
-                  })}
-                </Card>
+              {/* Events: one row per recurring thing; tap → its history. */}
+              <EventsCard
+                title={t('pets.events')}
+                series={series}
+                dueText={dueText}
+                daysUntil={(iso) => daysBetweenISO(today, iso)}
+                onOpen={(se) => setSeriesKey(se.key)}
+              />
             </>
           ) : null}
         </Animated.ScrollView>
+        {pet ? (
+          // Log event, docked like the other apps' main action — on the
+          // bottom button's curve (Btn curveBottom + half the inset).
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: dockGap }}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <AddEventBtn
+                side="left"
+                tone={TYPE_COLOR.vet}
+                icon={<Stethoscope size={18} color="#fff" />}
+                label={t('pets.addVet')}
+                onPress={() => openNewEvent('vet')}
+              />
+              <AddEventBtn
+                side="right"
+                tone={TYPE_COLOR.vaccine}
+                icon={<Syringe size={18} color="#fff" />}
+                label={t('pets.addVaccine')}
+                onPress={() => openNewEvent('vaccine')}
+              />
+            </View>
+          </View>
+        ) : null}
         </>
       )}
 
       <Toast data={toast} />
+
+      {openSeries ? (
+        <EventSeriesSheet
+          series={openSeries}
+          dueText={dueText}
+          daysUntil={(iso) => daysBetweenISO(today, iso)}
+          onClose={() => setSeriesKey(null)}
+          onEdit={(e) => fromSeries(() => openEditEvent(e))}
+          onDelete={removeEvent}
+          onLogAgain={(e) => fromSeries(() => logAgain(e))}
+        />
+      ) : null}
 
       {overdueSheet ? (
         <OverdueSheet
           items={overdueSheet}
           current={overdueNow}
           petById={petById}
+          tintById={petColorMap(petsSorted)}
           onDone={completeOverdue}
           onClose={closeOverdueSheet}
         />
@@ -1010,6 +744,7 @@ export default function PetCare() {
       {routineOpen && pet ? (
         <RoutineSheet
           pet={pet}
+          tint={petTint}
           tasks={petTasks}
           section={routineOpen}
           onClose={() => setRoutineOpen(null)}
@@ -1017,7 +752,31 @@ export default function PetCare() {
         />
       ) : null}
 
-      {showEventForm && profile ? (
+      {/* A vet visit or a vaccine gets its own focused sheet (pet and type
+          already known); any other type still opens the general form. */}
+      {showEventForm && profile && (draft.type === 'vet' || draft.type === 'vaccine') && petById[draft.pet] ? (
+        <VisitForm
+          pet={petById[draft.pet]}
+          draft={draft}
+          setDraft={setDraft}
+          editingEvent={editingEvent}
+          addedBy={profile.email}
+          onClose={() => {
+            setShowEventForm(false)
+            setEditingEvent(null)
+          }}
+          onSaved={() => {
+            setShowEventForm(false)
+            setEditingEvent(null)
+            load()
+          }}
+          onDelete={(ev) => {
+            setShowEventForm(false)
+            setEditingEvent(null)
+            removeEvent(ev)
+          }}
+        />
+      ) : showEventForm && profile ? (
         <EventForm
           pets={pets}
           draft={draft}
@@ -1041,5 +800,50 @@ export default function PetCare() {
         />
       ) : null}
     </SafeAreaView>
+  )
+}
+
+/** One of the two docked "add" buttons (vet visit / vaccine). The outer bottom
+ *  corner follows the display's curve (useScreenCorner), like NewItemButton. */
+function AddEventBtn({
+  side,
+  tone,
+  icon,
+  label,
+  onPress,
+}: {
+  side: 'left' | 'right'
+  /** The type's colour (vet blue, vaccine purple) — a solid gradient button. */
+  tone: string
+  icon: React.ReactNode
+  label: string
+  onPress: () => void
+}) {
+  const corner = useScreenCorner()
+  const curve = corner?.radius ?? 16
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.85 : 1 })}
+    >
+      <GradientBox
+        colors={[tone, shade(tone, -0.2)]}
+        radius={16}
+        style={{
+          height: 54,
+          borderBottomLeftRadius: side === 'left' ? curve : 16,
+          borderBottomRightRadius: side === 'right' ? curve : 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+        }}
+      >
+        <Plus size={16} color="#fff" strokeWidth={2.6} />
+        {icon}
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: '#fff' }}>{label}</Txt>
+      </GradientBox>
+    </Pressable>
   )
 }

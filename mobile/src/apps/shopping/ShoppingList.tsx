@@ -5,8 +5,8 @@
 //
 // 2026-11 rethink (Comando style): a quiet line says how much is left to buy
 // (and how much is already in the cart, as a thin amber bar); the stores sit at the TOP as a filter
-// — in the shop you pick it and see only its items plus the "anywhere" ones,
-// and new items go to it; bought items drop into a collapsible "In the cart"
+// — in the shop you pick it and see only that store's items, and new items
+// go to it; bought items drop into a collapsible "In the cart"
 // section with Clear; rows swipe left to delete (no X on every row) and show
 // who added them; the field takes several items at once ("milk, eggs"). RLS scopes everything to the household;
 // inserts get household_id / added_by stamped server-side, so the client never
@@ -30,11 +30,14 @@ import {
 } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check, ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
+import { ArrowUp, Check, ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
+import { router } from 'expo-router'
+import { GradientBox } from '@/components/home/GradientBox'
+import { useScreenCorner } from '@/hooks/useScreenCorner'
 import { Swipeable } from 'react-native-gesture-handler'
 import { memberColor } from '@/lib/calendar'
 
-import { AppHeader, DismissKeyboard, Loader, Txt } from '@/components/ui'
+import { DismissKeyboard, Loader, Txt } from '@/components/ui'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
 import { readCache, useRevalidateOnForeground, writeCache } from '@/hooks/useCachedQuery'
@@ -78,6 +81,8 @@ const EXIT_MS = 200
 
 /** Shopping's amber (its home-screen icon), for the progress bar. */
 const SHOP_AMBER = '#F5A524'
+/** The Home icon's own gradient, for the "All" tile and the empty state. */
+const SHOP_TILE = ['#FFC93C', '#FF9A1F'] as const
 
 interface Section {
   id: string
@@ -95,6 +100,7 @@ export default function ShoppingList() {
   const insets = useSafeAreaInsets()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
+  const corner = useScreenCorner()
   // "In the cart" starts folded: while shopping, a ticked item should get out
   // of the way. One tap brings the list back (to untick or check).
   const [cartOpen, setCartOpen] = useState(false)
@@ -522,6 +528,23 @@ export default function ShoppingList() {
     scheduleLoad()
   }
 
+  /** Long-press on a store tile: edit it or delete it (the delete then asks to
+   *  confirm). A list made by mistake — the assistant once created one called
+   *  "compras" — has to be easy to get rid of (owner, 2026-11). */
+  function storeMenu(store: ShoppingStore) {
+    Alert.alert(store.name, undefined, [
+      {
+        text: t('shopping.editStore'),
+        onPress: () => {
+          setPicking(true)
+          openEditStore(store)
+        },
+      },
+      { text: t('common.delete'), style: 'destructive', onPress: () => removeStore(store) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ])
+  }
+
   function removeStore(store: ShoppingStore) {
     Alert.alert(
       t('shopping.stores'),
@@ -553,10 +576,9 @@ export default function ShoppingList() {
   const sections = useMemo<Section[]>(() => {
     const valid = new Set(stores.map((s) => s.id))
     const isAnywhere = (i: ShoppingItem) => !i.store_id || !valid.has(i.store_id)
-    // A store picked at the top narrows the list to that store + the items
-    // that can be bought anywhere.
-    const inScope = (i: ShoppingItem) =>
-      activeStoreId === null || i.store_id === activeStoreId || isAnywhere(i)
+    // A store picked at the top shows ONLY that store's list (owner, 2026-11 —
+    // "anywhere" items used to tag along, which read as a broken filter).
+    const inScope = (i: ShoppingItem) => activeStoreId === null || i.store_id === activeStoreId
     const byName = (a: ShoppingItem, b: ShoppingItem) =>
       a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
     const open = items.filter((i) => !i.checked && inScope(i))
@@ -567,7 +589,7 @@ export default function ShoppingList() {
       if (data.length)
         out.push({ id: s.id, title: s.name, slug: s.slug, color: s.color, isStore: true, data })
     }
-    const anywhere = open.filter(isAnywhere).sort(byName)
+    const anywhere = activeStoreId ? [] : open.filter(isAnywhere).sort(byName)
     if (anywhere.length)
       out.push({ id: '__any', title: t('shopping.anywhere'), slug: null, color: null, isStore: false, data: anywhere })
     const cart = items.filter((i) => i.checked && inScope(i)).sort(byName)
@@ -585,9 +607,7 @@ export default function ShoppingList() {
   }, [items, stores, t, activeStoreId, cartOpen])
 
   const inScopeOpen = sections.filter((x) => !x.isCart).reduce((n, x) => n + x.data.length, 0)
-  const inScopeCart = items.filter(
-    (i) => i.checked && (activeStoreId === null || i.store_id === activeStoreId || !stores.some((s) => s.id === i.store_id)),
-  ).length
+  const inScopeCart = items.filter((i) => i.checked && (activeStoreId === null || i.store_id === activeStoreId)).length
   const storeOpenCount = (id: string) => items.filter((i) => !i.checked && i.store_id === id).length
 
   // Bring a just-added row into view. Runs off `sections` rather than straight
@@ -630,12 +650,18 @@ export default function ShoppingList() {
   )
 
   const memberEmails = profiles.map((p) => p.email)
-  const renderItem = ({ item }: { item: ShoppingItem }) => {
+  const renderItem = ({ item, index, section }: { item: ShoppingItem; index: number; section: Section }) => {
+    // Rows of one section read as ONE rounded card (the Home's panels):
+    // round only the first row's top and the last row's bottom.
+    const first = index === 0
+    const last = index === section.data.length - 1
     const adder = item.added_by !== profile?.email ? profiles.find((p) => p.email === item.added_by) : undefined
     return (
       <SwipeToDelete label={t('common.delete')} onDelete={() => remove(item)}>
         <ItemRowShell
           bg={c.card}
+          first={first}
+          last={last}
           dim={item.checked}
           // Only an OPEN row pulses: a duplicate label sitting in the cart
           // would otherwise light up alongside the one just added.
@@ -712,13 +738,82 @@ export default function ShoppingList() {
         ) : (
           <ShoppingCart size={18} strokeWidth={2} color={c.textFaint} />
         )}
-        <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: section.isStore ? c.text : c.textMuted }}>
-          {section.title}
+        {/* The Home's section-label voice: small caps, tracked, muted. */}
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}>
+          {section.title} · {section.data.length}
         </Txt>
-        <Txt variant="faint">{section.data.length}</Txt>
       </View>
     )
   }
+
+  // The page head, in the Home's voice: a big title, then how it stands in the
+  // same large type, faded ("6 to buy." / "All done!"), a thin amber bar for
+  // what's already in the cart, and the stores as tiles — the filter for when
+  // you're in the shop, and where new items go.
+  const listHeader = (
+    <View style={{ paddingBottom: sp.sm }}>
+      <Txt style={styles.bigTitle}>{t('shopping.title')}</Txt>
+      {items.length > 0 ? (
+        <Txt style={[styles.bigTitle, { color: c.textFaint }]} numberOfLines={2}>
+          {inScopeOpen === 0
+            ? activeStore && inScopeCart === 0
+              ? t('shopping.nothingAt', { store: activeStore.name })
+              : t('shopping.allDone')
+            : `${inScopeOpen} ${t('shopping.toBuy')}${activeStore ? ` ${t('shopping.atStore', { store: activeStore.name })}` : ''}.`}
+        </Txt>
+      ) : null}
+      {inScopeCart > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginTop: sp.md }}>
+          <View style={[styles.progressTrack, { flex: 1, backgroundColor: c.surface }]}>
+            <View style={[styles.progressFill, { width: `${(inScopeCart / (inScopeCart + inScopeOpen)) * 100}%` }]} />
+          </View>
+          <Txt variant="muted" style={{ fontSize: 13 }}>
+            {t('shopping.inCartN', { n: inScopeCart })}
+          </Txt>
+        </View>
+      ) : null}
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -sp.lg, marginTop: sp.lg }}
+        contentContainerStyle={{ paddingHorizontal: sp.lg, gap: 10 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* New list FIRST: with twenty lists, a "+" at the end of the strip
+            is twenty tiles away (owner, 2026-11). Long-press a list to edit
+            or delete it. */}
+        <StoreTile
+          label={stores.length ? '' : t('shopping.selectStores')}
+          dashed
+          onPress={() => setPicking(true)}
+          icon={<Plus size={22} color={c.accent} />}
+        />
+        <StoreTile
+          label={t('common.all')}
+          count={items.filter((i) => !i.checked).length}
+          active={activeStoreId === null}
+          onPress={() => selectStore(null)}
+          icon={
+            <GradientBox colors={SHOP_TILE} radius={10} style={styles.tileIcon}>
+              <ShoppingCart size={17} color="#fff" strokeWidth={2.2} />
+            </GradientBox>
+          }
+        />
+        {stores.map((st) => (
+          <StoreTile
+            key={st.id}
+            label={st.name}
+            count={storeOpenCount(st.id)}
+            active={activeStoreId === st.id}
+            onPress={() => selectStore(st.id)}
+            onLongPress={() => storeMenu(st)}
+            icon={<StoreLogo slug={st.slug} name={st.name} color={st.color} size={32} />}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  )
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
@@ -727,89 +822,43 @@ export default function ShoppingList() {
           bar below is deliberately OUTSIDE it — tapping beside the field you
           are typing in shouldn't close the keyboard. */}
       <DismissKeyboard style={{ flex: 1 }}>
-        <View style={{ paddingHorizontal: sp.lg }}>
-          <AppHeader title={t('shopping.title')} />
-        </View>
-
-        {/* Progress, quietly: "6 to buy · 2 in the cart" over a thin bar in
-            Shopping's amber. (A big gradient panel here was too loud — owner.) */}
-        {!loading && items.length > 0 ? (
-          <View style={{ paddingHorizontal: sp.lg, gap: 8 }}>
-            <Txt style={{ fontSize: 15 }} numberOfLines={1}>
-              <Txt style={{ fontSize: 15, fontFamily: fonts.semibold }}>
-                {inScopeOpen === 0 ? t('shopping.allDone') : `${inScopeOpen} ${t('shopping.toBuy')}`}
-                {activeStore && inScopeOpen ? ` ${t('shopping.atStore', { store: activeStore.name })}` : ''}
-              </Txt>
-              {inScopeCart > 0 ? (
-                <Txt style={{ fontSize: 15, color: c.textMuted }}> · {t('shopping.inCartN', { n: inScopeCart })}</Txt>
-              ) : null}
-            </Txt>
-            {inScopeCart > 0 ? (
-              <View style={[styles.progressTrack, { backgroundColor: c.surface }]}>
-                <View
-                  style={[styles.progressFill, { width: `${(inScopeCart / (inScopeCart + inScopeOpen)) * 100}%` }]}
-                />
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* Stores: a filter for when you're in the shop, and where new items go. */}
-        <View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.chips, { paddingHorizontal: sp.lg, paddingTop: sp.md }]}
-            keyboardShouldPersistTaps="handled"
+        {/* Top bar: back + stores, round like the Home's buttons. The big
+            title and the stores scroll with the list (listHeader). */}
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            hitSlop={8}
+            style={[styles.round, { backgroundColor: c.card, borderColor: c.border }]}
           >
-            {stores.length === 0 ? (
-              <Chip
-                onPress={() => setPicking(true)}
-                active={false}
-                c={c}
-                icon={<Store size={16} strokeWidth={2} color={c.textMuted} />}
-                label={t('shopping.selectStores')}
-              />
-            ) : (
-              <>
-                <Chip onPress={() => selectStore(null)} active={activeStoreId === null} c={c} label={t('common.all')} />
-                {stores.map((s) => {
-                  const n = storeOpenCount(s.id)
-                  return (
-                    <Chip
-                      key={s.id}
-                      onPress={() => selectStore(s.id)}
-                      active={activeStoreId === s.id}
-                      c={c}
-                      icon={<StoreLogo slug={s.slug} name={s.name} color={s.color} size={20} />}
-                      label={n ? `${s.name}  ${n}` : s.name}
-                    />
-                  )
-                })}
-                <Chip
-                  onPress={() => setPicking(true)}
-                  active={false}
-                  c={c}
-                  icon={<Plus size={18} strokeWidth={2} color={c.textMuted} />}
-                  label=""
-                  accessibilityLabel={t('shopping.manageStores')}
-                />
-              </>
-            )}
-          </ScrollView>
+            <ChevronLeft size={22} color={c.text} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('shopping.manageStores')}
+            onPress={() => setPicking(true)}
+            hitSlop={8}
+            style={[styles.round, { backgroundColor: c.card, borderColor: c.border }]}
+          >
+            <Store size={19} color={c.text} />
+          </Pressable>
         </View>
 
         {loading ? (
           <Loader />
         ) : items.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={[styles.emptyIcon, { backgroundColor: c.surface }]}>
-              <ShoppingCart size={40} strokeWidth={2} color={c.textFaint} />
+          <View style={{ flex: 1, paddingHorizontal: sp.lg }}>
+            {listHeader}
+            <View style={styles.empty}>
+              <GradientBox colors={SHOP_TILE} radius={22} style={styles.emptyIcon}>
+                <ShoppingCart size={32} strokeWidth={2} color="#fff" />
+              </GradientBox>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 22, marginTop: sp.lg }}>{t('shopping.empty')}</Txt>
+              <Txt variant="muted" style={{ textAlign: 'center' }}>
+                {t('shopping.emptyHint')}
+              </Txt>
             </View>
-            <Txt variant="body" style={{ color: c.textMuted, marginTop: sp.lg }}>
-              {t('shopping.empty')}
-            </Txt>
-            <Txt variant="faint">{t('shopping.emptyHint')}</Txt>
           </View>
         ) : (
           <SectionList
@@ -827,6 +876,14 @@ export default function ShoppingList() {
                 ?.scrollTo({ y: info.averageItemLength * info.index, animated: true })
             }}
             renderSectionHeader={renderSectionHeader}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={
+              activeStore ? (
+                <Txt variant="muted" style={{ textAlign: 'center', marginTop: sp.xl }}>
+                  {t('shopping.storeEmpty', { store: activeStore.name })}
+                </Txt>
+              ) : null
+            }
             stickySectionHeadersEnabled={false}
             // flex:1 so the list fills the space ABOVE the add bar (which is now
             // in normal flow) — the old `paddingBottom: 220 + inset` was a guess
@@ -836,8 +893,11 @@ export default function ShoppingList() {
               paddingHorizontal: sp.lg,
               paddingBottom: sp.md,
             }}
-            ItemSeparatorComponent={() => <View style={{ height: sp.sm }} />}
-            SectionSeparatorComponent={() => <View style={{ height: sp.xs }} />}
+            ItemSeparatorComponent={() => (
+              <View style={{ backgroundColor: c.card, paddingLeft: 54 }}>
+                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+              </View>
+            )}
             // Scrolling the list does NOT dismiss the keyboard — the whole
             // point of scrolling here is to check what's already on the list
             // while you type the next item. The way out is a tap on anything
@@ -871,7 +931,18 @@ export default function ShoppingList() {
             },
           ]}
         >
-          <View style={styles.inputRow}>
+          {/* A floating capsule, like the Home's ask bar: the field and a round
+              add button that flashes green with a check when an item lands. */}
+          <View
+            style={[
+              styles.capsule,
+              { backgroundColor: c.card, borderColor: c.border },
+              // Face ID iPhone: the bottom button's curve (useScreenCorner) —
+              // 40pt bottom corners following the display's.
+              corner ? { borderBottomLeftRadius: corner.radius, borderBottomRightRadius: corner.radius } : null,
+            ]}
+          >
+            <Plus size={20} color={c.textMuted} />
             <TextInput
               value={label}
               onChangeText={setLabel}
@@ -884,39 +955,25 @@ export default function ShoppingList() {
                   : t('shopping.addMany')
               }
               placeholderTextColor={c.textFaint}
-              style={[styles.input, { backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
+              style={[styles.capsuleInput, { color: c.text }]}
             />
             <Pressable
               onPress={add}
               disabled={!label.trim()}
               accessibilityLabel={justAdded ? t('shopping.itemAdded') : t('common.add')}
               style={[
-                styles.addBtn,
+                styles.capsuleBtn,
+                corner ? { borderBottomRightRadius: 26 } : null,
                 {
-                  backgroundColor: justAdded ? c.income : c.action,
-                  // While confirming, stay at full strength: add() has just
-                  // cleared the field, so the usual empty-field dimming would
-                  // fade the confirmation the instant it appears.
-                  opacity: justAdded || label.trim() ? 1 : 0.5,
+                  backgroundColor: justAdded ? c.income : label.trim() ? c.action : c.surface2,
                 },
               ]}
             >
-              {/* The label stays in flow and only goes invisible, with the check
-                  drawn over it — so the button keeps the width of the word "Add"
-                  in whatever language it's in, and swapping to the check can't
-                  resize the text field beside it. */}
-              <Txt
-                style={{ color: c.onAction, fontWeight: '700', fontSize: 16, opacity: justAdded ? 0 : 1 }}
-              >
-                {t('common.add')}
-              </Txt>
               {justAdded ? (
-                <View style={[StyleSheet.absoluteFill, styles.addBtnCheck]}>
-                  {/* White on the income green, matching the row checkboxes —
-                      c.onAction is for the ACCENT fill, which this isn't. */}
-                  <Check size={20} strokeWidth={3} color="#ffffff" />
-                </View>
-              ) : null}
+                <Check size={20} strokeWidth={3} color="#ffffff" />
+              ) : (
+                <ArrowUp size={21} strokeWidth={2.6} color={label.trim() ? c.onAction : c.textFaint} />
+              )}
             </Pressable>
           </View>
         </View>
@@ -1163,6 +1220,64 @@ export default function ShoppingList() {
   )
 }
 
+/** A store as a tile in the head's strip: its logo, name and what's left to
+ *  buy there; the selected one ringed in the action colour. Module scope. */
+function StoreTile({
+  label,
+  count,
+  icon,
+  active,
+  dashed,
+  onPress,
+  onLongPress,
+}: {
+  label: string
+  count?: number
+  icon: React.ReactNode
+  active?: boolean
+  dashed?: boolean
+  onPress: () => void
+  /** Store tiles only: edit / delete. */
+  onLongPress?: () => void
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
+      accessibilityLabel={label || undefined}
+      accessibilityActions={onLongPress ? [{ name: 'longpress' }] : undefined}
+      onAccessibilityAction={(e) => e.nativeEvent.actionName === 'longpress' && onLongPress?.()}
+      style={({ pressed }) => [
+        styles.tile,
+        {
+          width: label ? 96 : 64,
+          backgroundColor: dashed ? 'transparent' : c.card,
+          borderColor: active ? c.action : c.border,
+          borderWidth: active ? 2 : dashed ? 1 : StyleSheet.hairlineWidth,
+          borderStyle: dashed ? 'dashed' : 'solid',
+          alignItems: label ? 'flex-start' : 'center',
+          justifyContent: label ? 'space-between' : 'center',
+          opacity: pressed ? 0.7 : 1,
+        },
+      ]}
+    >
+      {icon}
+      {label ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'stretch' }}>
+          <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 13 }} numberOfLines={1}>
+            {label}
+          </Txt>
+          {count ? <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: c.textMuted }}>{count}</Txt> : null}
+        </View>
+      ) : null}
+    </Pressable>
+  )
+}
+
 /** Swipe a row left to reveal Delete (one tap removes it — the list is cheap
  *  to rebuild and the row slides out, so no confirm). Module scope. */
 function SwipeToDelete({ label, onDelete, children }: { label: string; onDelete: () => void; children: React.ReactNode }) {
@@ -1209,6 +1324,8 @@ function SwipeToDelete({ label, onDelete, children }: { label: string; onDelete:
  *  restart whatever was playing. */
 function ItemRowShell({
   bg,
+  first,
+  last,
   dim,
   pulseColor,
   pulseOpacity,
@@ -1216,6 +1333,8 @@ function ItemRowShell({
   children,
 }: {
   bg: string
+  first: boolean
+  last: boolean
   dim: boolean
   pulseColor: string | null
   pulseOpacity: Animated.Value
@@ -1242,6 +1361,10 @@ function ItemRowShell({
         styles.row,
         {
           backgroundColor: bg,
+          borderTopLeftRadius: first ? 22 : 0,
+          borderTopRightRadius: first ? 22 : 0,
+          borderBottomLeftRadius: last ? 22 : 0,
+          borderBottomRightRadius: last ? 22 : 0,
           opacity: exit.interpolate({ inputRange: [0, 1], outputRange: [base, 0] }),
           transform: [
             { translateX: exit.interpolate({ inputRange: [0, 1], outputRange: [0, 48] }) },
@@ -1309,51 +1432,12 @@ function ColorDots({
   )
 }
 
-// A pill chip in the store strip. Plain helper so styles stay co-located.
-function Chip({
-  onPress,
-  active,
-  c,
-  label,
-  icon,
-  accessibilityLabel,
-}: {
-  onPress: () => void
-  active: boolean
-  c: ReturnType<typeof useTheme>['c']
-  label: string
-  icon?: React.ReactNode
-  accessibilityLabel?: string
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: active ? c.action : c.surface,
-          borderColor: c.border,
-        },
-      ]}
-    >
-      {icon}
-      {label ? (
-        <Txt style={{ fontWeight: '600', fontSize: 14, color: active ? c.onAction : c.textMuted }}>
-          {label}
-        </Txt>
-      ) : null}
-    </Pressable>
-  )
-}
-
 const styles = StyleSheet.create({
   countPill: { borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 4 },
   // No paddingBottom offset: the add bar is in normal flow now, so this centres
   // in the space that's actually left rather than compensating for an overlay.
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1369,7 +1453,36 @@ const styles = StyleSheet.create({
   adder: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   swipeDelete: { width: 76, marginLeft: sp.sm, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   cartBadge: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  progressTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  progressTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: sp.lg, paddingVertical: sp.sm },
+  round: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bigTitle: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8 },
+  tile: { height: 84, borderRadius: 20, padding: 11 },
+  tileIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  capsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 58,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingLeft: 16,
+    paddingRight: 7,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  capsuleInput: { flex: 1, fontSize: 16, fontFamily: fonts.body, paddingVertical: 0 },
+  capsuleBtn: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   progressFill: { height: '100%', borderRadius: 2, backgroundColor: SHOP_AMBER },
   struck: { textDecorationLine: 'line-through' },
   removeBtn: { paddingHorizontal: 4 },

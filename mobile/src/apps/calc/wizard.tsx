@@ -17,13 +17,16 @@
 import { useEffect, type ReactNode } from 'react'
 import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Stack } from 'expo-router'
+import { Stack, router } from 'expo-router'
 import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated'
 
-import { AppHeader, Btn, DismissKeyboard, Txt } from '@/components/ui'
+import { ChevronLeft } from 'lucide-react-native'
+
+import { Pressable } from '@/components/Pressable'
+import { Btn, DismissKeyboard, Txt } from '@/components/ui'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useI18n } from '@/hooks/useI18n'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 export interface WizardAction {
   label: string
@@ -61,7 +64,9 @@ export function WizardScreen({
   swipeBack?: boolean
 }) {
   const { c } = useTheme()
-  const bottom = useBottomGap(sp.md)
+  // Half the home-indicator inset, like NewItemButton: the docked button's
+  // curved bottom corners then sit on the display's own curve.
+  const bottom = useBottomGap(sp.xs)
 
   // Android's back button walks the wizard like the header arrow does.
   useEffect(() => {
@@ -76,7 +81,7 @@ export function WizardScreen({
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <Stack.Screen options={{ gestureEnabled: swipeBack ?? index === 0 }} />
       <DismissKeyboard style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader title={title} onBack={onBack} />
+        <ToolTopBar title={title} onBack={onBack} />
         {hideProgress ? null : <Progress steps={steps} index={index} />}
       </DismissKeyboard>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -101,6 +106,7 @@ export function WizardScreen({
                 onPress={primary.onPress}
                 disabled={primary.disabled}
                 loading={primary.loading}
+                curveBottom={!secondary}
               />
             ) : null}
             {secondary ? (
@@ -115,6 +121,30 @@ export function WizardScreen({
         ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
+  )
+}
+
+/** The Utilities tools' top bar, in the Home's style: a round back button
+ *  and the tool's name. Shared by the wizards and the one-screen tools. */
+export function ToolTopBar({ title, onBack }: { title: string; onBack?: () => void }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/calc')))
+  return (
+    <View style={styles.topBar}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('common.back')}
+        onPress={back}
+        hitSlop={8}
+        style={[styles.round, { backgroundColor: c.card, borderColor: c.border }]}
+      >
+        <ChevronLeft size={22} color={c.text} />
+      </Pressable>
+      <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 16 }} numberOfLines={1}>
+        {title}
+      </Txt>
+    </View>
   )
 }
 
@@ -153,13 +183,15 @@ export function StepTitle({
           {t('calc.stepOf', { step, total: steps })}
         </Txt>
       ) : null}
-      <Txt variant="display">{title}</Txt>
+      <Txt style={{ fontFamily: fonts.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6 }}>{title}</Txt>
       {hint ? <Txt variant="muted">{hint}</Txt> : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  topBar: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: sp.sm },
+  round: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   progress: { flexDirection: 'row', gap: 6, marginTop: sp.xs },
   progressSeg: { flex: 1, height: 4, borderRadius: radius.pill },
   footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm, gap: sp.xs },

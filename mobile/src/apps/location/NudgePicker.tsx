@@ -3,17 +3,18 @@
 // in-place expanding card: the DETAIL is inline now, but choosing from a list of
 // presets is a deliberate, dismissable pick, which is what a modal is actually
 // for.
+import { SheetHead } from './sheetParts'
 import { useEffect, useState } from 'react'
 import { Modal, ScrollView, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { X } from 'lucide-react-native'
+import { Send } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { fetchPingPresets, presetText, sendPing } from '@/lib/pings'
 import type { PingPreset, Profile } from '@/lib/types'
-import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 
 export function NudgePicker({
   profile,
@@ -54,53 +55,52 @@ export function NudgePicker({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.cancel')} />
         <View
           style={{
             // c.sheet, never c.card — the glass skin makes card translucent.
             backgroundColor: c.sheet,
-            borderTopLeftRadius: 22,
-            borderTopRightRadius: 22,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
             padding: sp.lg,
-            paddingBottom: insets.bottom + sp.lg,
+            paddingBottom: insets.bottom + sp.md,
             gap: sp.md,
             maxHeight: '72%',
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-            <Txt style={{ flex: 1, fontFamily: fonts.displaySemi, fontSize: 20, color: c.text }} numberOfLines={1}>
-              {t('location.nudge.title', { name: profile.display_name })}
-            </Txt>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-              <X size={20} color={c.textMuted} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={{ gap: sp.sm }}>
-            {presets.map((p) => (
-              <Pressable
-                key={p.id}
-                disabled={sending}
-                onPress={() => void send(p)}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: sp.md,
-                    backgroundColor: c.surface,
-                    borderRadius: radius.md,
-                    padding: sp.md,
-                    opacity: sending ? 0.5 : 1,
-                  },
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Txt style={{ fontSize: 20 }}>{p.emoji}</Txt>
-                <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: c.text }} numberOfLines={1}>
-                  {presetText(p, t)}
-                </Txt>
-              </Pressable>
-            ))}
+          <SheetHead title={t('location.nudge.title', { name: profile.display_name })} onClose={onClose} />
+          <ScrollView style={{ flexShrink: 1 }}>
+            <View style={{ borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, backgroundColor: c.card, overflow: 'hidden' }}>
+              {presets.map((p, i) => (
+                <Pressable
+                  key={p.id}
+                  disabled={sending}
+                  onPress={() => void send(p)}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: sp.md,
+                      paddingHorizontal: sp.md,
+                      paddingVertical: 12,
+                      borderTopWidth: i ? StyleSheet.hairlineWidth : 0,
+                      borderColor: c.border,
+                      opacity: sending ? 0.5 : 1,
+                    },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                >
+                  <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+                    <Txt style={{ fontSize: 20 }}>{p.emoji}</Txt>
+                  </View>
+                  <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 16.5, color: c.text }} numberOfLines={1}>
+                    {presetText(p, t)}
+                  </Txt>
+                  <Send size={16} color={c.textFaint} />
+                </Pressable>
+              ))}
+            </View>
           </ScrollView>
         </View>
       </View>

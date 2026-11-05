@@ -16,7 +16,7 @@ import * as Location from 'expo-location'
 import { router } from 'expo-router'
 import { Check, ChevronsUpDown, LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react-native'
 
-import { Btn, Txt } from '@/components/ui'
+import { Txt } from '@/components/ui'
 import { KeyboardScroll, useRevealOnFocus } from '@/components/KeyboardScroll'
 import { FormRow, FormSection, RowValue, SelectRow, ToggleRow } from '@/components/form'
 import { useI18n } from '@/hooks/useI18n'
@@ -34,61 +34,10 @@ import {
 import type { Place, PlaceWatch, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
+import { FeatureButton } from './sheetParts'
+import { FEATURE } from './onCard'
 
 const ROW_MIN_H = 50
-
-/** Icon + name on ONE row: the emoji in a small square on the left, the name
- *  filling the rest. Both are fixed-height single lines, so the emoji's larger
- *  type can't make its box taller than the name beside it. */
-function IconNameRow({
-  icon,
-  name,
-  onIcon,
-  onName,
-}: {
-  icon: string
-  name: string
-  onIcon: (v: string) => void
-  onName: (v: string) => void
-}) {
-  const { c } = useTheme()
-  const { t } = useI18n()
-  const reveal = useRevealOnFocus()
-  const row = useRef<View>(null)
-  return (
-    <View ref={row} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, minHeight: 58, paddingHorizontal: sp.md }}>
-      <TextInput
-        value={icon}
-        onChangeText={onIcon}
-        maxLength={2}
-        accessibilityLabel={t('location.places.icon')}
-        onFocus={() => reveal(row.current)}
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: R.md,
-          backgroundColor: c.surface2,
-          textAlign: 'center',
-          fontSize: 22,
-          paddingVertical: 0,
-          // iOS centres a single line in a fixed height; Android needs telling.
-          textAlignVertical: 'center',
-          color: c.text,
-        }}
-      />
-      <TextInput
-        value={name}
-        onChangeText={onName}
-        placeholder={t('location.places.namePlaceholder')}
-        placeholderTextColor={c.textFaint}
-        autoCapitalize="words"
-        accessibilityLabel={t('location.places.name')}
-        onFocus={() => reveal(row.current)}
-        style={{ flex: 1, fontSize: 16, color: c.text, fontFamily: fonts.semibold, paddingVertical: 12 }}
-      />
-    </View>
-  )
-}
 
 /** The Location section's one statement of where this place is, with the bin
  *  when a named place is chosen. */
@@ -336,8 +285,9 @@ export function PlaceForm({
   onClose: () => void
   onSaved: () => void
 }) {
-  const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.lg)
+  const { c, dark } = useTheme()
+  // Half the inset: the docked button's curved corners meet the display's.
+  const bottomGap = useBottomGap(sp.xs)
   const { t } = useI18n()
   const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
 
@@ -596,12 +546,34 @@ export function PlaceForm({
             { backgroundColor: c.sheet, maxHeight: room * 0.92, marginBottom: lift },
           ]}
         >
-          {/* Title + an explicit way out. Tapping the backdrop already closed
-              the sheet, but that isn't discoverable on a form this tall. */}
+          {/* The place itself leads: its emoji on a tile in the Places colour
+              and its name, both typed in place, large — like the document and
+              pet event editors (2026-11). */}
           <View style={styles.sheetHead}>
-            <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 22, color: c.text }}>
-              {place ? t('location.places.edit') : t('location.places.new')}
-            </Txt>
+            <View style={[styles.emojiTile, { backgroundColor: FEATURE.places + (dark ? '33' : '1F') }]}>
+              <TextInput
+                value={icon}
+                onChangeText={setIcon}
+                maxLength={2}
+                accessibilityLabel={t('location.places.icon')}
+                style={{ width: 56, height: 56, textAlign: 'center', fontSize: 28, paddingVertical: 0, textAlignVertical: 'center' }}
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}>
+                {place ? t('location.places.edit') : t('location.places.new')}
+              </Txt>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder={t('location.places.namePlaceholder')}
+                placeholderTextColor={c.textFaint}
+                autoFocus={!place}
+                returnKeyType="done"
+                accessibilityLabel={t('location.places.namePlaceholder')}
+                style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, padding: 0, marginTop: 2 }}
+              />
+            </View>
             <Pressable
               onPress={onClose}
               hitSlop={10}
@@ -620,7 +592,6 @@ export function PlaceForm({
             showsVerticalScrollIndicator={false}
           >
             <FormSection title={t('location.places.details')}>
-              <IconNameRow icon={icon} name={name} onIcon={setIcon} onName={setName} />
               {/* Presets only (100 m floor — see `presets`). nearestPreset keeps
                   a saved value from another unit system showing a choice. */}
               <SelectRow
@@ -710,7 +681,13 @@ export function PlaceForm({
               { paddingBottom: clearOfBars ? sp.md : bottomGap, borderTopColor: c.border },
             ]}
           >
-            <Btn title={t('common.save')} onPress={save} disabled={!coords || !name.trim()} loading={busy} />
+            <FeatureButton
+              tint={FEATURE.places}
+              title={place ? t('common.saveChanges') : t('location.places.add')}
+              onPress={save}
+              disabled={!coords || !name.trim()}
+              busy={busy}
+            />
           </View>
         </View>
       </View>
@@ -721,13 +698,14 @@ export function PlaceForm({
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: sp.lg },
+  emojiTile: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   sheetHead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: sp.md,
     paddingHorizontal: sp.lg,
     paddingBottom: sp.md,
   },
   close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm, borderTopWidth: StyleSheet.hairlineWidth },
+  footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm },
 })
