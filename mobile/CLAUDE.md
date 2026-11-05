@@ -110,6 +110,9 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   turns output down — faint, late-sounding chimes). Every way out of the
   sheet goes through `closeSheet` → `voice.cancel()`, which plays the stop
   chime and aborts.
+  A chime REWINDS then plays (`await seekTo(0)` → `play()`): a finished
+  expo-audio player sits at the end, and play() before the async seek lands
+  is silent — the chimes sounded only every other time.
   **It's a conversation (2026-11):** while the sheet is open, each finished
   turn moves up as the question + a one-line summary of the answer
   (`summarize` in AskSheet — written for the user AND sent to Claude), and

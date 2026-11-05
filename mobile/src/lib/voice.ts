@@ -49,7 +49,7 @@ function speech(): SpeechModule | null {
 // ── the chimes: a soft rising "bip" when listening starts, falling when it
 // stops (owner idea, 2026-11). Synthesised WAVs in assets/sounds. expo-audio is
 // loaded the same guarded way — no module (an older build), no sound, no crash.
-type Player = { play: () => void; seekTo: (s: number) => void | Promise<void>; volume: number }
+type Player = { play: () => void; pause: () => void; seekTo: (s: number) => Promise<void>; volume: number }
 let players: { start: Player; stop: Player } | null | undefined
 function chimes() {
   if (players !== undefined) return players
@@ -75,9 +75,16 @@ function chimes() {
 function chime(which: 'start' | 'stop') {
   const p = chimes()?.[which]
   if (!p) return
+  // A player that finished sits at the END of the file. seekTo is async, and
+  // calling play() before the rewind lands plays nothing — which is why the
+  // chimes sounded only every other time (owner, 2026-11: open → bip, close →
+  // bip, then silence, then bip again…). Rewind first, THEN play.
   try {
-    void p.seekTo(0)
-    p.play()
+    p.pause()
+    p.seekTo(0).then(
+      () => p.play(),
+      () => p.play(),
+    )
   } catch {
     /* a sound is never worth an error */
   }
