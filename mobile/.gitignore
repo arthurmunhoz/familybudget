@@ -59,3 +59,6 @@ supabase/.temp/
 # Local EAS build artifacts
 build-*.aab
 build-*.apk
+
+# build-birth-years.py network cache
+scripts/.cache/

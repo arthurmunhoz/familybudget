@@ -158,11 +158,11 @@ export function OverdueSheet({
                         paddingHorizontal: 12,
                         paddingVertical: 7,
                         borderRadius: radius.pill,
-                        backgroundColor: c.accent,
+                        backgroundColor: c.action,
                       }}
                     >
-                      <Check size={14} strokeWidth={3} color={c.onAccent} />
-                      <Txt style={{ fontSize: 13, fontWeight: '700', color: c.onAccent }}>
+                      <Check size={14} strokeWidth={3} color={c.onAction} />
+                      <Txt style={{ fontSize: 13, fontWeight: '700', color: c.onAction }}>
                         {t('pets.markDone')}
                       </Txt>
                     </Pressable>

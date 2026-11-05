@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>One Roof V2 Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=block" rel="stylesheet">
+<script src="icons.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 390px; height: 844px; overflow: hidden; }
+  body { font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .screen { position: relative; width: 390px; height: 844px; overflow: hidden; }
+  .status { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0 34px; font: 600 16px Inter; }
+  .status .r { display: flex; gap: 6px; align-items: center; }
+  .bat { width: 25px; height: 12px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; opacity: .9 }
+  .bat::after { content: ''; position: absolute; inset: 1.5px; right: 5px; background: currentColor; border-radius: 1.5px; }
+  .homebar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; }
+  svg.i { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .row { display: flex; align-items: center; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ---------------- A · SALA (people first, warm editorial) ---------------- */
+  .A { background: #F4EEE6; color: #221B16; }
+  .A .head { padding: 10px 24px 0; }
+  .A .kicker { font: 600 12px Inter; letter-spacing: .12em; text-transform: uppercase; color: #9A8B7E; }
+  .A h1 { font: 600 38px/1.05 Fraunces, serif; letter-spacing: -.02em; margin-top: 6px; }
+  .A .me { position: absolute; right: 24px; top: 62px; width: 40px; height: 40px; border-radius: 20px; background: #E8DED2; display: grid; place-items: center; color: #6B5B4E; }
+  .A .people { display: flex; gap: 14px; padding: 20px 24px 6px; }
+  .A .p { width: 74px; text-align: center; white-space: nowrap; }
+  .A .av { width: 66px; height: 66px; border-radius: 33px; margin: 0 auto; display: grid; place-items: center; font: 600 22px Fraunces; color: #fff; position: relative; box-shadow: 0 0 0 3px #F4EEE6, 0 0 0 5px var(--ring, transparent); }
+  .A .av .dot { position: absolute; right: 1px; bottom: 2px; width: 15px; height: 15px; border-radius: 8px; border: 3px solid #F4EEE6; }
+  .A .p b { display: block; font: 600 14px Inter; margin-top: 9px; }
+  .A .p span { display: block; font: 500 12px Inter; color: #8C7D70; margin-top: 2px; }
+  .A .sec { display: flex; justify-content: space-between; align-items: baseline; padding: 22px 24px 10px; }
+  .A .sec h2 { font: 600 21px Fraunces; }
+  .A .sec a { font: 600 13px Inter; color: #C4552B; }
+  .A .now { margin: 0 16px; background: #FFFCF8; border-radius: 24px; padding: 6px 0; box-shadow: 0 1px 0 rgba(60,40,20,.06), 0 10px 30px -18px rgba(60,40,20,.25); }
+  .A .item { display: flex; align-items: center; gap: 14px; padding: 13px 18px; }
+  .A .item + .item { border-top: 1px solid #F0E8DE; }
+  .A .item .t { width: 46px; font: 600 15px Fraunces; color: #221B16; }
+  .A .item .bar { width: 3px; height: 34px; border-radius: 2px; }
+  .A .item .x { flex: 1; }
+  .A .item .x b { font: 600 15px Inter; display: block; }
+  .A .item .x span { font: 500 12.5px Inter; color: #8C7D70; }
+  .A .chk { width: 26px; height: 26px; border-radius: 13px; border: 2px solid #DCCFC1; }
+  .A .apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 16px; }
+  .A .app { background: #EDE5DA; border-radius: 20px; height: 84px; padding: 13px 14px; display: flex; flex-direction: column; justify-content: space-between; color: #3A2E25; }
+  .A .app b { font: 600 13.5px Inter; }
+  .A .app .badge { position: absolute; }
+  .A .fab { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); height: 56px; padding: 0 26px 0 20px; border-radius: 28px; background: #221B16; color: #FFF8EF; display: flex; align-items: center; gap: 10px; font: 600 16px Inter; box-shadow: 0 14px 30px -10px rgba(34,27,22,.55); }
+  .A .fab .plus { width: 28px; height: 28px; border-radius: 14px; background: #C4552B; display: grid; place-items: center; }
+  .A .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: linear-gradient(to bottom, rgba(244,238,230,0), #F4EEE6 60%); }
+
+  /* ---------------- B · BENTO (every app is a live widget) ---------------- */
+  .B { background: #F5F5F2; color: #121212; font-family: 'Plus Jakarta Sans', Inter, sans-serif; }
+  .B .head { display: flex; justify-content: space-between; align-items: center; padding: 8px 20px 0; }
+  .B .hi small { font: 600 13px 'Plus Jakarta Sans'; color: #8A8A85; display: flex; gap: 6px; align-items: center; }
+  .B .hi h1 { font: 800 29px/1.1 'Plus Jakarta Sans'; letter-spacing: -.03em; margin-top: 4px; }
+  .B .stack { display: flex; }
+  .B .stack i { width: 36px; height: 36px; border-radius: 18px; border: 2.5px solid #F5F5F2; margin-left: -10px; display: grid; place-items: center; font: 700 13px 'Plus Jakarta Sans'; font-style: normal; color: #fff; }
+  .B .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 18px 14px 0; }
+  .B .tile { border-radius: 26px; padding: 16px; position: relative; overflow: hidden; }
+  .B .lab { display: flex; align-items: center; gap: 7px; font: 700 13px 'Plus Jakarta Sans'; color: rgba(18,18,18,.62); }
+  .B .wide { grid-column: span 2; }
+  .B .cal { background: #E6E0FF; height: 128px; }
+  .B .cal .big { font: 800 23px/1.15 'Plus Jakarta Sans'; letter-spacing: -.02em; margin-top: 12px; }
+  .B .cal .sub { font: 600 13.5px 'Plus Jakarta Sans'; color: #5B4FA8; margin-top: 4px; }
+  .B .cal .when { position: absolute; right: 16px; top: 14px; background: #121212; color: #fff; font: 700 13px 'Plus Jakarta Sans'; padding: 6px 11px; border-radius: 999px; }
+  .B .cal .more { position: absolute; right: 16px; bottom: 16px; display: flex; gap: 6px; }
+  .B .cal .more span { background: rgba(255,255,255,.65); font: 700 11.5px 'Plus Jakarta Sans'; padding: 5px 9px; border-radius: 999px; color: #4A3F94; }
+  .B .shop { background: #FFEFB8; grid-row: span 2; height: 286px; }
+  .B .shop .n { font: 800 56px/1 'Plus Jakarta Sans'; letter-spacing: -.04em; margin-top: 12px; }
+  .B .shop .n small { font: 700 14px 'Plus Jakarta Sans'; letter-spacing: 0; color: rgba(18,18,18,.55); margin-left: 4px; }
+  .B .li { display: flex; align-items: center; gap: 9px; font: 600 14px 'Plus Jakarta Sans'; margin-top: 11px; }
+  .B .li i { width: 18px; height: 18px; border-radius: 6px; border: 2px solid rgba(18,18,18,.3); }
+  .B .li.done { color: rgba(18,18,18,.38); text-decoration: line-through; }
+  .B .li.done i { background: #121212; border-color: #121212; }
+  .B .add { position: absolute; left: 16px; right: 16px; bottom: 16px; height: 38px; border-radius: 13px; background: rgba(255,255,255,.7); display: flex; align-items: center; gap: 6px; padding: 0 12px; font: 600 13px 'Plus Jakarta Sans'; color: rgba(18,18,18,.5); }
+  .B .money { background: #D7F0DF; height: 138px; }
+  .B .money .v { font: 800 25px 'Plus Jakarta Sans'; letter-spacing: -.03em; margin-top: 14px; }
+  .B .money .s { font: 600 12px 'Plus Jakarta Sans'; color: #3F7A52; }
+  .B .meter { height: 7px; border-radius: 4px; background: rgba(18,18,18,.1); margin-top: 12px; overflow: hidden; }
+  .B .meter b { display: block; height: 100%; width: 62%; background: #1F8A4C; border-radius: 4px; }
+  .B .pets { background: #FFDCCB; height: 138px; }
+  .B .pets .face { width: 46px; height: 46px; border-radius: 23px; background: linear-gradient(135deg, #C9874F, #8F5428); display: grid; place-items: center; color: #fff; margin-top: 10px; }
+  .B .pets b { display: block; font: 800 16px 'Plus Jakarta Sans'; margin-top: 8px; }
+  .B .pets span { font: 600 12.5px 'Plus Jakarta Sans'; color: #A2482A; }
+  .B .nudge { background: #D9E9FF; height: 92px; display: flex; gap: 12px; align-items: center; }
+  .B .bubble { flex: 1; }
+  .B .bubble small { font: 700 12px 'Plus Jakarta Sans'; color: #3D63A6; }
+  .B .bubble p { font: 700 16px 'Plus Jakarta Sans'; margin-top: 3px; }
+  .B .reply { background: #121212; color: #fff; font: 700 13px 'Plus Jakarta Sans'; padding: 10px 14px; border-radius: 999px; }
+  .B .minis { grid-column: span 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .B .mini { background: #fff; border-radius: 22px; height: 82px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font: 700 12px 'Plus Jakarta Sans'; color: #3a3a38; box-shadow: 0 1px 0 rgba(0,0,0,.04); }
+  .B .tabbar { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; }
+  .B .cap { height: 62px; padding: 0 10px; border-radius: 31px; background: #121212; display: flex; align-items: center; gap: 4px; box-shadow: 0 16px 30px -12px rgba(0,0,0,.5); }
+  .B .cap span { width: 50px; height: 44px; border-radius: 22px; display: grid; place-items: center; color: rgba(255,255,255,.55); }
+  .B .cap span.on { background: #fff; color: #121212; width: 64px; }
+  .B .plusb { width: 62px; height: 62px; border-radius: 31px; background: #FF6B3D; color: #fff; display: grid; place-items: center; box-shadow: 0 16px 30px -12px rgba(255,107,61,.8); }
+
+  /* ---------------- C · COMANDO (dark, ask-first + icon launcher) ---------------- */
+  .C { background: #0C0D11; color: #F4F4F6; }
+  .C .glow { position: absolute; inset: -120px -80px auto; height: 460px; background:
+      radial-gradient(closest-side at 30% 45%, rgba(124,92,255,.42), transparent),
+      radial-gradient(closest-side at 80% 30%, rgba(0,200,170,.28), transparent); filter: blur(10px); }
+  .C > .status, .C > .head, .C > .ask, .C > .lbl, .C > .cards, .C > .apps { position: relative; }
+  .C .head { padding: 14px 24px 0; }
+  .C .date { font: 500 13px Inter; color: rgba(244,244,246,.55); display: flex; gap: 8px; align-items: center; }
+  .C h1 { font: 700 40px/1.05 'Plus Jakarta Sans'; letter-spacing: -.035em; margin-top: 10px; }
+  .C h1 em { font-style: normal; color: rgba(244,244,246,.45); }
+  .C .ask { margin: 22px 16px 0; height: 58px; border-radius: 20px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); display: flex; align-items: center; gap: 12px; padding: 0 8px 0 16px; backdrop-filter: blur(20px); }
+  .C .ask p { flex: 1; font: 500 15px Inter; color: rgba(244,244,246,.5); }
+  .C .ask .mic { width: 42px; height: 42px; border-radius: 14px; background: #F4F4F6; color: #0C0D11; display: grid; place-items: center; }
+  .C .sparkle { color: #A996FF; }
+  .C .lbl { font: 600 12px Inter; letter-spacing: .1em; text-transform: uppercase; color: rgba(244,244,246,.45); padding: 26px 24px 12px; display: flex; justify-content: space-between; }
+  .C .cards { display: flex; gap: 10px; padding-left: 16px; }
+  .C .card { flex: none; width: 236px; height: 132px; border-radius: 24px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
+  .C .card .top { display: flex; justify-content: space-between; align-items: center; font: 600 12.5px Inter; color: rgba(255,255,255,.75); }
+  .C .card b { font: 700 18px/1.2 'Plus Jakarta Sans'; letter-spacing: -.01em; color: #fff; }
+  .C .card .acts { display: flex; gap: 8px; }
+  .C .card .acts span { height: 34px; padding: 0 14px; border-radius: 12px; display: flex; align-items: center; font: 600 13px Inter; }
+  .C .apps { display: grid; grid-template-columns: repeat(4, 1fr); row-gap: 20px; padding: 0 14px; }
+  .C .app { display: flex; flex-direction: column; align-items: center; gap: 8px; font: 500 12px Inter; color: rgba(244,244,246,.82); position: relative; }
+  .C .ico { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 10px 20px -10px rgba(0,0,0,.6); }
+  .C .pill { position: absolute; top: -5px; right: 6px; min-width: 22px; height: 22px; border-radius: 11px; background: #FF4D5E; color: #fff; font: 700 12px Inter; display: grid; place-items: center; padding: 0 6px; border: 2.5px solid #0C0D11; }
+  .C .dock { position: absolute; left: 16px; right: 16px; bottom: 26px; height: 76px; border-radius: 30px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); display: flex; justify-content: space-around; align-items: center; }
+  .C .dock .av { width: 46px; height: 46px; border-radius: 23px; display: grid; place-items: center; font: 700 15px 'Plus Jakarta Sans'; position: relative; }
+  .C .dock .av::after { content: ''; position: absolute; right: 0; bottom: 0; width: 13px; height: 13px; border-radius: 50%; background: var(--s); border: 2.5px solid #1a1b20; }
+  .C .dock .av.all::after { display: none; }
+
+  /* ---------------- Comando · ask & answer sheets ---------------- */
+  .bgC { position: absolute; inset: 0; filter: blur(16px) brightness(.45) saturate(1.1); transform: scale(1.06); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 34px 34px 0 0; background: #15161B; border-top: 1px solid rgba(255,255,255,.09); padding: 10px 18px 34px; color: #F4F4F6; box-shadow: 0 -30px 60px -20px rgba(0,0,0,.6); }
+  .grab { width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.18); margin: 0 auto 16px; }
+  .q { margin-left: auto; max-width: 290px; background: rgba(255,255,255,.1); border-radius: 20px 20px 6px 20px; padding: 11px 15px; font: 500 15.5px/1.35 Inter; color: #fff; display: flex; gap: 8px; }
+  .q .i { color: rgba(255,255,255,.5); margin-top: 1px; }
+  .ans { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; }
+  .orb { width: 30px; height: 30px; border-radius: 15px; flex: none; background: conic-gradient(from 200deg, #7C5CFF, #00C8AA, #FF8A4C, #7C5CFF); display: grid; place-items: center; color: #fff; }
+  .ans p { font: 600 18px/1.35 'Plus Jakarta Sans'; letter-spacing: -.01em; padding-top: 3px; }
+  .ans p em { font-style: normal; color: #A996FF; }
+  .panel { margin-top: 16px; background: #1E1F26; border: 1px solid rgba(255,255,255,.07); border-radius: 24px; padding: 14px; }
+  .btns { display: flex; gap: 10px; margin-top: 14px; }
+  .btns span { flex: 1; height: 50px; border-radius: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; font: 600 15px Inter; }
+  .b1 { background: #F4F4F6; color: #0C0D11; } .b2 { background: rgba(255,255,255,.08); color: #F4F4F6; }
+  .chips { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .chips span { height: 34px; padding: 0 13px; border-radius: 17px; border: 1px solid rgba(255,255,255,.14); display: flex; align-items: center; font: 500 13.5px Inter; color: rgba(244,244,246,.8); }
+  .storehd { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .logo { width: 40px; height: 40px; border-radius: 12px; background: #0071CE; display: grid; place-items: center; font: 800 18px 'Plus Jakarta Sans'; color: #FFC220; }
+  .storehd b { font: 700 16px 'Plus Jakarta Sans'; display: block; } .storehd small { font: 500 13px Inter; color: rgba(244,244,246,.5); }
+  .it { display: flex; align-items: center; gap: 12px; padding: 10px 2px; font: 500 15.5px Inter; }
+  .it i { width: 22px; height: 22px; border-radius: 7px; border: 2px solid rgba(255,255,255,.25); flex: none; }
+  .it.new { color: #fff; } .it.old { color: rgba(244,244,246,.45); }
+  .tag { margin-left: auto; font: 700 11px Inter; letter-spacing: .04em; text-transform: uppercase; color: #2BD99A; background: rgba(43,217,154,.12); padding: 4px 8px; border-radius: 8px; }
+  .seg { display: inline-flex; background: rgba(255,255,255,.07); border-radius: 12px; padding: 3px; margin-top: 14px; }
+  .seg span { padding: 7px 16px; border-radius: 9px; font: 600 13.5px Inter; color: rgba(244,244,246,.55); }
+  .seg span.on { background: #F4F4F6; color: #0C0D11; }
+  .tl { position: relative; height: 296px; }
+  .hr { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 10px; font: 500 12px Inter; color: rgba(244,244,246,.38); }
+  .hr::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.06); }
+  .hr span { width: 34px; text-align: right; }
+  .ev { position: absolute; left: 46px; right: 4px; border-radius: 12px; padding: 8px 12px; font: 600 14px Inter; color: #fff; }
+  .ev small { display: block; font: 500 12px Inter; color: rgba(255,255,255,.75); margin-top: 2px; }
+  .nowl { position: absolute; left: 38px; right: 0; height: 2px; background: #FF4D5E; }
+  .nowl::before { content: ''; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; border-radius: 5px; background: #FF4D5E; }
+  .wave { display: flex; align-items: center; justify-content: center; gap: 5px; height: 70px; margin: 26px 0 10px; }
+  .wave i { width: 5px; border-radius: 3px; background: linear-gradient(#A996FF, #00C8AA); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const EXTRA = {
+  toolbox: '<path d="M16 12v4"/><path d="M16 6a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 22 12v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-7a2 2 0 0 1 .586-1.414l4-4A2 2 0 0 1 8 6z"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M2 14h20"/><path d="M8 12v4"/>',
+  house: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>',
+  user: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/>',
+  chev: '<path d="m9 18 6-6-6-6"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  grid: '<rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/>',
+  msg: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+};
+const I = (n, s = 22, w = 2) => `<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${w}">${EXTRA[n] || ICONS[n]}</svg>`;
+const status = (color) => `<div class="status" style="color:${color}"><span>9:41</span><span class="r">
+  <svg width="18" height="12" viewBox="0 0 18 12" fill="${color}"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+  <svg width="16" height="12" viewBox="0 0 16 12" fill="${color}"><path d="M8 2.5c2.3 0 4.4.9 6 2.4l1.2-1.2A10.2 10.2 0 0 0 8 .8 10.2 10.2 0 0 0 .8 3.7L2 4.9a8.5 8.5 0 0 1 6-2.4Zm0 3.4c1.4 0 2.7.5 3.6 1.4l1.2-1.2A6.8 6.8 0 0 0 8 4.2c-1.8 0-3.5.7-4.8 1.9l1.2 1.2c1-.9 2.2-1.4 3.6-1.4ZM8 9.3l1.9-1.9a2.7 2.7 0 0 0-3.8 0Z"/></svg>
+  <span class="bat"></span></span></div>`;
+
+const APPS = [
+  ['calendar', 'Agenda', 'calendar-days'], ['shopping', 'Compras', 'shopping-cart'], ['budget', 'Dinheiro', 'wallet'],
+  ['pets', 'Pets', 'paw-print'], ['pings', 'Recados', 'bell'], ['location', 'Onde está', 'map-pin'],
+  ['family', 'Família', 'users'], ['docs', 'Documentos', 'folder-lock'], ['calc', 'Utilidades', 'toolbox'],
+];
+
+const V = {
+A: () => `<div class="screen A">${status('#221B16')}
+  <div class="head"><div class="kicker">Quinta, 5 de novembro · 24°</div><h1>Casa Silva</h1></div>
+  <div class="me">${I('user', 22, 1.8)}</div>
+  <div class="people">
+    ${[['A','Ana','Em casa','#C4552B','#3FA266','linear-gradient(140deg,#E58A5F,#B9472A)'],
+       ['L','Léo','Trabalho','','#E0A23A','linear-gradient(140deg,#6E8BC9,#3E5A9A)'],
+       ['B','Bia','Escola','','#E0A23A','linear-gradient(140deg,#B98AD6,#7E52A3)'],
+       ['T','Thor','Remédio 18h','','#C4552B','linear-gradient(140deg,#C9935F,#8C5A2E)']].map(([i,n,s,ring,dot,bg],k)=>`
+      <div class="p"><div class="av" style="background:${bg};--ring:${ring||'transparent'}">${k===3?I('paw-print',26,2):i}<i class="dot" style="background:${dot}"></i></div>
+      <b>${n}</b><span style="${k===3?'color:#C4552B;font-weight:600':''}">${s}</span></div>`).join('')}
+  </div>
+  <div class="sec"><h2>Agora</h2><a>Ver o dia</a></div>
+  <div class="now">
+    ${[['16:30','Natação da Bia','Clube Pinheiros · Léo leva','#7E52A3'],
+       ['18:00','Remédio do Thor','1 comprimido com comida','#C4552B'],
+       ['','Mercado','7 itens · Ana adicionou leite','#3FA266']].map(([t,a,b,c])=>`
+      <div class="item"><div class="t tnum">${t||'<span style="font:600 12px Inter;color:#8C7D70">hoje</span>'}</div><div class="bar" style="background:${c}"></div>
+      <div class="x"><b>${a}</b><span>${b}</span></div><div class="chk"></div></div>`).join('')}
+  </div>
+  <div class="sec"><h2>A casa</h2><a>Editar</a></div>
+  <div class="apps">
+    ${APPS.map(([id,n,ic])=>`<div class="app" style="position:relative">${I(ic,22,1.9)}<b>${n}</b>${id==='shopping'?'<span style="position:absolute;top:12px;right:12px;font:700 12px Inter;background:#221B16;color:#FFF8EF;border-radius:10px;padding:2px 7px">7</span>':''}</div>`).join('')}
+  </div>
+  <div class="fade"></div>
+  <div class="fab"><span class="plus">${I('plus',18,2.6)}</span>Adicionar</div>
+  <div class="homebar" style="background:#221B16"></div>
+</div>`,
+
+B: () => `<div class="screen B">${status('#121212')}
+  <div class="head">
+    <div class="hi"><small>${I('sun',15,2.2)} 24° · quinta, 5 nov</small><h1>Boa tarde, Ana</h1></div>
+    <div class="stack">${[['L','#4C6FB5'],['B','#8E5DB5'],['A','#D2593A']].map(([l,c])=>`<i style="background:${c}">${l}</i>`).join('')}</div>
+  </div>
+  <div class="grid">
+    <div class="tile wide cal">
+      <div class="lab">${I('calendar-days',16,2.2)} Agenda</div>
+      <div class="when tnum">16:30</div>
+      <div class="big">Natação da Bia</div>
+      <div class="sub">Clube Pinheiros · Léo leva</div>
+      <div class="more"><span>+2 hoje</span></div>
+    </div>
+    <div class="tile shop">
+      <div class="lab">${I('shopping-cart',16,2.2)} Compras</div>
+      <div class="n tnum">7<small>itens</small></div>
+      <div class="li"><i></i>Leite integral</div>
+      <div class="li"><i></i>Pão de forma</div>
+      <div class="li"><i></i>Ração do Thor</div>
+      <div class="li done"><i></i>Bananas</div>
+      <div class="add">${I('plus',16,2.4)} Adicionar item</div>
+    </div>
+    <div class="tile money">
+      <div class="lab">${I('wallet',16,2.2)} Dinheiro</div>
+      <div class="v tnum">R$ 1.240</div>
+      <div class="s">livres até dia 30</div>
+      <div class="meter"><b></b></div>
+    </div>
+    <div class="tile pets">
+      <div class="lab">${I('paw-print',16,2.2)} Pets</div>
+      <div class="row" style="gap:10px"><div class="face">${I('paw-print',22,2)}</div><div><b style="margin-top:10px">Thor</b><span>Remédio 18h</span></div></div>
+    </div>
+    <div class="tile wide nudge">
+      <div class="bubble"><small>Léo · agora</small><p>“Chego 19h, alguém pega a Bia?”</p></div>
+      <div class="reply">Eu pego</div>
+    </div>
+    <div class="minis">
+      ${[['map-pin','Onde está'],['users','Família'],['folder-lock','Docs'],['toolbox','Utilidades']].map(([i,n])=>`<div class="mini">${I(i,22,1.9)}${n}</div>`).join('')}
+    </div>
+  </div>
+  <div class="tabbar">
+    <div class="cap"><span class="on">${I('house',22,2.2)}</span><span>${I('calendar-days',22,2)}</span><span>${I('shopping-cart',22,2)}</span><span>${I('users',22,2)}</span></div>
+    <div class="plusb">${I('plus',26,2.6)}</div>
+  </div>
+  <div class="homebar" style="background:#121212"></div>
+</div>`,
+
+C: () => `<div class="screen C"><div class="glow"></div>${status('#F4F4F6')}
+  <div class="head"><div class="date">${I('sun',15,2)} Quinta, 5 nov · 24° · Casa Silva</div>
+  <h1>Oi, Ana.<br><em>3 coisas pra hoje.</em></h1></div>
+  <div class="ask"><span class="sparkle">${I('sparkles',20,2)}</span><p>“leite e pão”, “vet terça 15h”…</p><span class="mic">${I('mic',20,2.2)}</span></div>
+  <div class="lbl"><span>Precisa de você</span><span style="color:#A996FF;letter-spacing:0;text-transform:none;font-size:13px">Ver tudo</span></div>
+  <div class="cards">
+    <div class="card" style="background:linear-gradient(150deg,#FF8A4C,#E5484D)">
+      <div class="top"><span class="row" style="gap:6px">${I('paw-print',15,2.2)} Thor</span><span class="tnum">18:00</span></div>
+      <b>Dar o remédio do Thor</b>
+      <div class="acts"><span style="background:#fff;color:#C6383D">Feito</span><span style="background:rgba(255,255,255,.2);color:#fff">Adiar 1h</span></div>
+    </div>
+    <div class="card" style="background:linear-gradient(150deg,#3E7BFA,#6B4CF6)">
+      <div class="top"><span class="row" style="gap:6px">${I('bell',15,2.2)} Léo</span><span>agora</span></div>
+      <b>“Chego 19h, alguém pega a Bia?”</b>
+      <div class="acts"><span style="background:#fff;color:#4B4CF0">Eu pego</span></div>
+    </div>
+  </div>
+  <div class="lbl" style="padding-top:28px"><span>Apps</span></div>
+  <div class="apps">
+    ${APPS.slice(0,8).map(([id,n,ic])=>{const g={calendar:'#FF5F6D,#FF2E63',shopping:'#FFC93C,#FF9A1F',budget:'#2BD99A,#0FA37F',pets:'#FF9B6A,#F2603A',pings:'#6E8BFF,#4A5BF5',location:'#38D1F5,#1E8EF0',family:'#C083FF,#8B4DF2',docs:'#8E9AAF,#5B667A'}[id];
+      return `<div class="app"><div class="ico" style="background:linear-gradient(150deg,${g})">${I(ic,28,2)}</div>${n}${id==='shopping'?'<span class="pill">7</span>':''}</div>`}).join('')}
+  </div>
+  <div class="dock">
+    ${[['A','#FFD7C7','#7A2E14','#2BD99A'],['L','#D3DEFF','#22357A','#FFC93C'],['B','#EBDBFF','#4E237E','#FFC93C'],['T','#F7E1C8','#6E431E','#FF5F6D']].map(([l,bg,fg,s],k)=>`<div class="av" style="background:${bg};color:${fg};--s:${s}">${k===3?I('paw-print',20,2.2):l}</div>`).join('')}
+    <div class="av all" style="background:rgba(255,255,255,.1);color:#fff">${I('grid',20,2)}</div>
+  </div>
+  <div class="homebar" style="background:#F4F4F6"></div>
+</div>`,
+D: () => `<div class="screen C"><div class="bgC">${V.C()}</div>
+  <div class="sheet" style="padding-bottom:40px"><div class="grab"></div>
+    <div style="font:600 12px Inter;letter-spacing:.1em;text-transform:uppercase;color:#A996FF;display:flex;gap:8px;align-items:center">${I('sparkles',15,2)} Ouvindo…</div>
+    <p style="font:700 27px/1.25 'Plus Jakarta Sans';letter-spacing:-.02em;margin-top:14px">adicione leite e pão na lista do <span style="color:rgba(244,244,246,.45)">Walm</span><span style="display:inline-block;width:3px;height:28px;background:#A996FF;vertical-align:-5px;margin-left:2px;border-radius:2px"></span></p>
+    <div class="wave">${[14,26,40,58,34,48,66,42,24,52,36,60,30,18,44,28,12].map(h=>`<i style="height:${h}px"></i>`).join('')}</div>
+    <div style="display:flex;justify-content:center;gap:22px;align-items:center;margin-top:8px">
+      <span style="width:52px;height:52px;border-radius:26px;background:rgba(255,255,255,.08);display:grid;place-items:center;color:rgba(244,244,246,.7)">${I('plus',22,2.2).replace('<path d="M12 5v14"/>','')}</span>
+      <span style="width:76px;height:76px;border-radius:38px;background:#F4F4F6;display:grid;place-items:center;box-shadow:0 0 0 8px rgba(169,150,255,.18),0 0 0 18px rgba(169,150,255,.07)"><span style="width:24px;height:24px;border-radius:6px;background:#E5484D"></span></span>
+      <span style="width:52px;height:52px;border-radius:26px;background:rgba(255,255,255,.08);display:grid;place-items:center;color:rgba(244,244,246,.7);font:600 13px Inter">Aa</span>
+    </div>
+  </div><div class="homebar" style="background:#F4F4F6"></div></div>`,
+
+E: () => `<div class="screen C"><div class="bgC">${V.C()}</div>
+  <div class="sheet"><div class="grab"></div>
+    <div class="q">adicione leite e pão na lista do Walmart</div>
+    <div class="ans"><div class="orb">${I('sparkles',15,2.2)}</div><p>Pronto! Coloquei <em>2 itens</em> na lista do Walmart.</p></div>
+    <div class="panel">
+      <div class="storehd"><div class="logo">W</div><div><b>Walmart</b><small>5 itens · lista da casa</small></div>
+        <span style="margin-left:auto;color:rgba(244,244,246,.4)">${I('chev',20,2)}</span></div>
+      <div class="it new"><i></i>Leite<span class="tag">novo</span></div>
+      <div class="it new"><i></i>Pão de forma<span class="tag">novo</span></div>
+      <div class="it old"><i></i>Ovos (12)</div>
+      <div class="it old"><i></i>Detergente</div>
+      <div class="it old" style="padding-bottom:2px"><i></i>Café</div>
+    </div>
+    <div class="btns"><span class="b2">${I('refresh-cw',17,2.2)} Desfazer</span><span class="b1">Abrir lista</span></div>
+    <div class="chips"><span>+ ovos também</span><span>Avisar o Léo</span><span>Quem vai ao Walmart?</span></div>
+  </div><div class="homebar" style="background:#F4F4F6"></div></div>`,
+
+F: () => { const top=14, ph=46; const y=h=>top+(h-14)*ph;
+  return `<div class="screen C"><div class="bgC">${V.C()}</div>
+  <div class="sheet"><div class="grab"></div>
+    <div class="q">o que tem pra hoje pra mim?</div>
+    <div class="ans"><div class="orb">${I('sparkles',15,2.2)}</div><p>Você tem <em>2 compromissos</em> hoje. O próximo é daqui a 40 min.</p></div>
+    <div class="seg"><span class="on">Só eu</span><span>Todos</span></div>
+    <div class="panel" style="padding:12px 14px 6px">
+      <div style="display:flex;justify-content:space-between;font:600 13px Inter;color:rgba(244,244,246,.6);margin-bottom:6px"><span>Quinta, 5 nov</span><span>${I('sun',14,2)} 24°</span></div>
+      <div class="tl">
+        ${[14,15,16,17,18,19].map(h=>`<div class="hr" style="top:${y(h)-8}px"><span class="tnum">${h}:00</span></div>`).join('')}
+        <div class="nowl" style="top:${y(14.33)}px"></div>
+        <div class="ev" style="top:${y(15)+2}px;height:${ph-4}px;background:linear-gradient(150deg,#FF5F6D,#E23A62)">Dentista · Dr. Paulo<small>15:00–15:45 · Rua Augusta, 1200</small></div>
+        <div class="ev" style="top:${y(18)+2}px;height:${ph*0.62}px;background:linear-gradient(150deg,#FF9B6A,#F2603A);padding-top:6px;display:flex;align-items:center;gap:8px">${I('paw-print',15,2.2)} Remédio do Thor <small style="margin:0 0 0 auto">18:00</small></div>
+      </div>
+    </div>
+    <div class="btns"><span class="b1">${I('calendar-days',18,2.1)} Abrir na Agenda</span></div>
+  </div><div class="homebar" style="background:#F4F4F6"></div></div>` },
+
+G: () => `<div class="screen C"><div class="bgC">${V.C()}</div>
+  <div class="sheet"><div class="grab"></div>
+    <div class="q">o que tem pra hoje pra mim?</div>
+    <div style="text-align:center;padding:26px 0 6px">
+      <div style="width:116px;height:116px;margin:0 auto;border-radius:58px;background:radial-gradient(circle at 40% 35%,#FFE27A,#FFB21F 60%,#FF8A1F);box-shadow:0 0 60px 10px rgba(255,178,31,.35),0 0 0 14px rgba(255,178,31,.08),0 0 0 30px rgba(255,178,31,.04)"></div>
+      <p style="font:700 26px/1.2 'Plus Jakarta Sans';letter-spacing:-.02em;margin-top:30px">Nada na sua agenda hoje.</p>
+      <p style="font:500 17px Inter;color:rgba(244,244,246,.6);margin-top:6px">Aproveite o dia ☀︎</p>
+    </div>
+    <div style="font:600 12px Inter;letter-spacing:.1em;text-transform:uppercase;color:rgba(244,244,246,.4);margin:22px 4px 8px">Enquanto isso, na casa</div>
+    <div class="panel" style="margin-top:0;padding:4px 14px">
+      ${[['B','#EBDBFF','#4E237E','Bia','Natação · Léo leva','16:30'],['T','#F7E1C8','#6E431E','Thor','Remédio','18:00']].map(([l,bg,fg,n,w,t],k)=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 0;${k?'border-top:1px solid rgba(255,255,255,.07)':''}">
+        <span style="width:34px;height:34px;border-radius:17px;background:${bg};color:${fg};display:grid;place-items:center;font:700 13px 'Plus Jakarta Sans'">${k?I('paw-print',16,2.2):l}</span>
+        <span style="flex:1;font:600 15px Inter">${n} <span style="font-weight:500;color:rgba(244,244,246,.5)">· ${w}</span></span>
+        <span class="tnum" style="font:600 14px Inter;color:rgba(244,244,246,.7)">${t}</span></div>`).join('')}
+    </div>
+    <div class="btns"><span class="b2">Ver a agenda de todos</span></div>
+  </div><div class="homebar" style="background:#F4F4F6"></div></div>`,
+
+};
+const v = new URLSearchParams(location.search).get('v') || 'A';
+document.getElementById('root').innerHTML = V[v]();
+</script>
+</body>
+</html>

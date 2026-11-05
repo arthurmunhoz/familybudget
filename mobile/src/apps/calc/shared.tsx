@@ -16,9 +16,14 @@ const perUnitFmt = new Intl.NumberFormat('en-US', {
 })
 export const formatPerUnit = (n: number) => perUnitFmt.format(n)
 
-/** Parse a user-typed amount; blank/garbage → 0. */
+/** Parse a user-typed amount; blank/garbage → 0. A lone comma is a DECIMAL
+ *  comma — the iOS decimal pad types the device locale's separator, so on a
+ *  Brazilian or Spanish phone "12,50" means twelve-fifty, not 1250. Commas
+ *  next to a dot ("1,234.50") are thousands separators. */
 export function num(s: string): number {
-  const n = parseFloat(s.replace(/,/g, ''))
+  const commas = (s.match(/,/g) ?? []).length
+  const clean = commas === 1 && !s.includes('.') ? s.replace(',', '.') : s.replace(/,/g, '')
+  const n = parseFloat(clean)
   return Number.isFinite(n) ? n : 0
 }
 
@@ -87,10 +92,10 @@ export function PercentPicker({
             }}
             style={[
               styles.chip,
-              { backgroundColor: active ? c.accent : c.surface },
+              { backgroundColor: active ? c.action : c.surface },
             ]}
           >
-            <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? c.onAccent : c.textMuted }}>
+            <Txt style={{ fontWeight: '700', fontSize: 14, color: active ? c.onAction : c.textMuted }}>
               {v}%
             </Txt>
           </Pressable>
@@ -108,8 +113,8 @@ export function PercentPicker({
         style={[
           styles.customInput,
           {
-            backgroundColor: usingCustom ? c.accent : c.surface,
-            color: usingCustom ? c.onAccent : c.text,
+            backgroundColor: usingCustom ? c.action : c.surface,
+            color: usingCustom ? c.onAction : c.text,
           },
         ]}
       />

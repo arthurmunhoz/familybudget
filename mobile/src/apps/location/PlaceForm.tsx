@@ -4,16 +4,23 @@
 // "save my home" case is one tap, but you never have to travel to a place to
 // save it. Radius is a small preset set: iOS enforces a ~100 m floor on
 // geofences, so finer-grained control would be a lie.
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { Toggle } from '@/components/Toggle'
+//
+// 2026-11 redesign (components/form): grouped rows instead of labelled boxes.
+// Icon + name share one row, the radius presets are a SelectRow instead of a
+// chip wall, the notify options are ToggleRows, and "whose comings and goings"
+// is a multi-select row whose checked list opens in a nested sheet.
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Modal, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable } from '@/components/Pressable'
 import * as Location from 'expo-location'
 import { router } from 'expo-router'
-import { LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react-native'
+import { Check, ChevronsUpDown, LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react-native'
 
-import { Btn, Field, Txt } from '@/components/ui'
+import { Btn, Txt } from '@/components/ui'
+import { KeyboardScroll, useRevealOnFocus } from '@/components/KeyboardScroll'
+import { FormRow, FormSection, RowValue, SelectRow, ToggleRow } from '@/components/form'
 import { useI18n } from '@/hooks/useI18n'
-import { useKeyboardHeight } from '@/hooks/useKeyboardHeight'
+import { useSheetLift } from '@/hooks/useSheetLift'
 import { formatDistance, nearestPreset, radiusPresets } from '@/lib/location'
 import { searchPlaces, type PlaceSuggestion } from '@/lib/placeSearch'
 import {
@@ -27,97 +34,288 @@ import {
 import type { Place, PlaceWatch, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius as R, sp, useTheme } from '@/theme/theme'
-import { Section } from './locationUi'
 
-/** Both inputs on the icon+name row are pinned to this height. `Field` sizes
- *  itself from its fontSize, so the icon input's 22pt emoji made it visibly
- *  TALLER than the name beside it — fixing the height decouples the two. */
-const FIELD_H = 46
+const ROW_MIN_H = 50
 
-/** Full-width action inside a Section — reads as part of the group rather than
- *  as a stray link under it. */
-function SectionAction({
+/** Icon + name on ONE row: the emoji in a small square on the left, the name
+ *  filling the rest. Both are fixed-height single lines, so the emoji's larger
+ *  type can't make its box taller than the name beside it. */
+function IconNameRow({
   icon,
-  label,
-  onPress,
+  name,
+  onIcon,
+  onName,
 }: {
-  icon: React.ReactNode
-  label: string
-  onPress: () => void
+  icon: string
+  name: string
+  onIcon: (v: string) => void
+  onName: (v: string) => void
 }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const reveal = useRevealOnFocus()
+  const row = useRef<View>(null)
+  return (
+    <View ref={row} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, minHeight: 58, paddingHorizontal: sp.md }}>
+      <TextInput
+        value={icon}
+        onChangeText={onIcon}
+        maxLength={2}
+        accessibilityLabel={t('location.places.icon')}
+        onFocus={() => reveal(row.current)}
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: R.md,
+          backgroundColor: c.surface2,
+          textAlign: 'center',
+          fontSize: 22,
+          paddingVertical: 0,
+          // iOS centres a single line in a fixed height; Android needs telling.
+          textAlignVertical: 'center',
+          color: c.text,
+        }}
+      />
+      <TextInput
+        value={name}
+        onChangeText={onName}
+        placeholder={t('location.places.namePlaceholder')}
+        placeholderTextColor={c.textFaint}
+        autoCapitalize="words"
+        accessibilityLabel={t('location.places.name')}
+        onFocus={() => reveal(row.current)}
+        style={{ flex: 1, fontSize: 16, color: c.text, fontFamily: fonts.semibold, paddingVertical: 12 }}
+      />
+    </View>
+  )
+}
+
+/** The Location section's one statement of where this place is, with the bin
+ *  when a named place is chosen. */
+function LocationStatusRow({
+  text,
+  active,
+  onClear,
+}: {
+  text: string
+  active: boolean
+  onClear?: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: ROW_MIN_H, paddingHorizontal: sp.md, paddingVertical: 10 }}>
+      <MapPin size={17} color={active ? c.accent : c.textFaint} />
+      <Txt style={{ flex: 1, fontSize: 15, color: c.text }} numberOfLines={2}>
+        {text}
+      </Txt>
+      {onClear ? (
+        <Pressable
+          onPress={onClear}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('location.places.clearLocation')}
+        >
+          <Trash2 size={17} color={c.expense} />
+        </Pressable>
+      ) : null}
+    </View>
+  )
+}
+
+/** Inline search box as a row: magnifier, then the query. */
+function SearchRow({ value, onChangeText }: { value: string; onChangeText: (v: string) => void }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const reveal = useRevealOnFocus()
+  const row = useRef<View>(null)
+  return (
+    <View ref={row} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: ROW_MIN_H, paddingHorizontal: sp.md }}>
+      <Search size={17} color={c.textMuted} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={t('location.places.searchPlaceholder')}
+        placeholderTextColor={c.textFaint}
+        accessibilityLabel={t('location.places.search')}
+        autoCapitalize="words"
+        autoCorrect={false}
+        returnKeyType="search"
+        onFocus={() => reveal(row.current)}
+        style={{ flex: 1, fontSize: 15, color: c.text, fontFamily: fonts.body, paddingVertical: 12 }}
+      />
+      {value ? (
+        <Pressable
+          onPress={() => onChangeText('')}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('form.clear')}
+          style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <X size={12} color={c.textMuted} />
+        </Pressable>
+      ) : null}
+    </View>
+  )
+}
+
+/** One search result: name + address, and how far it is from you — the list
+ *  is sorted by that, so it also explains the ordering. */
+function ResultRow({ r, onPress }: { r: PlaceSuggestion; onPress: () => void }) {
   const { c } = useTheme()
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 7,
-          backgroundColor: c.accentSoft,
-          borderRadius: R.md,
-          paddingVertical: 11,
-          opacity: pressed ? 0.75 : 1,
-        },
+        { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: ROW_MIN_H, paddingHorizontal: sp.md, paddingVertical: 8 },
+        pressed && { opacity: 0.6 },
       ]}
     >
-      {icon}
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.accent }} numberOfLines={1}>
-        {label}
-      </Txt>
+      <View style={{ width: 17 }} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
+          {r.name}
+        </Txt>
+        {r.address ? (
+          <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={1}>
+            {r.address}
+          </Txt>
+        ) : null}
+      </View>
+      {r.distanceM != null ? (
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, color: c.textMuted }} numberOfLines={1}>
+          {formatDistance(r.distanceM)}
+        </Txt>
+      ) : null}
     </Pressable>
   )
 }
 
-/** One labelled switch inside a Section. */
-function ToggleRow({
-  label,
-  value,
-  onValueChange,
-}: {
-  label: string
-  value: boolean
-  onValueChange: (v: boolean) => void
-}) {
-  const { c } = useTheme()
+/** A faint one-liner inside a section (searching… / no matches). */
+function NoteLine({ text }: { text: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: sp.md }}>
-      <Txt style={{ fontFamily: fonts.medium, fontSize: 14, color: c.text, flex: 1 }}>{label}</Txt>
-      <Toggle
-        value={value}
-        onValueChange={onValueChange}
-      />
+    <View style={{ paddingHorizontal: sp.md, paddingVertical: 12 }}>
+      <Txt variant="faint" style={{ fontSize: 13 }}>
+        {text}
+      </Txt>
     </View>
   )
 }
 
-function Divider() {
-  const { c } = useTheme()
-  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
-}
-
-/** Small selectable pill (used for "whose crossings" in the watch section). */
-function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+/** A text action as a row — accent label, no fill: it's actionable, not a state. */
+function ActionRow({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
   const { c } = useTheme()
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
       style={({ pressed }) => [
-        {
-          paddingVertical: 7,
-          paddingHorizontal: 13,
-          borderRadius: R.pill,
-          backgroundColor: on ? c.accent : c.sheet,
-        },
-        pressed && { opacity: 0.7 },
+        { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: ROW_MIN_H, paddingHorizontal: sp.md },
+        pressed && { opacity: 0.6 },
       ]}
     >
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.onAccent : c.text }}>
+      {icon}
+      <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: c.accent }} numberOfLines={1}>
         {label}
       </Txt>
     </Pressable>
+  )
+}
+
+/** "Whose comings and goings" — a MULTI-select, so SelectRow (single) doesn't
+ *  fit. The row shows "Everyone" or the names; the checked list opens in a
+ *  sheet nested in this row's tree (a sibling Modal fails on iOS). None picked
+ *  = everyone, so "Everyone" clears the picks. */
+function PeopleRow({
+  label,
+  people,
+  picked,
+  onChange,
+}: {
+  label: string
+  people: Profile[]
+  picked: string[]
+  onChange: (next: string[]) => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const bottomGap = useBottomGap(sp.lg)
+  const [open, setOpen] = useState(false)
+  const everyone = t('location.places.watchAll')
+  const names = people.filter((p) => picked.includes(p.email)).map((p) => p.display_name)
+  const options = [
+    { key: '', label: everyone, on: picked.length === 0 },
+    ...people.map((p) => ({ key: p.email, label: p.display_name, on: picked.includes(p.email) })),
+  ]
+  const pick = (key: string) => {
+    if (!key) onChange([])
+    else onChange(picked.includes(key) ? picked.filter((e) => e !== key) : [...picked, key])
+  }
+  return (
+    <>
+      <FormRow label={label} onPress={() => setOpen(true)}>
+        <RowValue value={picked.length ? names.join(', ') || everyone : everyone} placeholder={everyone} />
+        <ChevronsUpDown size={15} color={c.textFaint} />
+      </FormRow>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <Pressable
+          onPress={() => setOpen(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: c.sheet,
+              borderTopLeftRadius: R.lg,
+              borderTopRightRadius: R.lg,
+              paddingTop: sp.sm,
+              paddingBottom: bottomGap,
+              maxHeight: '70%',
+            }}
+          >
+            <View style={{ alignItems: 'center', paddingBottom: sp.sm }}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: sp.lg, paddingBottom: sp.sm }}>
+              <View style={{ width: 50 }} />
+              <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 16, textAlign: 'center' }} numberOfLines={1}>
+                {label}
+              </Txt>
+              <Pressable onPress={() => setOpen(false)} hitSlop={10} accessibilityRole="button" style={{ width: 50, alignItems: 'flex-end' }}>
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.accent }}>{t('common.done')}</Txt>
+              </Pressable>
+            </View>
+            <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: sp.lg }}>
+              {options.map((o, i) => (
+                <Pressable
+                  key={o.key || '__all'}
+                  onPress={() => pick(o.key)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: o.on }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    minHeight: ROW_MIN_H,
+                    borderTopWidth: i ? StyleSheet.hairlineWidth : 0,
+                    borderTopColor: c.border,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <Txt
+                    style={{ flex: 1, fontSize: 16, color: o.on ? c.accent : c.text, fontFamily: o.on ? fonts.semibold : fonts.body }}
+                    numberOfLines={1}
+                  >
+                    {o.label}
+                  </Txt>
+                  {o.on ? <Check size={18} color={c.accent} strokeWidth={2.5} /> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   )
 }
 
@@ -139,9 +337,9 @@ export function PlaceForm({
   onSaved: () => void
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
+  const bottomGap = useBottomGap(sp.lg)
   const { t } = useI18n()
-  const kb = useKeyboardHeight()
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
 
   const [icon, setIcon] = useState(place?.icon ?? '📍')
   const [name, setName] = useState(place?.name ?? '')
@@ -375,212 +573,82 @@ export function PlaceForm({
     ])
   }
 
+  const radiusOptions = presets.map((p) => ({ value: String(p.meters), label: p.label }))
+  const locationText = locating
+    ? t('location.locating')
+    : picked
+      ? picked.address || picked.name
+      : usingSaved
+        ? (savedLabel ?? t('location.places.savedLocation'))
+        : coords
+          ? t('location.places.currentLocation')
+          : t('location.places.noLocation')
+  const showNoResults = !hasPlace && query.trim().length >= 3 && !searching && !results.length
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+      <View style={styles.backdrop} onLayout={onRootLayout}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('common.cancel')} />
         <View
-          style={{
+          style={[
+            styles.sheet,
             // c.sheet, not c.card — the glass skin's card is translucent.
-            backgroundColor: c.sheet,
-            borderTopLeftRadius: 22,
-            borderTopRightRadius: 22,
-            padding: sp.lg,
-            // Half of iOS's inset (the Save button's curve is meant to sit
-            // down in the screen's corner) but all of Android's navigation bar,
-            // which would otherwise cover it — see useBottomGap. Less while the
-            // keyboard is up, since marginBottom already lifts the drawer.
-            paddingBottom: kb > 0 ? sp.lg : bottomGap,
-            marginBottom: kb,
-            gap: sp.md,
-            maxHeight: '88%',
-          }}
+            { backgroundColor: c.sheet, maxHeight: room * 0.92, marginBottom: lift },
+          ]}
         >
           {/* Title + an explicit way out. Tapping the backdrop already closed
               the sheet, but that isn't discoverable on a form this tall. */}
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, marginBottom: sp.sm }}
-          >
-            <Txt style={{ flex: 1, fontFamily: fonts.displaySemi, fontSize: 22, color: c.text }}>
+          <View style={styles.sheetHead}>
+            <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 22, color: c.text }}>
               {place ? t('location.places.edit') : t('location.places.new')}
             </Txt>
             <Pressable
               onPress={onClose}
-              hitSlop={12}
+              hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface }]}
             >
-              <X size={20} color={c.textMuted} />
+              <X size={16} color={c.textMuted} />
             </Pressable>
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ gap: sp.lg }}>
-            <Section title={t('location.places.details')}>
-              {/* Icon + name. Both inputs are pinned to FIELD_H so the emoji's
-                  larger type can't make its box taller than the name's. */}
-              <View style={{ flexDirection: 'row', gap: sp.sm, alignItems: 'flex-end' }}>
-                <View style={{ width: 68 }}>
-                  <Field
-                    label={t('location.places.icon')}
-                    value={icon}
-                    onChangeText={setIcon}
-                    maxLength={2}
-                    style={{
-                      textAlign: 'center',
-                      fontSize: 22,
-                      height: FIELD_H,
-                      paddingVertical: 0,
-                      // iOS centres a single line in a fixed height; Android needs telling.
-                      textAlignVertical: 'center',
-                    }}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Field
-                    label={t('location.places.name')}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={t('location.places.namePlaceholder')}
-                    autoCapitalize="words"
-                    style={{ height: FIELD_H, paddingVertical: 0, textAlignVertical: 'center' }}
-                  />
-                </View>
-              </View>
-
-              <Divider />
-
-              {/* Radius presets */}
-              <View style={{ gap: 8 }}>
-                <Txt variant="label">{t('location.places.radius')}</Txt>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                  {presets.map((p) => {
-                    const on = selectedRadius === p.meters
-                    return (
-                      <Pressable
-                        key={p.meters}
-                        onPress={() => setRadiusM(p.meters)}
-                        style={{
-                          paddingVertical: 8,
-                          paddingHorizontal: 14,
-                          borderRadius: R.pill,
-                          backgroundColor: on ? c.accent : c.surface2,
-                        }}
-                      >
-                        <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: on ? c.onAccent : c.text }}>
-                          {p.label}
-                        </Txt>
-                      </Pressable>
-                    )
-                  })}
-                </View>
-              </View>
-            </Section>
-
-
-            <Section title={t('location.places.location')}>
-              {/* ONE unambiguous statement of where this place is:
-                    - a chosen place  → its address (searched, or the saved one
-                      we're editing), with a bin to remove it
-                    - otherwise       → your current location, or nothing yet  */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 8,
-                  backgroundColor: c.surface2,
-                  borderRadius: R.md,
-                  paddingVertical: 10,
-                  paddingHorizontal: sp.md,
+          <KeyboardScroll
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <FormSection title={t('location.places.details')}>
+              <IconNameRow icon={icon} name={name} onIcon={setIcon} onName={setName} />
+              {/* Presets only (100 m floor — see `presets`). nearestPreset keeps
+                  a saved value from another unit system showing a choice. */}
+              <SelectRow
+                label={t('location.places.radius')}
+                value={String(selectedRadius)}
+                options={radiusOptions}
+                onChange={(v) => {
+                  if (v) setRadiusM(Number(v))
                 }}
-              >
-                <MapPin size={16} color={hasPlace || coords ? c.accent : c.textFaint} />
-                <Txt style={{ flex: 1, fontSize: 13, color: c.text }} numberOfLines={2}>
-                  {locating
-                    ? t('location.locating')
-                    : picked
-                      ? picked.address || picked.name
-                      : usingSaved
-                        ? (savedLabel ?? t('location.places.savedLocation'))
-                        : coords
-                          ? t('location.places.currentLocation')
-                          : t('location.places.noLocation')}
-                </Txt>
-                {hasPlace ? (
-                  <Pressable
-                    onPress={clearPlace}
-                    hitSlop={10}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('location.places.clearLocation')}
-                  >
-                    <Trash2 size={16} color={c.expense} />
-                  </Pressable>
-                ) : null}
-              </View>
+              />
+            </FormSection>
 
-              {/* Search is offered only when no place is chosen — once one is,
-                  the bin above is the way to change it. */}
-              {hasPlace ? null : (
-                <>
-                  <Field
-                    label={t('location.places.search')}
-                    value={query}
-                    onChangeText={setQuery}
-                    placeholder={t('location.places.searchPlaceholder')}
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                  />
-              {searching ? (
-                <Txt variant="faint" style={{ fontSize: 12 }}>
-                  {t('location.places.searching')}
-                </Txt>
-              ) : null}
-              {results.map((r) => (
-                <Pressable
-                  key={r.id}
-                  onPress={() => choose(r)}
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: sp.sm,
-                      backgroundColor: c.surface2,
-                      borderRadius: R.md,
-                      padding: sp.md,
-                    },
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Search size={15} color={c.textMuted} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
-                      {r.name}
-                    </Txt>
-                    {r.address ? (
-                      <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
-                        {r.address}
-                      </Txt>
-                    ) : null}
-                  </View>
-                  {/* How far it is from you — the list is sorted by this, so it
-                      also explains the ordering rather than leaving it a mystery. */}
-                  {r.distanceM != null ? (
-                    <Txt
-                      style={{ fontFamily: fonts.semibold, fontSize: 12, color: c.textMuted }}
-                      numberOfLines={1}
-                    >
-                      {formatDistance(r.distanceM)}
-                    </Txt>
-                  ) : null}
-                </Pressable>
-              ))}
-              {query.trim().length >= 3 && !searching && !results.length ? (
-                <Txt variant="faint" style={{ fontSize: 12 }}>
-                  {t('location.places.noResults')}
-                </Txt>
-              ) : null}
-                </>
-              )}
-
+            {/* ONE unambiguous statement of where this place is:
+                  - a chosen place  → its address (searched, or the saved one
+                    we're editing), with a bin to remove it
+                  - otherwise       → your current location, or nothing yet
+                Search is offered only when no place is chosen — once one is,
+                the bin is the way to change it. */}
+            <FormSection title={t('location.places.location')}>
+              <LocationStatusRow
+                text={locationText}
+                active={hasPlace || !!coords}
+                onClear={hasPlace ? clearPlace : undefined}
+              />
+              {hasPlace ? null : <SearchRow value={query} onChangeText={setQuery} />}
+              {!hasPlace && searching ? <NoteLine text={t('location.places.searching')} /> : null}
+              {hasPlace ? null : results.map((r) => <ResultRow key={r.id} r={r} onPress={() => choose(r)} />)}
+              {showNoResults ? <NoteLine text={t('location.places.noResults')} /> : null}
               {/* Pin to where I'm standing. Hidden in the one case where it
                   would change nothing — no place chosen and we're ALREADY on the
                   current location — so it never reads as a description of the
@@ -588,84 +656,78 @@ export function PlaceForm({
                   SWITCHES away from a chosen place, or sets one when there's
                   none. */}
               {hasPlace || !coords ? (
-                <SectionAction
-                  icon={<LocateFixed size={15} color={c.accent} />}
-                  label={
-                    hasPlace
-                      ? t('location.places.switchToCurrent')
-                      : t('location.places.useMyLocation')
-                  }
+                <ActionRow
+                  icon={<LocateFixed size={17} color={c.accent} />}
+                  label={hasPlace ? t('location.places.switchToCurrent') : t('location.places.useMyLocation')}
                   onPress={repin}
                 />
               ) : null}
-            </Section>
+            </FormSection>
 
             {/* MY notifications. The place is shared with the household; this
                 subscription is personal — saving a place signs up nobody else. */}
-            <Section title={t('location.places.notify')}>
-              <ToggleRow
-                label={t('location.places.watchTitle')}
-                value={watchOn}
-                onValueChange={toggleWatch}
-              />
+            <FormSection title={t('location.places.notify')}>
+              <ToggleRow label={t('location.places.watchTitle')} value={watchOn} onValueChange={toggleWatch} />
               {watchOn ? (
-                <>
-                  <Divider />
-                  <ToggleRow
-                    label={t('location.places.notifyArrivals')}
-                    value={arrivals}
-                    onValueChange={toggleArrivals}
-                  />
-                  <Divider />
-                  <ToggleRow
-                    label={t('location.places.notifyDepartures')}
-                    value={departures}
-                    onValueChange={toggleDepartures}
-                  />
-                  <Divider />
-                  {/* Whose crossings I care about. None picked = everyone. */}
-                  <View style={{ gap: 8 }}>
-                    <Txt variant="label">{t('location.places.watchWho')}</Txt>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                      <Chip
-                        label={t('location.places.watchAll')}
-                        on={watchedPicked.length === 0}
-                        onPress={() => setWatchedPicked([])}
-                      />
-                      {others.map((p) => (
-                        <Chip
-                          key={p.email}
-                          label={p.display_name}
-                          on={watchedPicked.includes(p.email)}
-                          onPress={() =>
-                            setWatchedPicked((cur) =>
-                              cur.includes(p.email)
-                                ? cur.filter((e) => e !== p.email)
-                                : [...cur, p.email],
-                            )
-                          }
-                        />
-                      ))}
-                    </View>
-                  </View>
-                </>
+                <ToggleRow label={t('location.places.notifyArrivals')} value={arrivals} onValueChange={toggleArrivals} />
               ) : null}
-            </Section>
-          </ScrollView>
+              {watchOn ? (
+                <ToggleRow label={t('location.places.notifyDepartures')} value={departures} onValueChange={toggleDepartures} />
+              ) : null}
+              {/* Whose crossings I care about. None picked = everyone. */}
+              {watchOn ? (
+                <PeopleRow
+                  label={t('location.places.watchWho')}
+                  people={others}
+                  picked={watchedPicked}
+                  onChange={setWatchedPicked}
+                />
+              ) : null}
+            </FormSection>
 
-          {/* Curved bottom only when Save is the bottom-most control. Editing
-              adds a Delete below it, so the curve would otherwise sit mid-sheet
-              instead of meeting the screen's corner. */}
-          <Btn
-            title={t('common.save')}
-            onPress={save}
-            disabled={!coords || !name.trim()}
-            loading={busy}
-            curveBottom={!place}
-          />
-          {place ? <Btn title={t('location.places.delete')} variant="ghost" onPress={remove} /> : null}
+            {/* Rare and irreversible: a quiet red label at the end of the
+                content, not a second button competing with Save. */}
+            {place ? (
+              <Pressable
+                onPress={remove}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  { alignSelf: 'center', paddingVertical: sp.sm, paddingHorizontal: sp.lg },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 14 }}>
+                  {t('location.places.delete')}
+                </Txt>
+              </Pressable>
+            ) : null}
+          </KeyboardScroll>
+
+          {/* Save — docked */}
+          <View
+            style={[
+              styles.footer,
+              { paddingBottom: clearOfBars ? sp.md : bottomGap, borderTopColor: c.border },
+            ]}
+          >
+            <Btn title={t('common.save')} onPress={save} disabled={!coords || !name.trim()} loading={busy} />
+          </View>
         </View>
       </View>
     </Modal>
   )
 }
+
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: sp.lg },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.md,
+  },
+  close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm, borderTopWidth: StyleSheet.hairlineWidth },
+})

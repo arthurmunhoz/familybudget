@@ -5,16 +5,22 @@
 // stamped by column defaults under RLS). Google-sourced rows are read-only and
 // never reach this form.
 //
+// 2026-11 redesign (components/form): grouped rows instead of labelled boxes
+// and chip walls. Type, Who and Repeats are SelectRows (value in the row, list
+// in a checked sheet); Starts/Ends carry the date and, when timed, the time as
+// two chips — each opens its own PickerSheet, never an inline picker.
+//
 // Keyboard: the sheet sits on top of the keyboard (useSheetLift) and the
 // fields scroll in a <KeyboardScroll>, which brings the focused one into view.
 // Without either, Location and Notes were typed blind under the keyboard.
 import { useState } from 'react'
-import { Alert, Modal, Pressable, View } from 'react-native'
-import { Toggle } from '@/components/Toggle'
-import { X } from 'lucide-react-native'
+import { Alert, Modal, StyleSheet, View } from 'react-native'
+import { ChevronsUpDown, X } from 'lucide-react-native'
 
+import { FormRow, FormSection, RowValue, SelectRow, SelectSheet, ToggleRow } from '@/components/form'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
-import { Btn, Field, Txt } from '@/components/ui'
+import { Pressable } from '@/components/Pressable'
+import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { HOUSEHOLD_COLOR, KIND_EMOJI, memberColor } from '@/lib/calendar'
@@ -23,12 +29,14 @@ import { supabase } from '@/lib/supabase'
 import type { CalendarEvent, EventKind, EventRecurrence, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
-import { radius, sp, useTheme } from '@/theme/theme'
-import { DateField } from '@/apps/pets/petUi'
-import { OwnerChip, Pill, TimeField } from './calendarUi'
+import { sp, useTheme } from '@/theme/theme'
+import { DangerRow, DateTimeRow, InputRow } from './calendarUi'
 
 const RECURRENCES: EventRecurrence[] = ['none', 'daily', 'weekly', 'monthly', 'yearly']
 const KINDS: EventKind[] = ['event', 'birthday', 'anniversary', 'renewal', 'other']
+/** SelectSheet values are strings; this one stands for "whole household"
+ *  (owner_email null). Can't collide with an email. */
+const HOUSEHOLD = '*'
 
 export interface EventDraft {
   title: string
@@ -43,6 +51,57 @@ export interface EventDraft {
   remind: boolean
   location: string
   notes: string
+}
+
+const isoToDate = (iso: string): Date | undefined => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return y && m && d ? new Date(y, m - 1, d) : undefined
+}
+
+/** "Who": the member's colour dot + name in the row (events are coloured by
+ *  owner, so the dot is the point), the list in a checked sheet. */
+function OwnerRow({
+  label,
+  owner,
+  profiles,
+  memberEmails,
+  onChange,
+}: {
+  label: string
+  owner: string | null
+  profiles: Profile[]
+  memberEmails: string[]
+  onChange: (owner: string | null) => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const current = owner === null ? null : profiles.find((p) => p.email === owner)
+  const color = owner === null ? HOUSEHOLD_COLOR : memberColor(owner, memberEmails)
+  const options = [
+    { value: HOUSEHOLD, label: t('calendar.everyone') },
+    ...profiles.map((p) => ({ value: p.email, label: p.display_name })),
+  ]
+  return (
+    <>
+      <FormRow label={label} onPress={() => setOpen(true)}>
+        <View style={{ height: 10, width: 10, borderRadius: 5, backgroundColor: color }} />
+        <RowValue value={owner === null ? t('calendar.everyone') : (current?.display_name ?? owner)} placeholder="" />
+        <ChevronsUpDown size={15} color={c.textFaint} />
+      </FormRow>
+      <SelectSheet
+        visible={open}
+        title={label}
+        value={owner ?? HOUSEHOLD}
+        options={options}
+        onPick={(v) => {
+          onChange(v === HOUSEHOLD || v === '' ? null : v)
+          setOpen(false)
+        }}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  )
 }
 
 export default function EventForm({
@@ -67,7 +126,7 @@ export default function EventForm({
   onDelete: (ev: CalendarEvent) => void
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
+  const bottomGap = useBottomGap(sp.lg)
   const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
   const { t } = useI18n()
   const [saving, setSaving] = useState(false)
@@ -108,36 +167,42 @@ export default function EventForm({
     onSaved(draft.start)
   }
 
+  function pickKind(k: EventKind) {
+    // Special dated kinds behave like the old Important Dates: all-day,
+    // household-wide; birthdays/anniversaries repeat yearly.
+    if (k === 'event') {
+      set({ kind: k })
+    } else {
+      set({
+        kind: k,
+        allDay: true,
+        owner: null,
+        repeat: k === 'birthday' || k === 'anniversary' ? 'yearly' : draft.repeat,
+      })
+    }
+  }
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-        onLayout={onRootLayout}
-      >
+      <View style={styles.backdrop} onLayout={onRootLayout}>
         <View
-          style={{
+          style={[
+            styles.sheet,
             // Against what the keyboard leaves, so the sheet never grows
             // behind it.
-            maxHeight: room * 0.9,
-            marginBottom: lift,
-            backgroundColor: c.sheet,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-          }}
+            { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift },
+          ]}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.lg,
-              paddingBottom: sp.sm,
-            }}
-          >
+          <View style={styles.sheetHead}>
             <Txt variant="h2">{editing ? t('calendar.editEvent') : t('calendar.newEvent')}</Txt>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')}>
-              <X size={22} color={c.textMuted} />
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface }]}
+            >
+              <X size={16} color={c.textMuted} />
             </Pressable>
           </View>
 
@@ -145,182 +210,108 @@ export default function EventForm({
             // flexShrink so the fields yield to the sheet's max height once the
             // keyboard has taken half the screen; flexGrow 0 keeps it a sheet.
             style={{ flexGrow: 0, flexShrink: 1 }}
-            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Field
-              value={draft.title}
-              onChangeText={(v) => set({ title: v })}
-              placeholder={t('calendar.titlePlaceholder')}
-              autoFocus={!editing}
-            />
-
-            {/* kind / type */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('calendar.typeLabel')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {KINDS.map((k) => {
-                  const active = draft.kind === k
-                  return (
-                    <Pill
-                      key={k}
-                      active={active}
-                      onPress={() => {
-                        // Special dated kinds behave like the old Important Dates:
-                        // all-day, household-wide; birthdays/anniversaries repeat yearly.
-                        if (k === 'event') {
-                          set({ kind: k })
-                        } else {
-                          set({
-                            kind: k,
-                            allDay: true,
-                            owner: null,
-                            repeat:
-                              k === 'birthday' || k === 'anniversary' ? 'yearly' : draft.repeat,
-                          })
-                        }
-                      }}
-                    >
-                      <Txt style={{ color: active ? '#fff' : c.textMuted, fontWeight: '600' }}>
-                        {KIND_EMOJI[k] ? `${KIND_EMOJI[k]} ` : ''}
-                        {t(`calendar.kind.${k}` as TKey)}
-                      </Txt>
-                    </Pill>
-                  )
-                })}
-              </View>
-            </View>
-
-            {/* all-day toggle */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: c.surface,
-                borderRadius: radius.md,
-                paddingHorizontal: sp.md,
-                paddingVertical: 10,
-              }}
-            >
-              <Txt>{t('calendar.allDay')}</Txt>
-              <Toggle
-                value={draft.allDay}
-                onValueChange={(v) => set({ allDay: v })}
+            <FormSection>
+              <InputRow
+                title
+                value={draft.title}
+                onChangeText={(v) => set({ title: v })}
+                placeholder={t('calendar.titlePlaceholder')}
+                autoFocus={!editing}
               />
-            </View>
+              <SelectRow
+                label={t('calendar.typeLabel')}
+                value={draft.kind}
+                options={KINDS.map((k) => ({
+                  value: k,
+                  label: `${KIND_EMOJI[k] ? `${KIND_EMOJI[k]} ` : ''}${t(`calendar.kind.${k}` as TKey)}`,
+                }))}
+                onChange={(v) => {
+                  if (v) pickKind(v)
+                }}
+              />
+            </FormSection>
 
-            {/* start / end date */}
-            <View style={{ flexDirection: 'row', gap: sp.md }}>
-              <DateField
+            <FormSection>
+              <ToggleRow label={t('calendar.allDay')} value={draft.allDay} onValueChange={(v) => set({ allDay: v })} />
+              <DateTimeRow
                 label={t('calendar.startLabel')}
-                value={draft.start}
-                placeholder={t('calendar.startLabel')}
-                onChange={(v) => set({ start: v, end: draft.end < v ? v : draft.end })}
+                date={draft.start}
+                time={draft.allDay ? null : draft.startTime}
+                locale={locale}
+                onDate={(v) => set({ start: v, end: draft.end < v ? v : draft.end })}
+                onTime={(v) => set({ startTime: v })}
               />
-              <DateField
+              <DateTimeRow
                 label={t('calendar.endLabel')}
-                value={draft.end}
-                placeholder={t('calendar.endLabel')}
-                onChange={(v) => set({ end: v })}
+                date={draft.end}
+                time={draft.allDay ? null : draft.endTime}
+                locale={locale}
+                minimumDate={isoToDate(draft.start)}
+                onDate={(v) => set({ end: v })}
+                onTime={(v) => set({ endTime: v })}
               />
-            </View>
-
-            {/* start / end time (timed only) */}
-            {!draft.allDay && (
-              <View style={{ flexDirection: 'row', gap: sp.md }}>
-                <TimeField
-                  label={t('calendar.fromLabel')}
-                  value={draft.startTime}
-                  locale={locale}
-                  onChange={(v) => set({ startTime: v })}
-                />
-                <TimeField
-                  label={t('calendar.toLabel')}
-                  value={draft.endTime}
-                  locale={locale}
-                  onChange={(v) => set({ endTime: v })}
-                />
-              </View>
-            )}
-
-            {/* owner */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('calendar.ownerLabel')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                <OwnerChip
-                  label={t('calendar.everyone')}
-                  color={HOUSEHOLD_COLOR}
-                  active={draft.owner === null}
-                  onPress={() => set({ owner: null })}
-                />
-                {profiles.map((p) => (
-                  <OwnerChip
-                    key={p.email}
-                    label={p.display_name}
-                    color={memberColor(p.email, memberEmails)}
-                    active={draft.owner === p.email}
-                    onPress={() => set({ owner: p.email })}
-                  />
-                ))}
-              </View>
-            </View>
-
-            {/* recurrence */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('calendar.repeatLabel')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {RECURRENCES.map((r) => {
-                  const active = draft.repeat === r
-                  return (
-                    <Pill key={r} active={active} onPress={() => set({ repeat: r })}>
-                      <Txt style={{ color: active ? '#fff' : c.textMuted, fontWeight: '600' }}>
-                        {t(`calendar.repeat.${r}` as TKey)}
-                      </Txt>
-                    </Pill>
-                  )
-                })}
-              </View>
-            </View>
-
-            {/* reminder */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: c.surface,
-                borderRadius: radius.md,
-                paddingHorizontal: sp.md,
-                paddingVertical: 10,
-              }}
-            >
-              <Txt>🔔 {t('calendar.remind')}</Txt>
-              <Toggle
-                value={draft.remind}
-                onValueChange={(v) => set({ remind: v })}
+              <SelectRow
+                label={t('calendar.repeatLabel')}
+                value={draft.repeat}
+                options={RECURRENCES.map((r) => ({ value: r, label: t(`calendar.repeat.${r}` as TKey) }))}
+                onChange={(v) => {
+                  if (v) set({ repeat: v })
+                }}
               />
-            </View>
+            </FormSection>
 
-            <Field
-              value={draft.location}
-              onChangeText={(v) => set({ location: v })}
-              placeholder={t('calendar.locationPlaceholder')}
-            />
-            <Field
-              value={draft.notes}
-              onChangeText={(v) => set({ notes: v })}
-              placeholder={t('calendar.notesPlaceholder')}
-            />
+            <FormSection>
+              <OwnerRow
+                label={t('calendar.ownerLabel')}
+                owner={draft.owner}
+                profiles={profiles}
+                memberEmails={memberEmails}
+                onChange={(owner) => set({ owner })}
+              />
+              <ToggleRow label={t('calendar.remind')} value={draft.remind} onValueChange={(v) => set({ remind: v })} />
+            </FormSection>
+
+            <FormSection>
+              <InputRow
+                value={draft.location}
+                onChangeText={(v) => set({ location: v })}
+                placeholder={t('calendar.locationPlaceholder')}
+              />
+              <InputRow
+                multiline
+                value={draft.notes}
+                onChangeText={(v) => set({ notes: v })}
+                placeholder={t('calendar.notesPlaceholder')}
+              />
+            </FormSection>
+
+            {editing ? (
+              <FormSection>
+                <DangerRow
+                  label={t('calendar.deleteEvent')}
+                  onPress={() => {
+                    const ev = editing
+                    onClose()
+                    onDelete(ev)
+                  }}
+                />
+              </FormSection>
+            ) : null}
           </KeyboardScroll>
 
+          {/* save — docked. iOS with no keyboard: clear the home indicator.
+              Otherwise the sheet already sits above the keyboard / nav bar. */}
           <View
             style={{
               paddingHorizontal: sp.lg,
-              paddingTop: sp.md,
-              // iOS with no keyboard: clear the home indicator. Otherwise the
-              // sheet already sits above the keyboard / navigation bar.
-              paddingBottom: clearOfBars ? sp.lg : bottomGap,
-              gap: sp.md,
+              paddingTop: sp.sm,
+              paddingBottom: clearOfBars ? sp.md : bottomGap,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.border,
             }}
           >
             <Btn
@@ -329,23 +320,36 @@ export default function EventForm({
               disabled={!canSave}
               loading={saving}
             />
-            {editing ? (
-              <Pressable
-                onPress={() => {
-                  const ev = editing
-                  onClose()
-                  onDelete(ev)
-                }}
-                style={{ paddingVertical: 12, alignItems: 'center' }}
-              >
-                <Txt style={{ color: c.expense, fontWeight: '600' }}>
-                  {t('calendar.deleteEvent')}
-                </Txt>
-              </Pressable>
-            ) : null}
           </View>
         </View>
       </View>
     </Modal>
   )
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: sp.lg,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.md,
+  },
+  close: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

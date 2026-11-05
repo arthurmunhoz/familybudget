@@ -39,7 +39,7 @@ are sourced from `useAuth().profiles` (already household-scoped), not raw querie
 | Module | What it does |
 |---|---|
 | **Hub** | App launcher (fixed header, Settings) |
-| **Calculator** | Split a bill evenly or by item (with a bill-photo scan + household-member quick-add), better-deal unit price, discount |
+| **Utilities** (route `/calc`, was Calculator) | Hub of small tools: split a bill evenly (4-step wizard) or by item (guided photo scan → people → who had what → tax & tip → editable summary), better-deal unit price, discount, and printable cards (luggage tag: live preview, print, save image) |
 | **Shopping** | Realtime shared list, per-store sections, **works offline** (queues + replays on reconnect) |
 | **Pet Care** | Pet profiles + photos, care events, next-due reminders, "done / again" re-log |
 | **Family** | Per-member profiles, avatars (tap-to-zoom), edit your own |

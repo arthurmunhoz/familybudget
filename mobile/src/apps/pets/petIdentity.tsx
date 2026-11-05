@@ -233,11 +233,11 @@ export function PetHero({
           borderRadius: HERO_BTN / 2,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: c.accent,
+          backgroundColor: c.action,
           opacity: uploading ? 0.5 : 1,
         }}
       >
-        <Pencil size={15} color={c.onAccent} />
+        <Pencil size={15} color={c.onAction} />
       </Pressable>
 
       {/* Frame the picked photo before it's uploaded. Lives here rather than in

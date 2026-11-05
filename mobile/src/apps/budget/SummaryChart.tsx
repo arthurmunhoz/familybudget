@@ -1,32 +1,41 @@
 // Period summary for the Money module — RN port of the PWA's SummaryChart, with
 // the Recharts pie replaced by plain Views. Shows the current balance (only
-// past-dated entries count), received vs spent totals, an optional upcoming
+// past-dated entries count) as a gradient hero in the budget's colours with
+// received/spent chips, then an optional upcoming
 // projection (coming in / due / expected), and a category breakdown of spending
 // with proportional bars and a tap-to-expand subcategory drill-down.
 import { useMemo, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import Svg, { Circle } from 'react-native-svg'
 import { Calendar, ChevronDown, ChevronRight, Hourglass } from 'lucide-react-native'
 
 import { Card, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import type { Gradient } from '@/components/home/palette'
+import { StatChip } from './StatChip'
 import { useI18n } from '@/hooks/useI18n'
 import { categoryById } from '@/lib/categories'
 import { formatMoney, todayISO } from '@/lib/format'
 import type { CategoryOverride, CustomCategory, Entry } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 export default function SummaryChart({
   entries,
   customCats = [],
   overrides = [],
+  look,
 }: {
   entries: Entry[]
   customCats?: CustomCategory[]
   overrides?: CategoryOverride[]
+  /** The budget's gradient (budgetLook) for the balance hero. */
+  look: Gradient
 }) {
   const { t } = useI18n()
   const { c } = useTheme()
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
+  // The top few categories carry the story; the long tail waits behind a tap
+  // so the entries aren't pushed off the screen.
+  const [allCats, setAllCats] = useState(false)
 
   // Balance reflects only what has actually happened by today; future-dated
   // income/expenses surface in the "coming in" / "due" projection instead.
@@ -88,48 +97,29 @@ export default function SummaryChart({
   }, [entries, today])
 
   return (
-    <Card style={{ gap: sp.md }}>
-      {/* balance + received/spent donut */}
-      <View style={{ flexDirection: 'row', gap: sp.lg, alignItems: 'center' }}>
-        <View style={{ flex: 1, minWidth: 0, gap: sp.sm }}>
-          <View>
-            <Txt
-              style={{
-                fontSize: 11,
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                color: c.textFaint,
-              }}
-            >
-              {t('chart.currentBalance')}
-            </Txt>
-            <Txt
-              style={{
-                marginTop: 2,
-                fontSize: 26,
-                fontWeight: '800',
-                fontVariant: ['tabular-nums'],
-                color: balance >= 0 ? c.income : c.expense,
-              }}
-            >
-              {formatMoney(balance)}
-            </Txt>
-          </View>
-          <View style={{ gap: 6 }}>
-            <Legend color={c.income} label={t('chart.received')} value={formatMoney(income)} />
-            <Legend color={c.expense} label={t('chart.spent')} value={formatMoney(spent)} />
-          </View>
-        </View>
-
-        {(income > 0 || spent > 0) && (
-          <Donut income={income} spent={spent} incomeColor={c.income} spentColor={c.expense} track={c.surface} />
-        )}
+    <>
+    {/* balance hero, in the budget's colours (2026-11 Comando restyle) */}
+    <GradientBox colors={look} radius={28} style={{ padding: 18, gap: 14 }}>
+      <View>
+        <Txt style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>{t('chart.currentBalance')}</Txt>
+        <Txt
+          adjustsFontSizeToFit
+          numberOfLines={1}
+          style={{ fontSize: 40, lineHeight: 46, fontFamily: fonts.display, color: '#fff', fontVariant: ['tabular-nums'], letterSpacing: -0.6 }}
+        >
+          {formatMoney(balance)}
+        </Txt>
       </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <StatChip label={t('chart.received')} value={income} max={Math.max(income, spent)} up />
+        <StatChip label={t('chart.spent')} value={spent} max={Math.max(income, spent)} />
+      </View>
+    </GradientBox>
 
-      {/* upcoming projection */}
-      {hasUpcoming && (
-        <View style={{ gap: 4, borderTopWidth: 1, borderTopColor: c.surface, paddingTop: sp.sm }}>
+    {/* what's still coming this period */}
+    {hasUpcoming ? (
+      <Card style={{ gap: sp.sm }}>
+        <View style={{ gap: 4 }}>
           {comingIn > 0 && (
             <ProjectionRow
               icon={<Hourglass size={14} color={c.textMuted} />}
@@ -168,86 +158,88 @@ export default function SummaryChart({
             </Txt>
           </View>
         </View>
-      )}
+      </Card>
+    ) : null}
 
-      {/* category breakdown */}
-      {categories.length > 0 && (
-        <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.surface, paddingTop: sp.md }}>
-          {categories.map(([catId, amount]) => {
+    {/* where it went: one stacked bar, then each category with its share */}
+    {categories.length > 0 ? (
+      <Card style={{ gap: sp.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+          <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 20 }}>{t('detail.whereItWent')}</Txt>
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.expense, fontVariant: ['tabular-nums'] }}>
+            {formatMoney(spent)}
+          </Txt>
+        </View>
+        <View style={{ flexDirection: 'row', height: 14, borderRadius: 7, overflow: 'hidden', gap: 2 }}>
+          {categories.map(([catId, amount], i) => (
+            <View key={catId} style={{ flex: amount, backgroundColor: catColor(i) }} />
+          ))}
+        </View>
+        <View style={{ gap: 2 }}>
+          {(allCats ? categories : categories.slice(0, TOP_CATS)).map(([catId, amount], i) => {
             const cat = categoryById(catId, customCats, overrides)
-            const subs = [...(bySub.get(catId)?.entries() ?? [])].sort((a, b) => b[1] - a[1])
+            const subs = [...(bySub.get(catId)?.entries() ?? [])].sort((x, y) => y[1] - x[1])
             const hasSubs = subs.some(([k]) => k !== '')
             const expanded = expandedCat === catId
             const maxSub = subs[0]?.[1] ?? 0
+            const pct = spent > 0 ? Math.round((amount / spent) * 100) : 0
             return (
-              <View key={catId} style={{ gap: 6 }}>
+              <View key={catId}>
                 <Pressable
                   onPress={() => hasSubs && setExpandedCat(expanded ? null : catId)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: sp.md,
+                    paddingVertical: 9,
+                    opacity: pressed && hasSubs ? 0.6 : 1,
+                  })}
                 >
-                  <Txt style={{ width: 24, textAlign: 'center', fontSize: 16 }}>{cat.icon}</Txt>
-                  <View style={{ flex: 1, height: 8, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: c.surface }}>
-                    <View
-                      style={{
-                        height: '100%',
-                        borderRadius: radius.pill,
-                        backgroundColor: c.accent,
-                        width: `${maxCat > 0 ? (amount / maxCat) * 100 : 0}%`,
-                      }}
-                    />
+                  <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: catColor(i) + '24', alignItems: 'center', justifyContent: 'center' }}>
+                    <Txt style={{ fontSize: 17 }}>{cat.icon}</Txt>
                   </View>
-                  <Txt
-                    style={{
-                      width: 78,
-                      textAlign: 'right',
-                      fontSize: 12,
-                      fontVariant: ['tabular-nums'],
-                      color: c.textMuted,
-                    }}
-                  >
-                    {formatMoney(amount)}
-                  </Txt>
-                  <View style={{ width: 16, alignItems: 'center' }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Txt style={{ fontFamily: fonts.medium, fontSize: 15 }} numberOfLines={1}>
+                      {cat.name}
+                    </Txt>
+                    <View style={{ height: 4, borderRadius: 2, backgroundColor: c.surface, marginTop: 5, overflow: 'hidden' }}>
+                      <View style={{ height: '100%', width: `${maxCat > 0 ? (amount / maxCat) * 100 : 0}%`, backgroundColor: catColor(i), borderRadius: 2 }} />
+                    </View>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, fontVariant: ['tabular-nums'] }}>
+                      {formatMoney(amount)}
+                    </Txt>
+                    <Txt variant="faint" style={{ fontSize: 12 }}>
+                      {pct}%
+                    </Txt>
+                  </View>
+                  <View style={{ width: 14, alignItems: 'center' }}>
                     {hasSubs ? (
-                      expanded ? (
-                        <ChevronDown size={14} color={c.textFaint} />
-                      ) : (
-                        <ChevronRight size={14} color={c.textFaint} />
-                      )
+                      expanded ? <ChevronDown size={14} color={c.textFaint} /> : <ChevronRight size={14} color={c.textFaint} />
                     ) : null}
                   </View>
                 </Pressable>
 
                 {expanded && (
-                  <View style={{ marginLeft: 32, gap: 4, marginBottom: 4 }}>
+                  <View style={{ marginLeft: 48, gap: 6, marginBottom: 8 }}>
                     {subs.map(([subName, subAmt]) => (
                       <View key={subName || '—'} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                        <Txt
-                          numberOfLines={1}
-                          style={{ width: 84, fontSize: 11, color: c.textMuted }}
-                        >
+                        <Txt numberOfLines={1} style={{ width: 96, fontSize: 12.5, color: c.textMuted }}>
                           {subName || t('chart.unlabeled')}
                         </Txt>
-                        <View style={{ flex: 1, height: 6, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: c.surface }}>
+                        <View style={{ flex: 1, height: 5, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: c.surface }}>
                           <View
                             style={{
                               height: '100%',
                               borderRadius: radius.pill,
-                              backgroundColor: c.accent,
-                              opacity: 0.6,
+                              backgroundColor: catColor(i),
+                              opacity: 0.7,
                               width: `${maxSub > 0 ? (subAmt / maxSub) * 100 : 0}%`,
                             }}
                           />
                         </View>
-                        <Txt
-                          style={{
-                            width: 64,
-                            textAlign: 'right',
-                            fontSize: 11,
-                            fontVariant: ['tabular-nums'],
-                            color: c.textFaint,
-                          }}
-                        >
+                        <Txt style={{ width: 70, textAlign: 'right', fontSize: 12, fontVariant: ['tabular-nums'], color: c.textMuted }}>
                           {formatMoney(subAmt)}
                         </Txt>
                       </View>
@@ -258,87 +250,25 @@ export default function SummaryChart({
             )
           })}
         </View>
-      )}
-    </Card>
+        {categories.length > TOP_CATS ? (
+          <Pressable onPress={() => setAllCats((v) => !v)} hitSlop={6} style={{ alignSelf: 'center' }}>
+            <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 14 }}>
+              {allCats ? t('detail.showLess') : t('detail.showAllCats', { n: categories.length })}
+            </Txt>
+          </Pressable>
+        ) : null}
+      </Card>
+    ) : null}
+    </>
   )
 }
 
-/** A 2-slice donut ring of received (income) vs spent — the RN equivalent of
- *  the PWA's Recharts pie. Income arc starts at 12 o'clock; spent follows it. */
-function Donut({
-  income,
-  spent,
-  incomeColor,
-  spentColor,
-  track,
-}: {
-  income: number
-  spent: number
-  incomeColor: string
-  spentColor: string
-  track: string
-}) {
-  const size = 76
-  const stroke = 13
-  const r = (size - stroke) / 2
-  const circ = 2 * Math.PI * r
-  const total = income + spent
-  const incFrac = total > 0 ? income / total : 0
-  const spFrac = total > 0 ? spent / total : 0
-  const center = size / 2
-  const rot = `rotate(-90 ${center} ${center})`
-  return (
-    <Svg width={size} height={size}>
-      <Circle cx={center} cy={center} r={r} stroke={track} strokeWidth={stroke} fill="none" />
-      {income > 0 && (
-        <Circle
-          cx={center}
-          cy={center}
-          r={r}
-          stroke={incomeColor}
-          strokeWidth={stroke}
-          fill="none"
-          strokeDasharray={`${incFrac * circ} ${circ}`}
-          transform={rot}
-        />
-      )}
-      {spent > 0 && (
-        <Circle
-          cx={center}
-          cy={center}
-          r={r}
-          stroke={spentColor}
-          strokeWidth={stroke}
-          fill="none"
-          strokeDasharray={`${spFrac * circ} ${circ}`}
-          strokeDashoffset={-incFrac * circ}
-          transform={rot}
-        />
-      )}
-    </Svg>
-  )
-}
-
-function Legend({ color, label, value }: { color: string; label: string; value: string }) {
-  const { c } = useTheme()
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-      <Txt style={{ fontSize: 12, color: c.textMuted }}>{label}</Txt>
-      <Txt
-        style={{
-          fontSize: 12,
-          fontWeight: '700',
-          fontVariant: ['tabular-nums'],
-          color: c.text,
-          marginLeft: 'auto',
-          paddingLeft: sp.sm,
-        }}
-      >
-        {value}
-      </Txt>
-    </View>
-  )
+/** Category colours for "where it went" — no greens or reds, which mean
+ *  received/spent everywhere else in Money. */
+const TOP_CATS = 5
+const CAT_COLORS = ['#5B6CF0', '#F2A93B', '#2BB3C0', '#E0609B', '#8E6CF0', '#3D9BE9', '#B07A4F', '#7C8597']
+function catColor(i: number): string {
+  return CAT_COLORS[i % CAT_COLORS.length]
 }
 
 function ProjectionRow({

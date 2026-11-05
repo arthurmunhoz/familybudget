@@ -1,46 +1,37 @@
-// Family module: the household roster as a coverflow. The bottom carousel is a
-// row of round member photos — the selected one centered at full opacity, its
-// neighbors scaled down + fading into the background the further out they sit.
-// Above it floats a card with the selected member's info (one icon per field).
-// The card pager and the carousel share the same horizontal scroll offset, so
-// swiping the photos slides the cards in sync. Only the info rows scroll; the
-// header + carousel stay put. RLS scopes every read/write to my household.
-import { useMemo, useRef, useState } from 'react'
-import {
-  Animated,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from 'react-native'
+// Family module: the household roster. Top: the selected member's photo,
+// full-bleed (components/PhotoHero, shared with Pet Care) with their name on it
+// — swipe it or tap the side arrows to change member. Below: a card with that
+// member's info only (one icon per field); the name lives on the photo now, so
+// the card doesn't repeat it. Scrolling the info shrinks the photo. Replaced
+// the coverflow of round photos + synced card pager (2026-11). RLS scopes
+// every read/write to my household.
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Animated, Platform, StyleSheet, View } from 'react-native'
+import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { supabase } from '@/lib/supabase'
-import { getSignedUrl } from '@/lib/signedUrls'
+import { getSignedUrl, getSignedUrls } from '@/lib/signedUrls'
 import { useAuth } from '@/lib/auth'
+import { memberColor } from '@/lib/calendar'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { useTheme, sp, radius } from '@/theme/theme'
 import { AppHeader, Btn, Txt, Loader, EmptyState } from '@/components/ui'
+import { PhotoHero, type HeroItem } from '@/components/PhotoHero'
 import type { MemberProfile } from '@/lib/types'
-import { Avatar } from './Avatar'
 import { MemberDetails } from './MemberDetail'
 import { EditProfile } from './EditProfile'
 import { ConvertSheet } from './ConvertSheet'
-import { hasDetails, type Member } from './familyShared'
+import { hasDetails, initial, type Member } from './familyShared'
 import { type ConvertKind } from './units'
 
-const AV_BASE = 84 // rendered avatar size (scaled per position by the carousel)
-const SLOT = 72 // horizontal slot width per avatar in the carousel
-const CAROUSEL_H = 150
-
-export default function Family() {
+export default function Family({ initialEmail }: { initialEmail?: string } = {}) {
   const { profile, profiles, refreshProfile } = useAuth()
   const { t } = useI18n()
   const { c } = useTheme()
-  const { width } = useWindowDimensions()
+  const bottomGap = useBottomGap(sp.lg)
 
   const [editing, setEditing] = useState(false)
   const [initialPhoto, setInitialPhoto] = useState<string | null>(null)
@@ -66,15 +57,44 @@ export default function Family() {
     return Object.fromEntries(rows.map((p) => [p.email, p]))
   })
 
-  // Start focused on my own card. scrollX seeds to the same offset so the card
-  // pager and carousel agree from the first frame (before any scroll fires).
-  const myIndex = Math.max(
-    0,
-    members.findIndex((m) => m.email === profile?.email),
-  )
-  const scrollX = useRef(new Animated.Value(myIndex * SLOT)).current
-  const scrollRef = useRef<ScrollView>(null)
-  const [selected, setSelected] = useState(myIndex)
+  // Start on the member we were opened for (the Home's family dock passes
+  // ?email=), else on my own card. Tracked by email, not index: the roster is
+  // sorted by name, so an index would point at someone else after a rename.
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(initialEmail ?? profile?.email ?? null)
+  const selected = members.find((m) => m.email === selectedEmail) ?? members[0]
+
+  // Signed photo URLs for the hero (cached + batched by signedUrls).
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
+  const avatarKey = members.map((m) => byEmail[m.email]?.avatar_path ?? '').join('|')
+  useEffect(() => {
+    let active = true
+    const paths = members.map((m) => byEmail[m.email]?.avatar_path).filter(Boolean) as string[]
+    if (!paths.length) return
+    getSignedUrls(paths)
+      .then((byPath) => {
+        if (!active) return
+        const out: Record<string, string> = {}
+        for (const m of members) {
+          const path = byEmail[m.email]?.avatar_path
+          if (path && byPath[path]) out[m.email] = byPath[path]
+        }
+        setPhotoUrls(out)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the avatar paths
+  }, [avatarKey])
+
+  // Scrolling the info rows shrinks the photo. Reset when the member changes:
+  // the new card's scroll starts at the top, so the photo should be open again.
+  const scrollY = useRef(new Animated.Value(0)).current
+  const collapse = scrollY.interpolate({ inputRange: [0, 140], outputRange: [0, 1], extrapolate: 'clamp' })
+  useEffect(() => {
+    scrollY.setValue(0)
+  }, [selected?.email, scrollY])
+
   // A field's "?" → conversion / blood-compatibility sheet.
   const [convert, setConvert] = useState<{
     kind: ConvertKind
@@ -113,221 +133,106 @@ export default function Family() {
     )
   }
 
-  // Card pager tracks the carousel: at scrollX = i*SLOT (avatar i centered) the
-  // card row is translated to show card i.
-  const cardTranslate = Animated.multiply(Animated.divide(scrollX, SLOT), -width)
-  const sideInset = (width - SLOT) / 2 // lets the first/last avatar reach center
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      {header}
-
-      {/* Info-card pager — slides in sync with the carousel below. `overflow:
-          hidden` keeps neighbour cards from bleeding at the screen edges, but RN
-          can't clip one axis only, so it would equally clip the card's shadow top
-          and bottom. The page padding below is therefore sized to CONTAIN the
-          shadow: it reaches ~(radius − offset) above the card and ~(radius +
-          offset) below, so paddingTop/paddingBottom must exceed those or the
-          shadow gets sliced off flush against the header / carousel. Keep them in
-          step with the shadow values if you ever deepen it again. */}
-      <View style={{ flex: 1, overflow: 'hidden' }}>
-        <Animated.View
+  const emails = members.map((m) => m.email)
+  const heroItems: HeroItem[] = members.map((m) => ({
+    id: m.email,
+    name: m.display_name,
+    photo: photoUrls[m.email],
+    color: memberColor(m.email, emails),
+    glyph: initial(m.display_name),
+    badge:
+      m.email === profile?.email ? (
+        <View
           style={{
-            flex: 1,
-            flexDirection: 'row',
-            width: width * members.length,
-            transform: [{ translateX: cardTranslate }],
+            backgroundColor: 'rgba(255,255,255,0.88)',
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 999,
           }}
         >
-          {members.map((m) => {
-            const p = byEmail[m.email]
-            const isMe = m.email === profile?.email
-            // Nothing filled in yet → no card at all. A full-height card around
-            // one line of grey text read as a loading failure; the name is
-            // already under the photo in the carousel, so the card's chrome was
-            // carrying nothing.
-            if (!hasDetails(p)) {
-              return (
-                <View
-                  key={m.email}
-                  style={{
-                    width,
-                    paddingHorizontal: sp.xl,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    gap: sp.lg,
-                  }}
-                >
-                  <Txt variant="muted" style={{ textAlign: 'center', lineHeight: 22 }}>
-                    {isMe
-                      ? t('family.emptyMine')
-                      : t('family.emptyOther', { name: m.display_name })}
-                  </Txt>
-                  {isMe ? (
-                    // Bounded rather than edge-to-edge: a lone button stretched
-                    // across a phone reads as a form footer, not an invitation.
-                    <View style={{ width: '100%', maxWidth: 320 }}>
-                      <Btn title={t('family.addMyInfo')} onPress={openEditMine} />
-                    </View>
-                  ) : null}
-                </View>
-              )
-            }
-            return (
-              <View
-                key={m.email}
-                style={{ width, paddingHorizontal: sp.lg, paddingTop: sp.lg, paddingBottom: 30 }}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                    // Opaque on Android: `elevation` paints its shadow BEHIND
-                    // the view, and through the glass skin's translucent c.card
-                    // it showed as a grey band framing the card's contents.
-                    // iOS's layer shadow doesn't bleed through, so it keeps the
-                    // glass card.
-                    backgroundColor: Platform.OS === 'android' ? c.sheet : c.card,
-                    borderRadius: radius.lg,
-                    padding: sp.lg,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: c.border,
-                    // Float it — but shallow enough that the shadow fits inside the
-                    // pager's clip: it spreads 6pt up and 22pt down, against the
-                    // 16pt / 30pt page padding above and below.
-                    shadowColor: '#000',
-                    shadowOpacity: 0.14,
-                    shadowRadius: 14,
-                    shadowOffset: { width: 0, height: 8 },
-                    elevation: 8,
-                  }}
-                >
-                  {/* Header (fixed) — no avatar; the photo lives in the carousel. */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                    <Txt variant="title" numberOfLines={1} style={{ flexShrink: 1 }}>
-                      {m.display_name}
-                    </Txt>
-                    {isMe ? (
-                      <View
-                        style={{
-                          backgroundColor: c.accentSoft,
-                          paddingHorizontal: 8,
-                          paddingVertical: 2,
-                          borderRadius: 999,
-                        }}
-                      >
-                        <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 11 }}>
-                          {t('family.you')}
-                        </Txt>
-                      </View>
-                    ) : null}
-                  </View>
+          <Txt style={{ color: '#241F1B', fontWeight: '700', fontSize: 11 }}>{t('family.you')}</Txt>
+        </View>
+      ) : null,
+  }))
 
-                  <View style={{ height: 1, backgroundColor: c.border, marginVertical: sp.md }} />
+  const m = selected
+  const p = m ? byEmail[m.email] : undefined
+  const isMe = m?.email === profile?.email
+  const openBirthday = m ? () => router.push(`/family/birthday?email=${encodeURIComponent(m.email)}`) : undefined
 
-                  {/* Only the info rows scroll. */}
-                  <ScrollView
-                    style={{ flex: 1 }}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: sp.xs }}
-                  >
-                    <MemberDetails
-                      member={m}
-                      profile={p}
-                      isMe={isMe}
-                      onConvert={(kind, raw, label) => setConvert({ kind, raw, label })}
-                    />
-                  </ScrollView>
+  return (
+    // No top edge: the photo runs under the status bar (PhotoHero pads itself).
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right']}>
+      <PhotoHero
+        items={heroItems}
+        selectedId={m?.email ?? null}
+        onSelect={setSelectedEmail}
+        collapse={collapse}
+      />
 
-                  {/* Edit (fixed) — only on my own card. */}
-                  {isMe ? (
-                    <Btn
-                      title={t('family.editMine')}
-                      variant="secondary"
-                      onPress={openEditMine}
-                      style={{ marginTop: sp.md }}
-                    />
-                  ) : null}
-                </View>
+      <View style={{ flex: 1, paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap }}>
+        {!m ? null : !hasDetails(p) ? (
+          // Nothing filled in yet → no card at all. A full-height card around
+          // one line of grey text read as a loading failure.
+          <View style={{ flex: 1, paddingHorizontal: sp.md, justifyContent: 'center', alignItems: 'center', gap: sp.lg }}>
+            <Txt variant="muted" style={{ textAlign: 'center', lineHeight: 22 }}>
+              {isMe ? t('family.emptyMine') : t('family.emptyOther', { name: m.display_name })}
+            </Txt>
+            {isMe ? (
+              // Bounded rather than edge-to-edge: a lone button stretched
+              // across a phone reads as a form footer, not an invitation.
+              <View style={{ width: '100%', maxWidth: 320 }}>
+                <Btn title={t('family.addMyInfo')} onPress={openEditMine} />
               </View>
-            )
-          })}
-        </Animated.View>
-      </View>
+            ) : null}
+          </View>
+        ) : (
+          // The PAGE scrolls, not the inside of the card: the card is only as
+          // tall as its rows, so a short profile is a compact card instead of
+          // a few rows stranded at the top of a full-height box (2026-11).
+          // Scrolling a long one shrinks the photo above.
+          <Animated.ScrollView
+            key={m.email}
+            style={{ flex: 1, marginHorizontal: -sp.lg }}
+            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
+            showsVerticalScrollIndicator={false}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+              useNativeDriver: false,
+            })}
+            scrollEventThrottle={16}
+          >
+            <View
+              style={{
+                // Opaque on Android: `elevation` paints its shadow BEHIND the
+                // view, and through the glass skin's translucent c.card it
+                // showed as a grey band framing the card's contents.
+                backgroundColor: Platform.OS === 'android' ? c.sheet : c.card,
+                borderRadius: radius.lg,
+                paddingHorizontal: sp.lg,
+                paddingVertical: sp.xs,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: c.border,
+                shadowColor: '#000',
+                shadowOpacity: 0.08,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 4,
+              }}
+            >
+              {/* Info only — the name is on the photo above. */}
+              <MemberDetails
+                member={m}
+                profile={p}
+                isMe={isMe}
+                onConvert={(kind, raw, label) => setConvert({ kind, raw, label })}
+                onBirthday={openBirthday}
+              />
+            </View>
 
-      {/* Bottom carousel — round member photos, coverflow. Drives the scroll. */}
-      <View style={{ height: CAROUSEL_H }}>
-        <Animated.ScrollView
-          ref={scrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={SLOT}
-          decelerationRate="fast"
-          contentOffset={{ x: myIndex * SLOT, y: 0 }}
-          contentContainerStyle={{ paddingHorizontal: sideInset, alignItems: 'center' }}
-          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-            useNativeDriver: true,
-          })}
-          scrollEventThrottle={16}
-          onMomentumScrollEnd={(e) =>
-            setSelected(Math.round(e.nativeEvent.contentOffset.x / SLOT))
-          }
-          style={{ flex: 1 }}
-        >
-          {members.map((m, i) => {
-            const p = byEmail[m.email]
-            const input = [
-              (i - 2) * SLOT,
-              (i - 1) * SLOT,
-              i * SLOT,
-              (i + 1) * SLOT,
-              (i + 2) * SLOT,
-            ]
-            const scale = scrollX.interpolate({
-              inputRange: input,
-              outputRange: [0.5, 0.62, 1, 0.62, 0.5],
-              extrapolate: 'clamp',
-            })
-            const opacity = scrollX.interpolate({
-              inputRange: input,
-              outputRange: [0.22, 0.5, 1, 0.5, 0.22],
-              extrapolate: 'clamp',
-            })
-            // Pull neighbours slightly toward the centered photo for overlap.
-            const tx = scrollX.interpolate({
-              inputRange: [(i - 1) * SLOT, i * SLOT, (i + 1) * SLOT],
-              outputRange: [12, 0, -12],
-              extrapolate: 'clamp',
-            })
-            return (
-              <View
-                key={m.email}
-                style={{ width: SLOT, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Animated.View
-                  style={{
-                    opacity,
-                    zIndex: members.length - Math.abs(i - selected),
-                    transform: [{ translateX: tx }, { scale }],
-                  }}
-                >
-                  <Pressable
-                    onPress={() => scrollRef.current?.scrollTo({ x: i * SLOT, animated: true })}
-                    accessibilityRole="button"
-                    accessibilityLabel={m.display_name}
-                  >
-                    <Avatar name={m.display_name} avatarPath={p?.avatar_path} size={AV_BASE} />
-                  </Pressable>
-                </Animated.View>
-              </View>
-            )
-          })}
-        </Animated.ScrollView>
-        <Txt
-          numberOfLines={1}
-          style={{ textAlign: 'center', fontWeight: '600', paddingBottom: sp.sm }}
-        >
-          {members[selected]?.display_name}
-        </Txt>
+            {/* Edit — only on my own card, right under it. */}
+            {isMe ? <Btn title={t('family.editMine')} variant="secondary" onPress={openEditMine} /> : null}
+          </Animated.ScrollView>
+        )}
       </View>
 
       {convert ? (

@@ -2,18 +2,29 @@
 // inside PetCare: pet picker, type picker (vet/vaccine/medication/grooming/other),
 // title, date, optional next-due, optional notes. Used for new events, edits, and
 // the "log again" re-log flow (the parent pre-fills the draft).
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+//
+// 2026-11 redesign (components/form): pet and type are SelectRows instead of
+// two walls of filled chips; the dates are rows that open a PickerSheet.
+// Keyboard: the sheet is lifted above the keyboard (useSheetLift) and the
+// fields scroll in a <KeyboardScroll> — KeyboardAvoidingView mis-measures
+// inside a Modal.
+import { Alert, Modal, StyleSheet, View } from 'react-native'
 import { X } from 'lucide-react-native'
 
-import { Btn, Field, Txt } from '@/components/ui'
+import { FormSection, SelectRow } from '@/components/form'
+import { KeyboardScroll } from '@/components/KeyboardScroll'
+import { Pressable } from '@/components/Pressable'
+import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
+import { useSheetLift } from '@/hooks/useSheetLift'
 import type { TKey } from '@/lib/i18n'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetEvent, PetEventType } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
-import { DateField, Pill_, TYPES, TYPE_ICON } from './petUi'
+import { sp, useTheme } from '@/theme/theme'
+import { DangerRow, DayRow, InputRow } from '@/apps/calendar/calendarUi'
+import { TYPES } from './petUi'
 
 export interface EventDraft {
   pet: string
@@ -45,7 +56,8 @@ export default function EventForm({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const insets = useSafeAreaInsets()
+  const bottomGap = useBottomGap(sp.lg)
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
   const set = (patch: Partial<EventDraft>) => setDraft({ ...draft, ...patch })
 
   const canSave = !!draft.title.trim() && !!draft.pet
@@ -74,145 +86,134 @@ export default function EventForm({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-      >
+      <View style={styles.backdrop} onLayout={onRootLayout}>
         {/* the dimmed area above the sheet dismisses on tap */}
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View
-          style={{
-            maxHeight: '90%',
-            backgroundColor: c.sheet,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.lg,
-              paddingBottom: sp.sm,
-            }}
-          >
+        <Pressable style={{ flex: 1 }} onPress={onClose} accessible={false} />
+        <View style={[styles.sheet, { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift }]}>
+          <View style={styles.sheetHead}>
             <Txt variant="h2">{editingEvent ? t('pets.editEvent') : t('pets.newEvent')}</Txt>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')}>
-              <X size={22} color={c.textMuted} />
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface }]}
+            >
+              <X size={16} color={c.textMuted} />
             </Pressable>
           </View>
 
-          <ScrollView
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
+          <KeyboardScroll
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {/* pet */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('pets.pet')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {pets.map((p) => (
-                  <Pill_ key={p.id} active={draft.pet === p.id} onPress={() => set({ pet: p.id })}>
-                    <Txt
-                      style={{
-                        color: draft.pet === p.id ? '#fff' : c.textMuted,
-                        fontWeight: '600',
-                      }}
-                    >
-                      {p.emoji} {p.name}
-                    </Txt>
-                  </Pill_>
-                ))}
-              </View>
-            </View>
-
-            {/* type */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('pets.typeLabel')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {TYPES.map((ty) => {
-                  const Icon = TYPE_ICON[ty]
-                  const active = draft.type === ty
-                  return (
-                    <Pill_ key={ty} active={active} onPress={() => set({ type: ty })}>
-                      <Icon size={16} color={active ? '#fff' : c.textMuted} />
-                      <Txt style={{ color: active ? '#fff' : c.textMuted, fontWeight: '600' }}>
-                        {t(`pets.type.${ty}` as TKey)}
-                      </Txt>
-                    </Pill_>
-                  )
-                })}
-              </View>
-            </View>
-
-            <Field
-              value={draft.title}
-              onChangeText={(v) => set({ title: v })}
-              placeholder={
-                draft.type === 'medication'
-                  ? t('pets.titleMedPlaceholder')
-                  : t('pets.titlePlaceholder')
-              }
-            />
-
-            <View style={{ flexDirection: 'row', gap: sp.md }}>
-              <DateField
-                label={t('pets.date')}
-                value={draft.date}
-                placeholder={t('pets.date')}
-                onChange={(v) => set({ date: v })}
+            <FormSection>
+              <InputRow
+                title
+                value={draft.title}
+                onChangeText={(v) => set({ title: v })}
+                placeholder={
+                  draft.type === 'medication' ? t('pets.titleMedPlaceholder') : t('pets.titlePlaceholder')
+                }
               />
-              <DateField
+              <SelectRow
+                label={t('pets.pet')}
+                value={draft.pet}
+                options={pets.map((p) => ({ value: p.id, label: `${p.emoji} ${p.name}` }))}
+                onChange={(v) => {
+                  if (v) set({ pet: v })
+                }}
+              />
+              <SelectRow
+                label={t('pets.typeLabel')}
+                value={draft.type}
+                options={TYPES.map((ty) => ({ value: ty, label: t(`pets.type.${ty}` as TKey) }))}
+                onChange={(v) => {
+                  if (v) set({ type: v })
+                }}
+              />
+            </FormSection>
+
+            <FormSection>
+              <DayRow label={t('pets.date')} value={draft.date} onChange={(v) => set({ date: v })} />
+              <DayRow
                 label={t('pets.nextDue')}
                 value={draft.nextDue}
-                placeholder={t('pets.optional')}
                 onChange={(v) => set({ nextDue: v })}
                 optional
               />
-            </View>
+            </FormSection>
 
-            <Field
-              value={draft.notes}
-              onChangeText={(v) => set({ notes: v })}
-              placeholder={t('pets.notesPlaceholder')}
-            />
-          </ScrollView>
+            <FormSection>
+              <InputRow
+                multiline
+                value={draft.notes}
+                onChangeText={(v) => set({ notes: v })}
+                placeholder={t('pets.notesPlaceholder')}
+              />
+            </FormSection>
 
-          {/* Delete sits ABOVE Save so the Save button stays docked at the
-              sheet's bottom in both new + edit modes — its screen-curve bottom
-              corners echo the phone's own corner. Half the inset hugs the edge
-              while clearing the home indicator, matching NewItemButton. */}
+            {editingEvent ? (
+              <FormSection>
+                <DangerRow
+                  label={t('pets.deleteEvent')}
+                  onPress={() => {
+                    const ev = editingEvent
+                    onClose()
+                    onDelete(ev)
+                  }}
+                />
+              </FormSection>
+            ) : null}
+          </KeyboardScroll>
+
+          {/* save — docked */}
           <View
             style={{
               paddingHorizontal: sp.lg,
-              paddingTop: sp.md,
-              paddingBottom: Math.max(Math.round(insets.bottom / 2), sp.xs),
-              gap: sp.md,
+              paddingTop: sp.sm,
+              paddingBottom: clearOfBars ? sp.md : bottomGap,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.border,
             }}
           >
-            {editingEvent ? (
-              <Pressable
-                onPress={() => {
-                  const ev = editingEvent
-                  onClose()
-                  onDelete(ev)
-                }}
-                style={{ paddingVertical: 12, alignItems: 'center' }}
-              >
-                <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('pets.deleteEvent')}</Txt>
-              </Pressable>
-            ) : null}
             <Btn
               title={editingEvent ? t('common.saveChanges') : t('pets.saveEvent')}
               onPress={save}
               disabled={!canSave}
-              curveBottom
             />
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: sp.lg,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.md,
+  },
+  close: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

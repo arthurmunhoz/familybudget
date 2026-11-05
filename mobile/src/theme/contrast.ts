@@ -43,3 +43,30 @@ export function pickOn(fill: string): string {
     return '#FFFFFF'
   }
 }
+
+/**
+ * The FILL for primary action buttons and selected controls: the accent,
+ * darkened just enough that WHITE text on it clears AA (4.5:1). Pair it with
+ * `c.onAction` (always white).
+ *
+ * Why not `accent` + `onAccent`: the brand accents are bright (sunset
+ * #E2683F is 3.3:1 against white), so `pickOn` chose the dark ink and every
+ * primary button read as brown-on-orange (user feedback, 2026-11). Deepening
+ * the fill keeps the hue — it's still clearly the scheme's colour — and gets a
+ * crisp white label in both modes.
+ */
+export function actionFill(accent: string): string {
+  try {
+    const h = accent.replace('#', '')
+    let [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16))
+    const hex = () => '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
+    for (let i = 0; i < 40 && ratio(hex(), '#FFFFFF') < 4.6; i++) {
+      r *= 0.96
+      g *= 0.96
+      b *= 0.96
+    }
+    return hex().toUpperCase()
+  } catch {
+    return accent
+  }
+}

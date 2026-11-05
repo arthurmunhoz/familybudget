@@ -249,7 +249,7 @@ export function Chip({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: radius.pill,
-        backgroundColor: active ? c.accent : c.surface,
+        backgroundColor: active ? c.action : c.surface,
         opacity: pressed ? 0.85 : 1,
       })}
     >

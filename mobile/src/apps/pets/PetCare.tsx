@@ -1,6 +1,6 @@
-// Pet Care — routine-first redesign (replaces the old month calendar). Top: a
-// coverflow pet selector matching the Family roster (round photos, the centred
-// one full size; name + overdue dot underneath; "+" in the header adds a pet).
+// Pet Care — routine-first redesign (replaces the old month calendar). Top: the
+// selected pet's photo full-bleed (components/PhotoHero) — swipe or tap the side arrows to
+// change pet; name + overdue dot on the photo; "+" on it adds a pet.
 // Then, for the selected pet:
 //   • Today — the daily checklist (morning walk, breakfast, dinner…) in the
 //     configured order, resetting each day and showing WHO did each item — so
@@ -15,21 +15,14 @@
 // also feeds the Pet Care home-screen widget: a fresh App Group snapshot +
 // a best-effort ?action=petcare-notify so OTHER members' widgets reload ASAP.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Alert,
-  Animated,
-  Pressable,
-  ScrollView,
-  View,
-  useWindowDimensions,
-} from 'react-native'
+import { Alert, Animated, Pressable, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
-import { Image } from 'expo-image'
 import { Check, ChevronLeft, ChevronRight, PawPrint, Pencil, Plus, Trash2 } from 'lucide-react-native'
 
 import { AppHeader, Btn, Card, EmptyState, Loader, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
+import { PhotoHero, type HeroItem } from '@/components/PhotoHero'
 import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
@@ -57,15 +50,10 @@ import EventForm, { type EventDraft } from './EventForm'
 import PetForm from './PetForm'
 import { RoutineSheet } from './RoutineSheet'
 import { OverdueSheet } from './OverdueSheet'
+import { petColor } from './petColors'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 const HISTORY_PREVIEW = 5
-
-/** Pet selector — a coverflow of round photos, mirroring the Family roster
- *  (see `apps/family/Family.tsx`): rendered size vs. the horizontal slot each
- *  one occupies, which is narrower so neighbours overlap. */
-const PET_AV = 76
-const PET_SLOT = 64
 
 /** Local HH:MM for a timestamptz — when a task was checked off. */
 function doneTime(iso: string): string {
@@ -141,7 +129,6 @@ function notifyPetCareChange(): void {
 
 export default function PetCare() {
   const { c } = useTheme()
-  const { width } = useWindowDimensions()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
   // Advances on foreground / at midnight — a render-time date would leave the
@@ -179,19 +166,11 @@ export default function PetCare() {
     if (overdueParam === '1') setOverduePending(true)
   }
 
-  // The selector starts big and shrinks as the list scrolls up (JS-driven —
-  // these feed layout props, which the native driver can't animate). Safe to
-  // animate a height here: the strip sits ABOVE the vertical ScrollView, so
-  // resizing it can't disturb that scroll's content offset.
+  // The photo hero shrinks as the list scrolls up (JS-driven — it feeds a
+  // height, which the native driver can't animate). Safe: the hero sits ABOVE
+  // the vertical ScrollView, so resizing it can't disturb that scroll's offset.
   const scrollY = useRef(new Animated.Value(0)).current
-  const strip = { inputRange: [0, 80], extrapolate: 'clamp' as const }
-  const stripH = scrollY.interpolate({ ...strip, outputRange: [PET_AV + 6, PET_AV * 0.46 + 6] })
-  const stripShrink = scrollY.interpolate({ ...strip, outputRange: [1, 0.46] })
-  const stripLabel = scrollY.interpolate({ ...strip, outputRange: [16, 13] })
-  // Horizontal offset of the coverflow — drives which photo is centred, at
-  // full size and full opacity, with its neighbours scaled down and faded.
-  const scrollX = useRef(new Animated.Value(0)).current
-  const petsRef = useRef<ScrollView>(null)
+  const collapse = scrollY.interpolate({ inputRange: [0, 160], outputRange: [0, 1], extrapolate: 'clamp' })
 
   const {
     data: { pets, tasks, done, events, petPhotoUrls } = EMPTY_DATA,
@@ -282,14 +261,6 @@ export default function PetCare() {
 
   const pet = selectedPet ? (petById[selectedPet] ?? null) : null
 
-  // Keep the coverflow centred on the selected pet. Adding or renaming a pet
-  // reorders the list, which would otherwise leave the name under the strip
-  // describing a photo that's no longer in the middle. After a swipe this
-  // lands on the offset snapping already chose, so it's a no-op.
-  useEffect(() => {
-    const i = petsSorted.findIndex((p) => p.id === selectedPet)
-    if (i >= 0) petsRef.current?.scrollTo({ x: i * PET_SLOT, animated: false })
-  }, [petsSorted, selectedPet])
   const checklist = useMemo(
     () => (pet ? dailyChecklist(tasks, done, pet.id, selectedDay) : []),
     [tasks, done, pet, selectedDay],
@@ -526,23 +497,42 @@ export default function PetCare() {
     checklist.length > 0 &&
     checklist.every(({ task, done: d }) => (overlay[task.id] ?? !!d))
 
+  const hasPets = !loading && pets.length > 0
+  const heroItems: HeroItem[] = petsSorted.map((p, i) => ({
+    id: p.id,
+    name: p.name,
+    photo: petPhotoUrls[p.id],
+    color: petColor(p, i),
+    glyph: p.emoji || speciesEmoji(p.species),
+    badge:
+      (overduePets[p.id] ?? 0) > 0 ? (
+        <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: c.expense, borderWidth: 1.5, borderColor: '#fff' }} />
+      ) : null,
+  }))
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader
-          title={t('pets.title')}
-          right={
-            <Pressable
-              onPress={() => setShowPetForm(true)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={t('pets.addPet')}
-            >
-              <Plus size={22} color={c.text} />
-            </Pressable>
-          }
-        />
-      </View>
+    // Top edge only without the hero: with it, the photo runs under the status
+    // bar and PetHero pads its own controls by the inset.
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: c.bg }}
+      edges={hasPets ? ['left', 'right'] : ['top', 'left', 'right']}
+    >
+      {!hasPets ? (
+        <View style={{ paddingHorizontal: sp.lg }}>
+          <AppHeader
+            title={t('pets.title')}
+            right={
+              <Pressable
+                onPress={() => setShowPetForm(true)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('pets.addPet')}
+              >
+                <Plus size={22} color={c.text} />
+              </Pressable>
+            }
+          />
+        </View>
+      ) : null}
 
       {loading ? (
         <Loader />
@@ -557,130 +547,22 @@ export default function PetCare() {
         </>
       ) : (
         <>
-          {/* Pet selector — the Family roster's coverflow: the centred photo
-              is full size and opaque, its neighbours scale down and fade out,
-              and the name sits under the row. Tapping the centred pet opens
-              its profile; tapping a neighbour brings it to the centre. */}
-          <View style={{ paddingBottom: sp.sm }}>
-            <Animated.ScrollView
-              ref={petsRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={PET_SLOT}
-              decelerationRate="fast"
-              style={{ height: stripH }}
-              contentContainerStyle={{
-                paddingHorizontal: (width - PET_SLOT) / 2, // any pet can reach the centre
-                alignItems: 'center',
-              }}
-              onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-                useNativeDriver: false,
-              })}
-              scrollEventThrottle={16}
-              onMomentumScrollEnd={(e) => {
-                const i = Math.round(e.nativeEvent.contentOffset.x / PET_SLOT)
-                const next = petsSorted[i]
-                if (!next || next.id === selectedPet) return
-                setSelectedPet(next.id)
-                setSelectedDay(todayISO())
-              }}
-            >
-              {petsSorted.map((p, i) => {
-                const at = (n: number) => (i + n) * PET_SLOT
-                const span = [at(-2), at(-1), at(0), at(1), at(2)]
-                const scale = scrollX.interpolate({
-                  inputRange: span,
-                  outputRange: [0.5, 0.62, 1, 0.62, 0.5],
-                  extrapolate: 'clamp',
-                })
-                const opacity = scrollX.interpolate({
-                  inputRange: span,
-                  outputRange: [0.22, 0.5, 1, 0.5, 0.22],
-                  extrapolate: 'clamp',
-                })
-                // Pull neighbours slightly toward the centred photo for overlap.
-                const tx = scrollX.interpolate({
-                  inputRange: [at(-1), at(0), at(1)],
-                  outputRange: [12, 0, -12],
-                  extrapolate: 'clamp',
-                })
-                const centred = p.id === selectedPet
-                return (
-                  <View
-                    key={p.id}
-                    style={{ width: PET_SLOT, alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Animated.View
-                      style={{
-                        opacity,
-                        zIndex: centred ? petsSorted.length : 0,
-                        transform: [
-                          { translateX: tx },
-                          // The coverflow's own scale times the shrink the
-                          // vertical scroll applies to the whole strip.
-                          { scale: Animated.multiply(scale, stripShrink) },
-                        ],
-                      }}
-                    >
-                      <Pressable
-                        onPress={() => {
-                          if (centred) router.push(`/pets/${p.id}`)
-                          else petsRef.current?.scrollTo({ x: i * PET_SLOT, animated: true })
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel={p.name}
-                        style={{
-                          width: PET_AV,
-                          height: PET_AV,
-                          borderRadius: PET_AV / 2,
-                          backgroundColor: c.surface,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {petPhotoUrls[p.id] ? (
-                          <Image
-                            source={{ uri: petPhotoUrls[p.id] }}
-                            style={{ width: '100%', height: '100%' }}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <Txt style={{ fontSize: PET_AV * 0.42 }}>{p.emoji || '🐾'}</Txt>
-                        )}
-                      </Pressable>
-                    </Animated.View>
-                  </View>
-                )
-              })}
-            </Animated.ScrollView>
-
-            {/* The selected pet's name under the row — plus the overdue dot,
-                which no longer has a chip to sit in. */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                paddingTop: 4,
-              }}
-            >
-              {(overduePets[selectedPet ?? ''] ?? 0) > 0 ? (
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.expense }} />
-              ) : null}
-              <Animated.Text
-                numberOfLines={1}
-                style={{ fontWeight: '700', fontSize: stripLabel, color: c.text }}
-              >
-                {pet?.name ?? ''}
-              </Animated.Text>
-            </View>
-          </View>
+          <PhotoHero
+            items={heroItems}
+            selectedId={selectedPet}
+            collapse={collapse}
+            onSelect={(id) => {
+              setSelectedPet(id)
+              setSelectedDay(todayISO())
+            }}
+            onPressItem={(id) => router.push(`/pets/${id}`)}
+            onAdd={() => setShowPetForm(true)}
+            addLabel={t('pets.addPet')}
+          />
 
         <Animated.ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xl * 2, gap: sp.md }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xl * 2, gap: sp.md }}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
             useNativeDriver: false,
           })}
@@ -776,20 +658,10 @@ export default function PetCare() {
                             borderTopColor: c.border,
                           }}
                         >
-                          <View
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 12,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: isDone ? c.income : 'transparent',
-                              borderWidth: isDone ? 0 : 1.5,
-                              borderColor: c.textFaint,
-                            }}
-                          >
-                            {isDone ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
-                          </View>
+                          {/* Icon beside the title, checkbox on the right (2026-11):
+                              the row reads as "what" first, and the tick sits
+                              where the thumb lands. */}
+                          <Icon size={18} color={isDone ? c.textFaint : c.accent} />
                           <Txt
                             style={{
                               flex: 1,
@@ -805,9 +677,21 @@ export default function PetCare() {
                             <Txt variant="faint" style={{ fontSize: 11 }}>
                               {nameFor(d.done_by)} · {doneTime(d.created_at)}
                             </Txt>
-                          ) : (
-                            <Icon size={16} color={c.textFaint} />
-                          )}
+                          ) : null}
+                          <View
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 12,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: isDone ? c.income : 'transparent',
+                              borderWidth: isDone ? 0 : 1.5,
+                              borderColor: c.textFaint,
+                            }}
+                          >
+                            {isDone ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
+                          </View>
                         </Pressable>
                       )
                     })}
@@ -913,11 +797,11 @@ export default function PetCare() {
                                 paddingHorizontal: 12,
                                 paddingVertical: 6,
                                 borderRadius: radius.pill,
-                                backgroundColor: urgent ? c.accent : c.surface,
+                                backgroundColor: urgent ? c.action : c.surface,
                               }}
                             >
                               <Txt
-                                style={{ fontSize: 12, fontWeight: '700', color: urgent ? c.onAccent : c.textMuted }}
+                                style={{ fontSize: 12, fontWeight: '700', color: urgent ? c.onAction : c.textMuted }}
                               >
                                 {t('common.done')}
                               </Txt>
@@ -1002,11 +886,11 @@ export default function PetCare() {
                               paddingHorizontal: 10,
                               paddingVertical: 5,
                               borderRadius: radius.pill,
-                              backgroundColor: c.accent,
+                              backgroundColor: c.action,
                             }}
                           >
-                            <Check size={13} strokeWidth={3} color={c.onAccent} />
-                            <Txt style={{ fontSize: 12, fontWeight: '700', color: c.onAccent }}>
+                            <Check size={13} strokeWidth={3} color={c.onAction} />
+                            <Txt style={{ fontSize: 12, fontWeight: '700', color: c.onAction }}>
                               {t('pets.markDone')}
                             </Txt>
                           </Pressable>

@@ -7,10 +7,10 @@
 // prebuild — deliberately avoided so this stays flip-a-boolean reversible).
 // Instead: a soft color wash painted behind everything with plain Views, plus
 // translucent card tokens, so cards let the wash bleed through and read glassy.
-import { Dimensions, View } from 'react-native'
+import { View } from 'react-native'
 
 import type { ThemeTokens } from './theme'
-import { pickOn } from './contrast'
+import { actionFill, pickOn } from './contrast'
 
 /** Master on/off. false = the app is exactly Warm Hearth again. */
 export const GLASS = true
@@ -37,6 +37,8 @@ export const glassLight: ThemeTokens = {
   accent: '#E2683F',
   accentSoft: 'rgba(226,104,63,0.15)',
   onAccent: pickOn('#E2683F'),
+  action: actionFill('#E2683F'),
+  onAction: '#FFFFFF',
   income: '#1F9E68',
   expense: '#E4554A',
   border: 'rgba(60,45,38,0.12)',
@@ -58,6 +60,8 @@ export const glassDark: ThemeTokens = {
   accent: '#F2884F',
   accentSoft: 'rgba(242,136,79,0.20)',
   onAccent: pickOn('#F2884F'),
+  action: actionFill('#F2884F'),
+  onAction: '#FFFFFF',
   income: '#54C088',
   expense: '#EF6B62',
   border: 'rgba(255,255,255,0.12)',
@@ -240,67 +244,23 @@ export function glassTokens(dark: boolean, scheme: SchemeId): ThemeTokens {
     // Derived, never authored: a new scheme can't forget it and silently ship
     // white-on-a-pale-accent again.
     onAccent: pickOn(dark ? s.accentDark : s.accent),
+    action: actionFill(dark ? s.accentDark : s.accent),
+    onAction: '#FFFFFF',
   }
 }
 
-// The color wash: a base fill plus three big, soft, low-opacity color fields in
-// the corners. No gradient library — overlapping translucent circles read as a
-// gentle wash behind the (transparent) screens. Rendered once, at the app root.
-const { width: W, height: H } = Dimensions.get('window')
-const BLOB = Math.max(W, H) * 0.95
-
-// Positions are LAYOUT, not colour, so every scheme shares them — a scheme only
-// swaps the three colours + the base fill.
-// Punchier than a flat tint on purpose: with see-through cards, this colour IS
-// the glass effect — the more variation behind a card, the more it reads as
-// glass rather than as a slightly-grey panel.
-const BLOB_POS = [
-  { top: -BLOB * 0.35, left: -BLOB * 0.28 },
-  { top: -BLOB * 0.18, left: W - BLOB * 0.72 },
-  { top: H - BLOB * 0.6, left: W * 0.1 },
-]
-
-/**
- * One dial on how loudly the wash reads. Blob opacities in SCHEMES are authored
- * at full strength; this scales all of them, so the relative weighting each
- * scheme was tuned with is preserved and there's a single number to turn.
- *
- * Why below 1: at full strength the background competed with the content. These
- * screens carry a lot of information (a budget period, a day's agenda, a
- * checklist), and a saturated wash behind all of it read as busy rather than
- * warm. Dialled back, the colour still tints the page — the app stays
- * recognisably itself — but it sits behind the content instead of alongside it.
- *
- * Light is cut hardest: its blobs are saturated colour on pale paper. Dark's are
- * already near-black on near-black, so the same cut would flatten it to grey and
- * kill the glass entirely.
- */
-const WASH_INTENSITY = { light: 0.42, dark: 0.75 }
-
+// The page background. It used to be a colour WASH — the base fill plus three
+// big, soft, translucent circles (`blobs` in SCHEMES) behind see-through cards.
+// Removed 2026-11 (owner: the pattern was ugly behind the new screens, whose
+// gradient cards now carry the colour). `blobs` stays in the scheme data in
+// case it ever comes back; the layout lived in BLOB_POS/WASH_INTENSITY (git).
 export function GlassWash({ dark, scheme }: { dark: boolean; scheme: SchemeId }) {
   const s = SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME]
   const w = dark ? s.washDark : s.wash
-  const intensity = dark ? WASH_INTENSITY.dark : WASH_INTENSITY.light
   return (
     <View
       pointerEvents="none"
       style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: w.base }}
-    >
-      {w.blobs.map((b, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            top: BLOB_POS[i].top,
-            left: BLOB_POS[i].left,
-            width: BLOB,
-            height: BLOB,
-            borderRadius: BLOB / 2,
-            backgroundColor: b.color,
-            opacity: b.o * intensity,
-          }}
-        />
-      ))}
-    </View>
+    />
   )
 }

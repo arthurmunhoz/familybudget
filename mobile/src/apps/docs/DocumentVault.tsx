@@ -721,7 +721,7 @@ function FilterChip({
   children: React.ReactNode
 }) {
   const { c } = useTheme()
-  const color = active ? c.onAccent : c.textMuted
+  const color = active ? c.onAction : c.textMuted
   return (
     <Pressable
       onPress={onPress}
@@ -732,7 +732,7 @@ function FilterChip({
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: radius.pill,
-        backgroundColor: active ? c.accent : c.surface,
+        backgroundColor: active ? c.action : c.surface,
       }}
     >
       {Icon ? <Icon size={15} color={color} /> : null}

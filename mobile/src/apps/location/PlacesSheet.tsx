@@ -240,7 +240,7 @@ export function PlacesSheet({
                           width: 9,
                           height: 9,
                           borderRadius: 5,
-                          backgroundColor: colors[e.user_email] ?? c.accent,
+                          backgroundColor: colors[e.user_email] ?? c.action,
                         }}
                       />
                       <Txt style={{ flex: 1, fontSize: 14, color: c.text }} numberOfLines={1}>

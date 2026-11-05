@@ -1,101 +1,138 @@
-// Calculator hub app — RN port of the PWA's calc/Calculator.tsx. Three tools:
-//  1. Split a bill (evenly, or by item with tip/tax — photo scan is stubbed)
-//  2. Better deal (price-per-unit comparison)
-//  3. Discount (final sale price)
+// Utilities hub (slug/route stays `calc` — it started life as "Calculator").
+// A grid of small tools, grouped by what they're for, so new ones slot in
+// without the screen turning into a long list. Each tool is its own route
+// under app/calc/, which gives it the native back gesture and a real stack
+// entry instead of the in-screen tool switch this used to be.
+//
+// Tools:
+//   Bills & shopping — split evenly (wizard), split by item (photo scan,
+//                      Plus), better deal (unit price), discount
+//   Printables       — luggage tag (see apps/calc/printables: the reusable
+//                      format for printable cards)
 // No database is used by this module.
-import { useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
-import {
-  ChevronRight,
-  Scale,
-  Tag,
-  Utensils,
-  type LucideIcon,
-} from 'lucide-react-native'
-import { router } from 'expo-router'
+import { Alert, StyleSheet, View } from 'react-native'
+import { router, type Href } from 'expo-router'
+import { Luggage, ReceiptText, Scale, Sparkles, Tag, UsersRound, type LucideIcon } from 'lucide-react-native'
 
+import { Pressable } from '@/components/Pressable'
 import { AppHeader, Screen, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { usePlus } from '@/lib/plus'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
-import { SplitBill } from '@/apps/calc/SplitBill'
-import { BetterDeal } from '@/apps/calc/BetterDeal'
-import { Discount } from '@/apps/calc/Discount'
+interface Tool {
+  id: string
+  route: Href
+  icon: LucideIcon
+  title: TKey
+  sub: TKey
+  plus?: boolean
+  /** Powered by AI — gets a "✨ AI" badge on the tile. */
+  ai?: boolean
+}
 
-type Tool = 'split' | 'unit' | 'discount'
-
-const TOOLS: { id: Tool; icon: LucideIcon; title: TKey; sub: TKey }[] = [
-  { id: 'split', icon: Utensils, title: 'calc.tool.split', sub: 'calc.tool.splitSub' },
-  { id: 'unit', icon: Scale, title: 'calc.tool.unit', sub: 'calc.tool.unitSub' },
-  { id: 'discount', icon: Tag, title: 'calc.tool.discount', sub: 'calc.tool.discountSub' },
+const SECTIONS: { title: TKey; tools: Tool[] }[] = [
+  {
+    title: 'calc.section.bills',
+    tools: [
+      { id: 'even', route: '/calc/even', icon: UsersRound, title: 'calc.tool.even', sub: 'calc.tool.evenSub' },
+      { id: 'items', route: '/calc/items', icon: ReceiptText, title: 'calc.tool.byItem', sub: 'calc.tool.byItemSub', plus: true, ai: true },
+      { id: 'deal', route: '/calc/deal', icon: Scale, title: 'calc.tool.unit', sub: 'calc.tool.unitSub' },
+      { id: 'discount', route: '/calc/discount', icon: Tag, title: 'calc.tool.discount', sub: 'calc.tool.discountSub' },
+    ],
+  },
+  {
+    title: 'calc.section.print',
+    tools: [{ id: 'tag', route: '/calc/tag', icon: Luggage, title: 'calc.tool.tag', sub: 'calc.tool.tagSub' }],
+  },
 ]
 
-export default function CalculatorScreen() {
+export default function UtilitiesScreen() {
   const { t } = useI18n()
-  const [tool, setTool] = useState<Tool | null>(null)
-  const active = TOOLS.find((x) => x.id === tool)
+  const { isFree } = usePlus()
 
-  const title = active ? t(active.title) : t('calc.title')
-  const onBack = tool
-    ? () => setTool(null)
-    : () => (router.canGoBack() ? router.back() : router.replace('/'))
+  function open(tool: Tool) {
+    // isFree, not !isPlus — must match the badge, or a paying user sees an
+    // unlocked tile that still refuses while the entitlement resolves.
+    if (tool.plus && isFree) {
+      Alert.alert(t('calc.plusByItem'), undefined, [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('settings.getPlus'), onPress: () => router.push('/paywall') },
+      ])
+      return
+    }
+    router.push(tool.route)
+  }
 
   return (
-    <Screen scroll header={<AppHeader title={title} onBack={onBack} />}>
-      {tool === 'split' ? (
-        <SplitBill />
-      ) : tool === 'unit' ? (
-        <BetterDeal />
-      ) : tool === 'discount' ? (
-        <Discount />
-      ) : (
-        <Menu onPick={setTool} />
-      )}
+    <Screen scroll header={<AppHeader title={t('calc.title')} />}>
+      {SECTIONS.map((sec) => (
+        <View key={sec.title} style={{ marginTop: sp.lg }}>
+          <Txt variant="label" style={styles.sectionLabel}>
+            {t(sec.title)}
+          </Txt>
+          <View style={styles.grid}>
+            {sec.tools.map((tool) => (
+              <ToolTile key={tool.id} tool={tool} locked={!!tool.plus && isFree} onPress={() => open(tool)} />
+            ))}
+          </View>
+        </View>
+      ))}
     </Screen>
   )
 }
 
-function Menu({ onPick }: { onPick: (t: Tool) => void }) {
+function ToolTile({ tool, locked, onPress }: { tool: Tool; locked: boolean; onPress: () => void }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const Icon = tool.icon
   return (
-    <View style={{ gap: sp.md, marginTop: sp.sm }}>
-      {TOOLS.map((tl) => {
-        const Icon = tl.icon
-        return (
-          <Pressable
-            key={tl.id}
-            onPress={() => onPick(tl.id)}
-            style={({ pressed }) => [
-              styles.tile,
-              { backgroundColor: pressed ? c.cardActive : c.card, borderColor: c.border },
-            ]}
-          >
-            <View style={[styles.tileIcon, { backgroundColor: c.surface }]}>
-              <Icon size={24} color={c.accent} strokeWidth={2} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontWeight: '700', color: c.text }}>{t(tl.title)}</Txt>
-              <Txt variant="faint">{t(tl.sub)}</Txt>
-            </View>
-            <ChevronRight size={20} color={c.textFaint} />
-          </Pressable>
-        )
-      })}
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.tile,
+        { backgroundColor: pressed ? c.cardActive : c.card, borderColor: c.border },
+      ]}
+    >
+      <View style={styles.tileTop}>
+        <View style={[styles.tileIcon, { backgroundColor: c.accentSoft }]}>
+          <Icon size={24} color={c.accent} strokeWidth={2} />
+        </View>
+        {tool.ai ? (
+          <View style={[styles.aiBadge, { backgroundColor: c.accentSoft }]}>
+            <Sparkles size={12} color={c.accent} />
+            <Txt style={{ fontSize: 11, fontFamily: fonts.semibold, color: c.accent }}>{t('calc.aiBadge')}</Txt>
+          </View>
+        ) : locked ? (
+          <Sparkles size={16} color={c.accent} />
+        ) : null}
+      </View>
+      <Txt style={{ fontFamily: fonts.semibold, color: c.text, fontSize: 16 }} numberOfLines={2}>
+        {t(tool.title)}
+      </Txt>
+      <Txt variant="faint" numberOfLines={3}>
+        {t(tool.sub)}
+      </Txt>
+    </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
+  aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
+  sectionLabel: { textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: sp.sm },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.md },
   tile: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.lg,
+    width: '47.5%',
+    flexGrow: 1,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     padding: sp.lg,
+    gap: 6,
+    minHeight: 150,
   },
+  tileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: sp.sm },
   tileIcon: {
     width: 48,
     height: 48,

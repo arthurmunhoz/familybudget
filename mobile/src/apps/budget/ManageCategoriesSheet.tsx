@@ -6,32 +6,180 @@
 //  • Yours — the household's custom categories: edit inline, 🗑 delete (its
 //    entries move to "Other" via delete_custom_category, migration 054), and an
 //    "Add category" row.
-// Opened from the entry form. Mirrors the Nudges "Edit presets" list pattern.
-import { useState } from 'react'
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native'
+// Opened from the entry form's category picker. Mirrors the Nudges "Edit
+// presets" list pattern.
+//
+// 2026-11 redesign: grouped FormSections (rows + hairlines on a card) inside
+// the shared FormSheet, instead of bare rows and a dashed add-button.
+import { useRef, useState, type ReactNode } from 'react'
+import { Alert, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { Plus, RotateCcw, Trash2, X } from 'lucide-react-native'
+import { ChevronRight, Plus, RotateCcw, Trash2, X } from 'lucide-react-native'
 
-import { Txt } from '@/components/ui'
+import { Btn, Txt } from '@/components/ui'
+import { FormSection } from '@/components/form'
+import { useRevealOnFocus } from '@/components/KeyboardScroll'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { CATEGORIES } from '@/lib/categories'
 import { supabase } from '@/lib/supabase'
 import type { CategoryOverride, CustomCategory } from '@/lib/types'
-import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { FormSheet } from './FormSheet'
 
 // Editable presets — salary is income-only, so it stays out of expense mgmt.
 const PRESETS = CATEGORIES.filter((c) => c.id !== 'salary')
+
+const ROW_MIN_H = 50
+
+/** The inline editor that replaces a row while it's being edited: emoji +
+ *  name + Save. Module scope so its inputs keep focus across re-renders. */
+function EditorRow({
+  icon,
+  name,
+  onIcon,
+  onName,
+  onSave,
+  onCancel,
+  saveLabel,
+  busy,
+}: {
+  icon: string
+  name: string
+  onIcon: (v: string) => void
+  onName: (v: string) => void
+  onSave: () => void
+  onCancel: () => void
+  saveLabel: string
+  busy: boolean
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const reveal = useRevealOnFocus()
+  const row = useRef<View>(null)
+  const canSave = !busy && Boolean(name.trim())
+  return (
+    <View
+      ref={row}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp.sm,
+        minHeight: ROW_MIN_H,
+        paddingHorizontal: sp.sm,
+        paddingVertical: 6,
+      }}
+    >
+      <TextInput
+        value={icon}
+        onChangeText={onIcon}
+        placeholder="🏷️"
+        placeholderTextColor={c.textFaint}
+        maxLength={4}
+        accessibilityLabel={t('entry.newCategoryIcon')}
+        onFocus={() => reveal(row.current)}
+        style={{
+          width: 40,
+          height: 38,
+          textAlign: 'center',
+          backgroundColor: c.surface,
+          borderRadius: radius.sm,
+          fontSize: 18,
+          color: c.text,
+        }}
+      />
+      <TextInput
+        value={name}
+        onChangeText={onName}
+        placeholder={t('manageCats.namePlaceholder')}
+        placeholderTextColor={c.textFaint}
+        maxLength={40}
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={() => canSave && onSave()}
+        onFocus={() => reveal(row.current)}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          height: 38,
+          fontSize: 15,
+          fontFamily: fonts.body,
+          color: c.text,
+        }}
+      />
+      <Pressable
+        onPress={onSave}
+        disabled={!canSave}
+        accessibilityRole="button"
+        style={({ pressed }) => ({
+          backgroundColor: c.action,
+          borderRadius: radius.pill,
+          paddingHorizontal: 14,
+          paddingVertical: 8,
+          opacity: !canSave ? 0.5 : pressed ? 0.85 : 1,
+        })}
+      >
+        <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 14 }}>{saveLabel}</Txt>
+      </Pressable>
+      <Pressable
+        onPress={onCancel}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.cancel')}
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          backgroundColor: c.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <X size={14} color={c.textMuted} />
+      </Pressable>
+    </View>
+  )
+}
+
+/** A category row: emoji + name (tap to edit), an optional trailing action. */
+function CategoryRow({
+  icon,
+  name,
+  onPress,
+  trailing,
+}: {
+  icon: string
+  name: string
+  onPress: () => void
+  trailing?: ReactNode
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.md }}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.editName', { name })}
+        style={({ pressed }) => ({
+          flex: 1,
+          minWidth: 0,
+          minHeight: ROW_MIN_H,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: sp.md,
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Txt style={{ fontSize: 20, width: 26, textAlign: 'center' }}>{icon}</Txt>
+        <Txt style={{ flex: 1, minWidth: 0, fontSize: 15, color: c.text }} numberOfLines={1}>
+          {name}
+        </Txt>
+      </Pressable>
+      {trailing ?? <ChevronRight size={16} color={c.textFaint} />}
+    </View>
+  )
+}
 
 export default function ManageCategoriesSheet({
   categories,
@@ -46,7 +194,6 @@ export default function ManageCategoriesSheet({
   onClose: () => void
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
   const [customList, setCustomList] = useState<CustomCategory[]>(categories)
   const [ovr, setOvr] = useState<CategoryOverride[]>(overrides)
@@ -184,196 +331,129 @@ export default function ManageCategoriesSheet({
     ])
   }
 
-  const iconInput = {
-    width: 46,
-    height: 44,
-    textAlign: 'center' as const,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    fontSize: 20,
-    color: c.text,
-  }
-  const nameInput = {
-    flex: 1,
-    minWidth: 0,
-    height: 44,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: sp.md,
-    fontSize: 16,
-    color: c.text,
-  }
-
-  // Plain function (NOT a component — a component defined in the render body
-  // would remount each keystroke and drop the input focus). Called directly.
-  const editorRow = (onSave: () => void, saveLabel: string, key?: string) => (
-    <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingVertical: sp.sm }}>
-      <TextInput
-        value={draftIcon}
-        onChangeText={setDraftIcon}
-        placeholder="🏷️"
-        placeholderTextColor={c.textFaint}
-        maxLength={4}
-        style={iconInput}
-      />
-      <TextInput
-        value={draftName}
-        onChangeText={setDraftName}
-        placeholder={t('manageCats.namePlaceholder')}
-        placeholderTextColor={c.textFaint}
-        maxLength={40}
-        autoFocus
-        style={nameInput}
-      />
-      <Pressable
-        onPress={onSave}
-        disabled={busy || !draftName.trim()}
-        style={({ pressed }) => ({
-          backgroundColor: c.accent,
-          borderRadius: radius.md,
-          paddingHorizontal: sp.md,
-          paddingVertical: 12,
-          opacity: busy || !draftName.trim() ? 0.5 : pressed ? 0.85 : 1,
-        })}
-      >
-        <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>{saveLabel}</Txt>
-      </Pressable>
-      <Pressable onPress={cancelEdit} hitSlop={8} accessibilityLabel={t('common.cancel')}>
-        <X size={20} color={c.textMuted} />
-      </Pressable>
-    </View>
+  // Plain function, called directly (not a component): spreads the shared
+  // draft state into an EditorRow.
+  const editor = (onSave: () => void, saveLabel: string, key?: string) => (
+    <EditorRow
+      key={key}
+      icon={draftIcon}
+      name={draftName}
+      onIcon={setDraftIcon}
+      onName={setDraftName}
+      onSave={onSave}
+      onCancel={cancelEdit}
+      saveLabel={saveLabel}
+      busy={busy}
+    />
   )
 
-  const rowStyle = {
-    flexDirection: 'row' as const,
+  const iconBtn = {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center' as const,
-    gap: sp.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: c.border,
+    justifyContent: 'center' as const,
   }
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View
-            style={{
-              maxHeight: '88%',
-              backgroundColor: c.sheet,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: sp.lg,
-                paddingTop: sp.lg,
-                paddingBottom: sp.sm,
-              }}
-            >
-              <Txt variant="h2">{t('manageCats.title')}</Txt>
-              <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')}>
-                <X size={22} color={c.textMuted} />
-              </Pressable>
-            </View>
+    <FormSheet
+      title={t('manageCats.title')}
+      onClose={onClose}
+      footer={<Btn title={t('common.done')} onPress={onClose} />}
+    >
+      {/* Defaults (built-in presets) */}
+      <FormSection title={t('manageCats.defaults')}>
+        {PRESETS.map((p) =>
+          editingId === p.id ? (
+            editor(() => savePreset(p), t('common.save'), p.id)
+          ) : (
+            <CategoryRow
+              key={p.id}
+              icon={presetIcon(p.id, p.icon)}
+              name={presetName(p.id)}
+              onPress={() => startEditPreset(p)}
+              trailing={
+                overrideOf(p.id) ? (
+                  <Pressable
+                    onPress={() => resetPreset(p.id)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('manageCats.reset')}
+                    style={[iconBtn, { backgroundColor: c.accentSoft }]}
+                  >
+                    <RotateCcw size={14} color={c.accent} />
+                  </Pressable>
+                ) : undefined
+              }
+            />
+          ),
+        )}
+      </FormSection>
 
-            <ScrollView
-              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: bottomGap }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Defaults (built-in presets) */}
-              <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
-                {t('manageCats.defaults')}
-              </Txt>
-              {PRESETS.map((p) =>
-                editingId === p.id ? (
-                  editorRow(() => savePreset(p), t('common.save'), p.id)
-                ) : (
-                  <View key={p.id} style={rowStyle}>
-                    <Pressable
-                      onPress={() => startEditPreset(p)}
-                      style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 12 }}
-                    >
-                      <Txt style={{ fontSize: 20 }}>{presetIcon(p.id, p.icon)}</Txt>
-                      <Txt style={{ flex: 1, minWidth: 0 }} numberOfLines={1}>
-                        {presetName(p.id)}
-                      </Txt>
-                    </Pressable>
-                    {overrideOf(p.id) ? (
-                      <Pressable onPress={() => resetPreset(p.id)} hitSlop={8} accessibilityLabel={t('manageCats.reset')}>
-                        <RotateCcw size={16} color={c.textMuted} />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                ),
-              )}
-
-              {/* Yours (custom categories) */}
-              <Txt
-                variant="label"
-                style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginTop: sp.lg, marginBottom: 2 }}
-              >
-                {t('manageCats.yours')}
-              </Txt>
-              {customList.length === 0 && editingId !== 'new' ? (
-                <Txt variant="faint" style={{ paddingVertical: sp.sm }}>
-                  {t('manageCats.empty')}
-                </Txt>
-              ) : null}
-              {customList.map((cat) =>
-                editingId === cat.id ? (
-                  editorRow(() => saveCustom(cat.id), t('common.save'), cat.id)
-                ) : (
-                  <View key={cat.id} style={rowStyle}>
-                    <Pressable
-                      onPress={() => startEditCustom(cat)}
-                      style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 12 }}
-                    >
-                      <Txt style={{ fontSize: 20 }}>{cat.icon}</Txt>
-                      <Txt style={{ flex: 1, minWidth: 0 }} numberOfLines={1}>
-                        {cat.name}
-                      </Txt>
-                    </Pressable>
-                    <Pressable onPress={() => confirmDeleteCustom(cat)} hitSlop={8} accessibilityLabel={t('common.delete')}>
-                      <Trash2 size={18} color={c.textFaint} />
-                    </Pressable>
-                  </View>
-                ),
-              )}
-
-              {editingId === 'new' ? (
-                editorRow(() => saveCustom('new'), t('common.add'))
-              ) : (
-                <Pressable
-                  onPress={startNew}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: sp.sm,
-                    marginTop: sp.md,
-                    paddingVertical: 12,
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    borderColor: c.textFaint,
-                    borderRadius: radius.md,
-                  }}
-                >
-                  <Plus size={18} color={c.textMuted} />
-                  <Txt style={{ color: c.textMuted, fontFamily: fonts.semibold }}>{t('manageCats.add')}</Txt>
-                </Pressable>
-              )}
-
-              <Txt variant="faint" style={{ marginTop: sp.md, fontSize: 12 }}>
-                {t('manageCats.deleteHint')}
-              </Txt>
-            </ScrollView>
+      {/* Yours (custom categories) + the add row at its foot */}
+      <FormSection title={t('manageCats.yours')} footer={t('manageCats.deleteHint')}>
+        {customList.length === 0 && editingId !== 'new' ? (
+          <View style={{ minHeight: ROW_MIN_H, justifyContent: 'center', paddingHorizontal: sp.md }}>
+            <Txt variant="faint" style={{ fontSize: 14 }}>
+              {t('manageCats.empty')}
+            </Txt>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+        ) : null}
+        {customList.map((cat) =>
+          editingId === cat.id ? (
+            editor(() => saveCustom(cat.id), t('common.save'), cat.id)
+          ) : (
+            <CategoryRow
+              key={cat.id}
+              icon={cat.icon}
+              name={cat.name}
+              onPress={() => startEditCustom(cat)}
+              trailing={
+                <Pressable
+                  onPress={() => confirmDeleteCustom(cat)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.delete')}
+                  style={iconBtn}
+                >
+                  <Trash2 size={17} color={c.textFaint} />
+                </Pressable>
+              }
+            />
+          ),
+        )}
+        {editingId === 'new' ? (
+          editor(() => saveCustom('new'), t('common.add'))
+        ) : (
+          <Pressable
+            onPress={startNew}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: sp.md,
+              minHeight: ROW_MIN_H,
+              paddingHorizontal: sp.md,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <View style={[styles.addDot, { backgroundColor: c.accentSoft }]}>
+              <Plus size={15} color={c.accent} strokeWidth={2.5} />
+            </View>
+            <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 15 }}>{t('manageCats.add')}</Txt>
+          </Pressable>
+        )}
+      </FormSection>
+    </FormSheet>
   )
 }
+
+const styles = StyleSheet.create({
+  addDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

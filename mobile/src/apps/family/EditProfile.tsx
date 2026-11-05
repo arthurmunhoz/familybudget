@@ -1,33 +1,41 @@
 // Edit-my-info sheet. Only the signed-in user can open this (for their own
 // member_profiles row). Handles the avatar (pick → resize → upload to the
-// documents bucket), birthday (native date picker), blood type (chips), and the
-// remaining text fields, then upserts the row.
-import { type ReactNode, useMemo, useState } from 'react'
-import {
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native'
+// documents bucket), then the fields as grouped rows (components/form) —
+// About you / Health / Sizes / Anything else — and upserts the row.
+//
+// 2026-11 redesign: this was a tall stack of labelled boxes with eight
+// accent-filled blood-type chips and permanently visible unit pills. Now:
+// compact rows, a picker for blood type, and the unit as a small "lb ⌄" chip.
+import { useState } from 'react'
+import { Alert, Modal, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { File } from 'expo-file-system'
-import { Camera, User, X } from 'lucide-react-native'
+import { Camera, X } from 'lucide-react-native'
 
 import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
 import { formatPhone, formatDay } from '@/lib/format'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { useTheme, sp, radius, fonts } from '@/theme/theme'
-import { Btn, Field, Txt } from '@/components/ui'
-import { PickerSheet } from '@/components/PickerSheet'
+import { useSheetLift } from '@/hooks/useSheetLift'
+import { useTheme, sp, fonts } from '@/theme/theme'
+import { Btn, Txt } from '@/components/ui'
+import { KeyboardScroll } from '@/components/KeyboardScroll'
+import {
+  DateRow,
+  FormRow,
+  FormSection,
+  NoteRow,
+  NumberBox,
+  SelectRow,
+  TextRow,
+  UnitButton,
+} from '@/components/form'
 import type { MemberProfile, Profile } from '@/lib/types'
-import { BLOOD_TYPES, EDIT_FIELDS } from './familyShared'
+import { BLOOD_TYPES, initial as initialOf } from './familyShared'
 import {
   cmToFtIn,
   composeHeight,
@@ -80,94 +88,11 @@ function emptyForm(p?: MemberProfile): Form {
   }
 }
 
-// ── Measured-field editors (hoisted to module scope so their TextInputs keep
+// ── Measured-field rows (hoisted to module scope so their TextInputs keep
 // focus across parent re-renders). Each seeds from the stored "value + unit"
-// string, and pushes a freshly-composed string up on every change. ────────────
-function UnitPills<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[]
-  value: T
-  onChange: (v: T) => void
-}) {
-  const { c } = useTheme()
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: c.border,
-        borderRadius: radius.sm,
-        overflow: 'hidden',
-      }}
-    >
-      {options.map((o, i) => {
-        const on = o.value === value
-        return (
-          <Pressable
-            key={o.value}
-            onPress={() => onChange(o.value)}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              backgroundColor: on ? c.accent : 'transparent',
-              borderLeftWidth: i ? StyleSheet.hairlineWidth : 0,
-              borderLeftColor: c.border,
-            }}
-          >
-            <Txt style={{ color: on ? c.onAccent : c.textMuted, fontWeight: '600', fontSize: 13 }}>
-              {o.label}
-            </Txt>
-          </Pressable>
-        )
-      })}
-    </View>
-  )
-}
+// string, and pushes a freshly-composed string up on every change. ──────────
 
-function NumInput({
-  value,
-  onChangeText,
-  width = 72,
-}: {
-  value: string
-  onChangeText: (v: string) => void
-  width?: number
-}) {
-  const { c } = useTheme()
-  return (
-    <TextInput
-      value={value}
-      onChangeText={onChangeText}
-      keyboardType="decimal-pad"
-      style={{
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: c.border,
-        borderRadius: radius.md,
-        paddingHorizontal: sp.md,
-        paddingVertical: 12,
-        fontSize: 16,
-        color: c.text,
-        width,
-        backgroundColor: c.card,
-        fontFamily: fonts.body,
-      }}
-    />
-  )
-}
-
-function MeasureRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <View style={{ gap: 6 }}>
-      <Txt variant="label">{label}</Txt>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>{children}</View>
-    </View>
-  )
-}
-
-function HeightField({
+function HeightRow({
   label,
   initial,
   metric,
@@ -178,9 +103,8 @@ function HeightField({
   metric: boolean
   onChange: (v: string) => void
 }) {
-  const [unit, setUnit] = useState<HeightUnit>(
-    () => parseHeight(initial)?.unit ?? (metric ? 'cm' : 'ftin'),
-  )
+  const { t } = useI18n()
+  const [unit, setUnit] = useState<HeightUnit>(() => parseHeight(initial)?.unit ?? (metric ? 'cm' : 'ftin'))
   const [a, setA] = useState(() => {
     const p = parseHeight(initial)
     if (!p) return ''
@@ -201,8 +125,8 @@ function HeightField({
   }
   function toggle(u: HeightUnit) {
     if (u === unit) return
-    let na = a
-    let nb = b
+    let na: string
+    let nb: string
     if (u === 'cm') {
       na = a || b ? String(Math.round(ftInToCm(parseFloat(a) || 0, parseFloat(b) || 0))) : ''
       nb = ''
@@ -224,19 +148,17 @@ function HeightField({
   }
 
   return (
-    <MeasureRow label={label}>
+    <FormRow label={label}>
       {unit === 'cm' ? (
-        <NumInput value={a} onChangeText={changeA} width={84} />
+        <NumberBox value={a} onChangeText={changeA} width={64} />
       ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <NumInput value={a} onChangeText={changeA} width={52} />
-          <Txt variant="muted">ft</Txt>
-          <NumInput value={b} onChangeText={changeB} width={52} />
-          <Txt variant="muted">in</Txt>
-        </View>
+        <>
+          <NumberBox value={a} onChangeText={changeA} width={40} suffix="ft" />
+          <NumberBox value={b} onChangeText={changeB} width={40} suffix="in" />
+        </>
       )}
-      <View style={{ flex: 1 }} />
-      <UnitPills
+      <UnitButton
+        title={t('family.unit')}
         value={unit}
         onChange={toggle}
         options={[
@@ -244,11 +166,11 @@ function HeightField({
           { value: 'cm', label: 'cm' },
         ]}
       />
-    </MeasureRow>
+    </FormRow>
   )
 }
 
-function WeightField({
+function WeightRow({
   label,
   initial,
   metric,
@@ -259,9 +181,8 @@ function WeightField({
   metric: boolean
   onChange: (v: string) => void
 }) {
-  const [unit, setUnit] = useState<WeightUnit>(
-    () => parseWeight(initial)?.unit ?? (metric ? 'kg' : 'lb'),
-  )
+  const { t } = useI18n()
+  const [unit, setUnit] = useState<WeightUnit>(() => parseWeight(initial)?.unit ?? (metric ? 'kg' : 'lb'))
   const [v, setV] = useState(() => (parseWeight(initial) ? String(parseFloat(initial)) : ''))
 
   function changeV(next: string) {
@@ -278,10 +199,10 @@ function WeightField({
   }
 
   return (
-    <MeasureRow label={label}>
-      <NumInput value={v} onChangeText={changeV} />
-      <View style={{ flex: 1 }} />
-      <UnitPills
+    <FormRow label={label}>
+      <NumberBox value={v} onChangeText={changeV} width={64} />
+      <UnitButton
+        title={t('family.unit')}
         value={unit}
         onChange={toggle}
         options={[
@@ -289,11 +210,13 @@ function WeightField({
           { value: 'kg', label: 'kg' },
         ]}
       />
-    </MeasureRow>
+    </FormRow>
   )
 }
 
-function ShoeField({
+type ShoeKey = `${ShoeSystem}-${ShoeGender}`
+
+function ShoeRow({
   label,
   initial,
   metric,
@@ -314,47 +237,36 @@ function ShoeField({
     setV(next)
     onChange(composeShoe(system, gender, next))
   }
-  function toggleSystem(s: ShoeSystem) {
-    if (s === system) return
+  // System and fit used to be two pill groups crammed into one row; they're
+  // one choice now ("US · Men's"), picked from a list.
+  function pick(key: ShoeKey) {
+    const [s, g] = key.split('-') as [ShoeSystem, ShoeGender]
+    if (s === system && g === gender) return
     const n = parseFloat(v)
-    const conv = isFinite(n) ? shoeConvert(n, gender, system, s) : null
+    const conv = isFinite(n) && s !== system ? shoeConvert(n, g, system, s) : null
     const nv = conv != null ? String(conv) : v
     setSystem(s)
-    setV(nv)
-    onChange(composeShoe(s, gender, nv))
-  }
-  function toggleGender(g: ShoeGender) {
-    if (g === gender) return
     setGender(g)
-    onChange(composeShoe(system, g, v))
+    setV(nv)
+    onChange(composeShoe(s, g, nv))
   }
+  const men = t('family.shoeMenFull')
+  const women = t('family.shoeWomenFull')
+  const options = (['US', 'EU', 'UK'] as ShoeSystem[]).flatMap((s) => [
+    { value: `${s}-M` as ShoeKey, label: `${s} · ${men}` },
+    { value: `${s}-W` as ShoeKey, label: `${s} · ${women}` },
+  ])
 
-  // Both pill groups ride on the label's row, gender to the right of the system.
-  // Gender is an initial per language (M/W; H/M in es/pt) — five controls have
-  // to share this row, and the spelled-out words were too wide to fit on a small
-  // screen alongside US/EU/UK.
   return (
-    <MeasureRow label={label}>
-      <NumInput value={v} onChangeText={changeV} />
-      <View style={{ flex: 1 }} />
-      <UnitPills
-        value={system}
-        onChange={toggleSystem}
-        options={[
-          { value: 'US', label: 'US' },
-          { value: 'EU', label: 'EU' },
-          { value: 'UK', label: 'UK' },
-        ]}
+    <FormRow label={label}>
+      <NumberBox value={v} onChangeText={changeV} width={52} />
+      <UnitButton
+        title={t('family.unit')}
+        value={`${system}-${gender}` as ShoeKey}
+        onChange={pick}
+        options={options}
       />
-      <UnitPills
-        value={gender}
-        onChange={toggleGender}
-        options={[
-          { value: 'M', label: t('family.shoeMen') },
-          { value: 'W', label: t('family.shoeWomen') },
-        ]}
-      />
-    </MeasureRow>
+    </FormRow>
   )
 }
 
@@ -373,7 +285,7 @@ export function EditProfile({
 }) {
   const { t, lang } = useI18n()
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
+  const bottomGap = useBottomGap(sp.lg)
   // Default unit for empty fields: imperial for English, metric otherwise.
   const metric = lang !== 'en'
 
@@ -384,21 +296,10 @@ export function EditProfile({
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialPhoto)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [showDate, setShowDate] = useState(false)
 
   function set<K extends keyof Form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
   }
-
-  // birthday "YYYY-MM-DD" → local Date for the picker (defaults to ~30y ago).
-  const birthdayDate = useMemo(() => {
-    if (form.birthday) {
-      const [y, m, d] = form.birthday.split('-').map(Number)
-      if (y && m && d) return new Date(y, m - 1, d)
-    }
-    const now = new Date()
-    return new Date(now.getFullYear() - 30, now.getMonth(), now.getDate())
-  }, [form.birthday])
 
   async function pickPhoto() {
     if (uploadingPhoto) return
@@ -499,11 +400,18 @@ export function EditProfile({
     onSaved()
   }
 
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}>
-          {/* header */}
+      <View style={styles.backdrop} onLayout={onRootLayout}>
+        <View
+          style={[
+            styles.sheet,
+            { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift },
+          ]}
+        >
+          {/* header: Cancel-less — the × closes, Save is docked at the bottom */}
           <View style={styles.sheetHead}>
             <Txt variant="h2">{t('family.editTitle')}</Txt>
             <Pressable
@@ -511,235 +419,151 @@ export function EditProfile({
               hitSlop={10}
               accessibilityRole="button"
               accessibilityLabel={t('common.close')}
+              style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
             >
-              <X size={22} color={c.textMuted} />
+              <X size={16} color={c.textMuted} />
             </Pressable>
           </View>
 
-          {/* avatar with edit / remove controls */}
-          <View style={{ alignItems: 'center', paddingBottom: sp.lg }}>
-            <View style={{ width: 96, height: 96 }}>
-              <View
-                style={{
-                  width: 96,
-                  height: 96,
-                  borderRadius: 48,
-                  backgroundColor: c.surface,
-                  overflow: 'hidden',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: uploadingPhoto ? 0.5 : 1,
-                }}
-              >
-                {photoPreview ? (
-                  <Image
-                    source={{ uri: photoPreview }}
-                    style={{ width: 96, height: 96 }}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <User size={40} color={c.textFaint} />
-                )}
-              </View>
-              {/* edit — bottom-right */}
+          <KeyboardScroll
+            style={{ flexGrow: 0 }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Photo: tap it to change; one quiet text action to remove. */}
+            <View style={{ alignItems: 'center', gap: sp.sm }}>
               <Pressable
                 onPress={pickPhoto}
                 disabled={uploadingPhoto}
                 accessibilityRole="button"
-                accessibilityLabel={
-                  form.avatar_path ? t('family.changePhoto') : t('family.addPhoto')
-                }
-                style={[
-                  styles.fab,
-                  { right: -2, bottom: -2, backgroundColor: c.accent, borderColor: c.card },
-                ]}
+                accessibilityLabel={photoPreview ? t('family.changePhoto') : t('family.addPhoto')}
               >
-                <Camera size={16} color={c.onAccent} />
-              </Pressable>
-              {/* remove — top-right */}
-              {form.avatar_path ? (
-                <Pressable
-                  onPress={removePhoto}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('family.removePhoto')}
-                  style={[
-                    styles.fabSmall,
-                    { right: -2, top: -2, backgroundColor: c.expense, borderColor: c.card },
-                  ]}
+                <View
+                  style={{
+                    width: 92,
+                    height: 92,
+                    borderRadius: 46,
+                    backgroundColor: c.accentSoft,
+                    overflow: 'hidden',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: uploadingPhoto ? 0.5 : 1,
+                  }}
                 >
-                  <X size={14} color="#fff" />
+                  {photoPreview ? (
+                    <Image source={{ uri: photoPreview }} style={{ width: 92, height: 92 }} contentFit="cover" />
+                  ) : (
+                    <Txt style={{ fontFamily: fonts.display, fontSize: 36, color: c.accent }}>
+                      {initialOf(displayName || profile.display_name)}
+                    </Txt>
+                  )}
+                </View>
+                <View style={[styles.fab, { backgroundColor: c.text, borderColor: c.sheet }]}>
+                  <Camera size={14} color={c.sheet} />
+                </View>
+              </Pressable>
+              <View style={{ flexDirection: 'row', gap: sp.lg }}>
+                <Pressable onPress={pickPhoto} hitSlop={8} disabled={uploadingPhoto}>
+                  <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 14 }}>
+                    {photoPreview ? t('family.changePhoto') : t('family.addPhoto')}
+                  </Txt>
                 </Pressable>
-              ) : null}
+                {photoPreview ? (
+                  <Pressable onPress={removePhoto} hitSlop={8}>
+                    <Txt style={{ color: c.textMuted, fontFamily: fonts.semibold, fontSize: 14 }}>
+                      {t('family.removePhoto')}
+                    </Txt>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-          </View>
 
-          {/* scrollable fields */}
-          <ScrollView
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ gap: sp.md, paddingBottom: sp.sm }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* your name (allowed_users.display_name — how the family sees you) */}
-            <View style={{ gap: 6 }}>
-              <Field
+            <FormSection title={t('family.section.about')}>
+              <TextRow
                 label={t('family.myName')}
                 value={displayName}
                 onChangeText={setDisplayName}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={40}
+                placeholder={t('family.myNameHint')}
               />
-              <Txt variant="faint">{t('family.myNameHint')}</Txt>
-            </View>
-
-            {/* birthday */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('family.birthday')}</Txt>
-              <Pressable
-                onPress={() => setShowDate(true)}
-                style={{
-                  backgroundColor: c.sheet,
-                  borderRadius: radius.md,
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor: c.border,
-                  paddingHorizontal: sp.md,
-                  paddingVertical: 12,
-                }}
-              >
-                <Txt style={{ color: form.birthday ? c.text : c.textFaint }}>
-                  {form.birthday ? formatDay(form.birthday) : t('family.notSet')}
-                </Txt>
-              </Pressable>
-              {form.birthday ? (
-                <Pressable onPress={() => set('birthday', '')} hitSlop={6}>
-                  <Txt variant="faint">{t('family.removePhoto')}</Txt>
-                </Pressable>
-              ) : null}
-              {/* Its own pop-up, not wheels pushed into the form. Nested in this
-                  Modal's tree on purpose (a sibling Modal won't present on iOS);
-                  wheels rather than a calendar grid — a birthday is decades back. */}
-              <PickerSheet
-                visible={showDate}
-                mode="date"
-                iosDisplay="spinner"
-                value={birthdayDate}
+              <DateRow
+                label={t('family.birthday')}
+                value={form.birthday}
+                display={form.birthday ? formatDay(form.birthday) : ''}
+                onChange={(v) => set('birthday', v)}
                 maximumDate={new Date()}
-                onChange={(date) => {
-                  const y = date.getFullYear()
-                  const m = String(date.getMonth() + 1).padStart(2, '0')
-                  const d = String(date.getDate()).padStart(2, '0')
-                  set('birthday', `${y}-${m}-${d}`)
-                }}
-                onClose={() => setShowDate(false)}
+                wheels
               />
-            </View>
+              <TextRow
+                label={t('family.phone')}
+                value={form.phone}
+                onChangeText={(v) => set('phone', v)}
+                onBlur={() => set('phone', formatPhone(form.phone))}
+                keyboardType="phone-pad"
+              />
+            </FormSection>
 
-            {/* blood type chips */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('family.bloodType')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                <Chip
-                  label={t('family.notSet')}
-                  active={!form.blood_type}
-                  onPress={() => set('blood_type', '')}
-                />
-                {BLOOD_TYPES.map((b) => (
-                  <Chip
-                    key={b}
-                    label={b}
-                    active={form.blood_type === b}
-                    onPress={() => set('blood_type', b)}
-                  />
-                ))}
-              </View>
-            </View>
+            <FormSection title={t('family.section.health')}>
+              <SelectRow
+                label={t('family.bloodType')}
+                value={form.blood_type}
+                options={BLOOD_TYPES.map((b) => ({ value: b, label: b }))}
+                onChange={(v) => set('blood_type', v)}
+                allowNone
+              />
+              <NoteRow
+                label={t('family.allergies')}
+                value={form.allergies}
+                onChangeText={(v) => set('allergies', v)}
+              />
+            </FormSection>
 
-            {/* remaining fields — height/weight/shoe get a unit picker */}
-            {EDIT_FIELDS.map(([key, labelKey]) => {
-              if (key === 'height')
-                return (
-                  <HeightField
-                    key={key}
-                    label={t(labelKey)}
-                    initial={form.height}
-                    metric={metric}
-                    onChange={(v) => set('height', v)}
-                  />
-                )
-              if (key === 'weight')
-                return (
-                  <WeightField
-                    key={key}
-                    label={t(labelKey)}
-                    initial={form.weight}
-                    metric={metric}
-                    onChange={(v) => set('weight', v)}
-                  />
-                )
-              if (key === 'shoe_size')
-                return (
-                  <ShoeField
-                    key={key}
-                    label={t(labelKey)}
-                    initial={form.shoe_size}
-                    metric={metric}
-                    onChange={(v) => set('shoe_size', v)}
-                  />
-                )
-              return (
-                <Field
-                  key={key}
-                  label={t(labelKey)}
-                  value={form[key as keyof Form]}
-                  onChangeText={(v) => set(key as keyof Form, v)}
-                  onBlur={
-                    key === 'phone' ? () => set('phone', formatPhone(form.phone)) : undefined
-                  }
-                  keyboardType={key === 'phone' ? 'phone-pad' : 'default'}
-                  multiline={key === 'notes' || key === 'allergies'}
-                />
-              )
-            })}
-          </ScrollView>
+            <FormSection title={t('family.section.sizes')}>
+              <HeightRow label={t('family.height')} initial={form.height} metric={metric} onChange={(v) => set('height', v)} />
+              <WeightRow label={t('family.weight')} initial={form.weight} metric={metric} onChange={(v) => set('weight', v)} />
+              <ShoeRow label={t('family.shoeSize')} initial={form.shoe_size} metric={metric} onChange={(v) => set('shoe_size', v)} />
+              <TextRow
+                label={t('family.pantsSize')}
+                value={form.pants_size}
+                onChangeText={(v) => set('pants_size', v)}
+                autoCapitalize="characters"
+              />
+              <TextRow
+                label={t('family.shirtSize')}
+                value={form.shirt_size}
+                onChangeText={(v) => set('shirt_size', v)}
+                autoCapitalize="characters"
+              />
+            </FormSection>
 
-          {/* save */}
-          <View style={{ paddingTop: sp.md }}>
-            <Btn
-              title={saving ? t('common.saving') : t('common.saveChanges')}
-              onPress={save}
-              loading={saving}
-            />
+            <FormSection title={t('family.section.notes')}>
+              <NoteRow
+                label={t('family.notes')}
+                placeholder={t('family.notesPlaceholder')}
+                value={form.notes}
+                onChangeText={(v) => set('notes', v)}
+              />
+            </FormSection>
+          </KeyboardScroll>
+
+          {/* save — docked */}
+          <View
+            style={{
+              paddingHorizontal: sp.lg,
+              paddingTop: sp.sm,
+              paddingBottom: clearOfBars ? sp.md : bottomGap,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.border,
+            }}
+          >
+            <Btn title={saving ? t('common.saving') : t('common.saveChanges')} onPress={save} loading={saving} />
           </View>
         </View>
       </View>
     </Modal>
-  )
-}
-
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string
-  active: boolean
-  onPress: () => void
-}) {
-  const { c } = useTheme()
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingHorizontal: sp.md,
-        paddingVertical: sp.sm,
-        borderRadius: radius.pill,
-        backgroundColor: active ? c.accent : c.surface,
-      }}
-    >
-      <Txt style={{ color: active ? c.onAccent : c.text, fontWeight: '600', fontSize: 14 }}>
-        {label}
-      </Txt>
-    </Pressable>
   )
 }
 
@@ -750,33 +574,24 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    maxHeight: '90%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: sp.lg,
     paddingTop: sp.lg,
-    paddingBottom: sp.xl,
   },
   sheetHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: sp.lg,
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.md,
   },
   fab: {
     position: 'absolute',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabSmall: {
-    position: 'absolute',
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    right: 0,
+    bottom: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',

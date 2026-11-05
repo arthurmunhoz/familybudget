@@ -3,16 +3,24 @@
 // interval tasks carry an every-N-days cadence. Empty state seeds a suggested
 // species routine (templateTasks) — a starting point, fully editable after.
 //
+// 2026-11 redesign (components/form look): the tasks are rows on one grouped
+// card (icon, title, cadence, delete) with "Add task" as the card's last row;
+// the task editor is a sheet of rows with the icon choice as a compact grid
+// and Save docked at the bottom.
+//
 // DraggableList needs gestures INSIDE this RN Modal, so the content is wrapped
 // in its own GestureHandlerRootView (the app-root one doesn't reach a modal's
 // separate native hierarchy — see NudgeSettings.tsx, the reference for this).
 import { useMemo, useState } from 'react'
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
+import { Alert, Keyboard, Modal, ScrollView, StyleSheet, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { GripVertical, Plus, Trash2, X } from 'lucide-react-native'
 
 import { DraggableList } from '@/components/DraggableList'
-import { Btn, Field, Txt } from '@/components/ui'
+import { FormRow, FormSection, NumberBox } from '@/components/form'
+import { KeyboardScroll } from '@/components/KeyboardScroll'
+import { Pressable } from '@/components/Pressable'
+import { Btn, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { track } from '@/lib/analytics'
 import type { TKey } from '@/lib/i18n'
@@ -20,12 +28,128 @@ import { templateTasks } from '@/lib/petCare'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetTaskIcon } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { useSheetLift } from '@/hooks/useSheetLift'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { InputRow } from '@/apps/calendar/calendarUi'
 import { CARE_ICONS, CARE_ICON_IDS } from './petUi'
 
-const ROW_H = 52
-// iPhones get screen-corner-like rounding on the sheet; Android keeps the norm.
-const SHEET_RADIUS = Platform.OS === 'ios' ? 40 : radius.lg
+const ROW_H = 56
+
+/** The task editor — a sheet NESTED in the routine sheet's modal (a sibling
+ *  Modal fails to present on iOS). Hoisted so its inputs keep focus. */
+function TaskEditor({
+  isNew,
+  kind,
+  title,
+  setTitle,
+  icon,
+  setIcon,
+  intervalDays,
+  setIntervalDays,
+  busy,
+  onSave,
+  onClose,
+}: {
+  isNew: boolean
+  kind: 'daily' | 'interval'
+  title: string
+  setTitle: (v: string) => void
+  icon: PetTaskIcon
+  setIcon: (v: PetTaskIcon) => void
+  intervalDays: string
+  setIntervalDays: (v: string) => void
+  busy: boolean
+  onSave: () => void
+  onClose: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const bottomGap = useBottomGap(sp.lg)
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
+  return (
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.backdrop} onLayout={onRootLayout}>
+        {/* A tap above the sheet only puts the keyboard away (the interval
+            box is a number pad, which has no return key) — never discards. */}
+        <Pressable style={{ flex: 1 }} onPress={Keyboard.dismiss} accessible={false} />
+        <View style={[styles.sheet, { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift }]}>
+          <View style={styles.sheetHead}>
+            <Txt variant="h2">{isNew ? t('petcare.newTask') : t('petcare.editTask')}</Txt>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface }]}
+            >
+              <X size={16} color={c.textMuted} />
+            </Pressable>
+          </View>
+
+          <KeyboardScroll
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <FormSection>
+              <InputRow title value={title} onChangeText={setTitle} placeholder={t('petcare.taskTitleHint')} autoFocus />
+              {/* The section decides daily vs interval — no selector needed. */}
+              {kind === 'interval' ? (
+                <FormRow label={t('petcare.intervalDays')}>
+                  <NumberBox value={intervalDays} onChangeText={setIntervalDays} width={56} />
+                </FormRow>
+              ) : null}
+            </FormSection>
+
+            {/* icon picker — a compact grid on its own card */}
+            <FormSection>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm, padding: sp.md }}>
+                {CARE_ICON_IDS.map((id) => {
+                  const Icon = CARE_ICONS[id]
+                  const on = icon === id
+                  return (
+                    <Pressable
+                      key={id}
+                      onPress={() => setIcon(id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={id}
+                      accessibilityState={{ selected: on }}
+                      style={({ pressed }) => ({
+                        width: 40,
+                        height: 40,
+                        borderRadius: radius.md,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: on ? c.action : c.surface,
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Icon size={18} color={on ? c.onAction : c.textMuted} />
+                    </Pressable>
+                  )
+                })}
+              </View>
+            </FormSection>
+          </KeyboardScroll>
+
+          {/* save — docked */}
+          <View
+            style={{
+              paddingHorizontal: sp.lg,
+              paddingTop: sp.sm,
+              paddingBottom: clearOfBars ? sp.md : bottomGap,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.border,
+            }}
+          >
+            <Btn title={t('common.save')} onPress={onSave} loading={busy} disabled={!title.trim()} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
 
 export function RoutineSheet({
   pet,
@@ -163,6 +287,7 @@ export function RoutineSheet({
   }
 
   function row(task: PetCareTask, draggable: boolean) {
+    const Icon = CARE_ICONS[task.icon] ?? CARE_ICONS.paw
     return (
       <View
         style={{
@@ -170,21 +295,56 @@ export function RoutineSheet({
           flexDirection: 'row',
           alignItems: 'center',
           gap: sp.md,
-          paddingHorizontal: sp.sm,
+          paddingLeft: draggable ? sp.sm : sp.md,
+          paddingRight: sp.md,
+          // Every task row draws its own bottom rule: "Add task" always
+          // follows, and a dragged row carries its rule with it.
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: c.border,
         }}
       >
         {draggable ? <GripVertical size={16} color={c.textFaint} /> : null}
-        <Pressable onPress={() => openEdit(task)} style={{ flex: 1, minWidth: 0 }}>
-          <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
-            {task.title}
-          </Txt>
-          {task.kind === 'interval' ? (
-            <Txt variant="faint" style={{ fontSize: 11 }}>
-              {t('petcare.every', { days: task.interval_days ?? 0 })}
+        <Pressable
+          onPress={() => openEdit(task)}
+          accessibilityRole="button"
+          style={({ pressed }) => ({
+            flex: 1,
+            minWidth: 0,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: sp.md,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: c.accentSoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon size={16} color={c.accent} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={{ fontSize: 15, color: c.text }} numberOfLines={1}>
+              {task.title}
             </Txt>
-          ) : null}
+            {task.kind === 'interval' ? (
+              <Txt variant="faint" style={{ fontSize: 12 }}>
+                {t('petcare.every', { days: task.interval_days ?? 0 })}
+              </Txt>
+            ) : null}
+          </View>
         </Pressable>
-        <Pressable onPress={() => remove(task)} hitSlop={8} accessibilityLabel={t('petcare.deleteTask')}>
+        <Pressable
+          onPress={() => remove(task)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('petcare.deleteTask')}
+        >
           <Trash2 size={16} color={c.textFaint} />
         </Pressable>
       </View>
@@ -195,146 +355,113 @@ export function RoutineSheet({
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         {/* Tapping the dimmed backdrop dismisses; taps inside the sheet don't. */}
-        <Pressable
-          onPress={onClose}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-        >
-          <Pressable
-            onPress={() => {}}
-            style={{
-              maxHeight: '88%',
-              backgroundColor: c.sheet,
-              // iPhones get screen-corner-like rounding; Android keeps the norm.
-              borderTopLeftRadius: SHEET_RADIUS,
-              borderTopRightRadius: SHEET_RADIUS,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: sp.lg,
-                paddingTop: sp.xl,
-                paddingBottom: sp.lg,
-              }}
-            >
-              <Txt variant="h2" style={{ marginLeft: sp.sm }}>
+        <Pressable onPress={onClose} style={styles.backdrop} accessible={false}>
+          <Pressable onPress={() => {}} accessible={false} style={[styles.sheet, { backgroundColor: c.sheet, maxHeight: '88%' }]}>
+            <View style={styles.sheetHead}>
+              <Txt variant="h2" style={{ flex: 1, marginRight: sp.md }} numberOfLines={1}>
                 {t(section === 'daily' ? 'petcare.dailyRoutine' : 'petcare.routines')} · {pet.name}
               </Txt>
               <Pressable
                 onPress={onClose}
                 hitSlop={10}
+                accessibilityRole="button"
                 accessibilityLabel={t('common.close')}
-                style={{ marginRight: sp.sm, marginTop: 2 }}
+                style={[styles.close, { backgroundColor: c.surface }]}
               >
-                <X size={22} color={c.textMuted} />
+                <X size={16} color={c.textMuted} />
               </Pressable>
             </View>
 
             <ScrollView
               style={{ flexGrow: 0 }}
-              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: bottomGap, gap: sp.md }}
+              contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: bottomGap, gap: sp.lg }}
               keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
               {tasks.length === 0 ? (
                 <Btn title={t('petcare.useTemplate')} variant="secondary" onPress={seedTemplate} loading={busy} />
               ) : null}
 
-              {section === 'daily' && daily.length > 0 ? (
-                <DraggableList data={daily} rowHeight={ROW_H} onReorder={reorder} renderItem={(item) => row(item, true)} />
-              ) : null}
+              {/* One grouped card: the tasks, then "Add task" as its last row.
+                  Not FormSection: its overflow clip would cut off a row
+                  lifted mid-drag. */}
+              <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                {section === 'daily' && daily.length > 0 ? (
+                  <DraggableList data={daily} rowHeight={ROW_H} onReorder={reorder} renderItem={(item) => row(item, true)} />
+                ) : null}
 
-              {section === 'interval' && intervals.length > 0 ? (
-                <View>
-                  {intervals.map((task) => (
-                    <View key={task.id}>{row(task, false)}</View>
-                  ))}
-                </View>
-              ) : null}
+                {section === 'interval' && intervals.length > 0
+                  ? intervals.map((task) => <View key={task.id}>{row(task, false)}</View>)
+                  : null}
 
-              <Pressable
-                onPress={openNew}
-                accessibilityRole="button"
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  paddingVertical: 14,
-                  // Bottom corners follow the sheet's iPhone-screen curve
-                  // (SHEET_RADIUS is the normal radius on Android).
-                  borderTopLeftRadius: radius.md,
-                  borderTopRightRadius: radius.md,
-                  borderBottomLeftRadius: SHEET_RADIUS,
-                  borderBottomRightRadius: SHEET_RADIUS,
-                  borderWidth: 1,
-                  borderStyle: 'dashed',
-                  borderColor: c.textFaint,
-                }}
-              >
-                <Plus size={16} color={c.textMuted} />
-                <Txt style={{ fontWeight: '600', color: c.textMuted }}>{t('petcare.addTask')}</Txt>
-              </Pressable>
+                <Pressable
+                  onPress={openNew}
+                  accessibilityRole="button"
+                  style={({ pressed }) => ({
+                    minHeight: 50,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: sp.sm,
+                    paddingHorizontal: sp.md,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <Plus size={18} color={c.accent} />
+                  <Txt style={{ fontSize: 15, fontFamily: fonts.semibold, color: c.accent }}>{t('petcare.addTask')}</Txt>
+                </Pressable>
+              </View>
             </ScrollView>
           </Pressable>
         </Pressable>
 
-        {/* task editor */}
+        {/* task editor — nested in this modal's tree */}
         {editing !== null && (
-          <Modal visible animationType="fade" transparent onRequestClose={() => setEditing(null)}>
-            {/* KeyboardAvoiding keeps the dialog above the keyboard (title field autofocuses). */}
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
-              <View style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
-                <Txt variant="h2">{editing === 'new' ? t('petcare.newTask') : t('petcare.editTask')}</Txt>
-                <Field value={title} onChangeText={setTitle} placeholder={t('petcare.taskTitleHint')} autoFocus />
-
-                {/* icon picker */}
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                  {CARE_ICON_IDS.map((id) => {
-                    const Icon = CARE_ICONS[id]
-                    const on = icon === id
-                    return (
-                      <Pressable
-                        key={id}
-                        onPress={() => setIcon(id)}
-                        accessibilityLabel={id}
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: radius.md,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: on ? c.accent : c.surface,
-                        }}
-                      >
-                        <Icon size={18} color={on ? c.onAccent : c.textMuted} />
-                      </Pressable>
-                    )
-                  })}
-                </View>
-
-                {/* The section decides daily vs interval — no selector needed. */}
-                {kind === 'interval' ? (
-                  <Field
-                    label={t('petcare.intervalDays')}
-                    value={intervalDays}
-                    onChangeText={setIntervalDays}
-                    keyboardType="number-pad"
-                  />
-                ) : null}
-
-                <View style={{ flexDirection: 'row', gap: sp.md }}>
-                  <Btn title={t('common.cancel')} variant="secondary" onPress={() => setEditing(null)} style={{ flex: 1 }} />
-                  <Btn title={t('common.save')} onPress={save} loading={busy} disabled={!title.trim()} style={{ flex: 1 }} />
-                </View>
-              </View>
-            </KeyboardAvoidingView>
-          </Modal>
+          <TaskEditor
+            isNew={editing === 'new'}
+            kind={kind}
+            title={title}
+            setTitle={setTitle}
+            icon={icon}
+            setIcon={setIcon}
+            intervalDays={intervalDays}
+            setIntervalDays={setIntervalDays}
+            busy={busy}
+            onSave={save}
+            onClose={() => setEditing(null)}
+          />
         )}
       </GestureHandlerRootView>
     </Modal>
   )
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: sp.lg,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.md,
+  },
+  close: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  card: {
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+})

@@ -208,11 +208,11 @@ function PetDetails({
                 borderRadius: radius.md,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: c.accent,
+                backgroundColor: c.action,
                 opacity: savingWeight || !newWeight.trim() ? 0.5 : 1,
               }}
             >
-              <Txt style={{ color: c.onAccent, fontWeight: '700' }}>{t('common.add')}</Txt>
+              <Txt style={{ color: c.onAction, fontWeight: '700' }}>{t('common.add')}</Txt>
             </Pressable>
           </View>
           {weights.map((w) => (

@@ -49,6 +49,57 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   `NudgeSettings.tsx`. Never add one anywhere else, least of all inside a
   scroller. DraggableList picks a row up after a 350 ms hold; shorter lifted
   rows when a finger rested a moment before scrolling.
+- **Forms: `@/components/form`** (2026-11 redesign — "inset grouped list").
+  A form is `FormSection`s of compact rows, not a stack of labelled boxes:
+  `TextRow` (label left, input right-aligned), `NoteRow` (multi-line),
+  `SelectRow` (current value in the row, options in a checked `SelectSheet` —
+  use it instead of a wall of chips for any list longer than ~3), `DateRow`
+  (platform date pop-up, × clears), `NumberBox` + `UnitButton` for measures
+  ("170 lb ⌄" — the unit is a small chip that opens a list, not a visible
+  segmented pill). Accent is for what's actionable (unit chips, checkmarks,
+  the primary button), not for every selected chip. `EditProfile` is the
+  reference. Sheets nest inside the row's tree (sibling Modals fail on iOS).
+- **Home + "Comando" look (2026-11).** The Hub is `TodaySection` (date ·
+  weather · household line, "Hi, Ana. 3 things for today.", the ask bar,
+  today's agenda as gradient cards — it also owns the Today WIDGET sync, so it
+  must stay mounted) + banners + a 4-column grid of gradient app icons + a
+  floating family dock. Colours: `components/home/palette.ts` — `APP_GRADIENT`
+  per app id, `CARD_GRADIENT`, and `budgetLook(id)` (a budget keeps ONE
+  gradient on every Money screen). Draw gradients with `GradientBox`
+  (react-native-svg — no expo-linear-gradient in the binary). Gradients are
+  identity and stay fixed in both themes; everything around them uses theme
+  tokens. Light is the default appearance (theme-pref). The page background is
+  now FLAT (the scheme's base colour) — the blob wash was removed 2026-11 at
+  the owner's request; don't bring the pattern back. Restyling another app:
+  RETHINK its screens, don't reskin them — every number shown once (no tile
+  repeating a label), headline numbers in a gradient hero in that app's
+  colours. Money keeps GREEN = received/in and RED = spent/out everywhere
+  (`apps/budget/StatChip` = solid chips on the gradient so those stay legible),
+  so budget gradients and category colours avoid green/red/orange. Money now:
+  budget cards → budget screen (`TrendCard` received-vs-spent per period +
+  plain period rows) → period (hero, "Where it went" stacked bar + top 5
+  categories, Entries with a segmented sort, bottom: Scan receipt + New entry
+  in the budget gradient).
+- **The ask bar (`components/home/AskSheet` + `lib/assistant`).** The server
+  only UNDERSTANDS (`/api/suggest-ping?action=assistant` → `{intent, items,
+  store, scope, person, date, reply}`, Claude Haiku, structured output); the
+  app DOES it with the user's own session (RLS stays the boundary). Intents:
+  `add_items` (resolves/creates the store, skips items already open, Undo
+  deletes what it added and a store it created) and `agenda` (me = own +
+  household-wide events, all, or a named member; pet care due shows on today).
+  `localParse` covers the two common phrasings offline / before a deploy — keep
+  `__tests__/assistant.test.ts` green when touching it. New intent = schema +
+  `understand` branch + an executor here + an answer view in AskSheet.
+- **`@/components/PhotoHero`** — the full-bleed, swipeable photo header used
+  by Pet Care and Family (one page per pet / member; name + badge on the photo,
+  side arrows with a tiny avatar of the neighbour, page dots, shrinks with a
+  `collapse` 0→1 from the host's scroll). The host's `SafeAreaView` must drop
+  the TOP edge — the photo runs under the status bar and the hero pads its own
+  controls (and turns the status bar light while focused). An arrow tap glides
+  the pager and selects only when the glide ARRIVES (onScroll + a timer):
+  selecting first and letting the sync effect snap the page is what made it
+  read as a jump, and `onMomentumScrollEnd` doesn't fire for programmatic
+  scrolls on Android. Reuse it for any "one big picture per item" roster.
 - **Theme** `@/theme/theme`: `useTheme()` → `{ dark, c }`; tokens `c` =
   bg/card/cardActive/surface/surface2/text/textMuted/textFaint/accent/accentSoft/
   income/expense/border (Warm Hearth, light+dark, follows system). Also `sp`,
@@ -84,6 +135,14 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     painting primary buttons and negative amounts nearly alike. A neutral wash
     buys headroom here (that's how `field`/`slateGreen`/`slateRed` work: they sit
     far enough apart in LIGHTNESS, ~1.6–2.1 ratio, not just hue).
+  - **Filled controls use `c.action` + `c.onAction`, not `accent`
+    (2026-11).** `action` is the accent deepened until WHITE text clears
+    4.5:1 (`actionFill` in `theme/contrast.ts`, derived per scheme and mode);
+    `onAction` is always white. Bright accents with `onAccent` gave the
+    primary button dark-ink-on-orange, which the user rejected. Use `accent`
+    for text, icons, tints and borders; `action` for primary buttons,
+    selected chips and badges. `onAccent` remains only for any remaining
+    true accent fill.
   - **`c.onAccent` — text/icons on an accent-filled surface. NEVER hardcode
     `'#fff'` there.** `pickOnAccent()` (`theme/contrast.ts`, its own module to
     avoid a real import cycle with `theme.ts`) returns white or the ink
@@ -403,6 +462,38 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   flip mounts a fresh native view; `Btn` already uses it.
   `__tests__/pressable.test.tsx` fails if a file with a disabled Pressable
   imports react-native's.
+- **Utilities (`/calc`, hub tile renamed from Calculator — slug, route and
+  `app.calc.*` keys unchanged)** is a grid of tools, each its OWN route under
+  `app/calc/` (native back gesture, real stack entry). Implementation in
+  `apps/calc/`:
+  - **Wizards** (`wizard.tsx` `WizardScreen`/`StepTitle`, controls in
+    `steps.tsx`): one question per screen, progress bar, ONE primary button
+    docked under a KeyboardAvoidingView so it rides on top of the decimal pad
+    (no return key, no Done bar — that button IS the way forward). Header back
+    and Android back walk the steps; the iOS swipe-back is off past step 1
+    (`swipeBack` re-enables it on result screens) so a stray edge swipe can't
+    drop a metered bill scan. The summary is also the editor: a row jumps to
+    its step, and "Update summary" returns straight there.
+  - **Money maths** is pure, in `splitMath.ts`, in whole cents with
+    largest-remainder apportioning so shares always add up to the bill
+    (`__tests__/splitMath.test.ts`). `shared.num()` reads a lone comma as a
+    decimal comma — the iOS decimal pad types the device locale's separator.
+  - **By-item split** keeps the owner rule: bill lines/tax come ONLY from the
+    scan (`billScan.ts` → `/api/scan-bill`), read-only; people can drop a
+    misread line or re-scan. The processing screen's stages are paced on a
+    timer (the API is one request). Plus-gated in the hub AND on the route.
+  - **Printable cards** (`printables/`): a template is data (inches, copies per
+    sheet, fields, a card component with FIXED print colours) and
+    `PrintableEditor` makes any template a full tool — live preview, colour,
+    "fill in for" a member, per-device draft (AsyncStorage), Print, Save
+    image. ONE artwork: the preview view is snapshotted with
+    react-native-view-shot at 300 dpi; Print wraps that PNG in inch-sized HTML
+    for expo-print, Save hands it to expo-sharing (iOS "Save Image" — needs
+    `NSPhotoLibraryAddUsageDescription`, or iOS asks for FULL library access).
+    All three modules are lazy-`require`d (`printing.ts`) — older binaries get
+    a "please update" alert instead of a crash. No expo-media-library on
+    purpose: its Android READ_MEDIA_* permissions draw Play policy review.
+    New card = template + card component + route + hub tile.
 - **Date/time pickers open in their own sheet, never inline in a form.**
   `@/components/PickerSheet` (iOS bottom sheet + Done; Android's native dialog)
   for times and one-off dates; Money's `DatePickerModal` and Pet Care's

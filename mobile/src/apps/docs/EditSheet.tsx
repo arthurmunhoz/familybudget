@@ -1,17 +1,23 @@
 // Edit sheet — rename a document and change its category / owner. The file
 // bytes are immutable (content-addressed path); this only updates the row.
+//
+// 2026-11 redesign (components/form): title, category and owner are rows of
+// one section — category and owner open checked lists instead of chip walls.
 import { useState } from 'react'
-import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native'
+import { Alert, Modal, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { X, type LucideIcon } from 'lucide-react-native'
+import { X } from 'lucide-react-native'
 
-import { Btn, Field, Txt } from '@/components/ui'
+import { Btn, Txt } from '@/components/ui'
+import { KeyboardScroll } from '@/components/KeyboardScroll'
+import { FormSection, SelectRow, TextRow } from '@/components/form'
 import { useI18n } from '@/hooks/useI18n'
+import { useSheetLift } from '@/hooks/useSheetLift'
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
 import type { FamilyDocument, DocCategory, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 import { CATEGORIES } from './docUtils'
 
 export default function EditSheet({
@@ -30,7 +36,7 @@ export default function EditSheet({
   onDelete: () => void
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
+  const bottomGap = useBottomGap(sp.lg)
   const { t } = useI18n()
 
   const [title, setTitle] = useState(doc.title)
@@ -39,9 +45,10 @@ export default function EditSheet({
   const [saving, setSaving] = useState(false)
 
   const ownerOptions = [
-    ...profiles.map((p) => ({ key: p.email, label: p.display_name })),
-    { key: 'shared', label: `🏠 ${t('docs.shared')}` },
+    ...profiles.map((p) => ({ value: p.email, label: p.display_name })),
+    { value: 'shared', label: `🏠 ${t('docs.shared')}` },
   ]
+  const categoryOptions = CATEGORIES.map((cat) => ({ value: cat.id, label: t(`docCat.${cat.id}` as TKey) }))
 
   async function save() {
     if (!title.trim() || saving) return
@@ -58,82 +65,56 @@ export default function EditSheet({
     onSaved()
   }
 
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-        <View
-          style={{
-            maxHeight: '90%',
-            backgroundColor: c.sheet,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.lg,
-              // Room under the heading so the document's name isn't crowded
-              // against it — that name is the thing being edited.
-              paddingBottom: sp.lg,
-            }}
-          >
-            <Txt variant="h2">{t('docs.editDoc')}</Txt>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')} disabled={saving}>
-              <X size={22} color={c.textMuted} />
+      <View style={styles.backdrop} onLayout={onRootLayout}>
+        <View style={[styles.sheet, { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift }]}>
+          <View style={styles.sheetHead}>
+            <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 22, color: c.text }}>{t('docs.editDoc')}</Txt>
+            <Pressable
+              onPress={onClose}
+              disabled={saving}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface, opacity: saving ? 0.5 : 1 }]}
+            >
+              <X size={16} color={c.textMuted} />
             </Pressable>
           </View>
 
-          <ScrollView
+          <KeyboardScroll
             style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Field
-              value={title}
-              onChangeText={setTitle}
-              placeholder={t('docs.titlePlaceholder')}
-              // The document's name is the subject of this sheet — give it more
-              // weight than the chips below it.
-              style={{ fontSize: 18 }}
-            />
-
-            <ChipRow>
-              {CATEGORIES.map((cat) => (
-                <Chip
-                  key={cat.id}
-                  active={category === cat.id}
-                  onPress={() => setCategory(cat.id)}
-                  Icon={cat.Icon}
-                >
-                  {t(`docCat.${cat.id}` as TKey)}
-                </Chip>
-              ))}
-            </ChipRow>
-
-            <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              {t('docs.belongsTo')}
-            </Txt>
-            <ChipRow>
-              {ownerOptions.map((o) => (
-                <Chip key={o.key} active={owner === o.key} onPress={() => setOwner(o.key)}>
-                  {o.label}
-                </Chip>
-              ))}
-            </ChipRow>
+            <FormSection>
+              <TextRow label={t('docs.titlePlaceholder')} value={title} onChangeText={setTitle} />
+              <SelectRow
+                label={t('entry.category')}
+                value={category}
+                options={categoryOptions}
+                onChange={(v) => {
+                  if (v) setCategory(v)
+                }}
+              />
+              <SelectRow
+                label={t('docs.belongsTo')}
+                value={owner}
+                options={ownerOptions}
+                onChange={(v) => {
+                  if (v) setOwner(v)
+                }}
+              />
+            </FormSection>
 
             {/* Destructive action at the END of the content, not beside Save —
                 it stays reachable without competing with the primary button,
-                and Save remains the sole footer control so its curve can meet
-                the screen's corner. Red label matches Delete account /
-                Disconnect elsewhere in the app. */}
+                and Save remains the sole docked control. A quiet red label,
+                matching Delete account / Disconnect elsewhere in the app. */}
             <Pressable
               onPress={onDelete}
               disabled={saving}
@@ -143,59 +124,40 @@ export default function EditSheet({
                 pressed && { opacity: 0.6 },
               ]}
             >
-              <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('common.delete')}</Txt>
+              <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 14 }}>{t('common.delete')}</Txt>
             </Pressable>
-          </ScrollView>
+          </KeyboardScroll>
 
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap }}>
+          <View
+            style={[
+              styles.footer,
+              { paddingBottom: clearOfBars ? sp.md : bottomGap, borderTopColor: c.border },
+            ]}
+          >
             <Btn
               title={saving ? t('common.saving') : t('common.saveChanges')}
               onPress={save}
               disabled={!title.trim()}
               loading={saving}
-              curveBottom
             />
           </View>
         </View>
       </View>
-      </KeyboardAvoidingView>
     </Modal>
   )
 }
 
-function ChipRow({ children }: { children: React.ReactNode }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>{children}</View>
-}
-
-function Chip({
-  active,
-  onPress,
-  Icon,
-  children,
-}: {
-  active: boolean
-  onPress: () => void
-  /** Drawn before the label, in the label's colour. */
-  Icon?: LucideIcon
-  children: React.ReactNode
-}) {
-  const { c } = useTheme()
-  const color = active ? c.onAccent : c.textMuted
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: radius.pill,
-        backgroundColor: active ? c.accent : c.surface,
-      }}
-    >
-      {Icon ? <Icon size={15} color={color} /> : null}
-      <Txt style={{ color, fontWeight: '600', fontSize: 14 }}>{children}</Txt>
-    </Pressable>
-  )
-}
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: sp.lg },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: sp.md,
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.md,
+  },
+  close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm, borderTopWidth: StyleSheet.hairlineWidth },
+})

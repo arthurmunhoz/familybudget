@@ -3,13 +3,13 @@
 // and the entry list (grouped by day when sorting by date). The bottom bar adds
 // an entry or scans a receipt photo. RN port of budget/MonthDetail.tsx.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, ScrollView, View } from 'react-native'
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
-import { Camera, Check, ChevronDown } from 'lucide-react-native'
+import { Check, ChevronDown, Sparkles } from 'lucide-react-native'
 
 import { AppHeader, Loader, Txt } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -31,6 +31,9 @@ import type {
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import SummaryChart from './SummaryChart'
+import { budgetLook } from '@/components/home/palette'
+import { GradientBox } from '@/components/home/GradientBox'
+import { CameraArt } from './CameraArt'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
@@ -48,7 +51,7 @@ export default function MonthDetail({
   /** True when arriving from the home card's scan button (?scan=1). */
   autoScan?: boolean
 }) {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
   const insets = useSafeAreaInsets()
   const { profile, profiles } = useAuth()
@@ -262,6 +265,7 @@ export default function MonthDetail({
   }
 
   if (loading || !month) return <Loader />
+  const look = budgetLook(month.budget_id).colors
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
@@ -336,16 +340,24 @@ export default function MonthDetail({
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
       >
-        <SummaryChart entries={filtered} customCats={customCats} overrides={overrides} />
+        <SummaryChart
+          entries={filtered}
+          customCats={customCats}
+          overrides={overrides}
+          look={look}
+        />
 
-        {/* sort controls */}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: sp.sm }}>
-          <SortBtn
-            active={sortBy === 'date'}
-            label={`${t('detail.byDate')} ${dateAsc ? '↑' : '↓'}`}
-            onPress={() => (sortBy === 'date' ? setDateAsc((d) => !d) : setSortBy('date'))}
-          />
-          <SortBtn active={sortBy === 'amount'} label={t('detail.byAmount')} onPress={() => setSortBy('amount')} />
+        {/* entries: a heading with the sort as a small segmented control */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: sp.sm }}>
+          <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 20 }}>{t('detail.entries')}</Txt>
+          <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: 12, padding: 3 }}>
+            <SortBtn
+              active={sortBy === 'date'}
+              label={`${t('detail.byDate')} ${dateAsc ? '↑' : '↓'}`}
+              onPress={() => (sortBy === 'date' ? setDateAsc((d) => !d) : setSortBy('date'))}
+            />
+            <SortBtn active={sortBy === 'amount'} label={t('detail.byAmount')} onPress={() => setSortBy('amount')} />
+          </View>
         </View>
 
         {/* future toggle */}
@@ -416,70 +428,65 @@ export default function MonthDetail({
         )}
       </ScrollView>
 
-      {/* Bottom action bar — scan + add. In NORMAL FLOW (not an absolute overlay)
-          so the list ends at it instead of scrolling underneath, and the two
-          buttons' OUTER bottom corners follow the iPhone's screen curve. Inner
-          corners stay square-ish (radius.md): they're mid-screen, not at a
-          screen corner. Bottom padding is HALF the home-indicator inset (floored
-          for home-button devices), so the buttons sit down near the screen edge
-          where their curved corners line up with the screen's — the full inset
-          floated them ~34pt too high. Matches NewItemButton. */}
+      {/* Bottom actions (2026-11 Money rethink): the AI receipt scan as a
+          secondary pill, and New entry filled in the budget's own gradient —
+          the one loud thing on the screen. In NORMAL FLOW (not an overlay) so
+          the list ends at it instead of scrolling underneath. Bottom padding
+          is half the home-indicator inset (floored), matching NewItemButton. */}
       <View
         style={{
           flexDirection: 'row',
-          gap: sp.md,
+          gap: 10,
           paddingHorizontal: sp.lg,
           paddingTop: sp.sm,
           paddingBottom: Math.max(Math.round(insets.bottom / 2), sp.xs),
         }}
       >
-        {/* Both are OUTLINE actions in the dashed idiom every other app's
-            "add new" button uses (NewItemButton — Documents, Calendar, periods,
-            budgets). Adding an entry is the same kind of act, so it gets the
-            same treatment instead of a filled bar of its own. The camera keeps
-            pace: paired with an outline button, a tinted fill would have made
-            the secondary action the loudest thing on the screen. */}
+        {/* Scan receipt: a realistic greyscale camera fills the button,
+            very transparent, with the label over it — the eye-catcher for the
+            AI scan (owner idea). */}
         <Pressable
           onPress={startScan}
           disabled={scanning}
           accessibilityLabel={t('detail.scanAria')}
           style={({ pressed }) => ({
-            width: 56,
-            borderTopLeftRadius: radius.md,
-            borderTopRightRadius: radius.md,
+            flex: 0.9,
+            height: 56,
+            borderRadius: 18,
             borderBottomLeftRadius: sheetRadius,
-            borderBottomRightRadius: radius.md,
-            borderWidth: 1,
-            borderStyle: 'dashed',
-            borderColor: c.textFaint,
+            backgroundColor: c.card,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: c.border,
+            overflow: 'hidden',
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: scanning ? 0.5 : pressed ? 0.6 : 1,
+            gap: 6,
+            opacity: scanning ? 0.5 : pressed ? 0.7 : 1,
           })}
         >
-          {scanning ? <ActivityIndicator color={c.accent} /> : <Camera size={24} color={c.accent} />}
+          <CameraArt opacity={dark ? 0.55 : 0.24} />
+          {scanning ? <ActivityIndicator color={c.text} /> : null}
+          <Txt style={{ fontFamily: fonts.display, fontSize: 15.5, color: c.text }}>{t('detail.scanReceipt')}</Txt>
+          {/* The AI mark sits on the button's corner, so the label stays centred. */}
+          <Sparkles size={15} color={c.accent} style={{ position: 'absolute', top: 8, right: 10 }} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          onPress={() => { setEditing(null); setPrefill(undefined); setFormOpen(true) }}
-          style={({ pressed }) => ({
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingVertical: 16,
-            borderWidth: 1,
-            borderStyle: 'dashed',
-            borderColor: c.textFaint,
-            borderTopLeftRadius: radius.md,
-            borderTopRightRadius: radius.md,
-            borderBottomLeftRadius: radius.md,
-            borderBottomRightRadius: sheetRadius,
-            opacity: pressed ? 0.6 : 1,
-          })}
+          onPress={() => {
+            setEditing(null)
+            setPrefill(undefined)
+            setFormOpen(true)
+          }}
+          style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.85 : 1 })}
         >
-          <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>
-            {t('detail.newEntry')}
-          </Txt>
+          <GradientBox
+            colors={look}
+            radius={18}
+            style={{ height: 56, borderBottomRightRadius: sheetRadius, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 16 }}>{t('detail.newEntry')}</Txt>
+          </GradientBox>
         </Pressable>
       </View>
 
@@ -519,13 +526,13 @@ function SortBtn({ active, label, onPress }: { active: boolean; label: string; o
     <Pressable
       onPress={onPress}
       style={{
-        borderRadius: radius.sm,
+        borderRadius: 9,
         paddingHorizontal: 12,
         paddingVertical: 6,
-        backgroundColor: active ? c.surface2 : c.surface,
+        backgroundColor: active ? c.action : 'transparent',
       }}
     >
-      <Txt style={{ fontSize: 12, fontWeight: '700', color: active ? c.text : c.textFaint }}>{label}</Txt>
+      <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, color: active ? c.onAction : c.textMuted }}>{label}</Txt>
     </Pressable>
   )
 }
@@ -567,33 +574,45 @@ function EntryRow({
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
-        gap: sp.sm,
         backgroundColor: pressed ? c.cardActive : c.card,
-        borderRadius: radius.md,
-        borderWidth: 1,
+        borderRadius: 18,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: c.border,
         paddingHorizontal: sp.md,
-        paddingVertical: 12,
+        paddingVertical: 10,
+        gap: sp.md,
       })}
     >
-      <Txt style={{ fontSize: 20 }}>{isIncome ? '💵' : cat.icon}</Txt>
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 13,
+          backgroundColor: isIncome ? c.income + '1F' : c.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Txt style={{ fontSize: 19 }}>{isIncome ? '💵' : cat.icon}</Txt>
+      </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt style={{ fontWeight: '500', fontSize: 14 }} numberOfLines={1}>
+        <Txt style={{ fontFamily: fonts.medium, fontSize: 15 }} numberOfLines={1}>
           {e.label}
           {e.recurring ? <Txt style={{ color: c.textFaint }}> ↻</Txt> : null}
         </Txt>
         {secondary ? (
-          <Txt style={{ fontSize: 11, color: c.textFaint }} numberOfLines={1}>
+          <Txt style={{ fontSize: 12.5, color: c.textFaint }} numberOfLines={1}>
             {secondary}
           </Txt>
         ) : null}
       </View>
+      {/* Green in, red out — the same two colours as every Money total. */}
       <Txt
         style={{
-          fontWeight: '700',
-          fontSize: 14,
+          fontFamily: fonts.semibold,
+          fontSize: 15,
           fontVariant: ['tabular-nums'],
-          color: isIncome ? c.income : c.textMuted,
+          color: isIncome ? c.income : c.expense,
         }}
       >
         {isIncome ? '+' : '−'}

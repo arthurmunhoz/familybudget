@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Alert,
   Animated,
   Easing,
@@ -18,6 +19,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native'
 import { Toggle } from '@/components/Toggle'
+import { Pressable as SafePressable } from '@/components/Pressable'
 import { router, useLocalSearchParams } from 'expo-router'
 import {
   Award,
@@ -30,6 +32,8 @@ import {
   Lock,
   MapPin,
   ReceiptText,
+  RefreshCw,
+  Share2,
   Sparkles,
   Users,
   Wallet,
@@ -60,7 +64,6 @@ import { dark, fonts, light, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
 import { useSchemePref } from '@/theme/scheme-pref'
 import { GLASS, SCHEMES, SCHEME_IDS, type SchemeId } from '@/theme/glass'
-import { useTilePref, type TileStyle } from '@/hooks/useTilePref'
 
 const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Sparkles, key: 'settings.plusFeatureScans' },
@@ -324,14 +327,63 @@ function HouseholdSection({ highlight = false }: { highlight?: boolean }) {
             <Txt style={{ fontFamily: fonts.semibold }}>{t('household.inviteCode')}</Txt>
             <Txt variant="faint">{t('household.inviteHint')}</Txt>
           </View>
-          <View style={{ alignItems: 'center', paddingVertical: sp.md, backgroundColor: c.surface, borderRadius: radius.md }}>
-            <Txt style={{ fontSize: 26, letterSpacing: 4, fontFamily: fonts.semibold, color: c.text }}>
-              {code ?? '········'}
-            </Txt>
-          </View>
-          <View style={{ flexDirection: 'row', gap: sp.sm }}>
-            <Btn title={t('household.share')} onPress={shareCode} disabled={!code} style={{ flex: 1 }} />
-            <Btn title={t('household.rotate')} onPress={rotate} variant="secondary" loading={rotating} style={{ flex: 1 }} />
+          {/* Code and its two actions on one row (2026-11): the old layout
+              stacked a full-width code box over two full-width buttons and
+              read as empty. Share is the action; reset is a quiet icon. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+            <View
+              style={{
+                flex: 1,
+                height: 48,
+                justifyContent: 'center',
+                paddingHorizontal: sp.md,
+                backgroundColor: c.surface,
+                borderRadius: radius.md,
+              }}
+            >
+              <Txt
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={{ fontSize: 20, letterSpacing: 3, fontFamily: fonts.semibold, color: c.text }}
+              >
+                {code ?? '········'}
+              </Txt>
+            </View>
+            <SafePressable
+              onPress={shareCode}
+              disabled={!code}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                height: 48,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: sp.md,
+                borderRadius: radius.md,
+                backgroundColor: c.action,
+                opacity: !code ? 0.5 : pressed ? 0.85 : 1,
+              })}
+            >
+              <Share2 size={16} color={c.onAction} />
+              <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 15 }}>{t('household.share')}</Txt>
+            </SafePressable>
+            <SafePressable
+              onPress={rotate}
+              disabled={rotating}
+              accessibilityRole="button"
+              accessibilityLabel={t('household.rotate')}
+              style={({ pressed }) => ({
+                width: 48,
+                height: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: radius.md,
+                backgroundColor: c.surface,
+                opacity: rotating ? 0.5 : pressed ? 0.7 : 1,
+              })}
+            >
+              {rotating ? <ActivityIndicator size="small" color={c.textMuted} /> : <RefreshCw size={18} color={c.textMuted} />}
+            </SafePressable>
           </View>
         </Card>
       ) : (
@@ -425,39 +477,6 @@ function SchemePreview({ id, dark }: { id: SchemeId; dark: boolean }) {
   )
 }
 
-// Mini preview of the home tile density (uses the active theme).
-function TilePreview({ compact }: { compact: boolean }) {
-  const { c } = useTheme()
-  const cols = compact ? 3 : 2
-  const tiles = cols * 2
-  const tileW = compact ? 18 : 30
-  const tileH = compact ? 18 : 24
-  return (
-    <View style={{ height: 74, borderRadius: 10, backgroundColor: c.bg, padding: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, width: cols * tileW + (cols - 1) * 5, justifyContent: 'center' }}>
-        {Array.from({ length: tiles }).map((_, i) => (
-          <View
-            key={i}
-            style={{
-              width: tileW,
-              height: tileH,
-              borderRadius: 6,
-              backgroundColor: c.card,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: c.border,
-              padding: 3,
-              justifyContent: 'space-between',
-            }}
-          >
-            <View style={{ width: 6, height: 6, borderRadius: 2, backgroundColor: c.accent }} />
-            {!compact ? <View style={{ width: 14, height: 2.5, borderRadius: 2, backgroundColor: c.textMuted }} /> : null}
-          </View>
-        ))}
-      </View>
-    </View>
-  )
-}
-
 // A selectable option: a preview thumbnail + label, with a selected ring + check.
 function OptionCard({
   selected,
@@ -503,7 +522,6 @@ export default function Settings() {
   const { c, dark: isDark } = useTheme()
   const { mode, setMode } = useThemePref()
   const { scheme, setScheme } = useSchemePref()
-  const { tile, setTile } = useTilePref()
   const { hiddenApps, appOrder, toggleApp, setAppOrder } = useAppPrefs()
   // Every app (hidden ones dimmed), in the user's hub order — same ranking the
   // Hub applies, so what you see here is what the home screen does.
@@ -875,22 +893,6 @@ export default function Settings() {
             </View>
           </>
         ) : null}
-
-        <Divider />
-
-        {/* App cards (home screen tile density) */}
-        <View style={{ gap: sp.sm }}>
-          <Txt variant="label">{t('settings.appCards')}</Txt>
-          <View style={{ flexDirection: 'row', gap: sp.sm }}>
-            <OptionCard selected={tile === 'large'} onPress={() => setTile('large')} label={t('settings.large')}>
-              <TilePreview compact={false} />
-            </OptionCard>
-            <OptionCard selected={tile === 'compact'} onPress={() => setTile('compact')} label={t('settings.compact')}>
-              <TilePreview compact />
-            </OptionCard>
-          </View>
-          <Txt variant="faint">{t('settings.compactHint')}</Txt>
-        </View>
 
         <Divider />
 

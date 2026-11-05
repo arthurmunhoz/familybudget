@@ -1,33 +1,50 @@
-// The launcher — a grid of the family apps, mirroring the PWA hub (including
-// the live "open shopping items" badge on the Shopping tile).
-import { useCallback, useEffect, useMemo } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+// The Home (2026-11 "Comando" redesign). Top to bottom:
+//  - TodaySection: date · weather · household, "Hi, Ana. 3 things for today.",
+//    the ask-anything bar (→ AskSheet), and today's agenda as cards.
+//  - The time-sensitive banners (birthday month, incoming nudges, a running
+//    safety watch, the invite nudge for a household of one).
+//  - The apps as a 4-column grid of colour icons, like a phone's home screen,
+//    with the live "open shopping items" badge.
+//  - A floating dock with the household's members (→ Family) and Settings.
+// Light is the default appearance; every surface here reads from the theme,
+// only the app icons and agenda cards carry their own fixed colours.
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Settings } from 'lucide-react-native'
 
-import { Card, Txt } from './ui'
+import { Txt } from './ui'
 import SafetyBanner from '../apps/location/SafetyBanner'
 import NudgesBanner from '../apps/pings/NudgesBanner'
-import TodaySection from './TodaySection'
+import TodaySection, { SectionLabel } from './TodaySection'
+import HomeBirthdays from './HomeBirthdays'
 import InviteBanner from './InviteBanner'
+import { AskSheet } from './home/AskSheet'
+import { APP_GRADIENT } from './home/palette'
+import { GradientBox } from './home/GradientBox'
 import { useAppPrefs } from '../hooks/useAppPrefs'
+import { useBottomGap } from '../hooks/useBottomGap'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { WHEREABOUTS_ENABLED } from '../lib/features'
 import { useAuth } from '../lib/auth'
+import { memberColor } from '../lib/calendar'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
-import { useTilePref } from '../hooks/useTilePref'
 import type { TKey } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
-import { radius, sp, useTheme } from '../theme/theme'
+import { fonts, sp, useTheme } from '../theme/theme'
+
+const DOCK_H = 72
 
 export default function Hub() {
   const { c } = useTheme()
-  const { profile } = useAuth()
+  const { profile, profiles } = useAuth()
   const { t } = useI18n()
-  const { tile } = useTilePref()
-  const compact = tile === 'compact'
+  const [asking, setAsking] = useState(false)
+  const [askKey, setAskKey] = useState(0)
+  const [askListen, setAskListen] = useState(false)
+  const dockGap = useBottomGap(sp.md)
 
   const { hiddenApps, appOrder } = useAppPrefs()
   // Hidden apps drop out; ordered ids come first (registry order for the rest);
@@ -39,9 +56,10 @@ export default function Hub() {
     return profile?.is_admin ? [...visible, ADMIN_APP] : visible
   }, [profile?.is_admin, hiddenApps, appOrder])
 
-  // Open (unchecked) shopping items → count pill on the Shopping tile. Cached
+  // Open (unchecked) shopping items → count pill on the Shopping icon. Cached
   // (renders the last value instantly) + live via the same Realtime table the
-  // list uses, so it updates while the other phone is shopping.
+  // list uses, so it updates while the other phone is shopping — and when the
+  // ask bar adds items.
   const { data: shoppingCount = 0, revalidate: reloadShopping } = useCachedQuery<number>(
     'hub:shoppingCount',
     async () => {
@@ -64,8 +82,8 @@ export default function Hub() {
     }
   }, [reloadShopping])
 
-  // Household name for the header (mirrors the PWA hub). Cached so it renders the
-  // last value instantly on return and doesn't flash the "One Roof" fallback.
+  // Household name for the header line. Cached so it renders the last value
+  // instantly on return.
   const { data: householdName, revalidate: reloadName } = useCachedQuery<string | null>(
     'hub:householdName',
     async () => {
@@ -79,10 +97,8 @@ export default function Hub() {
     },
   )
 
-  // The Hub never unmounts — every app is PUSHED on top of it — so these two
-  // only ever fetched once per app launch. The badge has Realtime to lean on,
-  // but the household name went stale after a rename in Settings until the next
-  // cold start. Refetch on focus, like TodaySection does just below.
+  // The Hub never unmounts — every app is PUSHED on top of it — so refetch on
+  // focus (a rename in Settings, items added on another screen).
   useFocusEffect(
     useCallback(() => {
       void reloadName()
@@ -91,108 +107,158 @@ export default function Hub() {
   )
 
   const badges: Record<string, number> = { shopping: shoppingCount }
+  const firstName = (profile?.display_name ?? '').split(' ')[0] || 'One Roof'
+  const memberEmails = useMemo(() => profiles.map((p) => p.email), [profiles])
+  // Me first, then everyone else in the household.
+  const members = useMemo(
+    () => [...profiles].sort((a, b) => Number(b.email === profile?.email) - Number(a.email === profile?.email)),
+    [profiles, profile?.email],
+  )
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      {/* Fixed header — stays put while the app grid scrolls. */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          paddingHorizontal: sp.lg,
-          paddingTop: sp.lg,
-          paddingBottom: sp.md,
-        }}
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: DOCK_H + dockGap + sp.xl }}
+        keyboardShouldPersistTaps="handled"
       >
-        <View>
-          <Txt variant="display">{householdName ?? 'One Roof'}</Txt>
-          {profile?.display_name ? (
-            <Txt variant="muted">{t('home.greeting', { name: profile.display_name })}</Txt>
-          ) : null}
-        </View>
-        <Pressable accessibilityLabel="Settings" hitSlop={10} onPress={() => router.push('/settings')} style={{ padding: 6 }}>
-          <Settings size={22} color={c.textMuted} />
-        </Pressable>
-      </View>
+        <TodaySection
+          name={firstName}
+          household={householdName ?? null}
+          onAsk={(listen) => {
+            setAskKey((k) => k + 1)
+            setAskListen(!!listen)
+            setAsking(true)
+          }}
+          right={
+            <Pressable
+              accessibilityLabel="Settings"
+              hitSlop={10}
+              onPress={() => router.push('/settings')}
+              style={[styles.round, { backgroundColor: c.card, borderColor: c.border }]}
+            >
+              <Settings size={20} color={c.textMuted} />
+            </Pressable>
+          }
+        />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xxl }}>
-        {/* Today: weather + agenda (calendar + pet care due). */}
-        <TodaySection />
-        {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
-        <NudgesBanner />
-        {/* An active safety radius — tap to manage or stop it. */}
-        {WHEREABOUTS_ENABLED && <SafetyBanner />}
-        {/* Household of one — where to find the invite code. Last of the
-            banners: a live nudge or a running safety watch is time-sensitive
-            and should sit above a standing suggestion. On a brand-new
-            household those two render nothing anyway, so in the case this is
-            actually for it lands directly under Today. */}
-        <InviteBanner />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: compact ? sp.sm : sp.md }}>
+        <View style={{ marginTop: sp.lg }}>
+          {/* Someone's birthday later this month (or today) → their Birthday page. */}
+          <HomeBirthdays />
+          {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
+          <NudgesBanner />
+          {/* An active safety radius — tap to manage or stop it. */}
+          {WHEREABOUTS_ENABLED && <SafetyBanner />}
+          {/* Household of one — where to find the invite code. Last: a live
+              nudge or a running safety watch is time-sensitive and should sit
+              above a standing suggestion. */}
+          <InviteBanner />
+        </View>
+
+        <SectionLabel text={t('home.apps')} />
+        <View style={styles.grid}>
           {apps.map((app) => {
             const Icon = app.icon
             const name = t(`app.${app.id}.name` as TKey) || app.name
-            const desc = t(`app.${app.id}.desc` as TKey) || app.description
             return (
-              <Card
+              <Pressable
                 key={app.id}
                 onPress={() => router.push(app.route as never)}
-                style={
-                  compact
-                    ? { width: '31%', gap: 8, minHeight: 96, alignItems: 'center', justifyContent: 'center', paddingVertical: sp.md }
-                    : { width: '47.5%', gap: 10, minHeight: 120, justifyContent: 'space-between' }
-                }
+                accessibilityRole="button"
+                accessibilityLabel={name}
+                style={({ pressed }) => [styles.app, { opacity: pressed ? 0.7 : 1 }]}
               >
+                <GradientBox colors={APP_GRADIENT[app.id] ?? APP_GRADIENT.admin} radius={20} style={styles.icon}>
+                  <Icon size={28} color="#fff" strokeWidth={2} />
+                </GradientBox>
                 {badges[app.id] ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 8,
-                      minWidth: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      paddingHorizontal: 5,
-                      backgroundColor: c.accent,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Txt style={{ color: c.onAccent, fontSize: 11, fontWeight: '700' }}>
-                      {badges[app.id]}
-                    </Txt>
+                  <View style={[styles.badge, { borderColor: c.sheet }]}>
+                    <Txt style={{ color: '#fff', fontSize: 12, fontFamily: fonts.semibold }}>{badges[app.id]}</Txt>
                   </View>
                 ) : null}
-                <View
-                  style={{
-                    width: compact ? 40 : 44,
-                    height: compact ? 40 : 44,
-                    borderRadius: radius.md,
-                    backgroundColor: c.accentSoft,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Icon size={compact ? 22 : 24} color={c.accent} />
-                </View>
-                {compact ? (
-                  <Txt variant="h2" numberOfLines={1} style={{ fontSize: 13, textAlign: 'center' }}>
-                    {name}
-                  </Txt>
-                ) : (
-                  <View style={{ gap: 2 }}>
-                    <Txt variant="h2">{name}</Txt>
-                    <Txt variant="faint" numberOfLines={2}>
-                      {desc}
-                    </Txt>
-                  </View>
-                )}
-              </Card>
+                <Txt numberOfLines={1} style={{ fontSize: 12.5, color: c.text, fontFamily: fonts.medium }}>
+                  {name}
+                </Txt>
+              </Pressable>
             )
           })}
         </View>
       </ScrollView>
+
+      {/* the household, always within reach */}
+      <View pointerEvents="box-none" style={[styles.dockWrap, { bottom: dockGap }]}>
+        <View style={[styles.dock, { backgroundColor: c.sheet, borderColor: c.border }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.dockRow}>
+            {members.map((p) => {
+              const tint = memberColor(p.email, memberEmails)
+              const initial = (p.display_name || p.email).trim().charAt(0).toUpperCase()
+              return (
+                <Pressable
+                  key={p.email}
+                  accessibilityLabel={p.display_name}
+                  onPress={() => router.push(`/family?email=${encodeURIComponent(p.email)}`)}
+                  style={[styles.avatar, { backgroundColor: tint + '2E' }]}
+                >
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 17, color: tint }}>{initial}</Txt>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+          <Pressable
+            onPress={() => router.push('/family')}
+            style={[styles.familyBtn, { backgroundColor: c.surface }]}
+          >
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 14 }}>{t('home.family')}</Txt>
+          </Pressable>
+        </View>
+      </View>
+
+      <AskSheet key={askKey} visible={asking} listen={askListen} onClose={() => setAsking(false)} />
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  round: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: sp.lg },
+  app: { width: '25%', alignItems: 'center', gap: 7 },
+  icon: { width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    // Pinned to the icon's top-right corner, not the (wider) grid cell's.
+    right: '50%',
+    marginRight: -40,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    backgroundColor: '#FF4D5E',
+    borderWidth: 2.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dockWrap: { position: 'absolute', left: sp.lg, right: sp.lg },
+  dock: {
+    height: DOCK_H,
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  dockRow: { alignItems: 'center', gap: 10, paddingHorizontal: 12 },
+  avatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  familyBtn: { height: 44, borderRadius: 22, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+})

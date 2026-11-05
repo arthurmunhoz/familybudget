@@ -1,42 +1,174 @@
 // The editable pet fields (name, species, breed, birthday, colors, weight,
-// length, microchip, notes) + a Save button — WITHOUT any surrounding chrome or
-// scroll container, so it can be dropped into both the "Add pet" bottom sheet
-// (PetForm) and the editable pet details screen (PetProfile). The parent
-// supplies the ScrollView, and the photo + name live in a `usePetIdentity`
-// controller the parent owns (PetProfile pins the photo above its scroll).
-import { useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { Check, ChevronDown } from 'lucide-react-native'
+// length, microchip, notes) + a Save button, for both the "Add pet" bottom
+// sheet (PetForm) and the editable pet details screen (PetProfile). The photo
+// + name live in a `usePetIdentity` controller the parent owns (PetProfile
+// pins the photo above its scroll).
+//
+// Two layouts: inline (PetProfile — the parent supplies the scroll view and
+// Save follows the fields) and `dock` (PetForm — this renders the
+// KeyboardScroll itself, with `top` at its head, and docks Save under it).
+//
+// 2026-11 redesign (components/form): grouped rows instead of labelled boxes;
+// species is a SelectRow, and weight/length are a number box + a small unit
+// chip ("12 kg ⌄") like the family profile, instead of free-text fields.
+import { useState, type ReactNode } from 'react'
+import { Alert, StyleSheet, TextInput, View } from 'react-native'
 
-import { Btn, Field, Txt } from '@/components/ui'
+import { FormRow, FormSection, NoteRow, NumberBox, SelectRow, TextRow, UnitButton } from '@/components/form'
+import { KeyboardScroll } from '@/components/KeyboardScroll'
+import { Btn } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
+import { DayRow } from '@/apps/calendar/calendarUi'
+import { composeWeight, parseWeight, weightConvert, type WeightUnit } from '@/apps/family/units'
 import type { PetIdentity } from './petIdentity'
 import { SPECIES, speciesEmoji } from './petMeta'
-import { DateField } from './petUi'
 
-/** Height of the plain (boxed) fields — the species dropdown matches Field. */
-const PET_FIELD_H = 48
+type LengthUnit = 'cm' | 'in'
+const CM_PER_IN = 2.54
+const round1 = (n: number) => Math.round(n * 10) / 10
+
+/** "40 cm" / "16 in" → value + unit; a bare number has no unit (null). */
+function parseLength(raw: string): { value: number; unit: LengthUnit } | null {
+  const n = parseFloat(raw)
+  if (!isFinite(n)) return null
+  if (/cm/i.test(raw)) return { value: n, unit: 'cm' }
+  if (/in|"/i.test(raw)) return { value: n, unit: 'in' }
+  return null
+}
+const composeLength = (unit: LengthUnit, v: string): string => {
+  const n = parseFloat(v.replace(',', '.'))
+  return isFinite(n) ? `${round1(n)} ${unit}` : ''
+}
+
+/** The number to seed a measure box with. A stored value with no unit ("12")
+ *  still shows its number (under the default unit) rather than an empty box;
+ *  nothing is rewritten unless the field is edited. */
+const seedNumber = (raw: string): string => {
+  const n = parseFloat(raw)
+  return isFinite(n) ? String(n) : ''
+}
+
+// Measured rows — hoisted to module scope so their inputs keep focus across
+// parent re-renders. Each seeds from the stored "value unit" string and pushes
+// a freshly-composed one up on every change (same shape as EditProfile's).
+
+function PetWeightRow({
+  label,
+  initial,
+  metric,
+  onChange,
+}: {
+  label: string
+  initial: string
+  metric: boolean
+  onChange: (v: string) => void
+}) {
+  const { t } = useI18n()
+  const [unit, setUnit] = useState<WeightUnit>(() => parseWeight(initial)?.unit ?? (metric ? 'kg' : 'lb'))
+  const [v, setV] = useState(() => seedNumber(initial))
+
+  function changeV(next: string) {
+    setV(next)
+    onChange(composeWeight(unit, next))
+  }
+  function pick(u: WeightUnit) {
+    if (u === unit) return
+    const n = parseFloat(v)
+    const nv = isFinite(n) ? String(weightConvert(n, unit, u)) : v
+    setUnit(u)
+    setV(nv)
+    onChange(composeWeight(u, nv))
+  }
+
+  return (
+    <FormRow label={label}>
+      <NumberBox value={v} onChangeText={changeV} width={64} />
+      <UnitButton
+        title={t('family.unit')}
+        value={unit}
+        onChange={pick}
+        options={[
+          { value: 'lb', label: 'lb' },
+          { value: 'kg', label: 'kg' },
+        ]}
+      />
+    </FormRow>
+  )
+}
+
+function PetLengthRow({
+  label,
+  initial,
+  metric,
+  onChange,
+}: {
+  label: string
+  initial: string
+  metric: boolean
+  onChange: (v: string) => void
+}) {
+  const { t } = useI18n()
+  const [unit, setUnit] = useState<LengthUnit>(() => parseLength(initial)?.unit ?? (metric ? 'cm' : 'in'))
+  const [v, setV] = useState(() => seedNumber(initial))
+
+  function changeV(next: string) {
+    setV(next)
+    onChange(composeLength(unit, next))
+  }
+  function pick(u: LengthUnit) {
+    if (u === unit) return
+    const n = parseFloat(v)
+    const nv = isFinite(n) ? String(round1(u === 'cm' ? n * CM_PER_IN : n / CM_PER_IN)) : v
+    setUnit(u)
+    setV(nv)
+    onChange(composeLength(u, nv))
+  }
+
+  return (
+    <FormRow label={label}>
+      <NumberBox value={v} onChangeText={changeV} width={64} />
+      <UnitButton
+        title={t('family.unit')}
+        value={unit}
+        onChange={pick}
+        options={[
+          { value: 'in', label: 'in' },
+          { value: 'cm', label: 'cm' },
+        ]}
+      />
+    </FormRow>
+  )
+}
 
 export function PetEditor({
   pet,
   identity,
   onSaved,
+  top,
+  dock,
 }: {
   pet: Pet | null
   /** The photo + name, owned by the host (see `usePetIdentity`). */
   identity: PetIdentity
   /** Called after a successful save, with the saved pet's name for a toast. */
   onSaved: (name?: string) => void
+  /** Rendered at the head of the scroll in `dock` mode (the sheet's photo). */
+  top?: ReactNode
+  /** Sheet layout: own KeyboardScroll + Save docked below it.
+   *  `clearOfBars` comes from the host's useSheetLift. */
+  dock?: { clearOfBars: boolean }
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
-  const { t } = useI18n()
+  const bottomGap = useBottomGap(sp.lg)
+  const { t, lang } = useI18n()
+  // Default unit for empty measures: imperial for English, metric otherwise.
+  const metric = lang !== 'en'
   const { name, setName, emoji, setEmoji, photoPath } = identity
 
   const [species, setSpecies] = useState(pet?.species ?? '')
@@ -49,7 +181,6 @@ export function PetEditor({
   const [microchip, setMicrochip] = useState(pet?.microchip ?? '')
   const [notes, setNotes] = useState(pet?.notes ?? '')
   const [saving, setSaving] = useState(false)
-  const [speciesOpen, setSpeciesOpen] = useState(false)
 
   function pickSpecies(id: string) {
     setSpecies(id)
@@ -92,8 +223,8 @@ export function PetEditor({
     onSaved(fields.name)
   }
 
-  return (
-    <View style={{ gap: sp.md }}>
+  const fields = (
+    <>
       {/* The name is the page's title, not a form field — it sits under the
           photo with no box around it, centred, in the display face. */}
       <TextInput
@@ -110,196 +241,116 @@ export function PetEditor({
         }}
       />
 
-      {/* species — one dropdown instead of nine wrapping pills */}
-      <View style={{ gap: 6 }}>
-        <Txt variant="label">{t('pets.species')}</Txt>
-        <Pressable
-          onPress={() => setSpeciesOpen(true)}
-          accessibilityRole="button"
-          style={{
-            height: PET_FIELD_H,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: sp.sm,
-            backgroundColor: c.card,
-            borderRadius: radius.md,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: c.border,
-            paddingHorizontal: sp.md,
+      <FormSection>
+        {/* species — a picker instead of nine wrapping pills */}
+        <SelectRow
+          label={t('pets.species')}
+          value={species}
+          placeholder={t('pets.speciesPlaceholder')}
+          options={SPECIES.map((s) => ({ value: s.id as string, label: `${s.emoji}  ${t(`pets.species.${s.id}` as TKey)}` }))}
+          onChange={(v) => {
+            if (v) pickSpecies(v)
           }}
-        >
-          <Txt style={{ flex: 1, color: species ? c.text : c.textFaint }}>
-            {species
-              ? `${speciesEmoji(species)}  ${t(`pets.species.${species}` as TKey)}`
-              : t('pets.speciesPlaceholder')}
-          </Txt>
-          <ChevronDown size={18} color={c.textMuted} />
-        </Pressable>
-      </View>
+        />
+        <TextRow
+          label={t('pets.breed')}
+          value={breed}
+          onChangeText={setBreed}
+          placeholder={t('pets.breedPlaceholder')}
+        />
+        <DayRow
+          label={t('pets.birthday')}
+          value={birthday}
+          onChange={setBirthday}
+          optional
+          maximumDate={new Date()}
+          wheels
+        />
+      </FormSection>
 
-      <Field
-        label={t('pets.breed')}
-        value={breed}
-        onChangeText={setBreed}
-        placeholder={t('pets.breedPlaceholder')}
-      />
+      <FormSection>
+        <TextRow
+          label={t('pets.color')}
+          value={color}
+          onChangeText={setColor}
+          placeholder={t('pets.colorPlaceholder')}
+        />
+        <TextRow
+          label={t('pets.colorSecondary')}
+          value={colorSecondary}
+          onChangeText={setColorSecondary}
+          placeholder={t('pets.colorSecondaryPlaceholder')}
+        />
+      </FormSection>
 
-      <DateField
-        label={`${t('pets.birthday')} ${t('pets.optional')}`}
-        value={birthday}
-        placeholder={t('pets.optional')}
-        onChange={setBirthday}
-        optional
-      />
+      <FormSection>
+        <PetWeightRow label={t('pets.weight')} initial={weight} metric={metric} onChange={setWeight} />
+        <PetLengthRow label={t('pets.length')} initial={length} metric={metric} onChange={setLength} />
+        <TextRow
+          label={t('pets.microchip')}
+          value={microchip}
+          onChangeText={setMicrochip}
+          placeholder={t('pets.microchipPlaceholder')}
+          autoCapitalize="characters"
+          autoCorrect={false}
+        />
+      </FormSection>
 
-      <View style={{ flexDirection: 'row', gap: sp.md }}>
-        <View style={{ flex: 1 }}>
-          <Field
-            label={t('pets.color')}
-            value={color}
-            onChangeText={setColor}
-            placeholder={t('pets.colorPlaceholder')}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Field
-            label={t('pets.colorSecondary')}
-            value={colorSecondary}
-            onChangeText={setColorSecondary}
-            placeholder={t('pets.colorSecondaryPlaceholder')}
-          />
-        </View>
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: sp.md }}>
-        <View style={{ flex: 1 }}>
-          <Field
-            label={t('pets.weight')}
-            value={weight}
-            onChangeText={setWeight}
-            placeholder={t('pets.weightPlaceholder')}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Field
-            label={t('pets.length')}
-            value={length}
-            onChangeText={setLength}
-            placeholder={t('pets.lengthPlaceholder')}
-          />
-        </View>
-      </View>
-
-      <Field
-        label={t('pets.microchip')}
-        value={microchip}
-        onChangeText={setMicrochip}
-        placeholder={t('pets.microchipPlaceholder')}
-      />
-
-      <Field
-        label={t('pets.petNotes')}
-        value={notes}
-        onChangeText={setNotes}
-        placeholder={t('pets.petNotesPlaceholder')}
-      />
-
-      <Btn
-        title={saving ? t('common.saving') : pet ? t('common.saveChanges') : t('pets.addPet')}
-        onPress={save}
-        disabled={!name.trim()}
-        loading={saving}
-        style={{ marginTop: sp.xs }}
-      />
-
-      {/* species dropdown */}
-      <Modal
-        visible={speciesOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSpeciesOpen(false)}
-      >
-        <Pressable
-          onPress={() => setSpeciesOpen(false)}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
-        >
-          <Pressable
-            onPress={() => {}}
-            style={{
-              backgroundColor: c.sheet,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
-              paddingTop: sp.lg,
-              paddingBottom: bottomGap,
-              maxHeight: '70%',
-            }}
-          >
-            <Txt variant="label" style={{ paddingHorizontal: sp.lg, marginBottom: sp.sm }}>
-              {t('pets.species')}
-            </Txt>
-            <ScrollView>
-              {SPECIES.map((s) => {
-                const active = species === s.id
-                return (
-                  <Pressable
-                    key={s.id}
-                    onPress={() => {
-                      pickSpecies(s.id)
-                      setSpeciesOpen(false)
-                    }}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: sp.md,
-                      paddingHorizontal: sp.lg,
-                      paddingVertical: 14,
-                    }}
-                  >
-                    <Txt style={{ fontSize: 20 }}>{s.emoji}</Txt>
-                    <Txt style={{ flex: 1, fontWeight: active ? '700' : '400' }}>
-                      {t(`pets.species.${s.id}` as TKey)}
-                    </Txt>
-                    {active ? <Check size={18} color={c.accent} /> : null}
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
+      <FormSection>
+        <NoteRow
+          label={t('pets.petNotes')}
+          value={notes}
+          onChangeText={setNotes}
+          placeholder={t('pets.petNotesPlaceholder')}
+        />
+      </FormSection>
+    </>
   )
-}
 
-/** RN-safe base64 → Uint8Array (no atob). */
-function decodeBase64(b64: string): Uint8Array {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  const lookup = new Uint8Array(256)
-  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i
-  const len = b64.length
-  let padding = 0
-  if (b64[len - 1] === '=') padding++
-  if (b64[len - 2] === '=') padding++
-  const byteLength = (len * 3) / 4 - padding
-  const bytes = new Uint8Array(byteLength)
-  let p = 0
-  for (let i = 0; i < len; i += 4) {
-    const e1 = lookup[b64.charCodeAt(i)]
-    const e2 = lookup[b64.charCodeAt(i + 1)]
-    const e3 = lookup[b64.charCodeAt(i + 2)]
-    const e4 = lookup[b64.charCodeAt(i + 3)]
-    bytes[p++] = (e1 << 2) | (e2 >> 4)
-    if (p < byteLength) bytes[p++] = ((e2 & 15) << 4) | (e3 >> 2)
-    if (p < byteLength) bytes[p++] = ((e3 & 3) << 6) | (e4 & 63)
+  const saveBtn = (
+    <Btn
+      title={saving ? t('common.saving') : pet ? t('common.saveChanges') : t('pets.addPet')}
+      onPress={save}
+      disabled={!name.trim()}
+      loading={saving}
+    />
+  )
+
+  if (!dock) {
+    return (
+      <View style={{ gap: sp.lg }}>
+        {fields}
+        {saveBtn}
+      </View>
+    )
   }
-  return bytes
-}
 
-/** UUID v4 without a crypto dependency (good enough for a storage filename). */
-function randomUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
-    const r = (Math.random() * 16) | 0
-    const v = ch === 'x' ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
+  return (
+    <>
+      <KeyboardScroll
+        // flexShrink so the scroller yields to the sheet's max height instead
+        // of overflowing it once the keyboard has taken half the screen;
+        // flexGrow 0 so a short form is still a short sheet.
+        style={{ flexGrow: 0, flexShrink: 1 }}
+        contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {top}
+        {fields}
+      </KeyboardScroll>
+      {/* save — docked */}
+      <View
+        style={{
+          paddingHorizontal: sp.lg,
+          paddingTop: sp.sm,
+          paddingBottom: dock.clearOfBars ? sp.md : bottomGap,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: c.border,
+        }}
+      >
+        {saveBtn}
+      </View>
+    </>
+  )
 }

@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 
 import { useThemePref } from './theme-pref';
 import { useSchemePref } from './scheme-pref';
-import { pickOn } from './contrast';
+import { actionFill, pickOn } from './contrast';
 import { GLASS, glassLight, glassDark, glassTokens } from './glass';
 
 export interface ThemeTokens {
@@ -27,6 +27,11 @@ export interface ThemeTokens {
    *  literal white on `accent` — the light, vivid accents used in dark mode need
    *  dark ink instead. See theme/contrast.ts. */
   onAccent: string;
+  /** Fill for primary actions and selected controls — the accent deepened so
+   *  white reads on it (theme/contrast.ts `actionFill`). Text/icons on it:
+   *  `onAction`. Prefer this over `accent` for any FILLED control. */
+  action: string;
+  onAction: string;
   income: string;
   expense: string;
   border: string;
@@ -45,6 +50,8 @@ export const light: ThemeTokens = {
   accent: '#c2603f',
   accentSoft: 'rgba(194,96,63,0.14)',
   onAccent: pickOn('#c2603f'),
+  action: actionFill('#c2603f'),
+  onAction: '#FFFFFF',
   income: '#3c7d58',
   expense: '#cf5a4c',
   border: 'rgba(43,37,33,0.10)',
@@ -63,6 +70,8 @@ export const dark: ThemeTokens = {
   accent: '#da7a5b',
   accentSoft: 'rgba(218,122,91,0.22)',
   onAccent: pickOn('#da7a5b'),
+  action: actionFill('#da7a5b'),
+  onAction: '#FFFFFF',
   income: '#6fb58a',
   expense: '#e07a6a',
   border: 'rgba(243,235,224,0.12)',

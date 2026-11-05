@@ -1,7 +1,14 @@
 // Shopping List — RN port of the PWA's ShoppingList. Shared, live-synced family
 // list: open items first, checked items struck-through below, optimistic
 // add/toggle/delete, optional per-store grouping, and Supabase Realtime so an
-// edit on another phone shows up here. RLS scopes everything to the household;
+// edit on another phone shows up here.
+//
+// 2026-11 rethink (Comando style): a quiet line says how much is left to buy
+// (and how much is already in the cart, as a thin amber bar); the stores sit at the TOP as a filter
+// — in the shop you pick it and see only its items plus the "anywhere" ones,
+// and new items go to it; bought items drop into a collapsible "In the cart"
+// section with Clear; rows swipe left to delete (no X on every row) and show
+// who added them; the field takes several items at once ("milk, eggs"). RLS scopes everything to the household;
 // inserts get household_id / added_by stamped server-side, so the client never
 // passes household_id.
 //
@@ -23,7 +30,9 @@ import {
 } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check, ChevronLeft, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
+import { Swipeable } from 'react-native-gesture-handler'
+import { memberColor } from '@/lib/calendar'
 
 import { AppHeader, DismissKeyboard, Loader, Txt } from '@/components/ui'
 import { track } from '@/lib/analytics'
@@ -43,7 +52,7 @@ import { supabase } from '@/lib/supabase'
 import { STORE_CATALOG, STORE_COLORS, type StoreCatalogEntry } from '@/lib/stores'
 import { fetchStoreSuggestions, type SuggestedStore } from '@/lib/storeSuggest'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
-import { radius, sheetRadius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import StoreLogo from './StoreLogo'
 
 // RN has no crypto.randomUUID on all engines — a temp id only needs to be unique
@@ -67,12 +76,17 @@ const PULSE_BEATS = 3
  *  visually undone. */
 const EXIT_MS = 200
 
+/** Shopping's amber (its home-screen icon), for the progress bar. */
+const SHOP_AMBER = '#F5A524'
+
 interface Section {
   id: string
   title: string
   slug: string | null
   color: string | null
   isStore: boolean
+  /** The bought (checked) items, in their own collapsible section. */
+  isCart?: boolean
   data: ShoppingItem[]
 }
 
@@ -80,7 +94,10 @@ export default function ShoppingList() {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
   const { t } = useI18n()
-  const { profile } = useAuth()
+  const { profile, profiles } = useAuth()
+  // "In the cart" starts folded: while shopping, a ticked item should get out
+  // of the way. One tap brings the list back (to untick or check).
+  const [cartOpen, setCartOpen] = useState(false)
 
   // Seed from the in-memory cache so the list renders instantly on return; a
   // durable AsyncStorage copy (below) hydrates it on a cold start / offline.
@@ -343,21 +360,29 @@ export default function ShoppingList() {
   // keeps the local list when offline. Single write path (the outbox) works
   // identically on- and offline; nothing writes to Supabase directly here. ────
   function add() {
-    const trimmed = label.trim()
-    if (!trimmed || !profile) return
+    const parts = label
+      .split(/\s*[,;\n]\s*/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+    if (!parts.length || !profile) return
     setLabel('')
+    // "milk, eggs, bread" → three items; the last one is the one we scroll to.
+    parts.forEach((p) => addOne(p, profile.email))
+  }
+
+  function addOne(trimmed: string, me: string) {
     const id = tempId()
     const optimistic: ShoppingItem = {
       id,
       label: trimmed,
       checked: false,
-      added_by: profile.email,
+      added_by: me,
       created_at: new Date().toISOString(),
       checked_at: null,
       store_id: activeStoreId,
     }
     setItems((list) => [...list, optimistic])
-    void enqueueOp({ k: 'item.add', tempId: id, label: trimmed, store_id: activeStoreId, added_by: profile.email })
+    void enqueueOp({ k: 'item.add', tempId: id, label: trimmed, store_id: activeStoreId, added_by: me })
     track('shopping.added', { item: trimmed })
     // Confirm it landed three ways: flash the button, scroll the row into view
     // (the effect below, once `sections` has been rebuilt with it), and pulse
@@ -527,27 +552,43 @@ export default function ShoppingList() {
   // only slides it into the checked block, nothing else reshuffles.
   const sections = useMemo<Section[]>(() => {
     const valid = new Set(stores.map((s) => s.id))
-    const bucket = (sid: string | null) =>
-      items
-        .filter((i) =>
-          sid === null ? !i.store_id || !valid.has(i.store_id) : i.store_id === sid,
-        )
-        .sort(
-          (a, b) =>
-            Number(a.checked) - Number(b.checked) ||
-            a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }),
-        )
+    const isAnywhere = (i: ShoppingItem) => !i.store_id || !valid.has(i.store_id)
+    // A store picked at the top narrows the list to that store + the items
+    // that can be bought anywhere.
+    const inScope = (i: ShoppingItem) =>
+      activeStoreId === null || i.store_id === activeStoreId || isAnywhere(i)
+    const byName = (a: ShoppingItem, b: ShoppingItem) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+    const open = items.filter((i) => !i.checked && inScope(i))
     const out: Section[] = []
     for (const s of stores) {
-      const data = bucket(s.id)
+      if (activeStoreId && s.id !== activeStoreId) continue
+      const data = open.filter((i) => i.store_id === s.id).sort(byName)
       if (data.length)
         out.push({ id: s.id, title: s.name, slug: s.slug, color: s.color, isStore: true, data })
     }
-    const anywhere = bucket(null)
+    const anywhere = open.filter(isAnywhere).sort(byName)
     if (anywhere.length)
       out.push({ id: '__any', title: t('shopping.anywhere'), slug: null, color: null, isStore: false, data: anywhere })
+    const cart = items.filter((i) => i.checked && inScope(i)).sort(byName)
+    if (cart.length)
+      out.push({
+        id: '__cart',
+        title: t('shopping.cartTitle'),
+        slug: null,
+        color: null,
+        isStore: false,
+        isCart: true,
+        data: cartOpen ? cart : [],
+      })
     return out
-  }, [items, stores, t])
+  }, [items, stores, t, activeStoreId, cartOpen])
+
+  const inScopeOpen = sections.filter((x) => !x.isCart).reduce((n, x) => n + x.data.length, 0)
+  const inScopeCart = items.filter(
+    (i) => i.checked && (activeStoreId === null || i.store_id === activeStoreId || !stores.some((s) => s.id === i.store_id)),
+  ).length
+  const storeOpenCount = (id: string) => items.filter((i) => !i.checked && i.store_id === id).length
 
   // Bring a just-added row into view. Runs off `sections` rather than straight
   // from add(), because at add() time the list hasn't been rebuilt yet and the
@@ -572,8 +613,6 @@ export default function ShoppingList() {
   }, [sections])
 
   const showHeaders = stores.length > 0
-  const doneCount = items.filter((i) => i.checked).length
-  const openCount = items.length - doneCount
   const activeStore = stores.find((s) => s.id === activeStoreId)
   const catalogToAdd = STORE_CATALOG.filter(
     (e) => !stores.some((s) => s.slug === e.slug),
@@ -590,73 +629,93 @@ export default function ShoppingList() {
     [stores],
   )
 
-  const renderItem = ({ item }: { item: ShoppingItem }) => (
-    <ItemRowShell
-      bg={c.card}
-      dim={item.checked}
-      // Only an OPEN row pulses: a duplicate label sitting in the checked block
-      // would otherwise light up alongside the one just added.
-      pulseColor={pulseLabel === item.label && !item.checked ? c.accentSoft : null}
-      pulseOpacity={pulseAnim}
-      exiting={exitingIds.has(item.id)}
-    >
-      <Pressable
-        onPress={() => toggle(item)}
-        style={styles.rowMain}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: item.checked }}
-      >
-        {item.checked ? (
-          <View style={[styles.checkOn, { backgroundColor: c.income }]}>
-            <Check size={12} strokeWidth={3} color="#ffffff" />
-          </View>
-        ) : (
-          <View style={[styles.checkOff, { borderColor: c.textFaint }]} />
-        )}
-        <Txt
-          numberOfLines={2}
-          style={[
-            styles.itemLabel,
-            { color: item.checked ? c.textMuted : c.text },
-            item.checked && styles.struck,
-          ]}
+  const memberEmails = profiles.map((p) => p.email)
+  const renderItem = ({ item }: { item: ShoppingItem }) => {
+    const adder = item.added_by !== profile?.email ? profiles.find((p) => p.email === item.added_by) : undefined
+    return (
+      <SwipeToDelete label={t('common.delete')} onDelete={() => remove(item)}>
+        <ItemRowShell
+          bg={c.card}
+          dim={item.checked}
+          // Only an OPEN row pulses: a duplicate label sitting in the cart
+          // would otherwise light up alongside the one just added.
+          pulseColor={pulseLabel === item.label && !item.checked ? c.accentSoft : null}
+          pulseOpacity={pulseAnim}
+          exiting={exitingIds.has(item.id)}
         >
-          {item.label}
-        </Txt>
-      </Pressable>
-      <Pressable
-        onPress={() => remove(item)}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.removeName', { name: item.label })}
-        style={styles.removeBtn}
-      >
-        <X size={18} strokeWidth={2} color={c.textFaint} />
-      </Pressable>
-    </ItemRowShell>
-  )
+          <Pressable
+            onPress={() => toggle(item)}
+            style={styles.rowMain}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: item.checked }}
+            accessibilityActions={[{ name: 'delete', label: t('common.removeName', { name: item.label }) }]}
+            onAccessibilityAction={(e) => e.nativeEvent.actionName === 'delete' && remove(item)}
+          >
+            {item.checked ? (
+              <View style={[styles.checkOn, { backgroundColor: c.income }]}>
+                <Check size={15} strokeWidth={3} color="#ffffff" />
+              </View>
+            ) : (
+              <View style={[styles.checkOff, { borderColor: c.textFaint }]} />
+            )}
+            <Txt
+              numberOfLines={2}
+              style={[styles.itemLabel, { color: item.checked ? c.textMuted : c.text }, item.checked && styles.struck]}
+            >
+              {item.label}
+            </Txt>
+            {adder ? (
+              <View
+                accessibilityLabel={t('shopping.addedBy', { name: adder.display_name })}
+                style={[styles.adder, { backgroundColor: memberColor(adder.email, memberEmails) + '2A' }]}
+              >
+                <Txt style={{ fontSize: 11.5, fontFamily: fonts.semibold, color: memberColor(adder.email, memberEmails) }}>
+                  {adder.display_name.charAt(0).toUpperCase()}
+                </Txt>
+              </View>
+            ) : null}
+          </Pressable>
+        </ItemRowShell>
+      </SwipeToDelete>
+    )
+  }
 
   const renderSectionHeader = ({ section }: { section: Section }) => {
+    if (section.isCart) {
+      return (
+        <View style={[styles.sectionHeader, { marginTop: sp.md }]}>
+          <Pressable
+            onPress={() => setCartOpen((o) => !o)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: cartOpen }}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
+          >
+            <View style={[styles.cartBadge, { backgroundColor: c.income }]}>
+              <Check size={13} strokeWidth={3} color="#fff" />
+            </View>
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 15 }}>
+              {section.title} · {inScopeCart}
+            </Txt>
+            {cartOpen ? <ChevronUp size={16} color={c.textMuted} /> : <ChevronDown size={16} color={c.textMuted} />}
+          </Pressable>
+          <Pressable onPress={clearChecked} hitSlop={8} accessibilityRole="button">
+            <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 14 }}>{t('shopping.clear')}</Txt>
+          </Pressable>
+        </View>
+      )
+    }
     if (!showHeaders) return <View style={{ height: sp.xs }} />
-    const open = section.data.filter((r) => !r.checked).length
     return (
-      <View style={[styles.sectionHeader, { backgroundColor: c.bg }]}>
+      <View style={styles.sectionHeader}>
         {section.isStore ? (
-          <StoreLogo slug={section.slug} name={section.title} color={section.color} size={20} />
+          <StoreLogo slug={section.slug} name={section.title} color={section.color} size={22} />
         ) : (
           <ShoppingCart size={18} strokeWidth={2} color={c.textFaint} />
         )}
-        <Txt
-          variant="label"
-          style={{
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            color: section.isStore ? c.text : c.textFaint,
-          }}
-        >
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: section.isStore ? c.text : c.textMuted }}>
           {section.title}
         </Txt>
-        {open > 0 ? <Txt variant="faint">{open}</Txt> : null}
+        <Txt variant="faint">{section.data.length}</Txt>
       </View>
     )
   }
@@ -669,16 +728,75 @@ export default function ShoppingList() {
           are typing in shouldn't close the keyboard. */}
       <DismissKeyboard style={{ flex: 1 }}>
         <View style={{ paddingHorizontal: sp.lg }}>
-          <AppHeader
-            title={t('shopping.title')}
-            right={
-              openCount > 0 ? (
-                <View style={[styles.countPill, { backgroundColor: c.surface }]}>
-                  <Txt variant="label">{openCount}</Txt>
-                </View>
-              ) : undefined
-            }
-          />
+          <AppHeader title={t('shopping.title')} />
+        </View>
+
+        {/* Progress, quietly: "6 to buy · 2 in the cart" over a thin bar in
+            Shopping's amber. (A big gradient panel here was too loud — owner.) */}
+        {!loading && items.length > 0 ? (
+          <View style={{ paddingHorizontal: sp.lg, gap: 8 }}>
+            <Txt style={{ fontSize: 15 }} numberOfLines={1}>
+              <Txt style={{ fontSize: 15, fontFamily: fonts.semibold }}>
+                {inScopeOpen === 0 ? t('shopping.allDone') : `${inScopeOpen} ${t('shopping.toBuy')}`}
+                {activeStore && inScopeOpen ? ` ${t('shopping.atStore', { store: activeStore.name })}` : ''}
+              </Txt>
+              {inScopeCart > 0 ? (
+                <Txt style={{ fontSize: 15, color: c.textMuted }}> · {t('shopping.inCartN', { n: inScopeCart })}</Txt>
+              ) : null}
+            </Txt>
+            {inScopeCart > 0 ? (
+              <View style={[styles.progressTrack, { backgroundColor: c.surface }]}>
+                <View
+                  style={[styles.progressFill, { width: `${(inScopeCart / (inScopeCart + inScopeOpen)) * 100}%` }]}
+                />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Stores: a filter for when you're in the shop, and where new items go. */}
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={[styles.chips, { paddingHorizontal: sp.lg, paddingTop: sp.md }]}
+            keyboardShouldPersistTaps="handled"
+          >
+            {stores.length === 0 ? (
+              <Chip
+                onPress={() => setPicking(true)}
+                active={false}
+                c={c}
+                icon={<Store size={16} strokeWidth={2} color={c.textMuted} />}
+                label={t('shopping.selectStores')}
+              />
+            ) : (
+              <>
+                <Chip onPress={() => selectStore(null)} active={activeStoreId === null} c={c} label={t('common.all')} />
+                {stores.map((s) => {
+                  const n = storeOpenCount(s.id)
+                  return (
+                    <Chip
+                      key={s.id}
+                      onPress={() => selectStore(s.id)}
+                      active={activeStoreId === s.id}
+                      c={c}
+                      icon={<StoreLogo slug={s.slug} name={s.name} color={s.color} size={20} />}
+                      label={n ? `${s.name}  ${n}` : s.name}
+                    />
+                  )
+                })}
+                <Chip
+                  onPress={() => setPicking(true)}
+                  active={false}
+                  c={c}
+                  icon={<Plus size={18} strokeWidth={2} color={c.textMuted} />}
+                  label=""
+                  accessibilityLabel={t('shopping.manageStores')}
+                />
+              </>
+            )}
+          </ScrollView>
         </View>
 
         {loading ? (
@@ -728,15 +846,6 @@ export default function ShoppingList() {
             // header is always there. The return key deliberately doesn't
             // dismiss either — `blurOnSubmit={false}` below, so you can rattle
             // off several items in a row.
-            ListFooterComponent={
-              doneCount > 0 ? (
-                <Pressable onPress={clearChecked} style={styles.clearBtn}>
-                  <Txt variant="label" style={{ color: c.accent }}>
-                    {t('shopping.clearChecked')}
-                  </Txt>
-                </Pressable>
-              ) : null
-            }
           />
         )}
 
@@ -762,50 +871,6 @@ export default function ShoppingList() {
             },
           ]}
         >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chips}
-            keyboardShouldPersistTaps="handled"
-          >
-            {stores.length === 0 ? (
-              <Chip
-                onPress={() => setPicking(true)}
-                active={false}
-                c={c}
-                icon={<Store size={16} strokeWidth={2} color={c.textMuted} />}
-                label={t('shopping.selectStores')}
-              />
-            ) : (
-              <>
-                <Chip
-                  onPress={() => selectStore(null)}
-                  active={activeStoreId === null}
-                  c={c}
-                  label={t('shopping.anywhere')}
-                />
-                {stores.map((s) => (
-                  <Chip
-                    key={s.id}
-                    onPress={() => selectStore(s.id)}
-                    active={activeStoreId === s.id}
-                    c={c}
-                    icon={<StoreLogo slug={s.slug} name={s.name} color={s.color} size={20} />}
-                    label={s.name}
-                  />
-                ))}
-                <Chip
-                  onPress={() => setPicking(true)}
-                  active={false}
-                  c={c}
-                  icon={<Plus size={18} strokeWidth={2} color={c.textMuted} />}
-                  label=""
-                  accessibilityLabel={t('shopping.manageStores')}
-                />
-              </>
-            )}
-          </ScrollView>
-
           <View style={styles.inputRow}>
             <TextInput
               value={label}
@@ -816,7 +881,7 @@ export default function ShoppingList() {
               placeholder={
                 activeStore
                   ? t('shopping.addToStore', { store: activeStore.name })
-                  : t('shopping.addPlaceholder')
+                  : t('shopping.addMany')
               }
               placeholderTextColor={c.textFaint}
               style={[styles.input, { backgroundColor: c.surface, color: c.text, borderColor: c.border }]}
@@ -828,7 +893,7 @@ export default function ShoppingList() {
               style={[
                 styles.addBtn,
                 {
-                  backgroundColor: justAdded ? c.income : c.accent,
+                  backgroundColor: justAdded ? c.income : c.action,
                   // While confirming, stay at full strength: add() has just
                   // cleared the field, so the usual empty-field dimming would
                   // fade the confirmation the instant it appears.
@@ -841,14 +906,14 @@ export default function ShoppingList() {
                   in whatever language it's in, and swapping to the check can't
                   resize the text field beside it. */}
               <Txt
-                style={{ color: c.onAccent, fontWeight: '700', fontSize: 16, opacity: justAdded ? 0 : 1 }}
+                style={{ color: c.onAction, fontWeight: '700', fontSize: 16, opacity: justAdded ? 0 : 1 }}
               >
                 {t('common.add')}
               </Txt>
               {justAdded ? (
                 <View style={[StyleSheet.absoluteFill, styles.addBtnCheck]}>
                   {/* White on the income green, matching the row checkboxes —
-                      c.onAccent is for the ACCENT fill, which this isn't. */}
+                      c.onAction is for the ACCENT fill, which this isn't. */}
                   <Check size={20} strokeWidth={3} color="#ffffff" />
                 </View>
               ) : null}
@@ -918,10 +983,10 @@ export default function ShoppingList() {
                   disabled={!storeInput.trim()}
                   style={[
                     styles.panelBtnDocked,
-                    { backgroundColor: c.accent, opacity: storeInput.trim() ? 1 : 0.5 },
+                    { backgroundColor: c.action, opacity: storeInput.trim() ? 1 : 0.5 },
                   ]}
                 >
-                  <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
+                  <Txt style={{ color: c.onAction, fontWeight: '700', fontSize: 16 }}>
                     {t('common.add')}
                   </Txt>
                 </Pressable>
@@ -962,10 +1027,10 @@ export default function ShoppingList() {
                   disabled={!editName.trim()}
                   style={[
                     styles.panelBtn,
-                    { backgroundColor: c.accent, opacity: editName.trim() ? 1 : 0.5 },
+                    { backgroundColor: c.action, opacity: editName.trim() ? 1 : 0.5 },
                   ]}
                 >
-                  <Txt style={{ color: c.onAccent, fontWeight: '700', fontSize: 16 }}>
+                  <Txt style={{ color: c.onAction, fontWeight: '700', fontSize: 16 }}>
                     {t('common.save')}
                   </Txt>
                 </Pressable>
@@ -1095,6 +1160,35 @@ export default function ShoppingList() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+  )
+}
+
+/** Swipe a row left to reveal Delete (one tap removes it — the list is cheap
+ *  to rebuild and the row slides out, so no confirm). Module scope. */
+function SwipeToDelete({ label, onDelete, children }: { label: string; onDelete: () => void; children: React.ReactNode }) {
+  const { c } = useTheme()
+  const ref = useRef<Swipeable>(null)
+  return (
+    <Swipeable
+      ref={ref}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      renderRightActions={() => (
+        <Pressable
+          onPress={() => {
+            ref.current?.close()
+            onDelete()
+          }}
+          accessibilityLabel={label}
+          style={[styles.swipeDelete, { backgroundColor: c.expense }]}
+        >
+          <Trash2 size={20} color="#fff" />
+        </Pressable>
+      )}
+    >
+      {children}
+    </Swipeable>
   )
 }
 
@@ -1239,14 +1333,14 @@ function Chip({
       style={[
         styles.chip,
         {
-          backgroundColor: active ? c.accent : c.surface,
+          backgroundColor: active ? c.action : c.surface,
           borderColor: c.border,
         },
       ]}
     >
       {icon}
       {label ? (
-        <Txt style={{ fontWeight: '600', fontSize: 14, color: active ? c.onAccent : c.textMuted }}>
+        <Txt style={{ fontWeight: '600', fontSize: 14, color: active ? c.onAction : c.textMuted }}>
           {label}
         </Txt>
       ) : null}
@@ -1264,14 +1358,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
-    borderRadius: radius.md,
-    paddingHorizontal: sp.lg,
-    paddingVertical: 12,
+    borderRadius: 18,
+    paddingHorizontal: sp.md,
+    paddingVertical: 13,
   },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp.md },
-  checkOn: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  checkOff: { width: 20, height: 20, borderRadius: 10, borderWidth: 2 },
-  itemLabel: { flex: 1, fontSize: 16, fontWeight: '500' },
+  checkOn: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  checkOff: { width: 26, height: 26, borderRadius: 13, borderWidth: 2 },
+  itemLabel: { flex: 1, fontSize: 16.5, fontFamily: fonts.medium },
+  adder: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  swipeDelete: { width: 76, marginLeft: sp.sm, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  cartBadge: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  progressTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2, backgroundColor: SHOP_AMBER },
   struck: { textDecorationLine: 'line-through' },
   removeBtn: { paddingHorizontal: 4 },
   sectionHeader: {

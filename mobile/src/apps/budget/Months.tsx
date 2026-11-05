@@ -14,16 +14,13 @@ import {
   ChevronRight,
   MoreHorizontal,
   Trash2,
-  X,
 } from 'lucide-react-native'
 
 import {
   AppHeader,
   Btn,
   Card,
-  DismissKeyboard,
   EmptyState,
-  Field,
   Loader,
   NewItemButton,
   Txt,
@@ -48,7 +45,10 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { TrendCard, type TrendPoint } from './TrendCard'
+import { FormSection, NoteRow } from '@/components/form'
+import { FormSheet } from './FormSheet'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { DatePickerModal } from './shared'
 
@@ -60,7 +60,7 @@ type EntryBalance = Pick<Entry, 'month_id' | 'type' | 'amount' | 'entry_date'>
 export default function Months({ budgetId }: { budgetId: string }) {
   const { c } = useTheme()
   const bottomGap = useBottomGap(sp.xl)
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { profile } = useAuth()
   const { isPlus } = usePlus()
 
@@ -68,7 +68,6 @@ export default function Months({ budgetId }: { budgetId: string }) {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [pickStart, setPickStart] = useState('')
-  const [pickerOpen, setPickerOpen] = useState(false)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
@@ -123,15 +122,19 @@ export default function Months({ budgetId }: { budgetId: string }) {
   // household that never had an owner) lets whoever makes it private claim it.
   const isOwner = !budget || !budget.owner_email || budget.owner_email === profile?.email
 
-  // To-date balance per period; future-dated entries don't count yet. `today`
+  // To-date totals per period; future-dated entries don't count yet. `today`
   // comes from useToday so that cut-off moves with the calendar instead of
   // freezing on the day the screen happened to first render.
-  const balances = useMemo(() => {
-    const map = new Map<string, number>()
+  const stats = useMemo(() => {
+    const map = new Map<string, { income: number; spent: number; balance: number }>()
     for (const e of entries) {
       if (e.entry_date > today) continue
-      const delta = e.type === 'income' ? Number(e.amount) : -Number(e.amount)
-      map.set(e.month_id, (map.get(e.month_id) ?? 0) + delta)
+      const cur = map.get(e.month_id) ?? { income: 0, spent: 0, balance: 0 }
+      const amt = Number(e.amount)
+      if (e.type === 'income') cur.income += amt
+      else cur.spent += amt
+      cur.balance = cur.income - cur.spent
+      map.set(e.month_id, cur)
     }
     return map
   }, [entries, today])
@@ -319,6 +322,28 @@ export default function Months({ budgetId }: { budgetId: string }) {
           ? t('months.addedBehind', { label: periodLabel(period, pickedStart) })
           : t('months.firstPeriod', { label: periodLabel(period, pickedStart) })
 
+  const currentStart = currentPeriodStart(period)
+  const locale = lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es' : 'en-US'
+  // The chart: the latest six periods, oldest first.
+  const trend: TrendPoint[] = months
+    .slice(0, 6)
+    .reverse()
+    .map((m) => {
+      const [y, mo0, d] = isoParts(m.start_date)
+      const dt = new Date(y, mo0, d)
+      const st = stats.get(m.id)
+      return {
+        id: m.id,
+        short: (period === 'monthly'
+          ? dt.toLocaleDateString(locale, { month: 'short' })
+          : dt.toLocaleDateString(locale, { day: 'numeric', month: 'short' })
+        ).replace('.', ''),
+        income: st?.income ?? 0,
+        spent: st?.spent ?? 0,
+        current: m.start_date === currentStart,
+      }
+    })
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
@@ -344,11 +369,20 @@ export default function Months({ budgetId }: { budgetId: string }) {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
         >
+          {months.length > 1 ? (
+            <TrendCard points={trend} onOpen={(id) => router.push(`/budget/${budgetId}/${id}`)} />
+          ) : null}
+          <Txt variant="label" style={{ marginTop: sp.sm, textTransform: 'uppercase', letterSpacing: 1, fontSize: 12 }}>
+            {t('months.periods')}
+          </Txt>
           {months.map((m) => (
             <PeriodCard
               key={m.id}
               label={periodLabel(period, m.start_date)}
-              balance={balances.get(m.id) ?? 0}
+              current={m.start_date === currentStart}
+              income={stats.get(m.id)?.income ?? 0}
+              spent={stats.get(m.id)?.spent ?? 0}
+              balance={stats.get(m.id)?.balance ?? 0}
               deletable={canManage}
               onOpen={() => router.push(`/budget/${budgetId}/${m.id}`)}
               onDelete={() => deletePeriod(m)}
@@ -432,132 +466,36 @@ export default function Months({ budgetId }: { budgetId: string }) {
         </Modal>
       )}
 
-      {/* rename modal */}
+      {/* rename sheet */}
       {renameOpen && (
-        <Modal visible animationType="slide" transparent onRequestClose={() => setRenameOpen(false)}>
-          <DismissKeyboard style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
-            <View style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
-              <Txt variant="h2">{t('months.renameTitle')}</Txt>
-              <Field value={name} onChangeText={setName} autoFocus />
-              <View style={{ flexDirection: 'row', gap: sp.md }}>
-                <Btn title={t('common.cancel')} variant="secondary" onPress={() => setRenameOpen(false)} style={{ flex: 1 }} />
-                <Btn title={t('common.save')} onPress={renameBudget} loading={saving} disabled={!name.trim()} style={{ flex: 1 }} />
-              </View>
-            </View>
-          </DismissKeyboard>
-        </Modal>
+        <RenameBudgetSheet
+          name={name}
+          onName={setName}
+          saving={saving}
+          onSave={renameBudget}
+          onClose={() => setRenameOpen(false)}
+        />
       )}
 
-      {/* create-period modal */}
+      {/* create-period sheet */}
       {createOpen && (
-        <Modal visible animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}>
-            <View style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Txt variant="h2">{t(`months.new${pk}Title` as TKey)}</Txt>
-                <Pressable onPress={() => setCreateOpen(false)} hitSlop={10}>
-                  <X size={22} color={c.textMuted} />
-                </Pressable>
-              </View>
-              {/* Period selector: ◀ [📅 Jul 2026] ▶. The arrows step one period
-                  and always work (no modal); the centre label opens the date
-                  picker to jump further. Base stepping on the normalized
-                  pickedStart so prev/next land on clean period boundaries. */}
-              <View style={{ gap: 6 }}>
-                <Txt variant="label">{t(`months.which${pk}` as TKey)}</Txt>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                  <Pressable
-                    onPress={() =>
-                      setPickStart(prevPeriodStart(period, pickedStart ?? currentPeriodStart(period)))
-                    }
-                    accessibilityLabel={t('months.prevPeriod')}
-                    style={{
-                      width: 46,
-                      height: 46,
-                      borderRadius: radius.md,
-                      borderWidth: 1,
-                      borderColor: c.border,
-                      backgroundColor: c.card,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <ChevronLeft size={20} color={c.text} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setPickerOpen(true)}
-                    style={{
-                      flex: 1,
-                      height: 46,
-                      borderRadius: radius.md,
-                      borderWidth: 1,
-                      borderColor: pickerOpen ? c.accent : c.border,
-                      backgroundColor: c.card,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: sp.sm,
-                      paddingHorizontal: sp.md,
-                    }}
-                  >
-                    <CalendarDays size={18} color={c.textMuted} />
-                    <Txt style={{ fontWeight: '600', fontSize: 15 }} numberOfLines={1}>
-                      {pickedStart ? periodLabel(period, pickedStart) : ''}
-                    </Txt>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      setPickStart(nextPeriodStart(period, pickedStart ?? currentPeriodStart(period)))
-                    }
-                    accessibilityLabel={t('months.nextPeriod')}
-                    style={{
-                      width: 46,
-                      height: 46,
-                      borderRadius: radius.md,
-                      borderWidth: 1,
-                      borderColor: c.border,
-                      backgroundColor: c.card,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <ChevronRight size={20} color={c.text} />
-                  </Pressable>
-                </View>
-                <DatePickerModal
-                  visible={pickerOpen}
-                  value={pickStart}
-                  onChange={setPickStart}
-                  onClose={() => setPickerOpen(false)}
-                />
-              </View>
-              {hint ? (
-                <Txt
-                  style={{
-                    fontSize: 13,
-                    lineHeight: 18,
-                    color: alreadyExists ? c.expense : c.textMuted,
-                  }}
-                >
-                  {hint}
-                </Txt>
-              ) : null}
-              <View style={{ flexDirection: 'row', gap: sp.md, marginTop: sp.sm }}>
-                <Btn title={t('common.cancel')} variant="secondary" onPress={() => setCreateOpen(false)} style={{ flex: 1 }} />
-                <Btn
-                  title={t('common.create')}
-                  disabled={!pickedStart || alreadyExists || creating}
-                  onPress={() => {
-                    if (!pickedStart) return
-                    setCreateOpen(false)
-                    createMonth(pickedStart, willCopyRecurring)
-                  }}
-                  style={{ flex: 1 }}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
+        <NewPeriodSheet
+          title={t(`months.new${pk}Title` as TKey)}
+          which={t(`months.which${pk}` as TKey)}
+          period={period}
+          pickStart={pickStart}
+          pickedStart={pickedStart}
+          onPickStart={setPickStart}
+          hint={hint}
+          alreadyExists={alreadyExists}
+          creating={creating}
+          onCreate={() => {
+            if (!pickedStart) return
+            setCreateOpen(false)
+            createMonth(pickedStart, willCopyRecurring)
+          }}
+          onClose={() => setCreateOpen(false)}
+        />
       )}
       {accessOpen && budget ? (
         <BudgetAccessSheet budget={budget} onClose={() => setAccessOpen(false)} />
@@ -567,16 +505,182 @@ export default function Months({ budgetId }: { budgetId: string }) {
   )
 }
 
-/** One period row. Swipe left to reveal a Delete action (which then confirms).
- *  A read-only viewer (deletable=false) gets a plain card with no swipe. */
+
+/** Rename the budget (2026-11 form redesign): one row, Save docked. */
+function RenameBudgetSheet({
+  name,
+  onName,
+  saving,
+  onSave,
+  onClose,
+}: {
+  name: string
+  onName: (v: string) => void
+  saving: boolean
+  onSave: () => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  return (
+    <FormSheet
+      title={t('months.renameTitle')}
+      onClose={onClose}
+      footer={<Btn title={t('common.save')} onPress={onSave} loading={saving} disabled={!name.trim()} />}
+    >
+      <FormSection>
+        <NoteRow
+          label={t('budget.nameLabel' as TKey)}
+          value={name}
+          onChangeText={onName}
+          multiline={false}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={() => name.trim() && onSave()}
+        />
+      </FormSection>
+    </FormSheet>
+  )
+}
+
+/** Create a period (2026-11 form redesign). The selector is one card row:
+ *  ‹ [📅 Jul 2026] › — the arrows step one period and always work (no modal);
+ *  the centre label opens the date picker to jump further. Stepping is based
+ *  on the normalized pickedStart so prev/next land on clean period
+ *  boundaries. Create is docked. */
+function NewPeriodSheet({
+  title,
+  which,
+  period,
+  pickStart,
+  pickedStart,
+  onPickStart,
+  hint,
+  alreadyExists,
+  creating,
+  onCreate,
+  onClose,
+}: {
+  title: string
+  which: string
+  period: Period
+  /** The raw picked date (what the calendar shows). */
+  pickStart: string
+  /** pickStart normalized to its period's first day. */
+  pickedStart: string | null
+  onPickStart: (iso: string) => void
+  hint: string | null
+  alreadyExists: boolean
+  creating: boolean
+  onCreate: () => void
+  onClose: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const base = pickedStart ?? currentPeriodStart(period)
+  const stepBtn = {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: c.surface,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  }
+  return (
+    <FormSheet
+      title={title}
+      onClose={onClose}
+      footer={
+        <Btn
+          title={t('common.create')}
+          disabled={!pickedStart || alreadyExists || creating}
+          onPress={onCreate}
+        />
+      }
+      overlay={
+        <DatePickerModal
+          visible={pickerOpen}
+          value={pickStart}
+          onChange={onPickStart}
+          onClose={() => setPickerOpen(false)}
+        />
+      }
+    >
+      <FormSection footer={which}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingHorizontal: sp.sm, paddingVertical: sp.sm }}>
+          <Pressable
+            onPress={() => onPickStart(prevPeriodStart(period, base))}
+            accessibilityRole="button"
+            accessibilityLabel={t('months.prevPeriod')}
+            hitSlop={6}
+            style={({ pressed }) => [stepBtn, pressed && { opacity: 0.6 }]}
+          >
+            <ChevronLeft size={18} color={c.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => setPickerOpen(true)}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              flex: 1,
+              minHeight: 44,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: sp.sm,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <CalendarDays size={17} color={c.accent} />
+            <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 18, color: c.text }} numberOfLines={1}>
+              {pickedStart ? periodLabel(period, pickedStart) : ''}
+            </Txt>
+          </Pressable>
+          <Pressable
+            onPress={() => onPickStart(nextPeriodStart(period, base))}
+            accessibilityRole="button"
+            accessibilityLabel={t('months.nextPeriod')}
+            hitSlop={6}
+            style={({ pressed }) => [stepBtn, pressed && { opacity: 0.6 }]}
+          >
+            <ChevronRight size={18} color={c.text} />
+          </Pressable>
+        </View>
+      </FormSection>
+      {hint ? (
+        <Txt
+          style={{
+            fontSize: 13,
+            lineHeight: 18,
+            marginHorizontal: sp.md,
+            marginTop: -sp.sm,
+            color: alreadyExists ? c.expense : c.textMuted,
+          }}
+        >
+          {hint}
+        </Txt>
+      ) : null}
+    </FormSheet>
+  )
+}
+
+/** One period (2026-11 Money rethink): its name (+ "Current"), received and
+ *  spent in green/red underneath, and the balance large on the right — every
+ *  number once, nothing repeated. Swipe left to reveal Delete (which then
+ *  confirms); a read-only viewer (deletable=false) gets no swipe. */
 function PeriodCard({
   label,
+  current,
+  income,
+  spent,
   balance,
   onOpen,
   onDelete,
   deletable,
 }: {
   label: string
+  current: boolean
+  income: number
+  spent: number
   balance: number
   onOpen: () => void
   onDelete: () => void
@@ -587,32 +691,35 @@ function PeriodCard({
   const swipeRef = useRef<Swipeable>(null)
 
   const card = (
-    <Card onPress={onOpen}>
+    <Card onPress={onOpen} style={{ paddingVertical: sp.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-        <Txt style={{ flex: 1, fontWeight: '700', fontSize: 16 }}>{label}</Txt>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Txt
-            style={{
-              fontSize: 10,
-              fontWeight: '700',
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              color: c.textFaint,
-            }}
-          >
-            {t('common.balance')}
-          </Txt>
-          <Txt
-            style={{
-              fontSize: 16,
-              fontWeight: '700',
-              fontVariant: ['tabular-nums'],
-              color: balance >= 0 ? c.income : c.expense,
-            }}
-          >
-            {formatMoney(balance)}
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }} numberOfLines={1}>
+              {label}
+            </Txt>
+            {current ? (
+              <View style={{ backgroundColor: c.action, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <Txt style={{ color: c.onAction, fontSize: 11, fontFamily: fonts.semibold }}>{t('months.current')}</Txt>
+              </View>
+            ) : null}
+          </View>
+          <Txt style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>
+            <Txt style={{ fontSize: 13, color: c.income }}>↑ {formatMoney(income)}</Txt>
+            <Txt style={{ fontSize: 13, color: c.textFaint }}>{'   '}</Txt>
+            <Txt style={{ fontSize: 13, color: c.expense }}>↓ {formatMoney(spent)}</Txt>
           </Txt>
         </View>
+        <Txt
+          style={{
+            fontSize: 19,
+            fontFamily: fonts.display,
+            fontVariant: ['tabular-nums'],
+            color: balance >= 0 ? c.income : c.expense,
+          }}
+        >
+          {formatMoney(balance)}
+        </Txt>
         <ChevronRight size={20} color={c.textFaint} />
       </View>
     </Card>

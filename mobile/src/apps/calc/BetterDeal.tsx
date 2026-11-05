@@ -5,30 +5,35 @@
 // which is cheaper. To make that obvious we (1) attach the unit to the amount
 // input as a suffix (it reads as part of the quantity, not a calc input),
 // (2) reframe the selector as "Compare price per", and (3) say outright it won't
-// change the result. The per-unit price under each card is the hero number.
+// change the result. The per-unit prices and the verdict are on the shelf
+// illustration (ProductShelf); the card below holds only the inputs.
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { Check } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 import { formatPerUnit, num } from './shared'
+import { ProductShelf } from './ProductShelf'
 
 const UNITS = ['kg', 'g', 'lb', 'oz', 'L', 'mL', 'each']
 
-// Hoisted to a stable top-level component — defining this inside BetterDeal's
-// render body would give React a new component type on every keystroke
-// (BetterDeal re-renders on every pA/qA/pB/qB change), forcing a remount of
-// the TextInput underneath and dropping keyboard focus mid-type.
-function OptionCard({
+// One offer as a column under its container on the shelf: "Offer A" with
+// its badge (green when it wins), then Price and Amount, each labelled with
+// the number centred. Columns rather than rows so A and B line up with the
+// two containers above (2026-11: a row per option, uncentred and unlabelled,
+// read as a spreadsheet the user had to decode).
+//
+// Hoisted to module scope: defined inside BetterDeal's render it would be a
+// new component type on every keystroke, remounting the TextInputs and
+// dropping keyboard focus mid-type.
+function OfferColumn({
   side,
   price,
   setPrice,
   qty,
   setQty,
-  unitPrice,
   unitLabel,
   isWinner,
 }: {
@@ -37,7 +42,6 @@ function OptionCard({
   setPrice: (s: string) => void
   qty: string
   setQty: (s: string) => void
-  unitPrice: number
   unitLabel: string
   isWinner: boolean
 }) {
@@ -45,62 +49,50 @@ function OptionCard({
   const { t } = useI18n()
   return (
     <View
-      style={[styles.card, { backgroundColor: c.card, borderColor: isWinner ? c.income : 'transparent' }]}
+      style={[
+        styles.offer,
+        // Same 2pt border either way, so the winner doesn't grow taller than its pair.
+        { backgroundColor: c.card, borderColor: isWinner ? c.income : 'transparent', borderWidth: 2 },
+      ]}
     >
-      <View style={styles.cardHead}>
-        <Txt style={{ fontSize: 14, fontWeight: '700', color: c.text }}>
-          {side === 'A' ? t('calc.optionA') : t('calc.optionB')}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <View style={[styles.letter, { backgroundColor: isWinner ? c.income : c.accentSoft }]}>
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, color: isWinner ? '#ffffff' : c.accent }}>{side}</Txt>
+        </View>
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>
+          {t('calc.offer', { side })}
         </Txt>
-        {isWinner && (
-          <View style={[styles.badge, { backgroundColor: c.income }]}>
-            <Check size={12} color="#ffffff" strokeWidth={2.5} />
-            <Txt style={{ color: '#ffffff', fontSize: 11, fontWeight: '700' }}>
-              {t('calc.betterDeal')}
-            </Txt>
-          </View>
-        )}
       </View>
 
-      <View style={{ flexDirection: 'row', gap: sp.sm }}>
-        {/* price */}
+      <View style={{ gap: 4 }}>
+        <Txt style={[styles.fieldLabel, { color: c.textMuted }]}>{t('calc.price')}</Txt>
         <View style={[styles.field, { backgroundColor: c.surface }]}>
-          {/* Same rule as the other calculators: the $ tracks the value's state. */}
-          <Txt style={{ color: price ? c.text : c.textFaint, fontWeight: '700' }}>$</Txt>
+          <Txt style={{ color: price ? c.text : c.textFaint, fontFamily: fonts.semibold, fontSize: 17 }}>$</Txt>
           <TextInput
             value={price}
             onChangeText={setPrice}
             keyboardType="decimal-pad"
-            placeholder={t('calc.price')}
+            placeholder="0.00"
             placeholderTextColor={c.textFaint}
             style={[styles.fieldInput, { color: c.text }]}
           />
         </View>
-        {/* amount, with the shared unit shown as a suffix (it's a label) */}
+      </View>
+
+      <View style={{ gap: 4 }}>
+        <Txt style={[styles.fieldLabel, { color: c.textMuted }]}>{t('calc.amount')}</Txt>
         <View style={[styles.field, { backgroundColor: c.surface }]}>
           <TextInput
             value={qty}
             onChangeText={setQty}
             keyboardType="decimal-pad"
-            placeholder={t('calc.amount')}
+            placeholder="0"
             placeholderTextColor={c.textFaint}
             style={[styles.fieldInput, { color: c.text }]}
           />
-          <Txt style={{ color: c.textMuted, fontWeight: '700' }}>{unitLabel}</Txt>
+          <Txt style={{ color: c.textMuted, fontSize: 14, fontFamily: fonts.semibold }}>{unitLabel}</Txt>
         </View>
       </View>
-
-      {/* per-unit price — the number that actually decides the winner */}
-      <Txt
-        style={{
-          marginTop: sp.md,
-          fontSize: 18,
-          fontWeight: '800',
-          fontVariant: ['tabular-nums'],
-          color: isWinner ? c.income : Number.isFinite(unitPrice) ? c.text : c.textFaint,
-        }}
-      >
-        {Number.isFinite(unitPrice) ? `${formatPerUnit(unitPrice)} / ${unitLabel}` : '—'}
-      </Txt>
     </View>
   )
 }
@@ -125,6 +117,10 @@ export function BetterDeal() {
 
   return (
     <View style={{ gap: sp.md }}>
+      {/* What this tool is, in one line — the screen used to start straight
+          at "Compare price per" and left people guessing. */}
+      <Txt style={{ fontSize: 16, lineHeight: 22, color: c.textMuted }}>{t('calc.dealIntro')}</Txt>
+
       {/* unit — a shared label, not a calc input */}
       <View>
         <Txt variant="label" style={{ color: c.textFaint }}>
@@ -141,9 +137,9 @@ export function BetterDeal() {
               <Pressable
                 key={u}
                 onPress={() => setUnit(u)}
-                style={[styles.unitChip, { backgroundColor: active ? c.accent : c.surface }]}
+                style={[styles.unitChip, { backgroundColor: active ? c.action : c.surface }]}
               >
-                <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? c.onAccent : c.textMuted }}>
+                <Txt style={{ fontSize: 14, fontWeight: '700', color: active ? c.onAction : c.textMuted }}>
                   {u === 'each' ? t('calc.unitEach') : u}
                 </Txt>
               </Pressable>
@@ -155,69 +151,63 @@ export function BetterDeal() {
         </Txt>
       </View>
 
-      <OptionCard
-        side="A"
-        price={pA}
-        setPrice={setPA}
-        qty={qA}
-        setQty={setQA}
-        unitPrice={uA}
-        unitLabel={unitLabel}
-        isWinner={winner === 'A'}
-      />
-      <OptionCard
-        side="B"
-        price={pB}
-        setPrice={setPB}
-        qty={qB}
-        setQty={setQB}
-        unitPrice={uB}
-        unitLabel={unitLabel}
-        isWinner={winner === 'B'}
+      {/* The same product, small vs big container, resizing as amounts are
+          typed; the cheaper-per-unit one gets the tag. */}
+      <ProductShelf
+        unit={unit}
+        qtyA={num(qA)}
+        qtyB={num(qB)}
+        winner={winner}
+        perUnitA={Number.isFinite(uA) ? `${formatPerUnit(uA)} / ${unitLabel}` : null}
+        perUnitB={Number.isFinite(uB) ? `${formatPerUnit(uB)} / ${unitLabel}` : null}
+        verdict={
+          winner === 'tie'
+            ? t('calc.tie')
+            : both
+              ? t('calc.cheaperBy', { side: winner === 'A' ? 'A' : 'B', pct })
+              : null
+        }
       />
 
-      {winner === 'tie' ? (
-        <Txt variant="muted" style={{ textAlign: 'center', fontWeight: '600' }}>
-          {t('calc.tie')}
-        </Txt>
-      ) : both ? (
-        <Txt style={{ textAlign: 'center', fontWeight: '700', color: c.income }}>
-          {t('calc.cheaperBy', { side: winner === 'A' ? 'A' : 'B', pct })}
-        </Txt>
-      ) : null}
+      <View style={{ flexDirection: 'row', gap: sp.md }}>
+        <OfferColumn side="A" price={pA} setPrice={setPA} qty={qA} setQty={setQA} unitLabel={unitLabel} isWinner={winner === 'A'} />
+        <OfferColumn side="B" price={pB} setPrice={setPB} qty={qB} setQty={setQB} unitLabel={unitLabel} isWinner={winner === 'B'} />
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    padding: sp.md,
-  },
-  cardHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: sp.sm,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: radius.pill,
-    paddingHorizontal: sp.sm,
-    paddingVertical: 2,
-  },
-  field: {
+  offer: {
     flex: 1,
+    borderRadius: radius.lg,
+    padding: sp.md,
+    gap: sp.md,
+  },
+  letter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fieldLabel: { fontSize: 12, textAlign: 'center' },
+  field: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
     borderRadius: radius.md,
-    paddingHorizontal: sp.md,
+    paddingHorizontal: sp.sm,
   },
-  fieldInput: { flex: 1, paddingVertical: 12, fontSize: 16, minWidth: 0 },
+  fieldInput: {
+    flexShrink: 1,
+    minWidth: 40,
+    textAlign: 'center',
+    paddingVertical: 11,
+    fontSize: 20,
+    fontFamily: fonts.semibold,
+  },
   unitChip: {
     borderRadius: radius.sm,
     paddingHorizontal: sp.md,

@@ -23,6 +23,7 @@
         "NSFaceIDUsageDescription": "Face ID unlocks your private Document Vault.",
         "NSCameraUsageDescription": "Take photos to scan receipts and bills, capture documents, and add pet and profile photos.",
         "NSPhotoLibraryUsageDescription": "Attach photos for receipts, pets, profiles and documents.",
+        "NSPhotoLibraryAddUsageDescription": "Save printable cards, like luggage tags, to your photos.",
         "NSCalendarsUsageDescription": "Add your One Roof events to the device calendar.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
@@ -62,6 +63,13 @@
         }
       ],
       "expo-localization",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "One Roof uses the microphone when you tap the mic to ask or add something by voice.",
+          "speechRecognitionPermission": "One Roof turns what you say into text so you can add to your lists and check your agenda by voice."
+        }
+      ],
       "@react-native-community/datetimepicker",
       "expo-apple-authentication",
       [
@@ -75,7 +83,7 @@
         {
           "photosPermission": "Attach photos for receipts, pets, profiles and documents.",
           "cameraPermission": "Take photos to scan receipts and bills, capture documents, and add pet and profile photos.",
-          "microphonePermission": false
+          "microphonePermission": "One Roof uses the microphone when you tap the mic to ask or add something by voice."
         }
       ],
       [

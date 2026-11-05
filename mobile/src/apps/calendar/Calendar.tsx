@@ -360,12 +360,12 @@ export default function Calendar() {
                     alignItems: 'center',
                     paddingVertical: 8,
                     borderRadius: radius.pill,
-                    backgroundColor: active ? c.accent : 'transparent',
+                    backgroundColor: active ? c.action : 'transparent',
                   }}
                 >
                   <Txt
                     style={{
-                      color: active ? c.onAccent : c.textMuted,
+                      color: active ? c.onAction : c.textMuted,
                       fontWeight: '600',
                     }}
                   >
@@ -434,7 +434,7 @@ export default function Calendar() {
                             borderRadius: 16,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            backgroundColor: isSelected ? c.accent : 'transparent',
+                            backgroundColor: isSelected ? c.action : 'transparent',
                             borderWidth: !isSelected && isToday ? 1 : 0,
                             borderColor: c.accent,
                           }}
@@ -442,7 +442,7 @@ export default function Calendar() {
                           <Txt
                             style={{
                               fontSize: 14,
-                              color: isSelected ? c.onAccent : isToday ? c.accent : c.text,
+                              color: isSelected ? c.onAction : isToday ? c.accent : c.text,
                               fontWeight: isSelected || isToday ? '700' : '400',
                             }}
                           >
@@ -631,10 +631,10 @@ function EventRow({
             borderRadius: radius.pill,
             paddingHorizontal: 10,
             paddingVertical: 4,
-            backgroundColor: soon ? c.accent : c.surface,
+            backgroundColor: soon ? c.action : c.surface,
           }}
         >
-          <Txt style={{ fontSize: 12, fontWeight: '700', color: soon ? c.onAccent : c.textMuted }}>
+          <Txt style={{ fontSize: 12, fontWeight: '700', color: soon ? c.onAction : c.textMuted }}>
             {countdown}
           </Txt>
         </View>

@@ -1,27 +1,37 @@
 // Add / edit a budget entry — a bottom-sheet modal, amount-first. The amount is
 // the hero input; the category is auto-suggested live from the label (learned
-// category_rules + keyword defaults) and shown as a chip row with the
-// household's most-used categories; the full grid (plus "create a new custom
-// category") sits behind an "All" chip. Date is Today / Yesterday / pick chips,
-// "who" chips show "First L.", recurring is a native Switch, and the save
-// button announces what it does ("Add expense · $12.50"). Supports an `initial`
-// prefill (e.g. a scanned receipt) and learns label→category on save.
-import { useEffect, useMemo, useState } from 'react'
-import {
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  TextInput,
-  View,
-} from 'react-native'
-import { Toggle } from '@/components/Toggle'
+// category_rules + keyword defaults).
+//
+// 2026-11 Money rethink (Comando style), on the "inset grouped list" rows of
+// components/form:
+//   • A HERO panel tinted by what this is — red for an expense, green for
+//     income, the same two colours as every Money total: the ↓ Expense / ↑
+//     Income pills, the amount large in that colour with its sign, and the
+//     category as a chip right under the amount (tap → the full grid in a
+//     sheet, which can also create a household category and links to Manage
+//     categories). "Coffee, $5.42, Dining" reads as one sentence up there.
+//   • What: Label, the household's most-used categories as a strip, then
+//     Subcategory with its used-before suggestions.
+//   • Details: Date (Today / Yesterday / 📅), Who (member avatars for ≤4,
+//     a picker beyond), Recurring.
+// The docked save button announces what it does ("Add expense · $12.50").
+// Supports an `initial` prefill (e.g. a scanned receipt) and learns
+// label→category on save.
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { Plus, SlidersHorizontal, X } from 'lucide-react-native'
+import { ArrowDown, ArrowUp, CalendarDays, ChevronDown, ChevronRight, Plus } from 'lucide-react-native'
 
-import { Btn, Field, Txt } from '@/components/ui'
+import { Btn, Txt } from '@/components/ui'
+import {
+  FormRow,
+  FormSection,
+  RowValue,
+  SelectRow,
+  TextRow,
+  ToggleRow,
+} from '@/components/form'
+import { useRevealOnFocus } from '@/components/KeyboardScroll'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import {
@@ -33,12 +43,13 @@ import {
   type Category,
 } from '@/lib/categories'
 import { track } from '@/lib/analytics'
-import { addDaysISO, formatDay, formatMoney, shortName, todayISO } from '@/lib/format'
+import { addDaysISO, formatMoney, shortName, todayISO } from '@/lib/format'
+import { memberColor } from '@/lib/calendar'
 import { supabase } from '@/lib/supabase'
 import type { CategoryOverride, CategoryRule, CustomCategory, Entry, EntryType, Profile } from '@/lib/types'
-import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { Chip, DatePickerModal } from './shared'
+import { DatePickerModal } from './shared'
+import { FormSheet } from './FormSheet'
 import ManageCategoriesSheet from './ManageCategoriesSheet'
 
 export interface EntryPrefill {
@@ -51,6 +62,494 @@ export interface EntryPrefill {
 
 /** Chips shown when the household has no history yet. */
 const FALLBACK_TOP = ['groceries', 'dining', 'transport']
+
+const ROW_MIN_H = 50
+
+/** Strip a hint's wrapping parentheses: "(suggested as you type)" was
+ *  written to sit inline after a label; under one, the brackets are noise. */
+function bareHint(s: string): string {
+  return s.replace(/^\s*\((.*)\)\s*$/, '$1')
+}
+
+/** "Nov 3" — short enough to sit in the date segment. */
+function shortDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// ── Row pieces (module scope: never define components in a render body) ────
+
+type SegOption<T extends string> = { value: T; label?: string; icon?: ReactNode; a11y?: string }
+
+/** A compact, content-sized segmented control that sits on the RIGHT of a
+ *  row (form's Segmented is full-width). Neutral track, the selected segment
+ *  a raised card — a choice, not an action, so no accent fill. Every tap
+ *  reports, even on the selected segment (the 📅 one reopens the calendar). */
+function MiniSegment<T extends string>({
+  value,
+  options,
+  onPress,
+}: {
+  value: T
+  options: SegOption<T>[]
+  onPress: (v: T) => void
+}) {
+  const { c, dark } = useTheme()
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: c.surface2, borderRadius: radius.pill, padding: 3, flexShrink: 1 }}>
+      {options.map((o) => {
+        const on = o.value === value
+        return (
+          <Pressable
+            key={o.value}
+            onPress={() => onPress(o.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={o.a11y ?? o.label}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: radius.pill,
+              backgroundColor: on ? (dark ? 'rgba(255,255,255,0.16)' : '#FFFFFF') : 'transparent',
+              shadowColor: '#000',
+              shadowOpacity: on && !dark ? 0.08 : 0,
+              shadowRadius: 3,
+              shadowOffset: { width: 0, height: 1 },
+            }}
+          >
+            {o.icon}
+            {o.label ? (
+              <Txt
+                style={{ fontSize: 13, fontFamily: on ? fonts.semibold : fonts.medium, color: on ? c.text : c.textMuted }}
+                numberOfLines={1}
+              >
+                {o.label}
+              </Txt>
+            ) : null}
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** ↓ Expense / ↑ Income as two pills; the chosen one filled in its colour. */
+function TypeToggle({ value, onChange }: { value: EntryType; onChange: (v: EntryType) => void }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const opts: { v: EntryType; label: string; color: string; Icon: typeof ArrowDown }[] = [
+    // The strings carry a "−"/"+" for the old text-only switch; the arrow says it now.
+    { v: 'expense', label: t('entry.expense').replace(/^[−+＋-]\s*/, ''), color: c.expense, Icon: ArrowDown },
+    { v: 'income', label: t('entry.income').replace(/^[−+＋-]\s*/, ''), color: c.income, Icon: ArrowUp },
+  ]
+  return (
+    <View style={{ flexDirection: 'row', alignSelf: 'center', gap: 6, backgroundColor: c.surface, borderRadius: radius.pill, padding: 4 }}>
+      {opts.map(({ v, label, color, Icon }) => {
+        const on = value === v
+        return (
+          <Pressable
+            key={v}
+            onPress={() => onChange(v)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: radius.pill,
+              backgroundColor: on ? color : 'transparent',
+            }}
+          >
+            <Icon size={15} color={on ? '#fff' : c.textMuted} strokeWidth={2.4} />
+            <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: on ? '#fff' : c.textMuted }}>{label}</Txt>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** The chosen category as a chip under the amount; tap opens the full grid. */
+function CategoryChip({ icon, name, hint, onPress }: { icon: string; name: string; hint?: string; onPress: () => void }) {
+  const { c } = useTheme()
+  return (
+    <View style={{ alignItems: 'center', gap: 4 }}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 7,
+          paddingLeft: 6,
+          paddingRight: 12,
+          paddingVertical: 6,
+          borderRadius: radius.pill,
+          backgroundColor: c.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: c.border,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+          <Txt style={{ fontSize: 16 }}>{icon}</Txt>
+        </View>
+        <Txt style={{ fontSize: 15, fontFamily: fonts.semibold, color: c.text }} numberOfLines={1}>
+          {name}
+        </Txt>
+        <ChevronDown size={15} color={c.textMuted} />
+      </Pressable>
+      {hint ? (
+        <Txt variant="faint" style={{ fontSize: 12 }}>
+          {hint}
+        </Txt>
+      ) : null}
+    </View>
+  )
+}
+
+/** Who paid / received: member avatars (initial in their calendar colour). */
+function WhoChips({
+  profiles,
+  value,
+  onChange,
+}: {
+  profiles: Profile[]
+  value: string
+  onChange: (email: string) => void
+}) {
+  const { c } = useTheme()
+  const emails = profiles.map((p) => p.email)
+  return (
+    <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1 }}>
+      {profiles.map((p) => {
+        const on = p.email === value
+        const tint = memberColor(p.email, emails)
+        return (
+          <Pressable
+            key={p.email}
+            onPress={() => onChange(p.email)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={p.display_name}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingLeft: 4,
+              paddingRight: 10,
+              paddingVertical: 4,
+              borderRadius: radius.pill,
+              borderWidth: 1.5,
+              borderColor: on ? tint : 'transparent',
+              backgroundColor: on ? tint + '1A' : 'transparent',
+            }}
+          >
+            <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: tint, alignItems: 'center', justifyContent: 'center' }}>
+              <Txt style={{ color: '#fff', fontSize: 12, fontFamily: fonts.semibold }}>
+                {(p.display_name || p.email).charAt(0).toUpperCase()}
+              </Txt>
+            </View>
+            <Txt style={{ fontSize: 13, fontFamily: on ? fonts.semibold : fonts.medium, color: on ? c.text : c.textMuted }}>
+              {shortName(p.display_name)}
+            </Txt>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** A short horizontal strip of small neutral pills — the quick categories and
+ *  the subcategory suggestions. `active` gets a soft accent tint. */
+function PillStrip({ children }: { children: ReactNode }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ gap: sp.sm, paddingHorizontal: sp.md, paddingVertical: 10 }}
+    >
+      {children}
+    </ScrollView>
+  )
+}
+
+function Pill({
+  label,
+  icon,
+  active,
+  onPress,
+}: {
+  label: string
+  icon?: string
+  active?: boolean
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 11,
+        paddingVertical: 6,
+        borderRadius: radius.pill,
+        backgroundColor: active ? c.action : c.surface,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      {icon ? <Txt style={{ fontSize: 14 }}>{icon}</Txt> : null}
+      <Txt
+        style={{ fontSize: 13, fontFamily: active ? fonts.semibold : fonts.medium, color: active ? c.onAction : c.textMuted }}
+        numberOfLines={1}
+      >
+        {label}
+      </Txt>
+    </Pressable>
+  )
+}
+
+/** Emoji + name + Add, for creating a custom category from the picker. Its own
+ *  component so it can reveal itself above the keyboard (KeyboardScroll). */
+function NewCategoryRow({
+  icon,
+  name,
+  onIcon,
+  onName,
+  onAdd,
+  busy,
+}: {
+  icon: string
+  name: string
+  onIcon: (v: string) => void
+  onName: (v: string) => void
+  onAdd: () => void
+  busy: boolean
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const reveal = useRevealOnFocus()
+  const row = useRef<View>(null)
+  const canAdd = !busy && Boolean(name.trim())
+  return (
+    <View
+      ref={row}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, minHeight: ROW_MIN_H, paddingHorizontal: sp.sm, paddingVertical: 6 }}
+    >
+      <TextInput
+        value={icon}
+        onChangeText={onIcon}
+        placeholder="🏷️"
+        placeholderTextColor={c.textFaint}
+        maxLength={4}
+        accessibilityLabel={t('entry.newCategoryIcon')}
+        onFocus={() => reveal(row.current)}
+        style={{
+          width: 40,
+          height: 38,
+          textAlign: 'center',
+          backgroundColor: c.surface,
+          borderRadius: radius.sm,
+          fontSize: 18,
+          color: c.text,
+        }}
+      />
+      <TextInput
+        value={name}
+        onChangeText={onName}
+        placeholder={t('entry.newCategoryPlaceholder')}
+        placeholderTextColor={c.textFaint}
+        maxLength={40}
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={() => canAdd && onAdd()}
+        onFocus={() => reveal(row.current)}
+        style={{ flex: 1, minWidth: 0, height: 38, fontSize: 15, fontFamily: fonts.body, color: c.text }}
+      />
+      <Pressable
+        onPress={onAdd}
+        disabled={!canAdd}
+        accessibilityRole="button"
+        style={({ pressed }) => ({
+          backgroundColor: c.action,
+          borderRadius: radius.pill,
+          paddingHorizontal: 14,
+          paddingVertical: 8,
+          opacity: !canAdd ? 0.5 : pressed ? 0.85 : 1,
+        })}
+      >
+        <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 14 }}>{t('common.add')}</Txt>
+      </Pressable>
+    </View>
+  )
+}
+
+/** The full category picker: a grid of every expense category in a sheet,
+ *  a "New" tile that opens an inline create row, and Manage categories.
+ *  Rendered INSIDE the entry form's Modal (via FormSheet's overlay) — a
+ *  sibling Modal of an open one fails to present on iOS. */
+function CategorySheet({
+  visible,
+  selectedId,
+  cats,
+  catName,
+  customCats,
+  overrides,
+  onPick,
+  onCreated,
+  onManageChanged,
+  onClose,
+}: {
+  visible: boolean
+  selectedId: string
+  cats: Category[]
+  catName: (cat: Category) => string
+  customCats: CustomCategory[]
+  overrides: CategoryOverride[]
+  onPick: (id: string) => void
+  onCreated: (cat: CustomCategory) => void
+  onManageChanged: () => void
+  onClose: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const [newOpen, setNewOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newIcon, setNewIcon] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [manageOpen, setManageOpen] = useState(false)
+
+  async function createCategory() {
+    const trimmed = newName.trim()
+    if (!trimmed) return
+    setCreating(true)
+    setError(null)
+    const { data, error: err } = await supabase
+      .from('custom_categories')
+      .insert({ name: trimmed, icon: newIcon.trim() || '🏷️' })
+      .select()
+      .single()
+    setCreating(false)
+    if (err || !data) {
+      setError(t('entry.categoryCreateFailed'))
+      return
+    }
+    setNewOpen(false)
+    setNewName('')
+    setNewIcon('')
+    onCreated(data as CustomCategory)
+  }
+
+  return (
+    <FormSheet
+      visible={visible}
+      title={t('entry.category')}
+      onClose={onClose}
+      onBackdropPress={onClose}
+      maxShare={0.85}
+      overlay={
+        manageOpen ? (
+          <ManageCategoriesSheet
+            categories={customCats}
+            overrides={overrides}
+            onChanged={onManageChanged}
+            onClose={() => setManageOpen(false)}
+          />
+        ) : null
+      }
+    >
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+        {cats.map((cat) => {
+          const active = selectedId === cat.id
+          return (
+            <Pressable
+              key={cat.id}
+              onPress={() => onPick(cat.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={catName(cat)}
+              style={({ pressed }) => ({
+                width: '22.5%',
+                alignItems: 'center',
+                paddingVertical: 10,
+                paddingHorizontal: 2,
+                borderRadius: radius.md,
+                backgroundColor: active ? c.action : c.surface,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Txt style={{ fontSize: 22 }}>{cat.icon}</Txt>
+              <Txt
+                style={{
+                  fontSize: 11,
+                  marginTop: 3,
+                  color: active ? c.accent : c.textMuted,
+                  fontFamily: active ? fonts.semibold : fonts.body,
+                }}
+                numberOfLines={1}
+              >
+                {catName(cat)}
+              </Txt>
+            </Pressable>
+          )
+        })}
+        <Pressable
+          onPress={() => setNewOpen((o) => !o)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: newOpen }}
+          style={({ pressed }) => ({
+            width: '22.5%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 10,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: newOpen ? c.accent : c.textFaint,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Plus size={20} color={newOpen ? c.accent : c.textMuted} />
+          <Txt style={{ fontSize: 11, marginTop: 3, color: newOpen ? c.accent : c.textMuted }} numberOfLines={1}>
+            {t('entry.newCategory')}
+          </Txt>
+        </Pressable>
+      </View>
+
+      {newOpen ? (
+        <View style={{ gap: 6 }}>
+          <FormSection>
+            <NewCategoryRow
+              icon={newIcon}
+              name={newName}
+              onIcon={setNewIcon}
+              onName={setNewName}
+              onAdd={createCategory}
+              busy={creating}
+            />
+          </FormSection>
+          {error ? <Txt style={{ color: c.expense, fontSize: 13, marginHorizontal: sp.md }}>{error}</Txt> : null}
+        </View>
+      ) : null}
+
+      {/* edit / delete the household's categories, rename the built-ins */}
+      <FormSection>
+        <FormRow label={t('manageCats.title')} onPress={() => setManageOpen(true)} chevron />
+      </FormSection>
+    </FormSheet>
+  )
+}
 
 export default function EntryForm({
   monthId,
@@ -94,7 +593,6 @@ export default function EntryForm({
   onSaved: () => void
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
   const { t } = useI18n()
 
   const today = todayISO()
@@ -121,15 +619,10 @@ export default function EntryForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Category picker: chips by default, the full grid behind "All".
+  // Category picker: a short strip by default, the full grid in a sheet.
   const [gridOpen, setGridOpen] = useState(false)
   const [localCats, setLocalCats] = useState<CustomCategory[]>(customCategories)
   const [localOverrides, setLocalOverrides] = useState<CategoryOverride[]>(categoryOverrides)
-  const [newCatOpen, setNewCatOpen] = useState(false)
-  const [newCatName, setNewCatName] = useState('')
-  const [newCatIcon, setNewCatIcon] = useState('')
-  const [creatingCat, setCreatingCat] = useState(false)
-  const [manageOpen, setManageOpen] = useState(false)
 
   // Auto-categorize as the label is typed, until the user picks manually.
   useEffect(() => {
@@ -168,26 +661,9 @@ export default function EntryForm({
     setGridOpen(false)
   }
 
-  async function createCategory() {
-    const trimmed = newCatName.trim()
-    if (!trimmed) return
-    setCreatingCat(true)
-    setError(null)
-    const { data, error: err } = await supabase
-      .from('custom_categories')
-      .insert({ name: trimmed, icon: newCatIcon.trim() || '🏷️' })
-      .select()
-      .single()
-    setCreatingCat(false)
-    if (err || !data) {
-      setError(t('entry.categoryCreateFailed'))
-      return
-    }
-    setLocalCats((prev) => [...prev, data as CustomCategory])
-    setNewCatOpen(false)
-    setNewCatName('')
-    setNewCatIcon('')
-    pickCategory((data as CustomCategory).id)
+  function categoryCreated(cat: CustomCategory) {
+    setLocalCats((prev) => [...prev, cat])
+    pickCategory(cat.id)
     onCategoryCreated()
   }
 
@@ -274,518 +750,218 @@ export default function EntryForm({
     ? t(type === 'expense' ? 'entry.editExpenseTitle' : 'entry.editIncomeTitle')
     : t(type === 'expense' ? 'entry.newExpenseTitle' : 'entry.newIncomeTitle')
 
+  // Date: Today / Yesterday (when inside this period) / 📅 any other day.
+  type DateKey = 'today' | 'yesterday' | 'other'
+  const dateKey: DateKey = date === today ? 'today' : date === yesterday ? 'yesterday' : 'other'
+  const dateOptions: SegOption<DateKey>[] = [
+    ...(inPeriod(today) ? [{ value: 'today' as const, label: t('entry.today') }] : []),
+    ...(inPeriod(yesterday) ? [{ value: 'yesterday' as const, label: t('entry.yesterday') }] : []),
+    {
+      value: 'other' as const,
+      label: dateIsOther ? shortDay(date) : undefined,
+      icon: <CalendarDays size={15} color={dateIsOther ? c.text : c.textMuted} />,
+      a11y: t('entry.pickDate'),
+    },
+  ]
+  function pickDateKey(k: DateKey) {
+    if (k === 'today') {
+      setDate(today)
+      setPickOpen(false)
+    } else if (k === 'yesterday') {
+      setDate(yesterday)
+      setPickOpen(false)
+    } else {
+      setPickOpen(true)
+    }
+  }
+
+  // Who: a segment for a small household, a picker beyond three members.
+  const who = profiles.find((p) => p.email === personEmail)
+  const whoRow =
+    profiles.length > 4 ? (
+      <SelectRow
+        label={t('entry.who')}
+        value={personEmail}
+        options={profiles.map((p) => ({ value: p.email, label: shortName(p.display_name) }))}
+        onChange={(v) => v && setPersonEmail(v)}
+      />
+    ) : profiles.length > 1 ? (
+      <FormRow label={t('entry.who')}>
+        <WhoChips profiles={profiles} value={personEmail} onChange={setPersonEmail} />
+      </FormRow>
+    ) : (
+      <FormRow label={t('entry.who')}>
+        <RowValue value={who ? shortName(who.display_name) : null} placeholder="—" />
+      </FormRow>
+    )
+
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        {/* Tap the dimmed area to dismiss the keyboard. */}
-        <Pressable
-          onPress={() => Keyboard.dismiss()}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
-        >
-          {/* Swallow taps so pressing the sheet doesn't dismiss the keyboard. */}
-          <Pressable
-            onPress={() => {}}
-            style={{
-              maxHeight: '92%',
-              backgroundColor: c.sheet,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
-            }}
-          >
-          {/* header */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.lg,
-              paddingBottom: sp.sm,
-            }}
-          >
-            <Txt variant="h2">{title}</Txt>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.cancel')}>
-              <X size={22} color={c.textMuted} />
-            </Pressable>
-          </View>
-
-          <ScrollView
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* expense / income — compact centered pill */}
-            <View style={{ alignItems: 'center' }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  backgroundColor: c.surface,
-                  borderRadius: radius.pill,
-                  padding: 4,
-                  gap: 4,
-                }}
-              >
-                {(['expense', 'income'] as const).map((ty) => {
-                  const active = type === ty
-                  return (
-                    <Pressable
-                      key={ty}
-                      onPress={() => setType(ty)}
-                      style={{
-                        borderRadius: radius.pill,
-                        paddingVertical: 8,
-                        paddingHorizontal: 20,
-                        backgroundColor: active ? (ty === 'expense' ? c.expense : c.income) : 'transparent',
-                      }}
-                    >
-                      <Txt
-                        style={{
-                          fontFamily: fonts.semibold,
-                          fontSize: 14,
-                          color: active ? '#fff' : c.textMuted,
-                        }}
-                      >
-                        {ty === 'expense' ? t('entry.expense') : t('entry.income')}
-                      </Txt>
-                    </Pressable>
-                  )
-                })}
-              </View>
-            </View>
-
-            {/* amount first — it's what you know when you open the form */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginTop: sp.sm,
-              }}
-            >
-              <Txt
-                style={{
-                  fontSize: 32,
-                  fontFamily: fonts.semibold,
-                  color: amount ? c.text : c.textFaint,
-                  marginRight: 2,
-                }}
-              >
-                $
-              </Txt>
-              <TextInput
-                value={amount}
-                onChangeText={(v) => setAmount(v.replace(/[^0-9.,]/g, ''))}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                placeholderTextColor={c.textFaint}
-                autoFocus={!entry && !initial?.amount}
-                accessibilityLabel={t('entry.amount')}
-                style={{
-                  fontSize: 52,
-                  fontFamily: fonts.display,
-                  fontVariant: ['tabular-nums'],
-                  color: c.text,
-                  minWidth: 120,
-                  textAlign: 'center',
-                  padding: 0,
-                }}
-              />
-            </View>
-
-            <Field
-              label={t('entry.label')}
-              value={label}
-              onChangeText={setLabel}
-              placeholder={
-                type === 'expense'
-                  ? t('entry.labelExpensePlaceholder')
-                  : t('entry.labelIncomePlaceholder')
-              }
-            />
-
-            {type === 'expense' && (
-              <View style={{ gap: sp.sm }}>
-                <Txt variant="label">
-                  {t('entry.category')}{' '}
-                  {!categoryTouched ? (
-                    <Txt style={{ fontSize: 12, color: c.textFaint }}>{t('entry.autoSuggested')}</Txt>
-                  ) : null}
-                </Txt>
-
-                {/* selected chip + most-used + All */}
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: sp.sm }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: c.accent,
-                      borderRadius: radius.pill,
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                    }}
-                  >
-                    <Txt style={{ fontSize: 14 }}>{selectedCat.icon}</Txt>
-                    <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.onAccent }}>
-                      {catName(selectedCat)}
-                    </Txt>
-                  </View>
-                  {quickIds.map((id) => {
-                    const qc = categoryById(id, localCats, localOverrides)
-                    return (
-                      <Pressable
-                        key={id}
-                        onPress={() => pickCategory(id)}
-                        accessibilityLabel={catName(qc)}
-                        style={({ pressed }) => ({
-                          backgroundColor: c.surface,
-                          borderRadius: radius.pill,
-                          paddingHorizontal: 12,
-                          paddingVertical: 7,
-                          opacity: pressed ? 0.7 : 1,
-                        })}
-                      >
-                        <Txt style={{ fontSize: 17 }}>{qc.icon}</Txt>
-                      </Pressable>
-                    )
-                  })}
-                  <Pressable
-                    onPress={() => setGridOpen(true)}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 3,
-                      borderRadius: radius.pill,
-                      borderWidth: 1,
-                      borderColor: c.border,
-                      backgroundColor: c.sheet,
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    {/* Always ▾, never a ▴ toggle: this opens a sheet now, and a
-                        caret that flips would promise the grid collapses back
-                        into the form. */}
-                    <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.textMuted }}>
-                      {t('common.all')} ▾
-                    </Txt>
-                  </Pressable>
-                </View>
-
-                {/* subcategory — its own labeled field section (optional) */}
-                <Field
-                  label={`${t('entry.subcategory')} ${t('entry.optional')}`}
-                  value={subcategory}
-                  onChangeText={setSubcategory}
-                  placeholder={
-                    isBuiltinCategory(category)
-                      ? t(`entry.sub.${category}` as TKey)
-                      : t('entry.subcategoryPlaceholder')
-                  }
-                />
-                {subSuggestions.length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                    {subSuggestions.map((s) => {
-                      const active = subcategory.trim().toLowerCase() === s.toLowerCase()
-                      return (
-                        <Chip key={s} active={active} onPress={() => setSubcategory(active ? '' : s)}>
-                          <Txt
-                            style={{ fontSize: 12, fontWeight: '600', color: active ? '#fff' : c.textMuted }}
-                          >
-                            {s}
-                          </Txt>
-                        </Chip>
-                      )
-                    })}
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* date — Today / Yesterday / pick */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('entry.date')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {inPeriod(today) && (
-                  <Chip
-                    active={date === today}
-                    onPress={() => {
-                      setDate(today)
-                      setPickOpen(false)
-                    }}
-                  >
-                    <Txt style={{ fontSize: 13, fontWeight: '600', color: date === today ? '#fff' : c.textMuted }}>
-                      {t('entry.today')}
-                    </Txt>
-                  </Chip>
-                )}
-                {inPeriod(yesterday) && (
-                  <Chip
-                    active={date === yesterday}
-                    onPress={() => {
-                      setDate(yesterday)
-                      setPickOpen(false)
-                    }}
-                  >
-                    <Txt
-                      style={{ fontSize: 13, fontWeight: '600', color: date === yesterday ? '#fff' : c.textMuted }}
-                    >
-                      {t('entry.yesterday')}
-                    </Txt>
-                  </Chip>
-                )}
-                <Chip active={dateIsOther} onPress={() => setPickOpen(true)}>
-                  <Txt style={{ fontSize: 13, fontWeight: '600', color: dateIsOther ? '#fff' : c.textMuted }}>
-                    {dateIsOther ? formatDay(date) : t('entry.pickDate')}
-                  </Txt>
-                </Chip>
-              </View>
-              {/* The calendar opens in a modal now — the Pick chip is the
-                  trigger, so there's no intermediate field row to tap through. */}
-              <DatePickerModal
-                visible={pickOpen}
-                value={date}
-                onChange={setDate}
-                onClose={() => setPickOpen(false)}
-              />
-            </View>
-
-            {/* who — "First L." chips */}
-            <View style={{ gap: 6 }}>
-              <Txt variant="label">{t('entry.who')}</Txt>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {profiles.map((p) => {
-                  const active = personEmail === p.email
-                  return (
-                    <Chip key={p.email} active={active} onPress={() => setPersonEmail(p.email)}>
-                      <Txt
-                        style={{ fontSize: 13, fontWeight: '600', color: active ? '#fff' : c.textMuted }}
-                      >
-                        {shortName(p.display_name)}
-                      </Txt>
-                    </Chip>
-                  )
-                })}
-              </View>
-            </View>
-
-            {/* recurring */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: c.surface,
-                borderRadius: radius.md,
-                paddingHorizontal: sp.md,
-                paddingVertical: 10,
-              }}
-            >
-              <View style={{ flex: 1, minWidth: 0, paddingRight: sp.sm }}>
-                <Txt>{t('entry.recurring')}</Txt>
-                <Txt variant="faint">{t('entry.recurringHint')}</Txt>
-              </View>
-              <Toggle
-                value={recurring}
-                onValueChange={setRecurring}
-                accessibilityLabel={t('entry.recurring')}
-              />
-            </View>
-          </ScrollView>
-
-          {/* footer */}
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap, gap: sp.md }}>
-            {error ? <Txt style={{ color: c.expense, fontSize: 13 }}>{error}</Txt> : null}
-            <Btn title={saveTitle} onPress={save} loading={saving} />
-            {entry ? (
-              <Pressable onPress={remove} disabled={saving} style={{ paddingVertical: 10, alignItems: 'center' }}>
-                <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('entry.deleteEntry')}</Txt>
-              </Pressable>
-            ) : null}
-          </View>
-          </Pressable>
-        </Pressable>
-      </KeyboardAvoidingView>
-      {/* Category picker — a sheet, not an inline grid. Expanded in place it
-          pushed the rest of the form (subcategory, date, who, save) down past
-          the fold, so choosing a category meant scrolling to find the grid and
-          scrolling back to finish. NESTED inside this Modal rather than a
-          sibling of it: on iOS a second Modal rendered alongside an open one
-          silently fails to present. */}
-      <Modal visible={gridOpen} transparent animationType="slide" onRequestClose={() => setGridOpen(false)}>
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-          onPress={() => setGridOpen(false)}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            style={{
-              maxHeight: '85%',
-              backgroundColor: c.sheet,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.lg,
-              paddingBottom: bottomGap,
-              gap: sp.md,
-            }}
-          >
-            <View
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-            >
-              <Txt variant="h2">{t('entry.category')}</Txt>
-              <Pressable
-                onPress={() => setGridOpen(false)}
-                hitSlop={10}
-                accessibilityLabel={t('common.close')}
-              >
-                <X size={20} color={c.textMuted} />
-              </Pressable>
-            </View>
-
-            <ScrollView keyboardShouldPersistTaps="handled">
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
-                {allExpenseCats.map((cat) => {
-                  const active = category === cat.id
-                  return (
-                    <Pressable
-                      key={cat.id}
-                      onPress={() => pickCategory(cat.id)}
-                      style={{
-                        width: '22%',
-                        alignItems: 'center',
-                        paddingVertical: 8,
-                        borderRadius: radius.md,
-                        backgroundColor: active ? c.accentSoft : c.surface,
-                        borderWidth: 2,
-                        borderColor: active ? c.accent : 'transparent',
-                      }}
-                    >
-                      <Txt style={{ fontSize: 20 }}>{cat.icon}</Txt>
-                      <Txt style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }} numberOfLines={1}>
-                        {catName(cat)}
-                      </Txt>
-                    </Pressable>
-                  )
-                })}
-                <Pressable
-                  onPress={() => setNewCatOpen((o) => !o)}
-                  style={{
-                    width: '22%',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingVertical: 8,
-                    borderRadius: radius.md,
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    borderColor: c.textFaint,
-                  }}
-                >
-                  <Plus size={20} color={c.textMuted} />
-                  <Txt style={{ fontSize: 10, color: c.textMuted, marginTop: 2 }}>
-                    {t('entry.newCategory')}
-                  </Txt>
-                </Pressable>
-              </View>
-
-              {newCatOpen ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginTop: sp.md }}>
-                  <TextInput
-                    value={newCatIcon}
-                    onChangeText={setNewCatIcon}
-                    placeholder="🏷️"
-                    placeholderTextColor={c.textFaint}
-                    maxLength={4}
-                    accessibilityLabel={t('entry.newCategoryIcon')}
-                    style={{
-                      width: 56,
-                      textAlign: 'center',
-                      backgroundColor: c.surface,
-                      borderRadius: radius.md,
-                      paddingVertical: 12,
-                      fontSize: 16,
-                      color: c.text,
-                    }}
-                  />
-                  <TextInput
-                    value={newCatName}
-                    onChangeText={setNewCatName}
-                    placeholder={t('entry.newCategoryPlaceholder')}
-                    placeholderTextColor={c.textFaint}
-                    maxLength={40}
-                    autoFocus
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      backgroundColor: c.surface,
-                      borderRadius: radius.md,
-                      paddingHorizontal: sp.md,
-                      paddingVertical: 12,
-                      fontSize: 16,
-                      color: c.text,
-                    }}
-                  />
-                  <Pressable
-                    onPress={createCategory}
-                    disabled={creatingCat || !newCatName.trim()}
-                    style={({ pressed }) => ({
-                      backgroundColor: c.accent,
-                      borderRadius: radius.md,
-                      paddingHorizontal: sp.lg,
-                      paddingVertical: 12,
-                      opacity: creatingCat || !newCatName.trim() ? 0.5 : pressed ? 0.85 : 1,
-                    })}
-                  >
-                    <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>
-                      {t('common.add')}
-                    </Txt>
-                  </Pressable>
-                </View>
-              ) : null}
-            </ScrollView>
-
-            {/* manage (edit / delete) the household's custom categories */}
+    <FormSheet
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
+          {error ? <Txt style={{ color: c.expense, fontSize: 13 }}>{error}</Txt> : null}
+          <Btn title={saveTitle} onPress={save} loading={saving} />
+          {entry ? (
             <Pressable
-              onPress={() => setManageOpen(true)}
-              style={({ pressed }) => ({
-                alignSelf: 'flex-start',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: sp.md,
-                paddingVertical: sp.sm,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: c.border,
-                backgroundColor: c.surface,
-                opacity: pressed ? 0.7 : 1,
-              })}
+              onPress={remove}
+              disabled={saving}
+              accessibilityRole="button"
+              style={{ paddingVertical: 8, alignItems: 'center' }}
             >
-              <SlidersHorizontal size={15} color={c.accent} />
-              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
-                {t('manageCats.title')}
-              </Txt>
+              <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 14 }}>{t('entry.deleteEntry')}</Txt>
             </Pressable>
-          </Pressable>
-        </Pressable>
-
-        {/* Inside this Modal, not beside it: "Manage categories" is only
-            reachable from here now, and ManageCategoriesSheet is itself a
-            Modal — rendered as a sibling of an already-open one it would
-            silently fail to present and the button would look dead. */}
-        {manageOpen ? (
-          <ManageCategoriesSheet
-            categories={localCats}
+          ) : null}
+        </>
+      }
+      overlay={
+        <>
+          {/* Nested inside the form's Modal (a sibling Modal fails on iOS). */}
+          <DatePickerModal
+            visible={pickOpen}
+            value={date}
+            onChange={setDate}
+            onClose={() => setPickOpen(false)}
+          />
+          <CategorySheet
+            visible={gridOpen}
+            selectedId={category}
+            cats={allExpenseCats}
+            catName={catName}
+            customCats={localCats}
             overrides={localOverrides}
-            onChanged={refreshCats}
-            onClose={() => setManageOpen(false)}
+            onPick={pickCategory}
+            onCreated={categoryCreated}
+            onManageChanged={refreshCats}
+            onClose={() => setGridOpen(false)}
+          />
+        </>
+      }
+    >
+      {/* hero: what kind, how much, which category — tinted red / green */}
+      <View style={[styles.hero, { backgroundColor: (type === 'expense' ? c.expense : c.income) + '12' }]}>
+        <TypeToggle value={type} onChange={setType} />
+        <View style={styles.amountRow}>
+          <Txt
+            style={{
+              fontSize: 30,
+              fontFamily: fonts.displaySemi,
+              color: amount ? (type === 'expense' ? c.expense : c.income) : c.textFaint,
+              marginRight: 2,
+            }}
+          >
+            {type === 'expense' ? '−$' : '+$'}
+          </Txt>
+          <TextInput
+            value={amount}
+            onChangeText={(v) => setAmount(v.replace(/[^0-9.,]/g, ''))}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor={c.textFaint}
+            autoFocus={!entry && !initial?.amount}
+            accessibilityLabel={t('entry.amount')}
+            style={{
+              fontSize: 56,
+              fontFamily: fonts.display,
+              fontVariant: ['tabular-nums'],
+              color: type === 'expense' ? c.expense : c.income,
+              minWidth: 120,
+              textAlign: 'center',
+              padding: 0,
+            }}
+          />
+        </View>
+        {type === 'expense' ? (
+          <CategoryChip
+            icon={selectedCat.icon}
+            name={catName(selectedCat)}
+            hint={!categoryTouched ? bareHint(t('entry.autoSuggested')) : undefined}
+            onPress={() => setGridOpen(true)}
           />
         ) : null}
-      </Modal>
-    </Modal>
+      </View>
+
+      <FormSection>
+        <TextRow
+          label={t('entry.label')}
+          value={label}
+          onChangeText={setLabel}
+          placeholder={
+            type === 'expense' ? t('entry.labelExpensePlaceholder') : t('entry.labelIncomePlaceholder')
+          }
+          autoCapitalize="sentences"
+          returnKeyType="done"
+        />
+      </FormSection>
+
+      {type === 'expense' ? (
+        <FormSection>
+          {quickIds.length > 0 ? (
+            <PillStrip>
+              {quickIds.map((id) => {
+                const qc = categoryById(id, localCats, localOverrides)
+                return <Pill key={id} icon={qc.icon} label={catName(qc)} onPress={() => pickCategory(id)} />
+              })}
+              <Pressable
+                onPress={() => setGridOpen(true)}
+                accessibilityRole="button"
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 2,
+                  paddingHorizontal: 8,
+                  paddingVertical: 6,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: c.accent }}>{t('common.all')}</Txt>
+                <ChevronRight size={14} color={c.accent} />
+              </Pressable>
+            </PillStrip>
+          ) : null}
+          <TextRow
+            label={t('entry.subcategory')}
+            value={subcategory}
+            onChangeText={setSubcategory}
+            placeholder={
+              isBuiltinCategory(category)
+                ? t(`entry.sub.${category}` as TKey)
+                : t('entry.subcategoryPlaceholder')
+            }
+          />
+          {subSuggestions.length > 0 ? (
+            <PillStrip>
+              {subSuggestions.map((s) => {
+                const active = subcategory.trim().toLowerCase() === s.toLowerCase()
+                return <Pill key={s} label={s} active={active} onPress={() => setSubcategory(active ? '' : s)} />
+              })}
+            </PillStrip>
+          ) : null}
+        </FormSection>
+      ) : null}
+
+      <FormSection>
+        <FormRow label={t('entry.date')}>
+          <MiniSegment value={dateKey} options={dateOptions} onPress={pickDateKey} />
+        </FormRow>
+        {whoRow}
+        <ToggleRow
+          label={t('entry.recurring')}
+          hint={bareHint(t('entry.recurringHint'))}
+          value={recurring}
+          onValueChange={setRecurring}
+        />
+      </FormSection>
+    </FormSheet>
   )
 }
+
+const styles = StyleSheet.create({
+  hero: { borderRadius: 26, paddingVertical: sp.lg, paddingHorizontal: sp.md, gap: sp.md },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

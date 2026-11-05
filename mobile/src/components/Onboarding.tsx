@@ -11,15 +11,70 @@
 // token, so "Hide My Email" users were landing in their family's app called
 // things like "z5khzgh5ff". We can only apply the name AFTER create/join, since
 // that's what creates the allowed_users row to update.
+//
+// 2026-11 redesign (components/form): calm, ONE primary action per step. The
+// name is a row; create vs join is a two-row choice; only the chosen path's
+// field and its button appear. Sign out is a quiet text link, not a button.
 import { useEffect, useState } from 'react'
 import { Alert, StyleSheet, View } from 'react-native'
-import { ChevronRight } from 'lucide-react-native'
+import { Check } from 'lucide-react-native'
 
-import { Btn, Card, Field, Screen, Txt } from './ui'
+import { Btn, Screen, Txt } from './ui'
+import { Pressable } from './Pressable'
+import { FormSection, TextRow } from './form'
 import { takePendingDisplayName, useAuth } from '../lib/auth'
 import { useI18n } from '../hooks/useI18n'
 import { supabase } from '../lib/supabase'
-import { sp, useTheme } from '../theme/theme'
+import { fonts, sp, useTheme } from '../theme/theme'
+
+/** One of the two household paths, as a row: title + one line of context,
+ *  a check on the chosen one. */
+function ChoiceRow({
+  title,
+  desc,
+  selected,
+  onPress,
+}: {
+  title: string
+  desc: string
+  selected: boolean
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={({ pressed }) => [styles.choice, pressed && { opacity: 0.6 }]}
+    >
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Txt style={{ fontSize: 16, fontFamily: fonts.semibold, color: c.text }}>{title}</Txt>
+        <Txt variant="faint" style={{ fontSize: 13 }}>
+          {desc}
+        </Txt>
+      </View>
+      <View
+        style={[
+          styles.radio,
+          selected ? { backgroundColor: c.action, borderColor: c.action } : { borderColor: c.border },
+        ]}
+      >
+        {selected ? <Check size={13} color={c.onAction} strokeWidth={3} /> : null}
+      </View>
+    </Pressable>
+  )
+}
+
+/** A low-key text action (Change, Sign out). */
+function QuietLink({ label, onPress, accent }: { label: string; onPress: () => void; accent?: boolean }) {
+  const { c } = useTheme()
+  return (
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'center', paddingVertical: sp.xs }}>
+      <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: accent ? c.accent : c.textMuted }}>{label}</Txt>
+    </Pressable>
+  )
+}
 
 export default function Onboarding() {
   const { t } = useI18n()
@@ -110,7 +165,7 @@ export default function Onboarding() {
 
   return (
     <Screen scroll>
-      <View style={{ gap: sp.lg, paddingVertical: sp.xl }}>
+      <View style={{ gap: sp.xl, paddingVertical: sp.xl }}>
         <View style={{ alignItems: 'center', gap: 6 }}>
           <Txt variant="display" style={{ fontSize: 34 }}>
             One Roof
@@ -130,7 +185,7 @@ export default function Onboarding() {
             {t('onboarding.title')}
           </Txt>
           {/* The instruction only belongs to the household step — on the name
-              step the card asks its own question. */}
+              step the question below asks its own. */}
           {step === 'household' ? (
             <Txt variant="muted" style={{ textAlign: 'center' }}>
               {t('onboarding.subtitle')}
@@ -139,13 +194,18 @@ export default function Onboarding() {
         </View>
 
         {step === 'name' ? (
-          <>
-            <Card style={{ gap: sp.md }}>
-              <View style={{ gap: 2 }}>
-                <Txt variant="h2">{t('onboarding.nameTitle')}</Txt>
-                <Txt variant="faint">{t('onboarding.nameDesc')}</Txt>
-              </View>
-              <Field
+          <View style={{ gap: sp.lg }}>
+            <View style={{ gap: 2, alignItems: 'center' }}>
+              <Txt variant="h2" style={{ textAlign: 'center' }}>
+                {t('onboarding.nameTitle')}
+              </Txt>
+              <Txt variant="faint" style={{ textAlign: 'center' }}>
+                {t('onboarding.nameDesc')}
+              </Txt>
+            </View>
+            <FormSection>
+              <TextRow
+                label={t('family.myName')}
                 value={myName}
                 onChangeText={setMyName}
                 placeholder={t('onboarding.yourNamePlaceholder')}
@@ -155,103 +215,107 @@ export default function Onboarding() {
                 returnKeyType="done"
                 onSubmitEditing={toHousehold}
               />
-              <Btn
-                title={t('onboarding.continue')}
-                onPress={toHousehold}
-                disabled={!myName.trim()}
-              />
-            </Card>
-            <Btn title={t('settings.signOut')} onPress={signOut} variant="ghost" />
-          </>
+            </FormSection>
+            <Btn title={t('onboarding.continue')} onPress={toHousehold} disabled={!myName.trim()} />
+            <QuietLink label={t('settings.signOut')} onPress={signOut} />
+          </View>
         ) : (
-          <>
+          <View style={{ gap: sp.lg }}>
             {/* Echo the name back, big — they just typed it, so let them
                 actually confirm it before committing to a household. */}
             <View style={{ alignItems: 'center', gap: 2 }}>
               <Txt variant="faint">{t('onboarding.appearAs')}</Txt>
-              <Txt variant="title" numberOfLines={1}>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 24, color: c.text }} numberOfLines={1}>
                 {myName.trim()}
               </Txt>
-              <Btn
-                title={t('onboarding.changeName')}
-                onPress={() => setStep('name')}
-                variant="ghost"
-              />
+              <QuietLink label={t('onboarding.changeName')} onPress={() => setStep('name')} accent />
             </View>
 
-            <Card
-              style={{ gap: sp.md }}
-              onPress={choice === 'create' ? undefined : () => setChoice('create')}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Txt variant="h2">{t('onboarding.createTitle')}</Txt>
-                  <Txt variant="faint">{t('onboarding.createDesc')}</Txt>
-                </View>
-                {choice === 'create' ? null : <ChevronRight size={20} color={c.textMuted} />}
-              </View>
-              {choice === 'create' ? (
-                <>
-                  <Field
+            {/* Both paths start as a title + blurb — showing two inputs at once
+                made the choice look like a form to fill in. Only the chosen
+                path's field and button appear. */}
+            <FormSection>
+              <ChoiceRow
+                title={t('onboarding.createTitle')}
+                desc={t('onboarding.createDesc')}
+                selected={choice === 'create'}
+                onPress={() => setChoice('create')}
+              />
+              <ChoiceRow
+                title={t('onboarding.joinTitle')}
+                desc={t('onboarding.joinDesc')}
+                selected={choice === 'join'}
+                onPress={() => setChoice('join')}
+              />
+            </FormSection>
+
+            {choice === 'create' ? (
+              <>
+                <FormSection key="create">
+                  <TextRow
+                    label={t('onboarding.namePlaceholder')}
                     value={name}
                     onChangeText={setName}
-                    placeholder={t('onboarding.namePlaceholder')}
                     autoCapitalize="words"
                     autoFocus
                     maxLength={40}
                     returnKeyType="done"
                     onSubmitEditing={create}
                   />
-                  <Btn
-                    title={t('onboarding.createBtn')}
-                    onPress={create}
-                    loading={busy === 'create'}
-                    disabled={busy !== null}
-                  />
-                </>
-              ) : null}
-            </Card>
-
-            <Card
-              style={{ gap: sp.md }}
-              onPress={choice === 'join' ? undefined : () => setChoice('join')}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Txt variant="h2">{t('onboarding.joinTitle')}</Txt>
-                  <Txt variant="faint">{t('onboarding.joinDesc')}</Txt>
-                </View>
-                {choice === 'join' ? null : <ChevronRight size={20} color={c.textMuted} />}
-              </View>
-              {choice === 'join' ? (
-                <>
-                  <Field
+                </FormSection>
+                <Btn
+                  title={t('onboarding.createBtn')}
+                  onPress={create}
+                  loading={busy === 'create'}
+                  disabled={busy !== null}
+                />
+              </>
+            ) : choice === 'join' ? (
+              <>
+                <FormSection key="join">
+                  <TextRow
+                    label={t('onboarding.codePlaceholder')}
                     value={code}
                     onChangeText={(v) => setCode(v.toUpperCase())}
-                    placeholder={t('onboarding.codePlaceholder')}
                     autoCapitalize="characters"
                     autoCorrect={false}
                     autoFocus
                     maxLength={8}
                     returnKeyType="done"
                     onSubmitEditing={join}
-                    style={{ letterSpacing: 2 }}
                   />
-                  <Btn
-                    title={t('onboarding.joinBtn')}
-                    onPress={join}
-                    variant="secondary"
-                    loading={busy === 'join'}
-                    disabled={busy !== null}
-                  />
-                </>
-              ) : null}
-            </Card>
+                </FormSection>
+                <Btn
+                  title={t('onboarding.joinBtn')}
+                  onPress={join}
+                  loading={busy === 'join'}
+                  disabled={busy !== null}
+                />
+              </>
+            ) : null}
 
-            <Btn title={t('settings.signOut')} onPress={signOut} variant="ghost" />
-          </>
+            <QuietLink label={t('settings.signOut')} onPress={signOut} />
+          </View>
         )}
       </View>
     </Screen>
   )
 }
+
+const styles = StyleSheet.create({
+  choice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    paddingHorizontal: sp.md,
+    paddingVertical: 14,
+  },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

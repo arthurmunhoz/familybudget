@@ -130,7 +130,7 @@ export function MemberAvatar({
       {url ? (
         <Image source={{ uri: url }} style={{ width: size, height: size }} contentFit="cover" transition={120} />
       ) : (
-        // Same reasoning as c.onAccent, applied to the MEMBER's colour: white
+        // Same reasoning as c.onAction, applied to the MEMBER's colour: white
         // initials measure 2.97:1 on the amber in MEMBER_PALETTE, under AA-large.
         <Txt style={{ fontFamily: fonts.semibold, color: pickOn(color), fontSize: size * 0.4 }}>
           {initials(name)}

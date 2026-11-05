@@ -11,7 +11,7 @@ import {
   FolderLock,
   CalendarDays,
   Users,
-  Calculator,
+  Toolbox,
   Wrench,
 } from 'lucide-react-native'
 
@@ -34,7 +34,7 @@ const ALL_APPS: HubApp[] = [
   { id: 'pets', name: 'Pets', icon: PawPrint, route: '/pets', description: 'Vet visits, meds & due dates' },
   { id: 'docs', name: 'Documents', icon: FolderLock, route: '/docs', description: 'IDs, insurance & records' },
   { id: 'family', name: 'Family', icon: Users, route: '/family', description: 'Everyone’s info at a glance' },
-  { id: 'calc', name: 'Calculator', icon: Calculator, route: '/calc', description: 'Split bills, tips & deals' },
+  { id: 'calc', name: 'Utilities', icon: Toolbox, route: '/calc', description: 'Split bills, deals & printable tags' },
 ]
 
 /** The hub's apps for THIS build. Whereabouts drops out where it's switched off

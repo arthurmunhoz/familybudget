@@ -222,7 +222,7 @@ export default function NudgesBanner() {
                 onPress={() => ack(p.id)}
                 style={[
                   styles.actionBtn,
-                  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.accent },
+                  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.action },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={t('pings.gotIt')}

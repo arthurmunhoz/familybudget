@@ -379,11 +379,11 @@ export default function AdminHousehold() {
                   borderRadius: radius.md,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: c.accent,
+                  backgroundColor: c.action,
                   opacity: !mName.trim() || !mEmail.trim() || busy ? 0.5 : 1,
                 }}
               >
-                <Txt style={{ color: c.onAccent, fontWeight: '700' }}>Add</Txt>
+                <Txt style={{ color: c.onAction, fontWeight: '700' }}>Add</Txt>
               </Pressable>
             </View>
           )}

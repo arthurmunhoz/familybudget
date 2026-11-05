@@ -264,11 +264,11 @@ export default function Admin() {
                 gap: 5,
                 paddingVertical: 8,
                 borderRadius: radius.sm,
-                backgroundColor: on ? c.accent : 'transparent',
+                backgroundColor: on ? c.action : 'transparent',
               }}
             >
-              <tb.icon size={15} color={on ? c.onAccent : c.textMuted} />
-              <Txt style={{ fontWeight: '700', fontSize: 13, color: on ? c.onAccent : c.textMuted }}>{tb.label}</Txt>
+              <tb.icon size={15} color={on ? c.onAction : c.textMuted} />
+              <Txt style={{ fontWeight: '700', fontSize: 13, color: on ? c.onAction : c.textMuted }}>{tb.label}</Txt>
             </Pressable>
           )
         })}
@@ -369,11 +369,11 @@ export default function Admin() {
                   borderRadius: radius.md,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: c.accent,
+                  backgroundColor: c.action,
                   opacity: !newHousehold.trim() || busy ? 0.5 : 1,
                 }}
               >
-                <Txt style={{ color: c.onAccent, fontWeight: '700' }}>Create</Txt>
+                <Txt style={{ color: c.onAction, fontWeight: '700' }}>Create</Txt>
               </Pressable>
             </View>
           </Card>
@@ -530,10 +530,10 @@ function Pills<T extends string | number>({
               paddingHorizontal: 14,
               paddingVertical: 6,
               borderRadius: radius.pill,
-              backgroundColor: on ? c.accent : c.surface,
+              backgroundColor: on ? c.action : c.surface,
             }}
           >
-            <Txt style={{ fontWeight: '700', color: on ? c.onAccent : c.textMuted }}>{label(v)}</Txt>
+            <Txt style={{ fontWeight: '700', color: on ? c.onAction : c.textMuted }}>{label(v)}</Txt>
           </Pressable>
         )
       })}

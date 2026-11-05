@@ -241,7 +241,7 @@ export function Btn({
    *  not the app's usual red-label-on-plain (Disconnect, Delete account): that
    *  measures 3.3:1 in light mode, under AA for this 16pt label. A fill with
    *  pickOn() lands at 4.7–5.8:1 in both shipping modes, the same way the
-   *  primary button derives c.onAccent. The label colour has to live here —
+   *  primary button derives c.onAction. The label colour has to live here —
    *  callers can restyle the box via `style`, but not the text. */
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   disabled?: boolean
@@ -254,14 +254,14 @@ export function Btn({
   const { c } = useTheme()
   const bg =
     variant === 'primary'
-      ? c.accent
+      ? c.action
       : variant === 'danger'
         ? c.expense
         : variant === 'secondary'
           ? c.surface
           : 'transparent'
   const fg =
-    variant === 'primary' ? c.onAccent : variant === 'danger' ? pickOn(c.expense) : c.text
+    variant === 'primary' ? c.onAction : variant === 'danger' ? pickOn(c.expense) : c.text
   const corners = curveBottom
     ? {
         borderTopLeftRadius: radius.md,

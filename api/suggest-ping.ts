@@ -2,6 +2,12 @@
 // "ping" — {kind, emoji, message}. Used by the Pings sheet's "just type it"
 // box. Auth: the caller must send a valid Supabase JWT (don't burn AI credits
 // for strangers). Uses a small/fast model — this is a trivial mapping task.
+//
+// `?action=assistant` (folded in here because api/ is at Vercel Hobby's
+// 12-function cap): the Home's "ask anything" bar. The model ONLY parses the
+// request into an intent ({add_items | agenda | unknown} + slots); the app
+// then carries it out with the user's OWN Supabase session, so RLS stays the
+// boundary and nothing here writes household data with the service role.
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@supabase/supabase-js'
 
@@ -39,6 +45,109 @@ const PING_SCHEMA = {
   additionalProperties: false,
 }
 
+// The Home assistant's parse: one structured-output call, no tools. "" and []
+// stand in for "not given" so every field can stay required/non-null.
+const ASSISTANT_SCHEMA = {
+  type: 'object',
+  properties: {
+    intent: {
+      type: 'string',
+      enum: ['add_items', 'agenda', 'unknown'],
+      description:
+        'add_items = put things on a shopping list. agenda = asks what is on the calendar for a day. unknown = anything else.',
+    },
+    items: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'add_items only: each product as its own short item, capitalised, in the language the user wrote it ("Leite", "Pão"). Empty otherwise.',
+    },
+    store: {
+      type: 'string',
+      description:
+        'add_items only: the store/list named, matched to one of KNOWN STORES when it is the same store (return that exact spelling), else as written. "" when none was named.',
+    },
+    scope: {
+      type: 'string',
+      enum: ['me', 'all', 'person'],
+      description:
+        'agenda only: me = the asker ("pra mim", "my day"), all = everyone/the family, person = one named member. Default me.',
+    },
+    person: { type: 'string', description: 'scope=person only: the member name exactly as in MEMBERS. "" otherwise.' },
+    date: {
+      type: 'string',
+      description: 'agenda only: the day asked about as YYYY-MM-DD, resolved from TODAY ("amanhã", "sexta"). TODAY when no day was named.',
+    },
+    reply: {
+      type: 'string',
+      description:
+        'unknown only: one short, friendly sentence in the user language saying what you can do (add to shopping lists, tell what is on the agenda). "" otherwise.',
+    },
+  },
+  required: ['intent', 'items', 'store', 'scope', 'person', 'date', 'reply'],
+  additionalProperties: false,
+}
+const HAIKU_55 = { id: 'claude-haiku-5-5', in: 0.1 / 1e6, out: 0.5 / 1e6 }
+const ASSISTANT_CAP = 300
+
+const str = (v: unknown, max = 60) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+const strList = (v: unknown, n = 30) =>
+  Array.isArray(v) ? v.map((x) => str(x, 40)).filter(Boolean).slice(0, n) : []
+
+async function assistant(body: any, db: any, household: string | null, res: any) {
+  const text = str(body?.text, 400)
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(body?.today ?? '') ? body.today : new Date().toISOString().slice(0, 10)
+  const context = [
+    `TODAY: ${today} (${str(body?.weekday, 20)})`,
+    `KNOWN STORES: ${strList(body?.stores).join(', ') || '(none yet)'}`,
+    `MEMBERS: ${strList(body?.members, 15).join(', ') || '(unknown)'}`,
+    `ASKER: ${str(body?.me, 40) || '(unknown)'}`,
+  ].join('\n')
+  try {
+    const client = new Anthropic()
+    const response = await client.messages.create({
+      model: HAIKU_55.id,
+      max_tokens: 512,
+      // A slot-filling parse: no reasoning needed, and thinking would be most
+      // of the bill. Disabled is accepted on Haiku 5.5 at effort <= high.
+      thinking: { type: 'disabled' },
+      system:
+        'You turn one request typed into a family organiser app into a structured intent. ' +
+        'The household speaks Portuguese, English or Spanish. Never invent items or stores the user did not say.',
+      messages: [{ role: 'user', content: `${context}\n\nREQUEST: ${text}` }],
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: ASSISTANT_SCHEMA } },
+    } as any)
+    if (db && household) {
+      const u: any = response.usage
+      const cost =
+        ((u?.input_tokens ?? 0) + (u?.cache_read_input_tokens ?? 0)) * HAIKU_55.in + (u?.output_tokens ?? 0) * HAIKU_55.out
+      try {
+        await db.rpc('ai_light_record', { p_household: household, p_kind: 'assistant', p_cost: cost })
+      } catch {
+        /* metering write failure must not break a good response */
+      }
+    }
+    const block = response.content.find((b) => b.type === 'text')
+    if (!block || block.type !== 'text') return res.status(502).json({ error: 'no_answer' })
+    const p = JSON.parse(block.text)
+    const intent = ['add_items', 'agenda', 'unknown'].includes(p.intent) ? p.intent : 'unknown'
+    return res.status(200).json({
+      intent,
+      items: strList(p.items),
+      store: str(p.store),
+      scope: ['me', 'all', 'person'].includes(p.scope) ? p.scope : 'me',
+      person: str(p.person),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(p.date ?? '') ? p.date : today,
+      reply: str(p.reply, 240),
+    })
+  } catch (err: any) {
+    if (err instanceof Anthropic.APIError && /credit balance|billing/i.test(err.message ?? '')) {
+      return res.status(502).json({ error: 'out_of_credits' })
+    }
+    return res.status(502).json({ error: 'failed' })
+  }
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -57,6 +166,7 @@ export default async function handler(req: any, res: any) {
   const email = (await userRes.json())?.email
   if (!email) return res.status(401).json({ error: 'Unauthorized' })
 
+  const isAssistant = req.query?.action === 'assistant'
   const { text } = req.body ?? {}
   if (!text || typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: 'Missing text' })
@@ -81,11 +191,12 @@ export default async function handler(req: any, res: any) {
       if (household) {
         const { data: gate, error: gateErr } = await db.rpc('ai_light_allowed', {
           p_household: household,
-          p_kind: 'nudge',
-          p_cap: DAILY_CAP,
+          p_kind: isAssistant ? 'assistant' : 'nudge',
+          p_cap: isAssistant ? ASSISTANT_CAP : DAILY_CAP,
         })
         // Only an EXPLICIT "no" blocks; an RPC error leaves the feature working.
         if (!gateErr && gate && gate.allowed === false) {
+          if (isAssistant) return res.status(429).json({ error: 'paused' })
           return res.status(429).json({ error: 'AI nudges are paused for now — try a preset.' })
         }
       }
@@ -93,6 +204,8 @@ export default async function handler(req: any, res: any) {
       /* metering must never block a legitimate nudge */
     }
   }
+
+  if (isAssistant) return assistant(req.body, db, household, res)
 
   try {
     const client = new Anthropic()

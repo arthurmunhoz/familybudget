@@ -13,21 +13,153 @@
 // On success it calls onSent so the screen can flash a confirmation toast.
 // Preset MANAGEMENT lives in the ⚙️ Nudge-settings modal, not here — this
 // screen is only for sending. `presets` is owned by the screen and passed in.
-import { useMemo, useRef, useState } from 'react'
-import { Alert, Modal, StyleSheet, TextInput, View } from 'react-native'
+//
+// 2026-11 redesign (components/form): the recipient is a row ("To  Everyone ⌄")
+// whose list opens in a checked bottom sheet — it used to be a dropdown
+// anchored under a pill, measured in window coordinates. The presets are one
+// grouped card of rows instead of a stack of bordered cards, and the AI box is
+// a single row with its send button inside.
+import { useMemo, useState } from 'react'
+import { Alert, Modal, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { Check, ChevronDown, ChevronUp, Send, Sparkles } from 'lucide-react-native'
+import { Check, ChevronsUpDown, Send, Sparkles } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
+import { FormRow, FormSection, RowValue } from '@/components/form'
 import type { ToastData } from '@/components/Toast'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { supabase } from '@/lib/supabase'
 import { presetText, sendPing } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
+
+type Member = { email: string; display_name: string }
+
+/** The recipient list: a checked bottom sheet like form's SelectSheet, but
+ *  MULTI-select — it stays open while you tick names, and closes on Done or a
+ *  tap on the backdrop. "Everyone" clears the selection. */
+function RecipientSheet({
+  visible,
+  title,
+  members,
+  selected,
+  everyone,
+  onEveryone,
+  onToggle,
+  onClose,
+}: {
+  visible: boolean
+  title: string
+  members: Member[]
+  selected: Set<string>
+  everyone: boolean
+  onEveryone: () => void
+  onToggle: (email: string) => void
+  onClose: () => void
+}) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const bottomGap = useBottomGap(sp.lg)
+  const rows: { key: string; label: string; on: boolean; onPress: () => void }[] = [
+    { key: '__everyone', label: t('pings.everyone'), on: everyone, onPress: onEveryone },
+    ...members.map((m) => ({
+      key: m.email,
+      label: m.display_name,
+      on: !everyone && selected.has(m.email),
+      onPress: () => onToggle(m.email),
+    })),
+  ]
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable onPress={onClose} style={styles.sheetBackdrop} accessible={false}>
+        <Pressable
+          onPress={() => {}}
+          accessible={false}
+          style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}
+        >
+          <View style={{ alignItems: 'center', paddingBottom: sp.sm }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
+          </View>
+          <View style={styles.sheetHead}>
+            <View style={{ width: 60 }} />
+            <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 16, textAlign: 'center' }}>{title}</Txt>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" style={{ width: 60, alignItems: 'flex-end' }}>
+              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 15 }}>{t('common.done')}</Txt>
+            </Pressable>
+          </View>
+          <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: sp.lg }}>
+            {rows.map((r, i) => (
+              <Pressable
+                key={r.key}
+                onPress={r.onPress}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: r.on }}
+                style={({ pressed }) => [
+                  styles.sheetRow,
+                  { borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: c.border, opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Txt
+                  numberOfLines={1}
+                  style={{ flex: 1, fontSize: 16, color: r.on ? c.accent : c.text, fontFamily: r.on ? fonts.semibold : fonts.body }}
+                >
+                  {r.label}
+                </Txt>
+                {r.on ? <Check size={18} color={c.accent} strokeWidth={2.5} /> : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  )
+}
+
+/** One preset as a row of the presets card. High priority keeps its red
+ *  treatment — a red emoji well and a small red tag — since that's a warning,
+ *  not decoration. */
+function PresetRow({
+  preset,
+  label,
+  busy,
+  disabled,
+  highLabel,
+  onPress,
+}: {
+  preset: PingPreset
+  label: string
+  busy: boolean
+  disabled: boolean
+  highLabel: string
+  onPress: () => void
+}) {
+  const { c } = useTheme()
+  const high = preset.high_priority
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.presetRow, { opacity: disabled && !busy ? 0.5 : pressed ? 0.6 : 1 }]}
+    >
+      <View style={[styles.presetEmojiWell, { backgroundColor: high ? `${c.expense}1F` : c.surface }]}>
+        <Txt style={styles.presetEmoji}>{busy ? '…' : preset.emoji}</Txt>
+      </View>
+      <Txt style={{ fontFamily: fonts.medium, fontSize: 16, color: c.text, flex: 1 }} numberOfLines={1}>
+        {label}
+      </Txt>
+      {high ? (
+        <Txt style={{ color: c.expense, fontSize: 11, fontFamily: fonts.semibold, letterSpacing: 0.4 }}>
+          {highLabel.toUpperCase()}
+        </Txt>
+      ) : null}
+    </Pressable>
+  )
+}
 
 export default function PingComposer({
   presets,
@@ -45,17 +177,6 @@ export default function PingComposer({
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pickerOpen, setPickerOpen] = useState(false)
-  // Where on SCREEN the TO: pill is, measured when the list opens — the list
-  // renders in a Modal (its own window), so it needs window coordinates.
-  const headRef = useRef<View>(null)
-  const [anchor, setAnchor] = useState<{ x: number; y: number; w: number } | null>(null)
-
-  const openPicker = () => {
-    headRef.current?.measureInWindow((x, y, w, h) => {
-      setAnchor({ x, y: y + h + 6, w })
-      setPickerOpen(true)
-    })
-  }
   const [text, setText] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
@@ -78,6 +199,9 @@ export default function PingComposer({
         .filter((m) => selected.has(m.email))
         .map((m) => m.display_name)
         .join(', ') || t('pings.everyone')
+  // "To:" is written for an inline "To: Everyone" — as a row label the colon
+  // is noise.
+  const toTitle = t('pings.to').replace(/[:：]\s*$/, '')
 
   async function sendPreset(p: PingPreset) {
     if (sending) return
@@ -129,115 +253,50 @@ export default function PingComposer({
     setAiBusy(false)
   }
 
+  const canSendAI = !!text.trim() && !sending
+
   return (
-    <View>
-      {/* Recipient picker. The open list lives in a Modal so it overlays the
-          page instead of pushing it down, and a tap ANYWHERE else — including
-          below the composer — closes it. It's anchored under the pill with
-          `anchor`, measured on open. */}
-      {members.length > 0 && (
-        <View style={{ marginBottom: sp.lg }}>
-          <Pressable
-            ref={headRef}
-            onPress={() => (pickerOpen ? setPickerOpen(false) : openPicker())}
-            style={[styles.pickerHead, { backgroundColor: c.surface }]}
-            accessibilityRole="button"
-          >
-            <Txt variant="label" style={{ textTransform: 'uppercase', color: c.textFaint }}>
-              {t('pings.to')}
-            </Txt>
-            <Txt numberOfLines={1} style={{ flex: 1, fontWeight: '600', color: c.text }}>
-              {toLabel}
-            </Txt>
-            {pickerOpen ? (
-              <ChevronUp size={16} strokeWidth={2} color={c.textFaint} />
-            ) : (
-              <ChevronDown size={16} strokeWidth={2} color={c.textFaint} />
-            )}
-          </Pressable>
-          <Modal
-            visible={pickerOpen && anchor !== null}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setPickerOpen(false)}
-          >
-            {/* Full-screen dismiss target. Undimmed: this is a dropdown, not a
-                sheet — the page stays legible behind it. */}
-            <Pressable style={{ flex: 1 }} onPress={() => setPickerOpen(false)} accessible={false}>
-              {anchor ? (
-                // `sheet`, not `surface`: it floats over the presets, so it has
-                // to be OPAQUE — the glass skin's surface token is translucent.
-                <View
-                  style={[
-                    styles.pickerBody,
-                    { backgroundColor: c.sheet, left: anchor.x, top: anchor.y, width: anchor.w },
-                  ]}
-                >
-                  <Pressable onPress={() => setSelected(new Set())} style={styles.pickerRow}>
-                    <Txt style={{ flex: 1, fontWeight: '600', color: c.text }}>
-                      {t('pings.everyone')}
-                    </Txt>
-                    {everyone && <Check size={16} strokeWidth={2.5} color={c.accent} />}
-                  </Pressable>
-                  {members.map((m) => {
-                    const on = !everyone && selected.has(m.email)
-                    return (
-                      <Pressable
-                        key={m.email}
-                        onPress={() => toggle(m.email)}
-                        style={styles.pickerRow}
-                      >
-                        <Txt numberOfLines={1} style={{ flex: 1, color: c.text }}>
-                          {m.display_name}
-                        </Txt>
-                        {on && <Check size={16} strokeWidth={2.5} color={c.accent} />}
-                      </Pressable>
-                    )
-                  })}
-                </View>
-              ) : null}
-            </Pressable>
-          </Modal>
-        </View>
-      )}
+    <View style={{ gap: sp.lg }}>
+      {/* Recipient — the list opens in a sheet. Hidden when you're alone in
+          the household (there's no one to pick). */}
+      {members.length > 0 ? (
+        <>
+          <FormSection>
+            <FormRow label={toTitle} onPress={() => setPickerOpen(true)}>
+              <RowValue value={toLabel} placeholder={t('pings.everyone')} />
+              <ChevronsUpDown size={15} color={c.textFaint} />
+            </FormRow>
+          </FormSection>
+          {/* Outside the section: FormSection treats every child as a row. */}
+          <RecipientSheet
+            visible={pickerOpen}
+            title={toTitle}
+            members={members}
+            selected={selected}
+            everyone={everyone}
+            onEveryone={() => setSelected(new Set())}
+            onToggle={toggle}
+            onClose={() => setPickerOpen(false)}
+          />
+        </>
+      ) : null}
 
-      {/* Presets header */}
-      <Txt variant="label" style={{ textTransform: 'uppercase', color: c.textFaint, marginBottom: sp.sm }}>
-        {t('app.pings.name')}
-      </Txt>
-
-      {/* Preset list */}
-      <View style={{ gap: sp.sm }}>
-        {presets.map((p) => {
-          const high = p.high_priority
-          return (
-            <Pressable
+      {/* One-tap presets */}
+      {presets.length > 0 ? (
+        <FormSection title={t('app.pings.name')}>
+          {presets.map((p) => (
+            <PresetRow
               key={p.id}
-              onPress={() => sendPreset(p)}
+              preset={p}
+              label={presetText(p, t)}
+              busy={busyId === p.id}
               disabled={sending}
-              style={({ pressed }) => [
-                styles.presetRow,
-                {
-                  backgroundColor: c.card,
-                  borderColor: high ? c.expense : 'transparent',
-                  opacity: sending ? 0.5 : pressed ? 0.85 : 1,
-                },
-              ]}
-              accessibilityRole="button"
-            >
-              <Txt style={styles.presetEmoji}>{busyId === p.id ? '…' : p.emoji}</Txt>
-              <Txt style={{ fontWeight: '600', fontSize: 16, color: c.text, flex: 1 }} numberOfLines={1}>
-                {presetText(p, t)}
-              </Txt>
-              {high ? (
-                <Txt style={{ color: c.expense, fontSize: 11, fontWeight: '700' }}>
-                  {t('pings.highPriority').toUpperCase()}
-                </Txt>
-              ) : null}
-            </Pressable>
-          )
-        })}
-      </View>
+              highLabel={t('pings.highPriority')}
+              onPress={() => sendPreset(p)}
+            />
+          ))}
+        </FormSection>
+      ) : null}
 
       {/* Divider */}
       <View style={styles.divider}>
@@ -246,31 +305,31 @@ export default function PingComposer({
         <View style={[styles.line, { backgroundColor: c.border }]} />
       </View>
 
-      {/* AI free-text */}
-      <View style={styles.aiRow}>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          onSubmitEditing={sendAI}
-          returnKeyType="send"
-          editable={!aiBusy}
-          placeholder={t('pings.aiPlaceholder')}
-          placeholderTextColor={c.textFaint}
-          style={[styles.aiInput, { backgroundColor: c.card, color: c.text, borderColor: c.border }]}
-        />
-        <Pressable
-          onPress={sendAI}
-          disabled={!text.trim() || sending}
-          style={[styles.sendBtn, { backgroundColor: c.accent, opacity: !text.trim() || sending ? 0.5 : 1 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t('pings.send')}
-        >
-          <Send size={18} strokeWidth={2.5} color={c.onAccent} />
-        </Pressable>
-      </View>
-      <View style={styles.hint}>
-        <Sparkles size={14} strokeWidth={2} color={c.textFaint} />
-        <Txt variant="faint" style={{ flex: 1 }}>
+      {/* AI free-text: one row, the send button inside it. */}
+      <View style={{ gap: sp.sm }}>
+        <View style={[styles.aiRow, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Sparkles size={16} strokeWidth={2} color={c.accent} />
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            onSubmitEditing={sendAI}
+            returnKeyType="send"
+            editable={!aiBusy}
+            placeholder={t('pings.aiPlaceholder')}
+            placeholderTextColor={c.textFaint}
+            style={[styles.aiInput, { color: c.text }]}
+          />
+          <Pressable
+            onPress={sendAI}
+            disabled={!canSendAI}
+            style={[styles.sendBtn, { backgroundColor: c.action, opacity: canSendAI ? 1 : 0.4 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('pings.send')}
+          >
+            <Send size={16} strokeWidth={2.5} color={c.onAction} />
+          </Pressable>
+        </View>
+        <Txt variant="faint" style={{ fontSize: 12, marginHorizontal: sp.md }}>
           {t('pings.aiHint')}
         </Txt>
       </View>
@@ -279,59 +338,37 @@ export default function PingComposer({
 }
 
 const styles = StyleSheet.create({
-  pickerHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-    borderRadius: radius.pill,
-    paddingHorizontal: sp.lg,
-    paddingVertical: 10,
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    paddingTop: sp.sm,
+    maxHeight: '70%',
   },
-  pickerBody: {
-    // Positioned in the Modal's window from the measured anchor.
-    position: 'absolute',
-    borderRadius: radius.md,
-    padding: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-    borderRadius: radius.sm,
-    paddingHorizontal: sp.md,
-    paddingVertical: 10,
-  },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: sp.lg, paddingBottom: sp.sm },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, minHeight: 50 },
   presetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    paddingHorizontal: sp.lg,
-    paddingVertical: 14,
+    minHeight: 56,
+    paddingHorizontal: sp.md,
+    paddingVertical: 8,
   },
-  presetEmoji: { fontSize: 24 },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: sp.md, marginVertical: sp.lg },
+  presetEmojiWell: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  presetEmoji: { fontSize: 22 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
   line: { flex: 1, height: StyleSheet.hairlineWidth },
-  aiRow: { flexDirection: 'row', gap: sp.sm },
-  aiInput: {
-    flex: 1,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: sp.lg,
-    paddingVertical: 14,
-    fontSize: 16,
-  },
-  sendBtn: {
-    borderRadius: radius.md,
-    paddingHorizontal: sp.lg,
+  aiRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: sp.sm,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingLeft: sp.md,
+    paddingRight: 6,
+    minHeight: 52,
   },
-  hint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: sp.sm },
+  aiInput: { flex: 1, fontSize: 16, fontFamily: fonts.body, paddingVertical: 12 },
+  sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 })

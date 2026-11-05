@@ -1,27 +1,28 @@
-// Money — the module's home. Each budget renders as a card: the budget name +
-// a details chevron on top (opens the budget's period history), then a
-// divided "overview" section for one period — a labelled balance on the left,
-// an in-card period dropdown on the right, received/spent bars, and a
-// "＋ New entry" button that deep-links into that period with the form open.
-// The dropdown switches which period the section previews. RN app.
+// Money — the module's home. Each budget renders as a bold gradient card
+// (2026-11 "Comando" restyle — each budget keeps one gradient, `budgetLook`,
+// on every Money screen, so two budgets read as two things): the name + a details chevron on top (opens the
+// budget's period history), then one period's overview — the balance large,
+// an in-card period dropdown, received/spent as two translucent chips with a
+// bar each, and a white "＋ New entry" button that deep-links into that period
+// with the form open (the camera next to it opens the receipt scan). The
+// dropdown switches which period the card previews. RN app.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Dimensions,
-  Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from 'react-native'
-import { Toggle } from '@/components/Toggle'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
-import { Camera, Check, ChevronDown, ChevronRight, Lock, X } from 'lucide-react-native'
+import { Camera, Check, ChevronDown, ChevronRight, Lock } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, EmptyState, Field, Loader, NewItemButton, Txt } from '@/components/ui'
+import { AppHeader, Btn, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { BUDGET_GRADIENTS, budgetLook } from '@/components/home/palette'
+import { StatChip } from './StatChip'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useToday } from '@/hooks/useToday'
@@ -34,7 +35,8 @@ import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { formatMoney, periodEndISO, periodLabel } from '@/lib/format'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { Segmented } from './shared'
+import { FormSection, NoteRow, Segmented, ToggleRow } from '@/components/form'
+import { FormSheet } from './FormSheet'
 
 const PERIODS: Period[] = ['monthly', 'weekly', 'daily']
 
@@ -224,6 +226,7 @@ export default function Budgets() {
             return (
               <BudgetCard
                 key={b.id}
+                look={budgetLook(b.id)}
                 budget={b}
                 months={info?.months ?? []}
                 defaultId={info?.defaultId ?? null}
@@ -250,77 +253,18 @@ export default function Budgets() {
       />
 
       {createOpen && (
-        <Modal visible animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{ flex: 1 }}
-          >
-            {/* Tap the dimmed area to dismiss the keyboard. */}
-            <Pressable
-              onPress={() => Keyboard.dismiss()}
-              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: sp.lg }}
-            >
-              {/* Swallow taps so pressing the card doesn't dismiss the keyboard. */}
-              <Pressable
-                onPress={() => {}}
-                style={{ backgroundColor: c.sheet, borderRadius: 18, padding: sp.lg, gap: sp.md }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Txt variant="h2">{t('budget.newTitle')}</Txt>
-                  <Pressable onPress={() => setCreateOpen(false)} hitSlop={10}>
-                    <X size={22} color={c.textMuted} />
-                  </Pressable>
-                </View>
-
-                <Field
-                  value={name}
-                  onChangeText={setName}
-                  placeholder={t('budget.namePlaceholder')}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={() => name.trim() && create()}
-                />
-
-                <View style={{ gap: 6 }}>
-                  <Txt variant="label">{t('budget.groupedBy')}</Txt>
-                  <Segmented<Period>
-                    options={PERIODS.map((p) => ({ id: p, label: t(`budget.${p}` as TKey) }))}
-                    value={period}
-                    onChange={setPeriod}
-                  />
-                </View>
-
-                {/* Private budget (Plus). Only offered to Plus members — the DB
-                    rejects it anyway (budgets_plus_guard, migration 058). */}
-                {isPlus ? (
-                  <>
-                    <View style={{ height: 1, backgroundColor: c.border }} />
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Lock size={14} color={c.text} />
-                          <Txt style={{ fontWeight: '600' }}>{t('budget.private')}</Txt>
-                        </View>
-                        <Txt variant="faint" style={{ marginTop: 2 }}>
-                          {t('budget.privateHint')}
-                        </Txt>
-                      </View>
-                      <Toggle
-                        value={isPrivate}
-                        onValueChange={setIsPrivate}
-                      />
-                    </View>
-                  </>
-                ) : null}
-
-                <View style={{ flexDirection: 'row', gap: sp.md, marginTop: sp.sm }}>
-                  <Btn title={t('common.cancel')} variant="secondary" onPress={() => setCreateOpen(false)} style={{ flex: 1 }} />
-                  <Btn title={t('common.create')} onPress={create} loading={saving} disabled={!name.trim()} style={{ flex: 1 }} />
-                </View>
-              </Pressable>
-            </Pressable>
-          </KeyboardAvoidingView>
-        </Modal>
+        <NewBudgetSheet
+          name={name}
+          onName={setName}
+          period={period}
+          onPeriod={setPeriod}
+          isPrivate={isPrivate}
+          onPrivate={setIsPrivate}
+          showPrivate={isPlus}
+          saving={saving}
+          onCreate={create}
+          onClose={() => setCreateOpen(false)}
+        />
       )}
 
       {accessFor ? (
@@ -330,20 +274,94 @@ export default function Budgets() {
   )
 }
 
+/** The "New budget" sheet (2026-11 form redesign): name, grouping as a
+ *  segmented switch, and — Plus only — the private toggle; Create is docked.
+ *  Only offered to Plus members — the DB rejects private anyway
+ *  (budgets_plus_guard, migration 058). */
+function NewBudgetSheet({
+  name,
+  onName,
+  period,
+  onPeriod,
+  isPrivate,
+  onPrivate,
+  showPrivate,
+  saving,
+  onCreate,
+  onClose,
+}: {
+  name: string
+  onName: (v: string) => void
+  period: Period
+  onPeriod: (p: Period) => void
+  isPrivate: boolean
+  onPrivate: (v: boolean) => void
+  showPrivate: boolean
+  saving: boolean
+  onCreate: () => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  return (
+    <FormSheet
+      title={t('budget.newTitle')}
+      onClose={onClose}
+      footer={<Btn title={t('common.create')} onPress={onCreate} loading={saving} disabled={!name.trim()} />}
+    >
+      <FormSection>
+        {/* Label on top, full-width input: the example placeholder is long. */}
+        <NoteRow
+          label={t('budget.nameLabel' as TKey)}
+          value={name}
+          onChangeText={onName}
+          placeholder={t('budget.namePlaceholder')}
+          multiline={false}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={() => name.trim() && onCreate()}
+        />
+      </FormSection>
+
+      <FormSection title={t('budget.groupedBy')}>
+        <View style={{ padding: sp.sm }}>
+          <Segmented<Period>
+            options={PERIODS.map((p) => ({ value: p, label: t(`budget.${p}` as TKey) }))}
+            value={period}
+            onChange={onPeriod}
+          />
+        </View>
+      </FormSection>
+
+      {showPrivate ? (
+        <FormSection>
+          <ToggleRow
+            label={t('budget.private')}
+            hint={t('budget.privateHint')}
+            value={isPrivate}
+            onValueChange={onPrivate}
+          />
+        </FormSection>
+      ) : null}
+    </FormSheet>
+  )
+}
+
+
 function BudgetCard({
   budget: b,
+  look,
   months,
   defaultId,
   statsById,
   onAccess,
 }: {
   budget: Budget
+  look: (typeof BUDGET_GRADIENTS)[number]
   months: Month[]
   defaultId: string | null
   statsById: Map<string, MonthStat>
   onAccess: () => void
 }) {
-  const { c } = useTheme()
   const { t } = useI18n()
 
   // Which period this card previews. Defaults to current/latest; resets if the
@@ -362,63 +380,44 @@ function BudgetCard({
   const openPeriod = () => selected && router.push(`/budget/${b.id}/${selected.id}`)
 
   return (
-    <Card style={{ gap: sp.md }}>
-      {/* title row: budget name + details chevron */}
-      <Pressable
-        onPress={openHistory}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
-      >
-        <Txt style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold, fontSize: 18 }} numberOfLines={1}>
+    <GradientBox colors={look.colors} radius={28} style={{ padding: 18, gap: 14 }}>
+      {/* title row: budget name (+ private chip) + details chevron */}
+      <Pressable onPress={openHistory} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+        <Txt style={{ flex: 1, minWidth: 0, fontFamily: fonts.display, fontSize: 20, color: '#fff' }} numberOfLines={1}>
           {b.name}
         </Txt>
-        <ChevronRight size={22} color={c.textFaint} />
+        {/* Private budgets say so, and the chip IS the way in to the access
+            list. Household budgets show nothing — they're unchanged. */}
+        {b.visibility === 'private' ? (
+          <Pressable
+            onPress={onAccess}
+            accessibilityRole="button"
+            hitSlop={6}
+            style={({ pressed }) => [s.glassChip, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Lock size={12} color="#fff" />
+            <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 11 }}>{t('budget.whoCanView')}</Txt>
+          </Pressable>
+        ) : null}
+        <ChevronRight size={22} color="rgba(255,255,255,0.85)" />
       </Pressable>
 
-      {/* Private budgets say so, and the chip IS the way in to the access list.
-          Household budgets show nothing — they're unchanged. */}
-      {b.visibility === 'private' ? (
-        <Pressable
-          onPress={onAccess}
-          accessibilityRole="button"
-          style={({ pressed }) => ({
-            alignSelf: 'flex-start',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 5,
-            marginTop: -sp.sm,
-            paddingHorizontal: 9,
-            paddingVertical: 5,
-            borderRadius: radius.sm,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: c.accent,
-            backgroundColor: pressed ? c.surface : c.accentSoft,
-          })}
-        >
-          <Lock size={12} color={c.accent} />
-          <Txt style={{ color: c.accent, fontWeight: '600', fontSize: 11 }}>
-            {t('budget.whoCanView')}
-          </Txt>
-        </Pressable>
-      ) : null}
-
       {selected ? (
-        <View style={{ gap: sp.md, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>
-          {/* overview header: labelled balance (left) + period dropdown (right) */}
+        <>
+          {/* balance (left, big) + period dropdown (right) */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm }}>
             <Pressable onPress={openPeriod} style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontSize: 12, color: c.textFaint }}>{t('chart.currentBalance')}</Txt>
+              <Txt style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>{t('chart.currentBalance')}</Txt>
               <Txt
-                style={{
-                  fontSize: 22,
-                  fontFamily: fonts.semibold,
-                  fontVariant: ['tabular-nums'],
-                  color: balance >= 0 ? c.income : c.expense,
-                }}
+                adjustsFontSizeToFit
+                numberOfLines={1}
+                style={{ fontSize: 38, lineHeight: 44, fontFamily: fonts.display, color: '#fff', fontVariant: ['tabular-nums'], letterSpacing: -0.6 }}
               >
                 {formatMoney(balance)}
               </Txt>
             </Pressable>
             <PeriodDropdown
+              onColor
               value={selected.id}
               options={months.map((m) => ({ id: m.id, label: periodLabel(b.period, m.start_date) }))}
               onChange={setSelectedId}
@@ -426,69 +425,44 @@ function BudgetCard({
           </View>
 
           {hasUpcoming && (
-            <Txt style={{ fontSize: 12, color: c.textMuted }}>
+            <Txt style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', marginTop: -8 }}>
               {t('home.withUpcoming')}{' '}
-              <Txt
-                style={{
-                  fontSize: 12,
-                  fontFamily: fonts.semibold,
-                  fontVariant: ['tabular-nums'],
-                  color: expected >= 0 ? c.income : c.expense,
-                }}
-              >
+              <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, fontVariant: ['tabular-nums'], color: '#fff' }}>
                 {formatMoney(expected)}
               </Txt>
             </Txt>
           )}
 
-          <View style={{ gap: 6 }}>
-            <BarRow label={t('chart.received')} value={income} max={barMax} color={c.income} />
-            <BarRow label={t('chart.spent')} value={spent} max={barMax} color={c.expense} />
+          {/* received / spent */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <StatChip label={t('chart.received')} value={income} max={barMax} up />
+            <StatChip label={t('chart.spent')} value={spent} max={barMax} />
           </View>
 
-          <View style={{ flexDirection: 'row', gap: sp.sm }}>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('detail.scanAria')}
               onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?scan=1`)}
-              style={({ pressed }) => ({
-                width: 46,
-                borderRadius: radius.md,
-                backgroundColor: c.surface,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.85 : 1,
-              })}
+              style={({ pressed }) => [s.camera, { opacity: pressed ? 0.75 : 1 }]}
             >
-              <Camera size={20} color={c.text} />
+              <Camera size={21} color="#fff" />
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?add=1`)}
-              style={({ pressed }) => ({
-                flex: 1,
-                backgroundColor: c.accent,
-                borderRadius: radius.md,
-                paddingVertical: 11,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.85 : 1,
-              })}
+              style={({ pressed }) => [s.newEntry, { opacity: pressed ? 0.85 : 1 }]}
             >
-              <Txt style={{ color: c.onAccent, fontFamily: fonts.semibold, fontSize: 14 }}>
-                {t('detail.newEntry')}
-              </Txt>
+              <Txt style={{ color: look.ink, fontFamily: fonts.semibold, fontSize: 15 }}>{t('detail.newEntry')}</Txt>
             </Pressable>
           </View>
-        </View>
+        </>
       ) : (
-        <Pressable onPress={openHistory} style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>
-          <Txt variant="muted" style={{ fontSize: 14 }}>
-            {t('home.noneYet')}
-          </Txt>
+        <Pressable onPress={openHistory}>
+          <Txt style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{t('home.noneYet')}</Txt>
         </Pressable>
       )}
-    </Card>
+    </GradientBox>
   )
 }
 
@@ -498,10 +472,13 @@ function PeriodDropdown({
   value,
   options,
   onChange,
+  onColor,
 }: {
   value: string
   options: { id: string; label: string }[]
   onChange: (id: string) => void
+  /** Sitting on a gradient card: translucent white pill, white text. */
+  onColor?: boolean
 }) {
   const { c } = useTheme()
   const ref = useRef<View>(null)
@@ -527,17 +504,17 @@ function PeriodDropdown({
           flexDirection: 'row',
           alignItems: 'center',
           gap: 3,
-          backgroundColor: c.accentSoft,
+          backgroundColor: onColor ? 'rgba(255,255,255,0.2)' : c.accentSoft,
           borderRadius: radius.pill,
           paddingHorizontal: 12,
           paddingVertical: 6,
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: c.accent }}>
+        <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: onColor ? '#fff' : c.accent }}>
           {current?.label ?? ''}
         </Txt>
-        <ChevronDown size={12} color={c.accent} strokeWidth={2.5} />
+        <ChevronDown size={12} color={onColor ? '#fff' : c.accent} strokeWidth={2.5} />
       </Pressable>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -596,44 +573,23 @@ function PeriodDropdown({
   )
 }
 
-function BarRow({
-  label,
-  value,
-  max,
-  color,
-}: {
-  label: string
-  value: number
-  max: number
-  color: string
-}) {
-  const { c } = useTheme()
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-      <Txt style={{ width: 64, fontSize: 11, color: c.textMuted }} numberOfLines={1}>
-        {label}
-      </Txt>
-      <View style={{ flex: 1, height: 6, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: c.surface }}>
-        <View
-          style={{
-            height: '100%',
-            borderRadius: radius.pill,
-            backgroundColor: color,
-            width: `${(value / max) * 100}%`,
-          }}
-        />
-      </View>
-      <Txt
-        style={{
-          width: 64,
-          textAlign: 'right',
-          fontSize: 11,
-          fontVariant: ['tabular-nums'],
-          color: c.textMuted,
-        }}
-      >
-        {formatMoney(value)}
-      </Txt>
-    </View>
-  )
-}
+const s = StyleSheet.create({
+  glassChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  camera: {
+    width: 52,
+    height: 50,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newEntry: { flex: 1, height: 50, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+})

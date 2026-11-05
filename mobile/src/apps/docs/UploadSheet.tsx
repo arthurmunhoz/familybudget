@@ -2,21 +2,27 @@
 // owner, then uploads the bytes to the private `documents` bucket at the
 // household-prefixed path and inserts a `documents` row. Mirrors the PWA's
 // upload form.
+//
+// 2026-11 redesign (components/form): the seven category chips and the owner
+// chips are SelectRows now — one compact section instead of two chip walls.
 import { useState } from 'react'
-import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, View } from 'react-native'
+import { Alert, Modal, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { X, type LucideIcon } from 'lucide-react-native'
+import { X } from 'lucide-react-native'
 import { File } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 
-import { Btn, Field, Txt } from '@/components/ui'
+import { Btn, Txt } from '@/components/ui'
+import { KeyboardScroll } from '@/components/KeyboardScroll'
+import { FormSection, SelectRow, TextRow } from '@/components/form'
 import { useI18n } from '@/hooks/useI18n'
+import { useSheetLift } from '@/hooks/useSheetLift'
 import type { TKey } from '@/lib/i18n'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { DocCategory, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 import { CATEGORIES, THUMB_WIDTH, formatBytes, randomUUID, thumbPathFor } from './docUtils'
 
 export interface PickedFile {
@@ -66,7 +72,7 @@ export default function UploadSheet({
   onSaved: () => void
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
+  const bottomGap = useBottomGap(sp.lg)
   const { t } = useI18n()
 
   const [title, setTitle] = useState(file.name.replace(/\.[^.]+$/, ''))
@@ -75,9 +81,10 @@ export default function UploadSheet({
   const [uploading, setUploading] = useState(false)
 
   const ownerOptions = [
-    ...profiles.map((p) => ({ key: p.email, label: p.display_name })),
-    { key: 'shared', label: `🏠 ${t('docs.shared')}` },
+    ...profiles.map((p) => ({ value: p.email, label: p.display_name })),
+    { value: 'shared', label: `🏠 ${t('docs.shared')}` },
   ]
+  const categoryOptions = CATEGORIES.map((cat) => ({ value: cat.id, label: t(`docCat.${cat.id}` as TKey) }))
 
   async function upload() {
     if (!title.trim() || uploading) return
@@ -114,80 +121,69 @@ export default function UploadSheet({
     onSaved()
   }
 
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-        <View
-          style={{
-            maxHeight: '90%',
-            backgroundColor: c.sheet,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.lg,
-              paddingBottom: sp.sm,
-            }}
-          >
+      <View style={styles.backdrop} onLayout={onRootLayout}>
+        <View style={[styles.sheet, { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift }]}>
+          <View style={styles.sheetHead}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt variant="h2">{t('docs.addDoc')}</Txt>
-              <Txt variant="faint" numberOfLines={1}>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: c.text }}>{t('docs.addDoc')}</Txt>
+              <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={1}>
                 {file.name} · {formatBytes(file.size)}
               </Txt>
             </View>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.close')} disabled={uploading}>
-              <X size={22} color={c.textMuted} />
+            <Pressable
+              onPress={onClose}
+              disabled={uploading}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface, opacity: uploading ? 0.5 : 1 }]}
+            >
+              <X size={16} color={c.textMuted} />
             </Pressable>
           </View>
 
-          <ScrollView
+          <KeyboardScroll
             style={{ flexGrow: 0 }}
-            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Field
-              value={title}
-              onChangeText={setTitle}
-              placeholder={t('docs.titlePlaceholder')}
-              autoFocus
-            />
+            <FormSection>
+              <TextRow
+                label={t('docs.titlePlaceholder')}
+                value={title}
+                onChangeText={setTitle}
+                autoFocus
+              />
+              <SelectRow
+                label={t('entry.category')}
+                value={category}
+                options={categoryOptions}
+                onChange={(v) => {
+                  if (v) setCategory(v)
+                }}
+              />
+              <SelectRow
+                label={t('docs.belongsTo')}
+                value={owner}
+                options={ownerOptions}
+                onChange={(v) => {
+                  if (v) setOwner(v)
+                }}
+              />
+            </FormSection>
+          </KeyboardScroll>
 
-            <ChipRow>
-              {CATEGORIES.map((cat) => (
-                <Chip
-                  key={cat.id}
-                  active={category === cat.id}
-                  onPress={() => setCategory(cat.id)}
-                  Icon={cat.Icon}
-                >
-                  {t(`docCat.${cat.id}` as TKey)}
-                </Chip>
-              ))}
-            </ChipRow>
-
-            <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              {t('docs.belongsTo')}
-            </Txt>
-            <ChipRow>
-              {ownerOptions.map((o) => (
-                <Chip key={o.key} active={owner === o.key} onPress={() => setOwner(o.key)}>
-                  {o.label}
-                </Chip>
-              ))}
-            </ChipRow>
-          </ScrollView>
-
-          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap }}>
+          <View
+            style={[
+              styles.footer,
+              { paddingBottom: clearOfBars ? sp.md : bottomGap, borderTopColor: c.border },
+            ]}
+          >
             <Btn
               title={uploading ? t('docs.uploading') : t('docs.saveDoc')}
               onPress={upload}
@@ -197,44 +193,21 @@ export default function UploadSheet({
           </View>
         </View>
       </View>
-      </KeyboardAvoidingView>
     </Modal>
   )
 }
 
-function ChipRow({ children }: { children: React.ReactNode }) {
-  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>{children}</View>
-}
-
-function Chip({
-  active,
-  onPress,
-  Icon,
-  children,
-}: {
-  active: boolean
-  onPress: () => void
-  /** Drawn before the label, in the label's colour. */
-  Icon?: LucideIcon
-  children: React.ReactNode
-}) {
-  const { c } = useTheme()
-  const color = active ? c.onAccent : c.textMuted
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: radius.pill,
-        backgroundColor: active ? c.accent : c.surface,
-      }}
-    >
-      {Icon ? <Icon size={15} color={color} /> : null}
-      <Txt style={{ color, fontWeight: '600', fontSize: 14 }}>{children}</Txt>
-    </Pressable>
-  )
-}
+const styles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: sp.lg },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: sp.md,
+    paddingHorizontal: sp.lg,
+    paddingBottom: sp.md,
+  },
+  close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm, borderTopWidth: StyleSheet.hairlineWidth },
+})

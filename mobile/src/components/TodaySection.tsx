@@ -1,13 +1,21 @@
-// The Hub's "Today" section — sits between the greeting and the app grid. Shows
-// the date + current weather (from the home city set in Settings, via
-// lib/weather), then a compact agenda: today's calendar events (birthdays and
-// anniversaries highlighted with their marker + "turns N"/"N years") and any
-// pet-care items due today or overdue. Tapping a row opens the relevant app.
-// Reloads on focus so it reflects new events / a changed home city.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Pressable, View, type StyleProp, type ViewStyle } from 'react-native'
+// The top of the Hub (2026-11 "Comando" redesign): the date + weather line
+// (home city from Settings, via lib/weather), a big greeting that says how many
+// things today holds, the "ask anything" bar (lib/assistant, AskSheet), any
+// weather alert, and today's agenda as a row of swipeable cards — calendar
+// events (birthdays/anniversaries with "turns N"/"N years") and pet care due
+// today or overdue. Tapping a card opens its app. Also owns the Today WIDGET
+// sync (syncTodayConfig/syncTodayWidget below), so it must stay mounted on the
+// Hub. Reloads on focus so it reflects new events / a changed home city.
+import { createElement, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Pressable, ScrollView, View } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import {
+  Cake,
+  CalendarDays,
+  ChevronRight,
+  PawPrint,
+  Sparkles,
+  Mic,
   CloudLightning,
   CloudRain,
   CloudSnow,
@@ -17,7 +25,11 @@ import {
   type LucideIcon,
 } from 'lucide-react-native'
 
-import { Card, Txt } from './ui'
+import { Txt } from './ui'
+import { voiceSupported } from '../lib/voice'
+import { CARD_GRADIENT } from './home/palette'
+import { GradientBox } from './home/GradientBox'
+import { Skeleton } from './Skeleton'
 import { CityPickerSheet } from './CityPickerSheet'
 import { useCachedQuery, useRevalidateOnForeground } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
@@ -31,7 +43,6 @@ import {
   yearsAt,
 } from '../lib/calendar'
 import { overdueEvents } from '../lib/petCare'
-import { TYPE_ICON } from '../apps/pets/petUi'
 import type { CalendarEvent, PetEvent } from '../lib/types'
 import { useHomeWeather, weatherIcon, type WeatherAlertKind } from '../lib/weather'
 import { syncTodayConfig, syncTodayWidget, type TodayWidgetItem } from '../lib/widget'
@@ -39,7 +50,8 @@ import type { TKey } from '../lib/i18n'
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 
 const LOCALE: Record<string, string> = { en: 'en-US', es: 'es', pt: 'pt-BR' }
-const MAX_ROWS = 5
+const MAX_CARDS = 8
+const CARD_W = 236
 
 // Home-screen weather alert: an on-brand Lucide icon + localized message per kind.
 const WEATHER_ALERT: Record<WeatherAlertKind, { icon: LucideIcon; key: TKey }> = {
@@ -53,33 +65,17 @@ const WEATHER_ALERT: Record<WeatherAlertKind, { icon: LucideIcon; key: TKey }> =
 
 type PetLite = { id: string; name: string; emoji: string }
 
-// A subtly-pulsing placeholder that holds the weather/alert area while the
+// Placeholders (shared Skeleton) hold the weather/alert area while the
 // forecast loads, so the card doesn't jump when the value lands.
-function Shimmer({ style }: { style?: StyleProp<ViewStyle> }) {
-  const { c } = useTheme()
-  const o = useRef(new Animated.Value(0.5)).current
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(o, { toValue: 1, duration: 650, useNativeDriver: true }),
-        Animated.timing(o, { toValue: 0.5, duration: 650, useNativeDriver: true }),
-      ]),
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [o])
-  return <Animated.View style={[{ backgroundColor: c.surface2, borderRadius: 6, opacity: o }, style]} />
-}
-
 // Matches the top-right weather block (icon + temp, then the city line).
 function WeatherSkeleton() {
   return (
     <View style={{ alignItems: 'flex-end', gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Shimmer style={{ width: 20, height: 20, borderRadius: 10 }} />
-        <Shimmer style={{ width: 34, height: 15 }} />
+        <Skeleton style={{ width: 20, height: 20, borderRadius: 10 }} />
+        <Skeleton style={{ width: 34, height: 15 }} />
       </View>
-      <Shimmer style={{ width: 52, height: 10 }} />
+      <Skeleton style={{ width: 52, height: 10 }} />
     </View>
   )
 }
@@ -99,15 +95,28 @@ function AlertSkeleton() {
         paddingVertical: sp.sm,
       }}
     >
-      <Shimmer style={{ width: 18, height: 18, borderRadius: 9 }} />
+      <Skeleton style={{ width: 18, height: 18, borderRadius: 9 }} />
       <View style={{ flex: 1 }}>
-        <Shimmer style={{ width: '70%', height: 11 }} />
+        <Skeleton style={{ width: '70%', height: 11 }} />
       </View>
     </View>
   )
 }
 
-export default function TodaySection() {
+export default function TodaySection({
+  name,
+  household,
+  onAsk,
+  right,
+}: {
+  /** First name for the greeting. */
+  name: string
+  household: string | null
+  /** Open the ask sheet; `listen` = straight into voice (the mic). */
+  onAsk: (listen?: boolean) => void
+  /** Header slot on the right (the Settings button). */
+  right?: ReactNode
+}) {
   const { c } = useTheme()
   const { t, lang } = useI18n()
   const locale = LOCALE[lang] ?? 'en-US'
@@ -185,9 +194,9 @@ export default function TodaySection() {
   // "Westchase, Florida, US" → "Westchase" for the compact city line.
   const cityShort = location?.city.split(',')[0].trim() ?? ''
   const totalItems = todaysOcc.length + petDue.length
-  // Fill the agenda from calendar first, then pet-care, up to MAX_ROWS.
-  const shownOcc = todaysOcc.slice(0, MAX_ROWS)
-  const shownPet = petDue.slice(0, Math.max(0, MAX_ROWS - shownOcc.length))
+  // Cards: calendar first (in time order), then pet care, up to MAX_CARDS.
+  const shownOcc = todaysOcc.slice(0, MAX_CARDS)
+  const shownPet = petDue.slice(0, Math.max(0, MAX_CARDS - shownOcc.length))
   const overflow = totalItems - (shownOcc.length + shownPet.length)
 
   // Home-screen "Today" widget: same agenda + weather, written to the App Group.
@@ -247,17 +256,18 @@ export default function TodaySection() {
     })
   }, [widgetItems, weather, weatherAlert, cityShort, locale, t, today])
 
+  const headerLine = [
+    dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1),
+    weather ? `${weather.temperature}${weather.unit}` : null,
+    household,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
     <>
-    <Card style={{ gap: sp.md, marginBottom: sp.lg }}>
-      {/* date + weather */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt variant="label">{t('home.today')}</Txt>
-          <Txt style={{ fontFamily: fonts.display, fontSize: 18 }} numberOfLines={1}>
-            {dateLabel}
-          </Txt>
-        </View>
+      {/* date · weather · household — tap for the weather settings */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingTop: sp.sm }}>
         <Pressable
           onPress={() =>
             location
@@ -266,32 +276,80 @@ export default function TodaySection() {
           }
           hitSlop={6}
           accessibilityRole="button"
-          style={{ alignItems: 'flex-end', gap: 1 }}
+          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}
         >
-          {weather && WIcon ? (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <WIcon size={22} color={c.accent} />
-                <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }}>
-                  {weather.temperature}
-                  {weather.unit}
-                </Txt>
-              </View>
-              {cityShort ? (
-                <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={1}>
-                  {t('home.inCity', { city: cityShort })}
-                </Txt>
-              ) : null}
-            </>
-          ) : weatherLoading ? (
+          {weather && WIcon ? createElement(WIcon, { size: 16, color: c.textMuted }) : null}
+          {weatherLoading && !weather ? (
             <WeatherSkeleton />
           ) : (
-            <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
-              {location ? '—' : t('home.setCity')}
+            <Txt variant="muted" style={{ fontSize: 13.5 }} numberOfLines={1}>
+              {headerLine}
+              {!location ? <Txt style={{ color: c.accent, fontSize: 13.5 }}> · {t('home.setCity')}</Txt> : null}
             </Txt>
           )}
         </Pressable>
+        {right}
       </View>
+
+      {/* greeting + how the day looks */}
+      <Txt style={{ fontFamily: fonts.display, fontSize: 38, lineHeight: 44, letterSpacing: -0.8, marginTop: sp.md }}>
+        {t('home.hi', { name })}
+      </Txt>
+      <Txt style={{ fontFamily: fonts.display, fontSize: 38, lineHeight: 44, letterSpacing: -0.8, color: c.textFaint }}>
+        {totalItems === 0
+          ? t('home.calmDay')
+          : totalItems === 1
+            ? t('home.thingsOne')
+            : t('home.thingsMany', { n: totalItems })}
+      </Txt>
+
+      {/* ask anything */}
+      <Pressable
+        onPress={() => onAsk(false)}
+        accessibilityRole="button"
+        accessibilityLabel={t('ask.title')}
+        style={({ pressed }) => ({
+          marginTop: sp.lg,
+          height: 58,
+          borderRadius: 20,
+          backgroundColor: c.card,
+          borderWidth: 1,
+          borderColor: c.border,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: sp.md,
+          paddingLeft: sp.lg,
+          paddingRight: 8,
+          opacity: pressed ? 0.75 : 1,
+        })}
+      >
+        <Sparkles size={20} color={c.accent} />
+        <Txt style={{ flex: 1, fontSize: 15, color: c.textFaint }} numberOfLines={1}>
+          {t('ask.placeholder')}
+        </Txt>
+        {/* The mic: straight into listening. Without the voice module (an
+            older build) it's the plain "open" chevron. */}
+        <Pressable
+          onPress={() => onAsk(voiceSupported())}
+          accessibilityRole="button"
+          accessibilityLabel={voiceSupported() ? t('ask.speak') : t('ask.title')}
+          hitSlop={6}
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 14,
+            backgroundColor: c.action,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {voiceSupported() ? (
+            <Mic size={21} color={c.onAction} strokeWidth={2.3} />
+          ) : (
+            <ChevronRight size={22} color={c.onAction} strokeWidth={2.4} />
+          )}
+        </Pressable>
+      </Pressable>
 
       {/* today's weather alert (rain / storm / extreme temp / wind) */}
       {alertMeta && AlertIcon ? (
@@ -304,108 +362,165 @@ export default function TodaySection() {
             borderRadius: radius.md,
             paddingHorizontal: sp.md,
             paddingVertical: sp.sm,
+            marginTop: sp.md,
           }}
         >
           <AlertIcon size={18} color={c.accent} />
           <Txt style={{ flex: 1, fontSize: 13, color: c.text }}>{t(alertMeta.key)}</Txt>
         </View>
       ) : weatherLoading ? (
-        <AlertSkeleton />
+        <View style={{ marginTop: sp.md }}>
+          <AlertSkeleton />
+        </View>
       ) : null}
 
-      {/* agenda */}
-      {totalItems === 0 ? (
-        <Txt variant="faint">{t('home.nothingToday')}</Txt>
-      ) : (
-        <View style={{ gap: sp.sm, borderTopWidth: 1, borderTopColor: c.border, paddingTop: sp.md }}>
-          {shownOcc.map((o) => {
-            const ev = o.event
-            const emoji = KIND_EMOJI[ev.kind]
-            const time = ev.all_day ? null : ev.start_time ? formatTime(ev.start_time, locale) : null
-            const years = ev.kind === 'birthday' || ev.kind === 'anniversary' ? yearsAt(ev, o.start) : 0
-            const suffix =
-              ev.kind === 'birthday' && years > 0
-                ? t('home.turns', { n: years })
-                : ev.kind === 'anniversary' && years > 0
-                  ? t('home.years', { n: years })
-                  : null
-            return (
+      {/* today's agenda as cards */}
+      {totalItems > 0 ? (
+        <>
+          <SectionLabel text={t('home.needsYou')} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={CARD_W + 10}
+            decelerationRate="fast"
+            style={{ marginHorizontal: -sp.lg }}
+            contentContainerStyle={{ paddingHorizontal: sp.lg, gap: 10 }}
+          >
+            {shownOcc.map((o) => {
+              const ev = o.event
+              const time = ev.all_day ? t('home.allDay') : ev.start_time ? formatTime(ev.start_time, locale) : ''
+              const years = ev.kind === 'birthday' || ev.kind === 'anniversary' ? yearsAt(ev, o.start) : 0
+              const sub =
+                ev.kind === 'birthday' && years > 0
+                  ? t('home.turns', { n: years })
+                  : ev.kind === 'anniversary' && years > 0
+                    ? t('home.years', { n: years })
+                    : (ev.location ?? '')
+              const special = ev.kind === 'birthday' || ev.kind === 'anniversary'
+              return (
+                <AgendaCard
+                  key={`${ev.id}:${o.start}`}
+                  colors={special ? CARD_GRADIENT.birthday : CARD_GRADIENT.event}
+                  icon={special ? <Cake size={15} color="#fff" /> : <CalendarDays size={15} color="#fff" />}
+                  label={KIND_EMOJI[ev.kind] ? `${KIND_EMOJI[ev.kind]}` : ''}
+                  time={time}
+                  title={ev.title}
+                  sub={sub}
+                  onPress={() => router.push('/calendar')}
+                />
+              )
+            })}
+            {shownPet.map((e) => {
+              const pet = petById[e.pet_id]
+              const isOverdue = (e.next_due ?? '') < today
+              return (
+                <AgendaCard
+                  key={e.id}
+                  colors={CARD_GRADIENT.pet}
+                  icon={<PawPrint size={15} color="#fff" />}
+                  label={pet?.name ?? ''}
+                  time={isOverdue ? t('home.overdue') : t('home.dueToday')}
+                  title={e.title}
+                  sub=""
+                  onPress={() => router.push('/pets')}
+                />
+              )
+            })}
+            {overflow > 0 ? (
               <Pressable
-                key={`${ev.id}:${o.start}`}
                 onPress={() => router.push('/calendar')}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
+                style={{
+                  width: 110,
+                  height: 132,
+                  borderRadius: 24,
+                  backgroundColor: c.card,
+                  borderWidth: 1,
+                  borderColor: c.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <Txt style={{ width: 22, textAlign: 'center', fontSize: emoji ? 15 : 8, color: c.accent }}>
-                  {emoji || '●'}
-                </Txt>
-                <Txt style={{ flex: 1, minWidth: 0 }} numberOfLines={1}>
-                  {ev.title}
-                  {suffix ? <Txt variant="muted"> · {suffix}</Txt> : null}
-                </Txt>
-                {time ? <Txt variant="faint">{time}</Txt> : null}
+                <Txt style={{ fontFamily: fonts.display, fontSize: 22 }}>{t('home.moreItems', { n: overflow })}</Txt>
               </Pressable>
-            )
-          })}
+            ) : null}
+          </ScrollView>
+        </>
+      ) : null}
 
-          {shownPet.map((e) => {
-            const Icon = TYPE_ICON[e.type]
-            const pet = petById[e.pet_id]
-            const isOverdue = (e.next_due ?? '') < today
-            return (
-              <Pressable
-                key={e.id}
-                onPress={() => router.push('/pets')}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}
-              >
-                <View style={{ width: 22, alignItems: 'center' }}>
-                  <Icon size={16} color={c.textMuted} />
-                </View>
-                <Txt style={{ flex: 1, minWidth: 0 }} numberOfLines={1}>
-                  {pet?.emoji ? `${pet.emoji} ` : ''}
-                  {e.title}
-                </Txt>
-                <View
-                  style={{
-                    borderRadius: radius.pill,
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    backgroundColor: isOverdue ? c.expense : c.surface,
-                  }}
-                >
-                  <Txt
-                    style={{
-                      fontSize: 11,
-                      fontFamily: fonts.semibold,
-                      color: isOverdue ? '#ffffff' : c.textMuted,
-                    }}
-                  >
-                    {isOverdue ? t('home.overdue') : t('home.dueToday')}
-                  </Txt>
-                </View>
-              </Pressable>
-            )
-          })}
+      {pickingCity ? (
+        <CityPickerSheet
+          onClose={() => setPickingCity(false)}
+          onSaved={() => {
+            setPickingCity(false)
+            void reloadWeather()
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
 
-          {overflow > 0 ? (
-            <Pressable onPress={() => router.push('/calendar')}>
-              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
-                {t('home.moreItems', { n: overflow })}
-              </Txt>
-            </Pressable>
+/** Small uppercase label above a Home section. */
+export function SectionLabel({ text }: { text: string }) {
+  const { c } = useTheme()
+  return (
+    <Txt
+      style={{
+        fontFamily: fonts.semibold,
+        fontSize: 12,
+        letterSpacing: 1.1,
+        textTransform: 'uppercase',
+        color: c.textMuted,
+        marginTop: sp.xl,
+        marginBottom: sp.md,
+      }}
+    >
+      {text}
+    </Txt>
+  )
+}
+
+/** One of today's things as a bold gradient card. */
+function AgendaCard({
+  colors,
+  icon,
+  label,
+  time,
+  title,
+  sub,
+  onPress,
+}: {
+  colors: readonly [string, string]
+  icon: ReactNode
+  label: string
+  time: string
+  title: string
+  sub: string
+  onPress: () => void
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+      <GradientBox colors={colors} radius={24} style={{ width: CARD_W, height: 132, padding: 16, justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {icon}
+          <Txt style={{ flex: 1, color: 'rgba(255,255,255,0.85)', fontSize: 12.5, fontFamily: fonts.semibold }} numberOfLines={1}>
+            {label}
+          </Txt>
+          <Txt style={{ color: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontFamily: fonts.semibold, fontVariant: ['tabular-nums'] }}>
+            {time}
+          </Txt>
+        </View>
+        <View>
+          <Txt style={{ color: '#fff', fontFamily: fonts.display, fontSize: 19, lineHeight: 23 }} numberOfLines={2}>
+            {title}
+          </Txt>
+          {sub ? (
+            <Txt style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 2 }} numberOfLines={1}>
+              {sub}
+            </Txt>
           ) : null}
         </View>
-      )}
-    </Card>
-
-    {pickingCity ? (
-      <CityPickerSheet
-        onClose={() => setPickingCity(false)}
-        onSaved={() => {
-          setPickingCity(false)
-          void reloadWeather()
-        }}
-      />
-    ) : null}
-    </>
+      </GradientBox>
+    </Pressable>
   )
 }
