@@ -37,6 +37,7 @@ import { useAuth } from '@/lib/auth'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
+import { channelName } from '@/lib/realtime'
 import {
   captureAndUpload,
   fetchMemberLocations,
@@ -174,12 +175,16 @@ function HeaderButton({
       accessibilityState={{ selected: !!active }}
       style={({ pressed }) => [
         {
+          // Two features, two equal halves of the row (owner, 2026-11): the
+          // whole width is the target, not a chip sized to its label.
+          flex: 1,
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 7,
-          height: 38,
-          paddingHorizontal: 14,
-          borderRadius: radius.pill,
+          justifyContent: 'center',
+          gap: 8,
+          height: 46,
+          paddingHorizontal: 12,
+          borderRadius: 16,
           backgroundColor: tint + (dark ? '2E' : '1A'),
           borderWidth: active ? 1.5 : 0,
           borderColor: tint,
@@ -188,7 +193,7 @@ function HeaderButton({
       ]}
     >
       {active ? <Pulse>{glyph}</Pulse> : glyph}
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.text }} numberOfLines={1}>
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text, flexShrink: 1 }} numberOfLines={1}>
         {label}
       </Txt>
       {badge ? <Sparkles size={12} color={tint} /> : null}
@@ -475,7 +480,7 @@ export default function Whereabouts() {
   const loadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     const channel = supabase
-      .channel('member_locations_changes')
+      .channel(channelName('member_locations_changes'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'member_locations' }, () => {
         if (loadTimer.current) clearTimeout(loadTimer.current)
         loadTimer.current = setTimeout(() => void revalidate(), 250)
@@ -824,13 +829,13 @@ export default function Whereabouts() {
             tint={FEATURE.safety}
             active={!!activeWatch}
             badge={isFree}
-            icon={(col) => <ShieldCheck size={17} color={col} />}
+            icon={(col) => <ShieldCheck size={19} color={col} />}
             onPress={() => setSafetyOpen(true)}
           />
           <HeaderButton
             label={t('location.places.title')}
             tint={FEATURE.places}
-            icon={(col) => <MapPin size={17} color={col} />}
+            icon={(col) => <MapPin size={19} color={col} />}
             onPress={() => setPlacesOpen(true)}
           />
         </View>

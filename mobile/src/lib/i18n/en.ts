@@ -1505,5 +1505,12 @@ export const en = {
   'pets.visitKind.followup': "Follow-up",
   'pets.visitKind.dental': "Dental cleaning",
   'pets.visitKind.sick': "Sick visit",
+  'settings.accent': "Accent colour",
+  'settings.accentHint': "Buttons, switches and highlights across the app.",
+  'pings.from': "From {name}",
+  'pings.youSent': "You sent",
+  'pings.seenByLabel': "Seen by",
+  'pings.seenCount': "{n} of {total}",
+  'pings.notYet': "not yet",
 } as const
 

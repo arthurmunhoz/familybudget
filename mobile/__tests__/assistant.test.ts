@@ -218,3 +218,17 @@ describe('petQuestion', () => {
     expect(petQuestion('Lola birthday', PETS)).toBe('')
   })
 })
+
+import { sceneFor } from '@/components/home/sceneKind'
+describe('sceneFor', () => {
+  it('maps WMO codes and day/night to a sky', () => {
+    expect(sceneFor(0)).toBe('clear')
+    expect(sceneFor(0, false)).toBe('night')
+    expect(sceneFor(2)).toBe('partly')
+    expect(sceneFor(3, false)).toBe('nightCloudy')
+    expect(sceneFor(45)).toBe('fog')
+    expect(sceneFor(61)).toBe('rain')
+    expect(sceneFor(73)).toBe('snow')
+    expect(sceneFor(95)).toBe('storm')
+  })
+})

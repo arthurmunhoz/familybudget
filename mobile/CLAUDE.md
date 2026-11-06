@@ -85,6 +85,36 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   round top-bar buttons, tiles instead of chips for the main filter, rows of a
   section grouped into ONE rounded card, uppercase tracked section labels, and
   the input as a floating capsule (Shopping is the reference).
+- **Weather sky (2026-11):** the Hub's header has the current weather drawn
+  behind it (`home/WeatherScene`, pure SVG; `sceneFor(code, isDay)` in
+  `home/sceneKind.ts` — open-meteo now also returns `is_day`): sun, partly,
+  cloudy, fog, rain, snow, storm, night. Strongest top-left, faded downward
+  and rightward under masks so text stays legible. The Hub drops its TOP
+  safe-area edge (scroll gets `paddingTop: insets.top`) so the sky runs under
+  the status bar. The day's weather alert is a quiet line under the date
+  line now, not a banner.
+- **Nudge banners on the Hub (`apps/pings/NudgesBanner`, 2026-11):** a
+  RECEIVED nudge is a gradient card in the Nudges colour (red when urgent),
+  "From Sam · 4m ago", the message large, Got it / Call as pills inside. A
+  SENT nudge is a plain card with a SEEN BY section — who acknowledged,
+  newest first, with their time, then who it went to and hasn't seen it yet
+  (faded "not yet"), and an "n of total" count; ✕ hides it on this device.
+- **Launch (2026-11):** the native splash (expo-splash-screen: cream
+  `#FBF6F0` in BOTH appearances, the glass icon at 150pt) is hidden by
+  `components/LaunchIntro` on its first layout — that layer starts
+  pixel-identical to it, pops the icon, raises "One Roof" + tagline, and
+  fades into the app once auth has resolved (≥0.9 s, ≤6 s). `_layout` keeps
+  a 4 s failsafe hide. Changing the splash image/colour needs a prebuild.
+  App icon = the "glass" house (assets/images/icon.png + the three Android
+  adaptive layers + splash-icon.png, rendered from one SVG).
+- **Settings (2026-11):** round back + big title + your name faded; Plus as
+  a purple gradient card (features, one action inside); apps listed with
+  their Home gradient tiles; tinted gradient icon tiles on every card;
+  Account is one card of rows (email, sign out, delete).
+  The colour picker is "Accent colour" (`AccentPicker`): swatches + a live
+  preview of a button, switch and chip — since the wash is flat, a scheme
+  only repaints the accent, and the old blob thumbnails promised more. Note the apps list
+  is a DraggableList: a scroll gesture that STARTS on a row can pick it up.
 - **The ask bar (`components/home/AskSheet` + `lib/assistant`).** The server
   only UNDERSTANDS (`/api/suggest-ping?action=assistant` → `{intent, items,
   store, scope, person, date, reply}`, Claude Haiku, structured output); the

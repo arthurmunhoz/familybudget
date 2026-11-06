@@ -25,7 +25,12 @@ import {
   Award,
   Bell,
   BellRing,
+  ChevronLeft,
+  ChevronRight,
   GripVertical,
+  LogOut,
+  Mail,
+  Trash2,
   CalendarDays,
   Check,
   FolderLock,
@@ -41,7 +46,9 @@ import {
   type LucideIcon,
 } from 'lucide-react-native'
 
-import { AppHeader, Btn, Card, Field, Screen, Txt } from '@/components/ui'
+import { Btn, Card, Field, Screen, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT, type Gradient } from '@/components/home/palette'
 import { DraggableList } from '@/components/DraggableList'
 import { useAppPrefs } from '@/hooks/useAppPrefs'
 import { APPS } from '@/lib/apps'
@@ -61,9 +68,9 @@ import {
 } from '@/lib/weather'
 import { supabase } from '@/lib/supabase'
 import { dark, fonts, light, radius, sp, useTheme } from '@/theme/theme'
-import { useThemePref, type ThemeMode } from '@/theme/theme-pref'
+import { useThemePref } from '@/theme/theme-pref'
 import { useSchemePref } from '@/theme/scheme-pref'
-import { GLASS, SCHEMES, SCHEME_IDS, type SchemeId } from '@/theme/glass'
+import { GLASS, SCHEMES, SCHEME_IDS, glassTokens, type SchemeId } from '@/theme/glass'
 
 const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Sparkles, key: 'settings.plusFeatureScans' },
@@ -275,12 +282,13 @@ function HouseholdSection({ highlight = false }: { highlight?: boolean }) {
 
   return (
     <View style={{ gap: sp.sm }}>
-      <Txt variant="label">{t('household.title')}</Txt>
+      <SectionLabel>{t('household.title')}</SectionLabel>
       <Card style={{ gap: sp.md }}>
-        {name ? <Txt style={{ fontFamily: fonts.display, fontSize: 18 }}>{name}</Txt> : null}
+        {name ? <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 25 }}>{name}</Txt> : null}
         <View style={{ gap: sp.md }}>
           {members.map((m) => (
-            <View key={m.email} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+            <View key={m.email} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <Initials name={m.display_name} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Txt numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
@@ -430,50 +438,64 @@ function ThemePreview({ p }: { p: typeof light }) {
 // Mini preview of a COLOUR SCHEME: the wash it paints behind everything, plus a
 // glass card and the accent on top. Rendered in the currently-active light/dark
 // mode, since a scheme defines both and you only ever see one at a time.
-function SchemePreview({ id, dark }: { id: SchemeId; dark: boolean }) {
-  const s = SCHEMES[id]
-  const w = dark ? s.washDark : s.wash
-  const accent = dark ? s.accentDark : s.accent
-  // The real wash is three huge offscreen circles; at this size they'd just be
-  // flat fills, so shrink them into the corners to keep the same read.
-  const spots = [
-    { top: -14, left: -14 },
-    { top: -10, right: -12 },
-    { bottom: -16, left: 18 },
-  ]
+/** The accent colour (2026-11): with the background wash gone, a scheme
+ *  only repaints the ACCENT — buttons, switches, selected chips, links — so
+ *  the picker says exactly that: a live preview of those controls in the
+ *  picked colour, over a row of colour swatches. Schemes themselves are
+ *  unchanged (everyone keeps what they chose). */
+function AccentPicker({ value, onChange, dark }: { value: SchemeId; onChange: (id: SchemeId) => void; dark: boolean }) {
+  const { t } = useI18n()
+  const k = glassTokens(dark, value)
   return (
-    <View style={{ height: 74, borderRadius: 10, backgroundColor: w.base, padding: 8, overflow: 'hidden', justifyContent: 'flex-end' }}>
-      {w.blobs.map((b, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            ...spots[i],
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            backgroundColor: b.color,
-            opacity: b.o,
-          }}
-        />
-      ))}
-      <View
-        style={{
-          height: 30,
-          borderRadius: 8,
-          backgroundColor: dark ? 'rgba(32,33,42,0.62)' : 'rgba(255,255,255,0.66)',
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: dark ? 'rgba(255,255,255,0.12)' : 'rgba(60,45,38,0.12)',
-          padding: 5,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 5,
-        }}
-      >
-        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: accent }} />
-        <View style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: accent, opacity: 0.28 }} />
+    <Card style={{ gap: sp.lg }}>
+      {/* live preview: a primary button, a switch, a selected chip, a link */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+        <View style={{ flex: 1, height: 42, borderRadius: radius.pill, backgroundColor: k.action, alignItems: 'center', justifyContent: 'center' }}>
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 14.5, color: k.onAction }}>{t('common.save')}</Txt>
+        </View>
+        <View style={{ width: 50, height: 30, borderRadius: 15, backgroundColor: k.action, padding: 3, alignItems: 'flex-end' }}>
+          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff' }} />
+        </View>
+        <View style={{ paddingHorizontal: 12, height: 32, borderRadius: radius.pill, backgroundColor: k.accentSoft, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Check size={14} color={k.accent} strokeWidth={3} />
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: k.accent }}>{t(`settings.scheme.${value}` as TKey)}</Txt>
+        </View>
       </View>
-    </View>
+      {/* swatches */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        {SCHEME_IDS.map((id) => {
+          const sc = SCHEMES[id]
+          const col = dark ? sc.accentDark : sc.accent
+          const on = id === value
+          return (
+            <Pressable
+              key={id}
+              onPress={() => onChange(id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={t(`settings.scheme.${id}` as TKey)}
+              hitSlop={4}
+              style={({ pressed }) => ({
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                borderWidth: 2.5,
+                borderColor: on ? col : 'transparent',
+                padding: 3,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <View style={{ flex: 1, borderRadius: 16, backgroundColor: col, alignItems: 'center', justifyContent: 'center' }}>
+                {on ? <Check size={15} color="#fff" strokeWidth={3} /> : null}
+              </View>
+            </Pressable>
+          )
+        })}
+      </View>
+      <Txt variant="faint" style={{ fontSize: 13, marginTop: -sp.xs }}>
+        {t('settings.accentHint')}
+      </Txt>
+    </Card>
   )
 }
 
@@ -516,6 +538,12 @@ function OptionCard({
     </Pressable>
   )
 }
+
+const PLUS_GRADIENT: Gradient = ['#8E6CF0', '#C2468E']
+
+const s_ = StyleSheet.create({
+  plusBtn: { height: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+})
 
 export default function Settings() {
   // `dark` is aliased: this module also imports the Warm Hearth `dark` token set.
@@ -723,106 +751,125 @@ export default function Settings() {
   }
 
   return (
-    <Screen scroll scrollRef={scrollRef} header={<AppHeader title={t('settings.title')} />}>
+    <Screen
+      scroll
+      scrollRef={scrollRef}
+      header={
+        // Home-style top bar: a round back button; the title sits big in the page.
+        <View style={{ flexDirection: 'row', paddingVertical: sp.sm }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: c.border,
+              backgroundColor: c.card,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <ChevronLeft size={22} color={c.text} />
+          </Pressable>
+        </View>
+      }
+    >
       <View style={{ gap: sp.xl }}>
-        {/* One Roof Plus */}
+        {/* Big title, who you are faded under it — the Home's voice. */}
+        <View>
+          <Txt style={{ fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8, color: c.text }}>
+            {t('settings.title')}
+          </Txt>
+          {profile?.display_name ? (
+            <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 26, color: c.textFaint }} numberOfLines={1}>
+              {profile.display_name}
+            </Txt>
+          ) : null}
+        </View>
+
+        {/* One Roof Plus — a gradient card, like the Home's (2026-11): status,
+            what's included and the one action all inside it. */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">{t('settings.plus')}</Txt>
-          {isPlus ? (
-            <Card style={{ gap: sp.md, overflow: 'hidden' }}>
-              <PlusConfetti />
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                <View
-                  style={{
-                    height: 48,
-                    width: 48,
-                    borderRadius: 24,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: c.accentSoft,
-                  }}
-                >
-                  <Award size={26} color={c.accent} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>{t('settings.plus')}</Txt>
-                  {/* On the signup trial everything below is unlocked, but saying
-                      "active" would imply a subscription they don't have — show
-                      what's actually true: how long is left. */}
-                  <Txt variant="faint">
-                    {isTrial
+          <SectionLabel>{t('settings.plus')}</SectionLabel>
+          <GradientBox colors={PLUS_GRADIENT} radius={24} style={{ padding: sp.lg, gap: sp.md, overflow: 'hidden' }}>
+            {isPlus ? <PlusConfetti /> : null}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                <Award size={26} color="#fff" />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt style={{ fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: '#fff' }}>{t('settings.plus')}</Txt>
+                {/* On the signup trial everything is unlocked, but "active" would
+                    imply a subscription they don't have — say how long is left. */}
+                <Txt style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.88)' }}>
+                  {isPlus
+                    ? isTrial
                       ? trialDaysLeft === 0
                         ? t('settings.trialEndsToday')
                         : t('settings.trialDaysLeft', { count: trialDaysLeft ?? 0 })
-                      : t('settings.plusActive')}
+                      : t('settings.plusActive')
+                    : trialExpired
+                      ? t('settings.trialEnded')
+                      : t('settings.plusUnlock')}
+                </Txt>
+              </View>
+              {isPlus ? (
+                <View style={{ borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(255,255,255,0.22)' }}>
+                  <Txt style={{ fontSize: 11, fontFamily: fonts.semibold, letterSpacing: 0.5, color: '#fff' }}>
+                    {(isTrial ? t('settings.trial') : t('settings.active')).toUpperCase()}
                   </Txt>
                 </View>
-                <StatusPill
-                  on
-                  label={isTrial ? t('settings.trial') : t('settings.active')}
-                />
-              </View>
-              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
-              <View style={{ gap: sp.sm }}>
-                {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.key} icon={f.icon} label={t(platformKey(f.key))} included />
-                ))}
-              </View>
-            </Card>
-          ) : (
-            <Card style={{ gap: sp.md }}>
-              {/* Someone whose 30-day trial lapsed has ALREADY seen these features
-                  — pitching them as new reads as if the app forgot. `trialExpired`
-                  is server-sourced so this never shows to someone who never had a
-                  trial (which a bare `!isPlus` could not distinguish). */}
-              <Txt variant="muted">
-                {trialExpired ? t('settings.trialEnded') : t('settings.plusUnlock')}
-              </Txt>
-              <View style={{ gap: sp.sm }}>
-                {PLUS_FEATURES.map((f) => (
-                  <FeatureRow key={f.key} icon={f.icon} label={t(platformKey(f.key))} />
-                ))}
-              </View>
-            </Card>
-          )}
-
-          {isPlus && isTrial ? (
-            // A trial is granted by our own server, so there is no store
-            // subscription to "manage" — the useful action is to convert.
-            <Btn title={t('settings.keepPlus')} onPress={() => router.push('/paywall')} />
-          ) : isPlus ? (
-            <Btn
-              title={t('settings.manageSubscription')}
-              variant="secondary"
+              ) : null}
+            </View>
+            <View style={{ gap: 9 }}>
+              {PLUS_FEATURES.map((f) => (
+                <FeatureRow key={f.key} icon={f.icon} label={t(platformKey(f.key))} included={isPlus} />
+              ))}
+            </View>
+            {isPlus && !isTrial ? (
               // RevenueCat's managementUrl points at the store that SOLD this
-              // subscription, which is the only correct answer once the app is
-              // on two stores — subscribe on an iPhone, open the Android app,
-              // and the device's own store lists nothing to manage.
-              onPress={() => Linking.openURL(managementUrl ?? DEVICE_STORE_SUBSCRIPTIONS_URL)}
-            />
-          ) : (
-            <>
-              <Btn title={t('settings.getPlus')} onPress={() => router.push('/paywall')} />
-              <Pressable onPress={doRestore} style={{ paddingVertical: sp.sm, alignItems: 'center' }}>
-                <Txt style={{ color: c.accent, fontWeight: '600' }}>
-                  {t('settings.restorePurchases')}
+              // subscription — the only right answer once the app is on two stores.
+              <Pressable
+                onPress={() => Linking.openURL(managementUrl ?? DEVICE_STORE_SUBSCRIPTIONS_URL)}
+                accessibilityRole="button"
+                style={({ pressed }) => [s_.plusBtn, { backgroundColor: 'rgba(255,255,255,0.2)', opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: '#fff' }}>{t('settings.manageSubscription')}</Txt>
+              </Pressable>
+            ) : (
+              // A trial is granted by our server — no store subscription to manage;
+              // the useful action is to convert. Same button for a free household.
+              <Pressable
+                onPress={() => router.push('/paywall')}
+                accessibilityRole="button"
+                style={({ pressed }) => [s_.plusBtn, { backgroundColor: '#fff', opacity: pressed ? 0.85 : 1 }]}
+              >
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: PLUS_GRADIENT[1] }}>
+                  {isPlus ? t('settings.keepPlus') : t('settings.getPlus')}
                 </Txt>
               </Pressable>
-            </>
-          )}
+            )}
+          </GradientBox>
+          {!isPlus ? (
+            <Pressable onPress={doRestore} style={{ paddingVertical: sp.xs, alignItems: 'center' }}>
+              <Txt style={{ color: c.accent, fontFamily: fonts.semibold }}>{t('settings.restorePurchases')}</Txt>
+            </Pressable>
+          ) : null}
         </View>
-
-        <Divider />
 
         <View onLayout={registerSection('invite')}>
           <HouseholdSection highlight={highlighted === 'invite'} />
         </View>
 
-        <Divider />
 
         {/* Language */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">{t('settings.language')}</Txt>
+          <SectionLabel>{t('settings.language')}</SectionLabel>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
             {LANGUAGES.map((l) => {
               const active = l.id === lang
@@ -831,12 +878,15 @@ export default function Settings() {
                   key={l.id}
                   onPress={() => setLang(l.id)}
                   style={{
+                    // Three languages, three equal thirds of the row.
+                    flex: 1,
                     flexDirection: 'row',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: 6,
-                    paddingHorizontal: sp.md,
-                    paddingVertical: sp.sm,
-                    borderRadius: radius.md,
+                    height: 46,
+                    paddingHorizontal: sp.sm,
+                    borderRadius: 16,
                     backgroundColor: active ? c.accentSoft : c.card,
                     borderWidth: 1,
                     borderColor: active ? c.accent : c.border,
@@ -850,11 +900,10 @@ export default function Settings() {
           </View>
         </View>
 
-        <Divider />
 
         {/* Appearance */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">{t('settings.appearance')}</Txt>
+          <SectionLabel>{t('settings.appearance')}</SectionLabel>
           <View style={{ flexDirection: 'row', gap: sp.sm }}>
             <OptionCard selected={mode === 'light'} onPress={() => setMode('light')} label={t('settings.light')}>
               <ThemePreview p={light} />
@@ -870,35 +919,17 @@ export default function Settings() {
             single fixed accent, so this is hidden when GLASS is off. */}
         {GLASS ? (
           <>
-            <Divider />
             <View style={{ gap: sp.sm }}>
-              <Txt variant="label">{t('settings.colorScheme')}</Txt>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: sp.sm, paddingRight: sp.sm }}
-              >
-                {SCHEME_IDS.map((id) => (
-                  <View key={id} style={{ width: 108 }}>
-                    <OptionCard
-                      selected={scheme === id}
-                      onPress={() => setScheme(id)}
-                      label={t(`settings.scheme.${id}` as TKey)}
-                    >
-                      <SchemePreview id={id} dark={isDark} />
-                    </OptionCard>
-                  </View>
-                ))}
-              </ScrollView>
+              <SectionLabel>{t('settings.accent')}</SectionLabel>
+              <AccentPicker value={scheme} onChange={setScheme} dark={isDark} />
             </View>
           </>
         ) : null}
 
-        <Divider />
 
         {/* Which apps show on the hub, and in what order */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">{t('settings.apps')}</Txt>
+          <SectionLabel>{t('settings.apps')}</SectionLabel>
           <Card>
             <DraggableList
               data={orderedApps}
@@ -918,7 +949,9 @@ export default function Settings() {
                     }}
                   >
                     <GripVertical size={16} color={c.textFaint} />
-                    <app.icon size={18} color={c.accent} />
+                    <IconTile colors={APP_GRADIENT[app.id] ?? APP_GRADIENT.admin} size={32}>
+                      <app.icon size={16} color="#fff" />
+                    </IconTile>
                     <Txt style={{ flex: 1, fontWeight: '500' }} numberOfLines={1}>
                       {t(`app.${app.id}.name` as TKey)}
                     </Txt>
@@ -934,29 +967,15 @@ export default function Settings() {
           <Txt variant="faint">{t('settings.appsHint')}</Txt>
         </View>
 
-        <Divider />
 
         {/* Notifications */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">{t('settings.notifications')}</Txt>
+          <SectionLabel>{t('settings.notifications')}</SectionLabel>
           <Card style={{ gap: sp.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-              <View
-                style={{
-                  height: 40,
-                  width: 40,
-                  borderRadius: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: pushOn ? c.accentSoft : c.surface,
-                }}
-              >
-                {pushOn ? (
-                  <BellRing size={20} color={c.accent} />
-                ) : (
-                  <Bell size={20} color={c.textMuted} />
-                )}
-              </View>
+              <IconTile colors={pushOn ? ['#F25C7A', '#C93D63'] : ['#9AA0AA', '#737985']}>
+                {pushOn ? <BellRing size={20} color="#fff" /> : <Bell size={20} color="#fff" />}
+              </IconTile>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt style={{ fontFamily: fonts.semibold }}>{t('settings.pushReminders')}</Txt>
                 <Txt variant="faint">{t('settings.pushRemindersHint')}</Txt>
@@ -981,14 +1000,13 @@ export default function Settings() {
           </Card>
         </View>
 
-        <Divider />
 
         {/* Weather / home city (drives the Today section on the home screen) */}
         <View
           style={{ gap: sp.sm }}
           onLayout={registerSection('weather')}
         >
-          <Txt variant="label">{t('settings.weather')}</Txt>
+          <SectionLabel>{t('settings.weather')}</SectionLabel>
           <Card
             style={{
               gap: sp.md,
@@ -996,25 +1014,16 @@ export default function Settings() {
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-              <View
-                style={{
-                  height: 44,
-                  width: 44,
-                  borderRadius: 22,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: homeLoc ? c.accentSoft : c.surface,
-                }}
-              >
+              <IconTile colors={homeLoc ? ['#4FA3F7', '#3567D6'] : ['#9AA0AA', '#737985']}>
                 {homeLoc && preview ? (
                   (() => {
                     const WI = weatherIcon(preview.code)
-                    return <WI size={22} color={c.accent} />
+                    return <WI size={21} color="#fff" />
                   })()
                 ) : (
-                  <MapPin size={20} color={homeLoc ? c.accent : c.textMuted} />
+                  <MapPin size={20} color="#fff" />
                 )}
-              </View>
+              </IconTile>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt style={{ fontFamily: fonts.semibold }} numberOfLines={1}>
                   {homeLoc ? homeLoc.city.split(',')[0] : t('settings.homeCity')}
@@ -1080,27 +1089,32 @@ export default function Settings() {
           </Card>
         </View>
 
-        <Divider />
 
-        {/* Account */}
+        {/* Account — one card: who you're signed in as, then the two ways out. */}
         <View style={{ gap: sp.sm }}>
-          <Txt variant="label">{t('settings.account')}</Txt>
-          <Card>
-            <Txt variant="muted">{profile?.email ?? ''}</Txt>
+          <SectionLabel>{t('settings.account')}</SectionLabel>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <AccountRow
+              first
+              icon={<IconTile colors={['#9AA0AA', '#737985']} size={32}><Mail size={16} color="#fff" /></IconTile>}
+              label={profile?.email ?? ''}
+            />
+            <AccountRow
+              icon={<IconTile colors={['#6E7BF2', '#4B57C9']} size={32}><LogOut size={16} color="#fff" /></IconTile>}
+              label={t('settings.signOut')}
+              onPress={doSignOut}
+            />
+            <AccountRow
+              icon={<IconTile colors={['#F0766A', '#D2483C']} size={32}><Trash2 size={16} color="#fff" /></IconTile>}
+              label={t('settings.deleteAccount')}
+              color={c.expense}
+              onPress={confirmDelete}
+            />
           </Card>
-          <Btn title={t('settings.signOut')} variant="secondary" onPress={doSignOut} />
-          <Pressable onPress={confirmDelete} style={{ paddingVertical: sp.md, alignItems: 'center' }}>
-            <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('settings.deleteAccount')}</Txt>
-          </Pressable>
         </View>
       </View>
     </Screen>
   )
-}
-
-function Divider() {
-  const { c } = useTheme()
-  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
 }
 
 function StatusPill({ on, label }: { on: boolean; label?: string }) {
@@ -1138,23 +1152,88 @@ function FeatureRow({
   label: string
   included?: boolean
 }) {
-  const { c } = useTheme()
+  // Sits on the Plus gradient: white glyph on a translucent tile, white text.
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-      <View
-        style={{
-          height: 28,
-          width: 28,
-          borderRadius: 8,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: c.surface,
-        }}
-      >
-        <Icon size={16} color={c.accent} />
+      <View style={{ height: 28, width: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' }}>
+        <Icon size={15} color="#fff" />
       </View>
-      <Txt style={{ flex: 1, minWidth: 0 }}>{label}</Txt>
-      {included ? <Check size={16} color={c.income} strokeWidth={2.5} /> : null}
+      <Txt style={{ flex: 1, minWidth: 0, fontSize: 14.5, color: '#fff' }}>{label}</Txt>
+      {included ? <Check size={16} color="#fff" strokeWidth={2.6} /> : null}
+    </View>
+  )
+}
+
+/** Home-style section label: uppercase, tracked, outside the card. */
+function SectionLabel({ children }: { children: ReactNode }) {
+  const { c } = useTheme()
+  return (
+    <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted, paddingHorizontal: 2 }}>
+      {children}
+    </Txt>
+  )
+}
+
+/** A white glyph on a small gradient tile — the Home's app-icon look. */
+function IconTile({ colors, children, size = 40 }: { colors: Gradient; children: ReactNode; size?: number }) {
+  return (
+    <GradientBox colors={colors} radius={size * 0.3} style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {children}
+    </GradientBox>
+  )
+}
+
+/** One row of the Account card: a tinted icon, a label, an optional chevron. */
+function AccountRow({
+  icon,
+  label,
+  color,
+  onPress,
+  first,
+}: {
+  icon: ReactNode
+  label: string
+  color?: string
+  onPress?: () => void
+  first?: boolean
+}) {
+  const { c } = useTheme()
+  const body = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp.md,
+        paddingHorizontal: sp.md,
+        paddingVertical: 13,
+        borderTopWidth: first ? 0 : StyleSheet.hairlineWidth,
+        borderTopColor: c.border,
+      }}
+    >
+      {icon}
+      <Txt style={{ flex: 1, fontSize: 15.5, fontFamily: onPress ? fonts.semibold : fonts.body, color: color ?? c.text }} numberOfLines={1}>
+        {label}
+      </Txt>
+      {onPress ? <ChevronRight size={17} color={c.textFaint} /> : null}
+    </View>
+  )
+  return onPress ? (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+      {body}
+    </Pressable>
+  ) : (
+    body
+  )
+}
+
+/** Initials on a soft accent circle, for the member list. */
+function Initials({ name }: { name: string }) {
+  const { c } = useTheme()
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const ini = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
+  return (
+    <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.accent }}>{ini}</Txt>
     </View>
   )
 }

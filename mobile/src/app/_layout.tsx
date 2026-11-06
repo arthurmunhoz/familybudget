@@ -20,6 +20,7 @@ import {
 } from '@expo-google-fonts/nunito';
 
 import { AnalyticsBridge } from '@/components/AnalyticsBridge';
+import { LaunchIntro } from '@/components/LaunchIntro';
 import { AuthProvider } from '@/lib/auth';
 import { registerBackgroundNotifications } from '@/lib/backgroundNotifications';
 import { registerLocationTask } from '@/lib/locationTask';
@@ -51,9 +52,13 @@ export default function RootLayout() {
     Nunito_800ExtraBold,
   });
 
+  // The native splash is hidden by LaunchIntro on its first layout (it starts
+  // identical to it, so the swap can't be seen). Failsafe: never leave the
+  // splash up if that layer somehow doesn't mount.
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
-  }, [fontsLoaded]);
+    const id = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 4000);
+    return () => clearTimeout(id);
+  }, []);
 
   // Silent-push → Nudges widget "seen by" plumbing (backgroundNotifications.ts).
   // Also registers the background-location task so the OS can wake it headlessly
@@ -147,6 +152,9 @@ function Chrome() {
         >
           <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         </Stack>
+        {/* The opening: starts identical to the native splash, animates, then
+            fades into the app once the session is known (LaunchIntro). */}
+        <LaunchIntro />
       </GestureHandlerRootView>
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>

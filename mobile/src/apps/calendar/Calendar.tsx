@@ -32,6 +32,7 @@ import {
 } from '@/lib/calendar'
 import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
+import { channelName } from '@/lib/realtime'
 import type { CalendarEvent } from '@/lib/types'
 import { radius, sp, useTheme } from '@/theme/theme'
 import { getGoogleConnection } from '@/lib/googleCalendar'
@@ -87,7 +88,7 @@ export default function Calendar() {
   useEffect(() => {
     // Realtime: refetch when any household row changes (RLS scopes the stream).
     const channel = supabase
-      .channel('calendar_events')
+      .channel(channelName('calendar_events'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, load)
       .subscribe()
     return () => {

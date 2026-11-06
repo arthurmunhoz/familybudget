@@ -9,6 +9,7 @@ import { Bell, Crosshair, LogIn, LogOut, MapPin, Plus } from 'lucide-react-nativ
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
+import { channelName } from '@/lib/realtime'
 import { formatDistance } from '@/lib/location'
 import { fetchMyPlaceWatches, fetchPlaceEvents, fetchPlaces } from '@/lib/places'
 import type { Place, PlaceEvent, PlaceWatch, Profile } from '@/lib/types'
@@ -62,7 +63,7 @@ export function PlacesSheet({
   useEffect(() => {
     void load()
     const channel = supabase
-      .channel('places_changes')
+      .channel(channelName('places_changes'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'places' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'place_events' }, () => void load())
       .subscribe()

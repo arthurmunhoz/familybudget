@@ -1495,5 +1495,12 @@ export const es: Record<keyof typeof en, string> = {
   'pets.visitKind.followup': "Control",
   'pets.visitKind.dental': "Limpieza dental",
   'pets.visitKind.sick': "Estaba enfermo",
+  'settings.accent': "Color de acento",
+  'settings.accentHint': "Botones, interruptores y resaltados en toda la app.",
+  'pings.from': "De {name}",
+  'pings.youSent': "Enviaste",
+  'pings.seenByLabel': "Visto por",
+  'pings.seenCount': "{n} de {total}",
+  'pings.notYet': "aún no",
 }
 

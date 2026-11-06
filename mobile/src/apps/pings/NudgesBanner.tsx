@@ -12,16 +12,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Linking, Pressable, StyleSheet, Vibration, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Phone, ThumbsUp, X } from 'lucide-react-native'
+import { Check, Phone, ThumbsUp, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT } from '@/components/home/palette'
 import { useAuth } from '@/lib/auth'
 import { useRevalidateOnForeground } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
+import { channelName } from '@/lib/realtime'
 import { timeAgo } from '@/lib/format'
 import type { Ping, PingAck } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 type ActivePing = Ping & { acks: PingAck[] }
 
@@ -87,7 +90,7 @@ export default function NudgesBanner() {
     void load()
     void fetchMemberPhones().then(setPhones)
     const channel = supabase
-      .channel('hub_nudges_banner')
+      .channel(channelName('hub_nudges_banner'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pings' }, () => scheduleLoad())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ping_acks' }, () => scheduleLoad())
       .subscribe()
@@ -166,113 +169,134 @@ export default function NudgesBanner() {
 
   return (
     <View style={{ gap: sp.sm, marginBottom: sp.lg }}>
+      {/* RECEIVED — a gradient card in the Nudges colour (red when it's
+          urgent): who and when as a kicker, the message large, the replies as
+          pills inside (2026-11). The card itself is inert. */}
       {incoming.map((p) => {
         const isHigh = p.high_priority
         const phone = phones[p.sender_email]
+        const colors = isHigh ? URGENT : (APP_GRADIENT.pings as [string, string])
         return (
-          <View
-            key={p.id}
-            style={[
-              styles.row,
-              {
-                backgroundColor: c.card,
-                borderColor: c.border,
-                borderLeftColor: isHigh ? c.expense : c.accent,
-              },
-            ]}
-          >
-            {/* Body is inert — the CTAs beside it are the only actions, and
-                there is no history screen to deep-link into. */}
-            <View style={styles.body}>
-              <Txt style={styles.emoji}>{p.emoji}</Txt>
+          <GradientBox key={p.id} colors={colors} radius={24} style={styles.card}>
+            <View style={styles.top}>
+              <View style={styles.emojiOnColor}>
+                <Txt style={styles.emoji}>{p.emoji}</Txt>
+              </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt numberOfLines={2} style={{ fontWeight: '600', color: c.text }}>
-                  {p.message}
+                <Txt style={styles.kickerOnColor} numberOfLines={1}>
+                  {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
                 </Txt>
-                <Txt variant="faint" numberOfLines={1}>
-                  {nameOf(p.sender_email)} · {timeAgo(p.created_at)}
+                <Txt style={styles.msgOnColor} numberOfLines={3}>
+                  {p.message}
                 </Txt>
               </View>
             </View>
-            {/* Respond CTAs.
-                Help nudges get Call AND Got it, so a recipient can acknowledge —
-                and dismiss the banner — without having to call. Other nudges just
-                get Got it. */}
             <View style={styles.actions}>
-              {/* Call is the primary, urgent action → filled. */}
+              {/* Urgent: Call AND Got it, so a recipient can acknowledge
+                  without having to call. */}
               {isHigh && phone ? (
                 <Pressable
                   onPress={() => void Linking.openURL(`tel:${phone}`)}
-                  style={[
-                    styles.actionBtn,
-                    // Same 1.5 border as the outlined Got it (just invisible here)
-                    // so the two buttons end up exactly the same height.
-                    { backgroundColor: c.expense, borderWidth: 1.5, borderColor: c.expense },
-                  ]}
+                  style={({ pressed }) => [styles.pill, { backgroundColor: '#fff', opacity: pressed ? 0.8 : 1 }]}
                   accessibilityRole="button"
                   accessibilityLabel={t('pings.call')}
                 >
-                  <Phone size={14} strokeWidth={2.5} color="#ffffff" />
-                  <Txt style={[styles.actionTxt, { color: '#ffffff' }]}>{t('pings.call')}</Txt>
+                  <Phone size={15} strokeWidth={2.5} color={colors[1]} />
+                  <Txt style={[styles.pillTxt, { color: colors[1] }]}>{t('pings.call')}</Txt>
                 </Pressable>
               ) : null}
-              {/* Got it is the quiet acknowledge → outlined, so it never competes
-                  with Call when both are on screen. */}
               <Pressable
                 onPress={() => ack(p.id)}
-                style={[
-                  styles.actionBtn,
-                  { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.action },
+                style={({ pressed }) => [
+                  styles.pill,
+                  isHigh && phone
+                    ? { backgroundColor: 'rgba(255,255,255,0.22)' }
+                    : { backgroundColor: '#fff' },
+                  { opacity: pressed ? 0.8 : 1 },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={t('pings.gotIt')}
               >
-                <ThumbsUp size={14} strokeWidth={2.5} color={c.accent} />
-                <Txt style={[styles.actionTxt, { color: c.accent }]}>{t('pings.gotIt')}</Txt>
+                <ThumbsUp size={15} strokeWidth={2.5} color={isHigh && phone ? '#fff' : colors[1]} />
+                <Txt style={[styles.pillTxt, { color: isHigh && phone ? '#fff' : colors[1] }]}>{t('pings.gotIt')}</Txt>
               </Pressable>
             </View>
-          </View>
+          </GradientBox>
         )
       })}
 
+      {/* SENT — a plain card: what I sent, then WHO HAS SEEN IT, newest first,
+          with who's still to see it faded below (owner, 2026-11: "You · No one
+          has acknowledged yet" said nothing about who it went to). */}
       {sent.map((p) => {
-        const ackers = p.acks
+        const seen = p.acks
           .filter((a) => a.user_email !== myEmail)
-          .map((a) => nameOf(a.user_email))
-        const seen = ackers.length
-          ? t('pings.seenBy', { names: ackers.join(', ') })
-          : t('pings.noAcks')
+          .sort((x, y) => y.created_at.localeCompare(x.created_at))
+        const seenSet = new Set(seen.map((a) => a.user_email))
+        const audience = (p.recipients?.length ? p.recipients : profiles.map((m) => m.email)).filter(
+          (e) => e !== myEmail,
+        )
+        const waiting = audience.filter((e) => !seenSet.has(e))
+        const total = Math.max(audience.length, seen.length)
         return (
-          <View
-            key={p.id}
-            style={[
-              styles.row,
-              // Same glass card as a received nudge — only the rail colour says
-              // which it is (muted = one I sent, nothing to act on).
-              { backgroundColor: c.card, borderColor: c.border, borderLeftColor: c.textFaint },
-            ]}
-          >
-            <View style={styles.body}>
-              <Txt style={styles.emoji}>{p.emoji}</Txt>
+          <View key={p.id} style={[styles.card, { backgroundColor: c.card, borderColor: c.border, borderWidth: StyleSheet.hairlineWidth }]}>
+            <View style={styles.top}>
+              <GradientBox colors={APP_GRADIENT.pings as [string, string]} radius={14} style={styles.emojiTile}>
+                <Txt style={styles.emoji}>{p.emoji}</Txt>
+              </GradientBox>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt numberOfLines={2} style={{ fontWeight: '600', color: c.text }}>
+                <Txt style={[styles.kicker, { color: c.textMuted }]} numberOfLines={1}>
+                  {t('pings.youSent')} · {timeAgo(p.created_at)}
+                </Txt>
+                <Txt style={[styles.msg, { color: c.text }]} numberOfLines={3}>
                   {p.message}
                 </Txt>
-                <Txt variant="faint" numberOfLines={1}>
-                  {t('pings.you')} · {seen}
-                </Txt>
               </View>
+              {/* ✕ dismiss from my home (persists on this device). */}
+              <Pressable
+                onPress={() => dismiss(p.id)}
+                hitSlop={8}
+                style={[styles.close, { backgroundColor: c.surface }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+              >
+                <X size={14} color={c.textMuted} />
+              </Pressable>
             </View>
-            {/* ✕ dismiss from my home (persists on this device). */}
-            <Pressable
-              onPress={() => dismiss(p.id)}
-              hitSlop={8}
-              style={styles.dismissBtn}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.close')}
-            >
-              <X size={18} color={c.textFaint} />
-            </Pressable>
+
+            <View style={[styles.seenBox, { borderTopColor: c.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Txt style={[styles.label, { color: c.textMuted }]}>{t('pings.seenByLabel')}</Txt>
+                {total ? (
+                  <Txt style={[styles.label, { color: seen.length === total ? c.income : c.textMuted }]}>
+                    {t('pings.seenCount', { n: seen.length, total })}
+                  </Txt>
+                ) : null}
+              </View>
+              {seen.map((a) => (
+                <View key={a.user_email} style={styles.person}>
+                  <Initials name={nameOf(a.user_email)} />
+                  <Txt style={{ flex: 1, fontSize: 14.5, color: c.text }} numberOfLines={1}>
+                    {nameOf(a.user_email)}
+                  </Txt>
+                  <Check size={14} color={c.income} strokeWidth={3} />
+                  <Txt variant="faint" style={{ fontSize: 12.5 }}>
+                    {timeAgo(a.created_at)}
+                  </Txt>
+                </View>
+              ))}
+              {waiting.map((e) => (
+                <View key={e} style={[styles.person, { opacity: 0.55 }]}>
+                  <Initials name={nameOf(e)} faded />
+                  <Txt style={{ flex: 1, fontSize: 14.5, color: c.textMuted }} numberOfLines={1}>
+                    {nameOf(e)}
+                  </Txt>
+                  <Txt variant="faint" style={{ fontSize: 12.5 }}>
+                    {t('pings.notYet')}
+                  </Txt>
+                </View>
+              ))}
+            </View>
           </View>
         )
       })}
@@ -280,39 +304,37 @@ export default function NudgesBanner() {
   )
 }
 
+const URGENT: [string, string] = ['#F2605A', '#C9353F']
+
+const firstName = (n: string) => n.split(' ')[0]
+
+/** Initials on a soft accent circle. */
+function Initials({ name, faded }: { name: string; faded?: boolean }) {
+  const { c } = useTheme()
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const ini = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
+  return (
+    <View style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: faded ? c.surface : c.accentSoft }}>
+      <Txt style={{ fontSize: 12, fontWeight: '700', color: faded ? c.textMuted : c.accent }}>{ini}</Txt>
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
-  // One shared shape for BOTH received and sent nudges — glass card, hairline
-  // rim, colour-coded left rail. Only the rail colour and the trailing control
-  // differ, so they read as one component in two states.
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: 4,
-    borderLeftColor: 'transparent',
-    paddingVertical: 10,
-    paddingHorizontal: sp.md,
-  },
-  body: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: sp.md },
-  emoji: { fontSize: 26 },
-  actions: { gap: 6, alignItems: 'stretch' },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  // Colour is set per-button (filled Call = white, outlined Got it = accent).
-  actionTxt: { fontWeight: '700', fontSize: 13 },
-  dismissBtn: {
-    height: 30,
-    width: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  card: { borderRadius: 24, padding: sp.md, gap: sp.md },
+  top: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.md },
+  emojiOnColor: { width: 46, height: 46, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' },
+  emojiTile: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 24 },
+  kickerOnColor: { fontSize: 12.5, fontWeight: '600', color: 'rgba(255,255,255,0.88)' },
+  msgOnColor: { fontFamily: fonts.display, fontSize: 18, lineHeight: 23, color: '#fff', marginTop: 2 },
+  kicker: { fontSize: 12.5, fontWeight: '600' },
+  msg: { fontFamily: fonts.display, fontSize: 18, lineHeight: 23, marginTop: 2 },
+  actions: { flexDirection: 'row', gap: sp.sm },
+  pill: { flex: 1, height: 42, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  pillTxt: { fontWeight: '700', fontSize: 14 },
+  close: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  seenBox: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: sp.sm, gap: 8 },
+  label: { fontSize: 11.5, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  person: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
 })

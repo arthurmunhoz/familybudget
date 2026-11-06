@@ -8,6 +8,7 @@
 // Hub. Reloads on focus so it reflects new events / a changed home city.
 import { createElement, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import {
   Cake,
@@ -45,13 +46,17 @@ import {
 import { overdueEvents } from '../lib/petCare'
 import type { CalendarEvent, PetEvent } from '../lib/types'
 import { useHomeWeather, weatherIcon, type WeatherAlertKind } from '../lib/weather'
+import { WeatherScene } from './home/WeatherScene'
+import { sceneFor } from './home/sceneKind'
 import { syncTodayConfig, syncTodayWidget, type TodayWidgetItem } from '../lib/widget'
 import type { TKey } from '../lib/i18n'
-import { fonts, radius, sp, useTheme } from '../theme/theme'
+import { fonts, sp, useTheme } from '../theme/theme'
 
 const LOCALE: Record<string, string> = { en: 'en-US', es: 'es', pt: 'pt-BR' }
 const MAX_CARDS = 8
 const CARD_W = 236
+/** How far the weather sky reaches below the status bar. */
+const SCENE_H = 280
 
 // Home-screen weather alert: an on-brand Lucide icon + localized message per kind.
 const WEATHER_ALERT: Record<WeatherAlertKind, { icon: LucideIcon; key: TKey }> = {
@@ -81,27 +86,6 @@ function WeatherSkeleton() {
 }
 
 // Matches the alert banner (same height + accentSoft chip) so it doesn't reflow.
-function AlertSkeleton() {
-  const { c } = useTheme()
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: sp.sm,
-        backgroundColor: c.accentSoft,
-        borderRadius: radius.md,
-        paddingHorizontal: sp.md,
-        paddingVertical: sp.sm,
-      }}
-    >
-      <Skeleton style={{ width: 18, height: 18, borderRadius: 9 }} />
-      <View style={{ flex: 1 }}>
-        <Skeleton style={{ width: '70%', height: 11 }} />
-      </View>
-    </View>
-  )
-}
 
 export default function TodaySection({
   name,
@@ -117,6 +101,7 @@ export default function TodaySection({
   /** Header slot on the right (the Settings button). */
   right?: ReactNode
 }) {
+  const insets = useSafeAreaInsets()
   const { c } = useTheme()
   const { t, lang } = useI18n()
   const locale = LOCALE[lang] ?? 'en-US'
@@ -266,6 +251,17 @@ export default function TodaySection({
 
   return (
     <>
+      {/* The current weather as a soft sky behind the header, from the very
+          top of the screen (Hub drops its top safe-area edge for this). */}
+      {weather ? (
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: -insets.top, left: -sp.lg, right: -sp.lg, height: insets.top + SCENE_H }}
+        >
+          <WeatherScene kind={sceneFor(weather.code, weather.isDay)} height={insets.top + SCENE_H} />
+        </View>
+      ) : null}
+
       {/* date · weather · household — tap for the weather settings */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingTop: sp.sm }}>
         <Pressable
@@ -290,6 +286,17 @@ export default function TodaySection({
         </Pressable>
         {right}
       </View>
+
+      {/* today's weather alert, up here with the weather (owner, 2026-11) —
+          one quiet line instead of a banner further down */}
+      {alertMeta && AlertIcon ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+          <AlertIcon size={15} color={c.text} />
+          <Txt style={{ flex: 1, fontSize: 13.5, fontFamily: fonts.semibold, color: c.text }} numberOfLines={1}>
+            {t(alertMeta.key)}
+          </Txt>
+        </View>
+      ) : null}
 
       {/* greeting + how the day looks */}
       <Txt style={{ fontFamily: fonts.display, fontSize: 38, lineHeight: 44, letterSpacing: -0.8, marginTop: sp.md }}>
@@ -350,29 +357,6 @@ export default function TodaySection({
           )}
         </Pressable>
       </Pressable>
-
-      {/* today's weather alert (rain / storm / extreme temp / wind) */}
-      {alertMeta && AlertIcon ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: sp.sm,
-            backgroundColor: c.accentSoft,
-            borderRadius: radius.md,
-            paddingHorizontal: sp.md,
-            paddingVertical: sp.sm,
-            marginTop: sp.md,
-          }}
-        >
-          <AlertIcon size={18} color={c.accent} />
-          <Txt style={{ flex: 1, fontSize: 13, color: c.text }}>{t(alertMeta.key)}</Txt>
-        </View>
-      ) : weatherLoading ? (
-        <View style={{ marginTop: sp.md }}>
-          <AlertSkeleton />
-        </View>
-      ) : null}
 
       {/* today's agenda as cards */}
       {totalItems > 0 ? (

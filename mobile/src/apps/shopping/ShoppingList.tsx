@@ -52,6 +52,7 @@ import {
   LOCAL_STORES,
 } from '@/lib/offline'
 import { supabase } from '@/lib/supabase'
+import { channelName } from '@/lib/realtime'
 import { STORE_CATALOG, STORE_COLORS, type StoreCatalogEntry } from '@/lib/stores'
 import { fetchStoreSuggestions, type SuggestedStore } from '@/lib/storeSuggest'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
@@ -330,7 +331,7 @@ export default function ShoppingList() {
   useEffect(() => {
     void load()
     const channel = supabase
-      .channel('shopping_changes')
+      .channel(channelName('shopping_changes'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () =>
         scheduleLoad(),
       )

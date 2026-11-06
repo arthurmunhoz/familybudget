@@ -10,7 +10,7 @@
 // only the app icons and agenda cards carry their own fixed colours.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Settings } from 'lucide-react-native'
 
@@ -34,6 +34,7 @@ import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
 import type { TKey } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
+import { channelName } from '@/lib/realtime'
 import { fonts, sp, useTheme } from '../theme/theme'
 
 const DOCK_H = 72
@@ -77,7 +78,7 @@ export default function Hub() {
   )
   useEffect(() => {
     const channel = supabase
-      .channel('hub_shopping_badge')
+      .channel(channelName('hub_shopping_badge'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_items' }, () =>
         reloadShopping(),
       )
@@ -111,6 +112,7 @@ export default function Hub() {
     }, [reloadName, reloadShopping]),
   )
 
+  const insets = useSafeAreaInsets()
   const badges: Record<string, number> = { shopping: shoppingCount }
   const firstName = (profile?.display_name ?? '').split(' ')[0] || 'One Roof'
   const memberEmails = useMemo(() => profiles.map((p) => p.email), [profiles])
@@ -121,9 +123,12 @@ export default function Hub() {
   )
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
+    // No TOP safe-area edge: the scroll starts at the very top so the header's
+    // weather sky (TodaySection → WeatherScene) can run up behind the status
+    // bar; the inset is padding inside the scroll instead.
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right']}>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: DOCK_H + dockGap + sp.xl }}
+        contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: insets.top, paddingBottom: DOCK_H + dockGap + sp.xl }}
         keyboardShouldPersistTaps="handled"
       >
         <TodaySection
