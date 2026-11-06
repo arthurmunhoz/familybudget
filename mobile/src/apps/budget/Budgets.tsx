@@ -8,20 +8,28 @@
 // dropdown switches which period the card previews. RN app.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ActivityIndicator,
   Dimensions,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
-import { Camera, Check, ChevronDown, ChevronRight, Lock } from 'lucide-react-native'
+import { CalendarDays, CalendarRange, Camera, Check, ChevronDown, ChevronRight, Lock, Plus, Sun, Wallet, X } from 'lucide-react-native'
 
-import { AppHeader, Btn, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
+import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
-import { BUDGET_GRADIENTS, budgetLook } from '@/components/home/palette'
+import { APP_GRADIENT, BUDGET_GRADIENTS, budgetLook } from '@/components/home/palette'
+import { Toggle } from '@/components/Toggle'
+import { Pressable as SafePressable } from '@/components/Pressable'
+import { useBottomGap } from '@/hooks/useBottomGap'
+import { useScreenCorner } from '@/hooks/useScreenCorner'
+import { useSheetLift } from '@/hooks/useSheetLift'
 import { StatChip } from './StatChip'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
@@ -35,8 +43,6 @@ import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { formatMoney, periodEndISO, periodLabel } from '@/lib/format'
 import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { FormSection, NoteRow, Segmented, ToggleRow } from '@/components/form'
-import { FormSheet } from './FormSheet'
 
 const PERIODS: Period[] = ['monthly', 'weekly', 'daily']
 
@@ -250,6 +256,7 @@ export default function Budgets() {
         onPress={startCreate}
         disabled={loading}
         plus={overFreeLimit}
+        colors={APP_GRADIENT.budget}
       />
 
       {createOpen && (
@@ -274,10 +281,11 @@ export default function Budgets() {
   )
 }
 
-/** The "New budget" sheet (2026-11 form redesign): name, grouping as a
- *  segmented switch, and — Plus only — the private toggle; Create is docked.
- *  Only offered to Plus members — the DB rejects private anyway
- *  (budgets_plus_guard, migration 058). */
+/** The "New budget" sheet (2026-11, the editors' look): the budget's NAME
+ *  leads, typed in place and large beside a Money-green tile; how entries
+ *  are grouped is three equal tiles (month / week / day) with an icon each;
+ *  Plus members get the private switch as one row; Create is docked in the
+ *  Money gradient, following the screen's curve. */
 function NewBudgetSheet({
   name,
   onName,
@@ -302,50 +310,157 @@ function NewBudgetSheet({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  const { c, dark } = useTheme()
+  const bottomGap = useBottomGap(sp.xs)
+  const corner = useScreenCorner()
+  const bottomR = corner?.radius ?? radius.md
+  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
+  const green = APP_GRADIENT.budget as [string, string]
+  const tint = green[1]
+  const soft = tint + (dark ? '2E' : '1A')
+  const PERIOD_ICON: Record<Period, typeof CalendarDays> = { monthly: CalendarDays, weekly: CalendarRange, daily: Sun }
+  const can = !!name.trim() && !saving
   return (
-    <FormSheet
-      title={t('budget.newTitle')}
-      onClose={onClose}
-      footer={<Btn title={t('common.create')} onPress={onCreate} loading={saving} disabled={!name.trim()} />}
-    >
-      <FormSection>
-        {/* Label on top, full-width input: the example placeholder is long. */}
-        <NoteRow
-          label={t('budget.nameLabel' as TKey)}
-          value={name}
-          onChangeText={onName}
-          placeholder={t('budget.namePlaceholder')}
-          multiline={false}
-          autoFocus
-          returnKeyType="done"
-          onSubmitEditing={() => name.trim() && onCreate()}
-        />
-      </FormSection>
+    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} onLayout={onRootLayout}>
+        <Pressable style={{ flex: 1 }} onPress={() => Keyboard.dismiss()} accessible={false} />
+        <View
+          style={{
+            backgroundColor: c.sheet,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingTop: sp.lg,
+            maxHeight: room * 0.94,
+            marginBottom: lift,
+          }}
+        >
+          {/* the name, large and typed in place */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.md, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}>
+            <GradientBox colors={green} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+              <Wallet size={26} color="#fff" />
+            </GradientBox>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}>
+                {t('budget.newTitle')}
+              </Txt>
+              <TextInput
+                value={name}
+                onChangeText={onName}
+                placeholder={t('budget.namePlaceholderShort')}
+                placeholderTextColor={c.textFaint}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={() => can && onCreate()}
+                accessibilityLabel={t('budget.nameLabel' as TKey)}
+                style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, padding: 0, marginTop: 2 }}
+              />
+            </View>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={16} color={c.textMuted} />
+            </Pressable>
+          </View>
 
-      <FormSection title={t('budget.groupedBy')}>
-        <View style={{ padding: sp.sm }}>
-          <Segmented<Period>
-            options={PERIODS.map((p) => ({ value: p, label: t(`budget.${p}` as TKey) }))}
-            value={period}
-            onChange={onPeriod}
-          />
+          <View style={{ paddingHorizontal: sp.lg, gap: sp.lg, paddingBottom: sp.lg }}>
+            {/* grouping: three equal tiles */}
+            <View>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted, marginBottom: sp.sm }}>
+                {t('budget.groupedBy')}
+              </Txt>
+              <View style={{ flexDirection: 'row', gap: sp.sm }}>
+                {PERIODS.map((p) => {
+                  const on = p === period
+                  const Icon = PERIOD_ICON[p]
+                  return (
+                    <Pressable
+                      key={p}
+                      onPress={() => onPeriod(p)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      style={({ pressed }) => ({
+                        flex: 1,
+                        height: 76,
+                        borderRadius: 18,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        backgroundColor: on ? tint : soft,
+                        opacity: pressed ? 0.75 : 1,
+                      })}
+                    >
+                      <Icon size={20} color={on ? '#fff' : tint} />
+                      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? '#fff' : tint }}>
+                        {t(`budget.${p}` as TKey)}
+                      </Txt>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            </View>
+
+            {showPrivate ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: sp.md,
+                  padding: sp.md,
+                  borderRadius: 22,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: c.border,
+                  backgroundColor: c.card,
+                }}
+              >
+                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isPrivate ? tint : c.surface, alignItems: 'center', justifyContent: 'center' }}>
+                  <Lock size={18} color={isPrivate ? '#fff' : c.textMuted} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('budget.private')}</Txt>
+                  <Txt variant="faint" style={{ fontSize: 12.5 }}>
+                    {t('budget.privateHint')}
+                  </Txt>
+                </View>
+                <Toggle value={isPrivate} onValueChange={onPrivate} />
+              </View>
+            ) : null}
+          </View>
+
+          {/* Create — docked, in the Money gradient */}
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.xs, paddingBottom: clearOfBars ? sp.md : bottomGap }}>
+            <SafePressable
+              onPress={onCreate}
+              disabled={!can}
+              accessibilityRole="button"
+              style={({ pressed }) => ({ opacity: !name.trim() ? 0.45 : pressed || saving ? 0.8 : 1 })}
+            >
+              <GradientBox
+                colors={green}
+                radius={radius.md}
+                style={{
+                  height: 54,
+                  borderBottomLeftRadius: bottomR,
+                  borderBottomRightRadius: bottomR,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                {saving ? <ActivityIndicator color="#fff" /> : <Plus size={18} color="#fff" strokeWidth={2.6} />}
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 16, color: '#fff' }}>{t('budget.createBudget')}</Txt>
+              </GradientBox>
+            </SafePressable>
+          </View>
         </View>
-      </FormSection>
-
-      {showPrivate ? (
-        <FormSection>
-          <ToggleRow
-            label={t('budget.private')}
-            hint={t('budget.privateHint')}
-            value={isPrivate}
-            onValueChange={onPrivate}
-          />
-        </FormSection>
-      ) : null}
-    </FormSheet>
+      </View>
+    </Modal>
   )
 }
-
 
 function BudgetCard({
   budget: b,

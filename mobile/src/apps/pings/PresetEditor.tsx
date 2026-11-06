@@ -2,55 +2,26 @@
 // A bottom-sheet Modal. Moved out of PingComposer so the Nudge-settings modal
 // owns preset management and the composer is just for sending.
 //
-// 2026-11 redesign (components/form): title + round ×, the fields as one
-// section of rows, high priority as a ToggleRow, Save docked at the bottom —
-// the same shape as EditProfile. It renders as a <Modal> nested INSIDE
+// 2026-11 restyle: the emoji (typed on a gradient tile) and the words large in
+// the header, "urgent" as one card that turns red, Save docked in the nudge's
+// colour. It renders as a <Modal> nested INSIDE
 // NudgeSettings' modal tree (sibling modals fail on iOS); keep it that way.
-import { useRef, useState } from 'react'
-import { Alert, Modal, StyleSheet, TextInput, View } from 'react-native'
-import { X } from 'lucide-react-native'
+import { useState } from 'react'
+import { Alert, Keyboard, Modal, StyleSheet, TextInput, View } from 'react-native'
+import { Siren, X } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
-import { Btn, DismissKeyboard, Txt } from '@/components/ui'
-import { KeyboardScroll, useRevealOnFocus } from '@/components/KeyboardScroll'
-import { FormRow, FormSection, TextRow, ToggleRow } from '@/components/form'
+import { Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { TintButton } from '@/components/TintButton'
+import { Toggle } from '@/components/Toggle'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
 import { createPingPreset, presetText, updatePingPreset } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
-
-/** The emoji as a row: a small square well on the right, big enough to read
- *  the glyph (TextRow's 15pt text makes an emoji look like a typo). Hoisted to
- *  module scope so its TextInput keeps focus across parent re-renders. */
-function EmojiRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const { c } = useTheme()
-  const reveal = useRevealOnFocus()
-  const row = useRef<View>(null)
-  return (
-    <View ref={row}>
-      <FormRow label={label}>
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          maxLength={4}
-          onFocus={() => reveal(row.current)}
-          style={{
-            width: 48,
-            height: 38,
-            textAlign: 'center',
-            fontSize: 22,
-            borderRadius: radius.sm,
-            backgroundColor: c.surface,
-            color: c.text,
-            padding: 0,
-          }}
-        />
-      </FormRow>
-    </View>
-  )
-}
+import { fonts, sp, useTheme } from '@/theme/theme'
 
 export function PresetEditor({
   preset,
@@ -61,8 +32,8 @@ export function PresetEditor({
   onClose: () => void
   onSaved: () => void
 }) {
-  const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.lg)
+  const { c, dark } = useTheme()
+  const bottomGap = useBottomGap(sp.xs)
   const { t } = useI18n()
   const [emoji, setEmoji] = useState(preset?.emoji ?? '📣')
   const [label, setLabel] = useState(preset ? presetText(preset, t) : '')
@@ -84,14 +55,39 @@ export function PresetEditor({
     }
   }
 
+  const tint = high ? URGENT : (APP_GRADIENT.pings as [string, string])
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop} onLayout={onRootLayout}>
+        <Pressable style={{ flex: 1 }} onPress={() => Keyboard.dismiss()} accessible={false} />
         <View style={[styles.sheet, { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift }]}>
-          {/* The header is fixed chrome, so a tap on it puts the keyboard away
-              (the scroller below handles its own inert taps). */}
-          <DismissKeyboard style={styles.sheetHead}>
-            <Txt variant="h2">{preset ? t('pings.editPreset') : t('pings.newPreset')}</Txt>
+          {/* 2026-11 restyle: the emoji on a big tile (typed in place) and the
+              words large beside it — the nudge as it will look. The tile turns
+              red when it's urgent. */}
+          <View style={styles.sheetHead}>
+            <GradientBox colors={tint} radius={18} style={styles.tile}>
+              <TextInput
+                value={emoji}
+                onChangeText={setEmoji}
+                maxLength={4}
+                accessibilityLabel={t('pings.presetEmoji')}
+                style={{ width: 60, height: 60, textAlign: 'center', fontSize: 30, padding: 0, textAlignVertical: 'center' }}
+              />
+            </GradientBox>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={[styles.kicker, { color: c.textMuted }]}>{preset ? t('pings.editPreset') : t('pings.newPreset')}</Txt>
+              <TextInput
+                value={label}
+                onChangeText={setLabel}
+                placeholder={t('pings.presetLabelPlaceholder')}
+                placeholderTextColor={c.textFaint}
+                autoFocus={!preset}
+                returnKeyType="done"
+                accessibilityLabel={t('pings.presetLabel')}
+                style={{ fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: c.text, padding: 0, marginTop: 2 }}
+              />
+            </View>
             <Pressable
               onPress={onClose}
               hitSlop={10}
@@ -101,51 +97,36 @@ export function PresetEditor({
             >
               <X size={16} color={c.textMuted} />
             </Pressable>
-          </DismissKeyboard>
+          </View>
 
-          <KeyboardScroll
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <FormSection>
-              <EmojiRow label={t('pings.presetEmoji')} value={emoji} onChange={setEmoji} />
-              <TextRow
-                label={t('pings.presetLabel')}
-                value={label}
-                onChangeText={setLabel}
-                placeholder={t('pings.presetLabelPlaceholder')}
-                autoFocus={!preset}
-                returnKeyType="done"
-              />
-            </FormSection>
+          <View style={{ paddingHorizontal: sp.lg, paddingBottom: sp.lg }}>
+            {/* urgent: one card, red when on */}
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: high ? c.expense + (dark ? '26' : '12') : c.card, borderColor: high ? c.expense + '55' : c.border },
+              ]}
+            >
+              <View style={[styles.icon, { backgroundColor: high ? c.expense : c.surface }]}>
+                <Siren size={18} color={high ? '#fff' : c.textMuted} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('pings.highPriority')}</Txt>
+                <Txt variant="faint" style={{ fontSize: 12.5 }}>
+                  {t('pings.highPriorityHint')}
+                </Txt>
+              </View>
+              <Toggle value={high} onValueChange={setHigh} />
+            </View>
+          </View>
 
-            <FormSection>
-              <ToggleRow
-                label={t('pings.highPriority')}
-                hint={t('pings.highPriorityHint')}
-                value={high}
-                onValueChange={setHigh}
-              />
-            </FormSection>
-          </KeyboardScroll>
-
-          {/* save — docked */}
-          <View
-            style={{
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.sm,
-              paddingBottom: clearOfBars ? sp.md : bottomGap,
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: c.border,
-            }}
-          >
-            <Btn
+          {/* save — docked, in the nudge's colour */}
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.xs, paddingBottom: clearOfBars ? sp.md : bottomGap }}>
+            <TintButton
+              tint={tint[0]}
               title={preset ? t('common.saveChanges') : t('pings.newPreset')}
               onPress={save}
-              loading={saving}
-              disabled={!label.trim()}
+              disabled={!label.trim() || saving}
             />
           </View>
         </View>
@@ -154,15 +135,15 @@ export function PresetEditor({
   )
 }
 
+const URGENT: [string, string] = ['#F2605A', '#C9353F']
+
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: sp.lg },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: sp.lg,
-    paddingBottom: sp.md,
-  },
+  sheetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.md, paddingHorizontal: sp.lg, paddingBottom: sp.lg },
+  tile: { width: 60, height: 60, alignItems: 'center', justifyContent: 'center' },
+  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase' },
   close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  card: { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.md, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth },
+  icon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 })

@@ -32,7 +32,7 @@ import { DangerRow, DayRow, InputRow } from '@/apps/calendar/calendarUi'
 import type { EventDraft } from './EventForm'
 import { TYPE_COLOR } from './petColors'
 import { TYPE_ICON } from './petUi'
-import { TintButton } from './TintButton'
+import { TintButton } from '@/components/TintButton'
 import { nextChoices, vaccineKeys, VISIT_KEYS } from './visitPresets'
 
 export default function VisitForm({
@@ -157,7 +157,7 @@ export default function VisitForm({
             </ScrollView>
 
             <FormSection>
-              <DayRow label={t('pets.visit.when')} value={draft.date} onChange={(v) => set({ date: v })} maximumDate={new Date()} />
+              <DayRow tint={tint} label={t('pets.visit.when')} value={draft.date} onChange={(v) => set({ date: v })} maximumDate={new Date()} />
             </FormSection>
 
             {/* Next one: a chip computes it from the date above; the row
@@ -175,7 +175,7 @@ export default function VisitForm({
                   })}
                 </View>
                 <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }}>
-                  <DayRow label={t('pets.nextDue')} value={draft.nextDue} onChange={(v) => set({ nextDue: v })} optional />
+                  <DayRow tint={tint} label={t('pets.nextDue')} value={draft.nextDue} onChange={(v) => set({ nextDue: v })} optional />
                 </View>
               </View>
             </View>

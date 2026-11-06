@@ -232,11 +232,9 @@ export default function NudgesBanner() {
         const seen = p.acks
           .filter((a) => a.user_email !== myEmail)
           .sort((x, y) => y.created_at.localeCompare(x.created_at))
-        const seenSet = new Set(seen.map((a) => a.user_email))
         const audience = (p.recipients?.length ? p.recipients : profiles.map((m) => m.email)).filter(
           (e) => e !== myEmail,
         )
-        const waiting = audience.filter((e) => !seenSet.has(e))
         const total = Math.max(audience.length, seen.length)
         return (
           <View key={p.id} style={[styles.card, { backgroundColor: c.card, borderColor: c.border, borderWidth: StyleSheet.hairlineWidth }]}>
@@ -264,38 +262,21 @@ export default function NudgesBanner() {
               </Pressable>
             </View>
 
+            {/* One line, however big the family (owner, 2026-11): "Seen by:"
+                then the names, the most recent first; the count on the right. */}
             <View style={[styles.seenBox, { borderTopColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Txt style={[styles.label, { color: c.textMuted }]}>{t('pings.seenByLabel')}</Txt>
-                {total ? (
-                  <Txt style={[styles.label, { color: seen.length === total ? c.income : c.textMuted }]}>
+              <Txt style={{ flex: 1, fontSize: 13.5, color: c.textMuted }} numberOfLines={2}>
+                <Txt style={{ fontSize: 13.5, fontWeight: '700', color: c.text }}>{t('pings.seenByLabel')}: </Txt>
+                {seen.length ? seen.map((a) => firstName(nameOf(a.user_email))).join(', ') : t('pings.nobodyYet')}
+              </Txt>
+              {total ? (
+                <View style={[styles.count, { backgroundColor: seen.length === total ? c.income + '22' : c.surface }]}>
+                  {seen.length === total ? <Check size={12} color={c.income} strokeWidth={3} /> : null}
+                  <Txt style={{ fontSize: 12, fontWeight: '700', color: seen.length === total ? c.income : c.textMuted }}>
                     {t('pings.seenCount', { n: seen.length, total })}
                   </Txt>
-                ) : null}
-              </View>
-              {seen.map((a) => (
-                <View key={a.user_email} style={styles.person}>
-                  <Initials name={nameOf(a.user_email)} />
-                  <Txt style={{ flex: 1, fontSize: 14.5, color: c.text }} numberOfLines={1}>
-                    {nameOf(a.user_email)}
-                  </Txt>
-                  <Check size={14} color={c.income} strokeWidth={3} />
-                  <Txt variant="faint" style={{ fontSize: 12.5 }}>
-                    {timeAgo(a.created_at)}
-                  </Txt>
                 </View>
-              ))}
-              {waiting.map((e) => (
-                <View key={e} style={[styles.person, { opacity: 0.55 }]}>
-                  <Initials name={nameOf(e)} faded />
-                  <Txt style={{ flex: 1, fontSize: 14.5, color: c.textMuted }} numberOfLines={1}>
-                    {nameOf(e)}
-                  </Txt>
-                  <Txt variant="faint" style={{ fontSize: 12.5 }}>
-                    {t('pings.notYet')}
-                  </Txt>
-                </View>
-              ))}
+              ) : null}
             </View>
           </View>
         )
@@ -307,18 +288,6 @@ export default function NudgesBanner() {
 const URGENT: [string, string] = ['#F2605A', '#C9353F']
 
 const firstName = (n: string) => n.split(' ')[0]
-
-/** Initials on a soft accent circle. */
-function Initials({ name, faded }: { name: string; faded?: boolean }) {
-  const { c } = useTheme()
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const ini = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
-  return (
-    <View style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: faded ? c.surface : c.accentSoft }}>
-      <Txt style={{ fontSize: 12, fontWeight: '700', color: faded ? c.textMuted : c.accent }}>{ini}</Txt>
-    </View>
-  )
-}
 
 const styles = StyleSheet.create({
   card: { borderRadius: 24, padding: sp.md, gap: sp.md },
@@ -334,7 +303,7 @@ const styles = StyleSheet.create({
   pill: { flex: 1, height: 42, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   pillTxt: { fontWeight: '700', fontSize: 14 },
   close: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  seenBox: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: sp.sm, gap: 8 },
+  seenBox: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: sp.sm, flexDirection: 'row', alignItems: 'center', gap: sp.sm },
+  count: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
   label: { fontSize: 11.5, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-  person: { flexDirection: 'row', alignItems: 'center', gap: sp.sm },
 })

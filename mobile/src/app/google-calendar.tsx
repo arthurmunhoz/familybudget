@@ -5,11 +5,12 @@
 // Calendar screen picks up pulled events via its calendar_events Realtime
 // subscription, so no explicit refresh is needed here.
 import { useEffect, useState } from 'react'
-import { Alert, View } from 'react-native'
-import { Pressable } from '@/components/Pressable'
+import { Alert } from 'react-native'
 import { router } from 'expo-router'
 
-import { AppHeader, Btn, Card, Loader, Screen, Txt } from '@/components/ui'
+import { SyncScreen } from '@/apps/calendar/SyncScreen'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { AlertTriangle, ArrowLeftRight, CalendarSync, RefreshCw, UserRound } from 'lucide-react-native'
 import { useI18n } from '@/hooks/useI18n'
 import { usePlus } from '@/lib/plus'
 import { timeAgo } from '@/lib/format'
@@ -20,7 +21,7 @@ import {
   syncGoogleCalendar,
   type GoogleConnection,
 } from '@/lib/googleCalendar'
-import { sp, useTheme } from '@/theme/theme'
+import { useTheme } from '@/theme/theme'
 import { GoogleIcon } from '@/apps/calendar/GoogleIcon'
 
 export default function GoogleCalendarScreen() {
@@ -97,67 +98,43 @@ export default function GoogleCalendarScreen() {
     ])
   }
 
+  const red = APP_GRADIENT.calendar[1]
   return (
-    <Screen scroll header={<AppHeader title={t('calendar.google')} />}>
-      {loading ? (
-        <Loader />
-      ) : conn ? (
-        <View style={{ gap: sp.lg }}>
-          <Card style={{ gap: sp.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-              <GoogleIcon size={22} />
-              <Txt variant="h2">{t('calendar.google')}</Txt>
-            </View>
-            <Txt variant="muted">
-              {t('calendar.connectedAs', { email: conn.google_email ?? conn.user_email })}
-            </Txt>
-            <Txt variant="faint">
-              {conn.last_synced_at
-                ? t('calendar.lastSynced', { when: timeAgo(conn.last_synced_at) })
-                : t('calendar.neverSynced')}
-            </Txt>
-            <Txt variant="faint">{t('calendar.syncDir')}</Txt>
-            {conn.last_error ? (
-              <Txt style={{ color: c.expense, fontSize: 13 }}>
-                {conn.last_error === 'TOKEN_EXPIRED'
-                  ? t('calendar.googleTokenExpired')
-                  : t('calendar.googleSyncError')}
-              </Txt>
-            ) : null}
-          </Card>
-
-          <Btn
-            title={busy ? t('calendar.syncing') : t('calendar.syncNow')}
-            onPress={sync}
-            loading={busy}
-            disabled={busy}
-          />
-          <Pressable
-            onPress={disconnect}
-            disabled={busy}
-            style={{ paddingVertical: sp.md, alignItems: 'center' }}
-          >
-            <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('calendar.disconnect')}</Txt>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={{ gap: sp.lg }}>
-          <Card style={{ gap: sp.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-              <GoogleIcon size={22} />
-              <Txt variant="h2">{t('calendar.google')}</Txt>
-            </View>
-            <Txt variant="muted">{t('calendar.googleHint')}</Txt>
-            <Txt variant="faint">{t('calendar.syncDir')}</Txt>
-          </Card>
-          <Btn
-            title={busy ? t('calendar.syncing') : t('calendar.connectGoogle')}
-            onPress={connect}
-            loading={busy}
-            disabled={busy}
-          />
-        </View>
-      )}
-    </Screen>
+    <SyncScreen
+      logo={<GoogleIcon size={30} />}
+      title={t('calendar.google')}
+      state={conn ? t('calendar.stateConnected') : t('calendar.stateNotConnected')}
+      loading={loading}
+      facts={
+        conn
+          ? [
+              { icon: <UserRound size={17} color={red} />, text: t('calendar.connectedAs', { email: conn.google_email ?? conn.user_email }) },
+              {
+                icon: <RefreshCw size={17} color={red} />,
+                text: conn.last_synced_at ? t('calendar.lastSynced', { when: timeAgo(conn.last_synced_at) }) : t('calendar.neverSynced'),
+                tone: 'faint',
+              },
+              { icon: <ArrowLeftRight size={17} color={red} />, text: t('calendar.syncDir'), tone: 'faint' },
+              ...(conn.last_error
+                ? [
+                    {
+                      icon: <AlertTriangle size={17} color={c.expense} />,
+                      text: conn.last_error === 'TOKEN_EXPIRED' ? t('calendar.googleTokenExpired') : t('calendar.googleSyncError'),
+                      tone: 'error' as const,
+                    },
+                  ]
+                : []),
+            ]
+          : [
+              { icon: <CalendarSync size={17} color={red} />, text: t('calendar.googleHint') },
+              { icon: <ArrowLeftRight size={17} color={red} />, text: t('calendar.syncDir'), tone: 'faint' },
+            ]
+      }
+      action={conn ? t('calendar.syncNow') : t('calendar.connectGoogle')}
+      onAction={conn ? sync : connect}
+      busy={busy}
+      onDisconnect={conn ? disconnect : undefined}
+      disconnectLabel={t('calendar.disconnect')}
+    />
   )
 }

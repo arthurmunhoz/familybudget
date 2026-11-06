@@ -9,12 +9,14 @@
 // endpoints). Google-sourced rows (source='google') render read-only; pulled
 // events arrive via the calendar_events Realtime subscription.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
-import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
+import { CalendarDays, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
 
-import { AppHeader, Card, Loader, NewItemButton, Txt } from '@/components/ui'
+import { Loader, NewItemButton, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -34,7 +36,7 @@ import { track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import { channelName } from '@/lib/realtime'
 import type { CalendarEvent } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { getGoogleConnection } from '@/lib/googleCalendar'
 import { getAppleConnection, isAppleCalendarAvailable, syncAppleCalendar } from '@/lib/appleCalendar'
 import EventForm, { type EventDraft } from './EventForm'
@@ -264,72 +266,58 @@ export default function Calendar() {
     return t('calendar.inMonths', { months: Math.round(days / 30) })
   }
 
-  function shortDate(iso: string): string {
-    const [y, m, d] = iso.split('-').map(Number)
-    return new Date(y, m - 1, d).toLocaleDateString(locale, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    })
+  const red = APP_GRADIENT.calendar as [string, string]
+  const tint = red[1]
+  // the faded state line under the title: how the next week looks
+  const soonCount = upcoming.filter((o) => daysBetweenISO(today, o.start) <= 7).length
+  const stateLine =
+    soonCount === 0 ? t('calendar.stateNone') : soonCount === 1 ? t('calendar.stateOne') : t('calendar.stateMany', { n: soonCount })
+
+  const roundBtn = {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader
-          title={t('calendar.title')}
-          right={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-              <Pressable
-                onPress={goToday}
-                hitSlop={8}
-                accessibilityRole="button"
-                style={{
-                  backgroundColor: c.surface,
-                  borderRadius: radius.pill,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                }}
-              >
-                <Txt variant="label">{t('calendar.today')}</Txt>
-              </Pressable>
-              <Pressable
-                onPress={() => router.push('/google-calendar')}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={t('calendar.google')}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  backgroundColor: c.surface,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <GoogleIcon size={18} color={googleConnected ? undefined : c.textFaint} />
-              </Pressable>
-              {isAppleCalendarAvailable ? (
-                <Pressable
-                  onPress={() => router.push('/apple-calendar')}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('calendar.apple')}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 17,
-                    backgroundColor: c.surface,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <AppleIcon size={17} color={appleConnected ? c.text : c.textFaint} />
-                </Pressable>
-              ) : null}
-            </View>
-          }
-        />
+      {/* Home-style top bar: round back; Google / Apple sync as round buttons */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingHorizontal: sp.lg, paddingVertical: sp.sm }}>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
+          style={({ pressed }) => [roundBtn, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <ChevronLeft size={22} color={c.text} />
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <Pressable
+          onPress={() => router.push('/google-calendar')}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('calendar.google')}
+          style={({ pressed }) => [roundBtn, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <GoogleIcon size={18} color={googleConnected ? undefined : c.textFaint} />
+        </Pressable>
+        {isAppleCalendarAvailable ? (
+          <Pressable
+            onPress={() => router.push('/apple-calendar')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('calendar.apple')}
+            style={({ pressed }) => [roundBtn, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <AppleIcon size={17} color={appleConnected ? c.text : c.textFaint} />
+          </Pressable>
+        ) : null}
       </View>
 
       {loading ? (
@@ -340,36 +328,34 @@ export default function Calendar() {
           contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Month / Upcoming toggle */}
-          <View
-            style={{
-              flexDirection: 'row',
-              backgroundColor: c.surface,
-              borderRadius: radius.pill,
-              padding: 4,
-              gap: 4,
-            }}
-          >
+          {/* big title, state faded under it — the Home's voice */}
+          <View>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8, color: c.text }}>
+              {t('calendar.title')}
+            </Txt>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 26, color: c.textFaint }}>{stateLine}</Txt>
+          </View>
+
+          {/* Month / Upcoming */}
+          <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.pill, padding: 4, gap: 4 }}>
             {(['month', 'upcoming'] as const).map((m) => {
               const active = mode === m
               return (
                 <Pressable
                   key={m}
                   onPress={() => setMode(m)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
                   style={{
                     flex: 1,
                     alignItems: 'center',
-                    paddingVertical: 8,
+                    paddingVertical: 9,
                     borderRadius: radius.pill,
-                    backgroundColor: active ? c.action : 'transparent',
+                    backgroundColor: active ? c.card : 'transparent',
+                    ...(active ? { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 } : {}),
                   }}
                 >
-                  <Txt
-                    style={{
-                      color: active ? c.onAction : c.textMuted,
-                      fontWeight: '600',
-                    }}
-                  >
+                  <Txt style={{ color: active ? c.text : c.textMuted, fontFamily: fonts.semibold, fontSize: 14.5 }}>
                     {t(m === 'month' ? 'calendar.tabMonth' : 'calendar.tabUpcoming')}
                   </Txt>
                 </Pressable>
@@ -380,33 +366,34 @@ export default function Calendar() {
           {mode === 'month' ? (
             <>
               {/* month grid */}
-              <Card style={{ padding: sp.md }}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingBottom: sp.sm,
-                  }}
-                >
-                  <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityLabel="Previous month">
-                    <ChevronLeft size={22} color={c.textMuted} />
-                  </Pressable>
-                  <Txt variant="h2" style={{ textTransform: 'capitalize' }}>
+              <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, padding: sp.md }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingBottom: sp.sm }}>
+                  <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 21, lineHeight: 26, color: c.text, textTransform: 'capitalize', paddingLeft: 4 }}>
                     {monthLabel}
                   </Txt>
-                  <Pressable onPress={() => shift(1)} hitSlop={10} accessibilityLabel="Next month">
-                    <ChevronRight size={22} color={c.textMuted} />
+                  {view.y !== Number(today.slice(0, 4)) || view.m !== Number(today.slice(5, 7)) || selected !== today ? (
+                    <Pressable
+                      onPress={goToday}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [styles.todayPill, { backgroundColor: tint + '1F', opacity: pressed ? 0.7 : 1 }]}
+                    >
+                      <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: tint }}>{t('calendar.today')}</Txt>
+                    </Pressable>
+                  ) : null}
+                  <Pressable onPress={() => shift(-1)} hitSlop={8} accessibilityLabel="Previous month" style={[styles.navBtn, { backgroundColor: c.surface }]}>
+                    <ChevronLeft size={18} color={c.text} />
+                  </Pressable>
+                  <Pressable onPress={() => shift(1)} hitSlop={8} accessibilityLabel="Next month" style={[styles.navBtn, { backgroundColor: c.surface }]}>
+                    <ChevronRight size={18} color={c.text} />
                   </Pressable>
                 </View>
 
                 {/* weekday header */}
                 <View style={{ flexDirection: 'row' }}>
                   {weekdays.map((w, i) => (
-                    <View key={i} style={{ flex: 1, alignItems: 'center', paddingBottom: 4 }}>
-                      <Txt variant="faint" style={{ fontSize: 11, fontWeight: '600' }}>
-                        {w}
-                      </Txt>
+                    <View key={i} style={{ flex: 1, alignItems: 'center', paddingBottom: 6 }}>
+                      <Txt style={{ fontSize: 11, fontFamily: fonts.semibold, color: c.textFaint }}>{w}</Txt>
                     </View>
                   ))}
                 </View>
@@ -415,7 +402,7 @@ export default function Calendar() {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                   {cells.map((day, i) => {
                     if (day === null) {
-                      return <View key={`b${i}`} style={{ width: `${100 / 7}%`, height: 46 }} />
+                      return <View key={`b${i}`} style={{ width: `${100 / 7}%`, height: 48 }} />
                     }
                     const dateStr = `${view.y}-${pad(view.m)}-${pad(day)}`
                     const occs = byDay.get(dateStr)
@@ -426,74 +413,59 @@ export default function Calendar() {
                         key={day}
                         onPress={() => setSelected(dateStr)}
                         accessibilityLabel={dateStr}
-                        style={{ width: `${100 / 7}%`, height: 46, alignItems: 'center' }}
+                        style={{ width: `${100 / 7}%`, height: 48, alignItems: 'center' }}
                       >
-                        <View
-                          style={{
-                            height: 32,
-                            width: 32,
-                            borderRadius: 16,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: isSelected ? c.action : 'transparent',
-                            borderWidth: !isSelected && isToday ? 1 : 0,
-                            borderColor: c.accent,
-                          }}
-                        >
-                          <Txt
+                        {isSelected ? (
+                          <GradientBox colors={red} radius={17} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}>
+                            <Txt style={{ fontSize: 14.5, color: '#fff', fontFamily: fonts.semibold }}>{day}</Txt>
+                          </GradientBox>
+                        ) : (
+                          <View
                             style={{
-                              fontSize: 14,
-                              color: isSelected ? c.onAction : isToday ? c.accent : c.text,
-                              fontWeight: isSelected || isToday ? '700' : '400',
+                              height: 34,
+                              width: 34,
+                              borderRadius: 17,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: isToday ? tint + '1F' : 'transparent',
                             }}
                           >
-                            {day}
-                          </Txt>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 2, marginTop: 2, height: 6 }}>
+                            <Txt style={{ fontSize: 14.5, color: isToday ? tint : c.text, fontFamily: isToday ? fonts.semibold : fonts.body }}>
+                              {day}
+                            </Txt>
+                          </View>
+                        )}
+                        <View style={{ flexDirection: 'row', gap: 2, marginTop: 3, height: 5 }}>
                           {occs?.slice(0, 3).map((o, j) => (
-                            <View
-                              key={j}
-                              style={{
-                                height: 6,
-                                width: 6,
-                                borderRadius: 3,
-                                backgroundColor: eventColor(o.event, memberEmails),
-                              }}
-                            />
+                            <View key={j} style={{ height: 5, width: 5, borderRadius: 3, backgroundColor: eventColor(o.event, memberEmails) }} />
                           ))}
                         </View>
                       </Pressable>
                     )
                   })}
                 </View>
-              </Card>
+              </View>
 
-              {/* selected-day agenda */}
-              <Txt variant="h2" style={{ textTransform: 'capitalize' }}>
-                {selectedLabel}
-              </Txt>
+              {/* selected-day agenda: one card of rows */}
+              <Txt style={[styles.section, { color: c.textMuted }]}>{selectedLabel}</Txt>
               {dayOccs.length === 0 ? (
-                <View style={{ alignItems: 'center', gap: 4, paddingVertical: sp.lg }}>
-                  <Txt variant="muted">{t('calendar.empty')}</Txt>
+                <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', gap: 4, paddingVertical: sp.xl }]}>
+                  <CalendarDays size={24} color={c.textFaint} />
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 17, color: c.text, marginTop: 4 }}>{t('calendar.empty')}</Txt>
                   <Txt variant="faint">{t('calendar.emptyHint')}</Txt>
                 </View>
               ) : (
-                <View style={{ gap: sp.sm }}>
-                  {dayOccs.map((o) => (
+                <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                  {dayOccs.map((o, i) => (
                     <EventRow
                       key={`${o.event.id}:${o.start}`}
-                      event={o.event}
+                      first={i === 0}
                       color={eventColor(o.event, memberEmails)}
-                      title={`${KIND_EMOJI[o.event.kind] ? `${KIND_EMOJI[o.event.kind]} ` : ''}${o.event.title}`}
-                      subtitle={[
-                        timeLabel(o.event),
-                        o.event.owner_email
-                          ? ownerName(o.event.owner_email)
-                          : t('calendar.everyone'),
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
+                      emoji={KIND_EMOJI[o.event.kind]}
+                      time={o.event.all_day ? null : o.event.start_time ? formatTime(o.event.start_time, locale) : null}
+                      allDayLabel={t('calendar.allDay')}
+                      title={o.event.title}
+                      subtitle={o.event.owner_email ? ownerName(o.event.owner_email) : t('calendar.everyone')}
                       location={o.event.location}
                       onPress={() => openEdit(o.event)}
                     />
@@ -502,38 +474,37 @@ export default function Calendar() {
               )}
             </>
           ) : upcoming.length === 0 ? (
-            <View style={{ alignItems: 'center', gap: 4, paddingVertical: sp.lg }}>
-              <Txt variant="muted">{t('calendar.upcomingEmpty')}</Txt>
+            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', gap: 4, paddingVertical: sp.xl }]}>
+              <CalendarDays size={24} color={c.textFaint} />
+              <Txt style={{ fontFamily: fonts.display, fontSize: 17, color: c.text, marginTop: 4 }}>{t('calendar.upcomingEmpty')}</Txt>
               <Txt variant="faint">{t('calendar.emptyHint')}</Txt>
             </View>
           ) : (
-            <View style={{ gap: sp.sm }}>
-              {upcoming.map((o) => {
+            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+              {upcoming.map((o, i) => {
                 const days = daysBetweenISO(today, o.start)
-                const emoji = KIND_EMOJI[o.event.kind]
                 const age =
-                  o.event.kind === 'birthday' || o.event.kind === 'anniversary'
-                    ? yearsAt(o.event, o.start)
-                    : 0
+                  o.event.kind === 'birthday' || o.event.kind === 'anniversary' ? yearsAt(o.event, o.start) : 0
                 const subtitle = [
-                  shortDate(o.start),
-                  age > 0
-                    ? t('calendar.turns', { years: age })
-                    : !o.event.all_day
-                      ? timeLabel(o.event)
-                      : '',
+                  new Date(Number(o.start.slice(0, 4)), Number(o.start.slice(5, 7)) - 1, Number(o.start.slice(8, 10))).toLocaleDateString(locale, { weekday: 'long' }),
+                  age > 0 ? t('calendar.turns', { years: age }) : !o.event.all_day ? timeLabel(o.event) : '',
                 ]
                   .filter(Boolean)
                   .join(' · ')
                 return (
                   <EventRow
                     key={`${o.event.id}:${o.start}`}
-                    event={o.event}
+                    first={i === 0}
                     color={eventColor(o.event, memberEmails)}
-                    title={`${emoji ? `${emoji} ` : ''}${o.event.title}`}
+                    title={`${KIND_EMOJI[o.event.kind] ? `${KIND_EMOJI[o.event.kind]} ` : ''}${o.event.title}`}
                     subtitle={subtitle}
                     countdown={countdownLabel(days)}
                     soon={days <= 14}
+                    tint={tint}
+                    dateTile={{
+                      month: new Date(Number(o.start.slice(0, 4)), Number(o.start.slice(5, 7)) - 1, 1).toLocaleDateString(locale, { month: 'short' }).replace('.', ''),
+                      day: Number(o.start.slice(8, 10)),
+                    }}
                     onPress={() => {
                       setMode('month')
                       setView({ y: Number(o.start.slice(0, 4)), m: Number(o.start.slice(5, 7)) })
@@ -550,7 +521,7 @@ export default function Calendar() {
 
       {/* Bottom action in NORMAL flow — the branch above is flex:1, so this
           stays pinned to the bottom and the list ends AT it, never under it. */}
-      <NewItemButton label={t('calendar.addBtn')} onPress={openNew} />
+      <NewItemButton label={t('calendar.addBtn')} onPress={openNew} colors={APP_GRADIENT.calendar} />
 
       {showForm && (
         <EventForm
@@ -573,73 +544,111 @@ export default function Calendar() {
   )
 }
 
+/** One event as a row of the day's (or Upcoming's) card: the time (or the
+ *  kind's emoji) in a tile tinted with the owner's colour, the title, who /
+ *  when, the place, and — in Upcoming — a countdown pill. */
 function EventRow({
-  event,
+  first,
   color,
+  emoji,
+  time,
+  allDayLabel,
   title,
   subtitle,
   location,
   countdown,
   soon,
+  tint,
+  dateTile,
   onPress,
 }: {
-  event: CalendarEvent
+  /** Upcoming: a tear-off calendar page (month + day) instead of the time. */
+  dateTile?: { month: string; day: number }
+  first: boolean
   color: string
+  emoji?: string
+  /** "5:00 PM" for a timed event on the day view; null = all day. */
+  time?: string | null
+  allDayLabel?: string
   title: string
   subtitle: string
   location?: string | null
   countdown?: string
   soon?: boolean
+  tint?: string
   onPress: () => void
 }) {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
+  const [hm, ampm] = time ? time.split(/\s/u) : [null, null]
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',
-        alignItems: 'stretch',
+        alignItems: 'center',
         gap: sp.md,
-        backgroundColor: pressed ? c.cardActive : c.card,
-        borderRadius: radius.md,
         paddingHorizontal: sp.md,
-        paddingVertical: sp.md,
+        paddingVertical: 12,
+        borderTopWidth: first ? 0 : StyleSheet.hairlineWidth,
+        borderTopColor: c.border,
+        opacity: pressed ? 0.6 : 1,
       })}
     >
-      <View style={{ width: 5, borderRadius: 3, backgroundColor: color }} />
+      <View style={{ width: 52, minHeight: 48, borderRadius: 14, backgroundColor: color + (dark ? '33' : '1F'), alignItems: 'center', justifyContent: 'center', paddingVertical: 6 }}>
+        {dateTile ? (
+          <>
+            <Txt style={{ fontSize: 10.5, fontFamily: fonts.semibold, color, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              {dateTile.month}
+            </Txt>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 23, color: c.text }}>{dateTile.day}</Txt>
+          </>
+        ) : emoji ? (
+          <Txt style={{ fontSize: 22 }}>{emoji}</Txt>
+        ) : time !== undefined ? (
+          time ? (
+            <>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color }}>{hm}</Txt>
+              {ampm ? <Txt style={{ fontSize: 10, fontFamily: fonts.semibold, color }}>{ampm}</Txt> : null}
+            </>
+          ) : (
+            <Txt style={{ fontSize: 10.5, fontFamily: fonts.semibold, color, textAlign: 'center' }} numberOfLines={2}>
+              {allDayLabel}
+            </Txt>
+          )
+        ) : (
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: color }} />
+        )}
+      </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt style={{ fontWeight: '500' }} numberOfLines={1}>
+        <Txt style={{ fontFamily: fonts.display, fontSize: 16.5, lineHeight: 21, color: c.text }} numberOfLines={1}>
           {title}
         </Txt>
         {subtitle ? (
-          <Txt variant="faint" numberOfLines={1}>
+          <Txt variant="faint" style={{ fontSize: 13 }} numberOfLines={1}>
             {subtitle}
           </Txt>
         ) : null}
         {location ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
             <MapPin size={12} color={c.textMuted} />
-            <Txt variant="muted" numberOfLines={1}>
+            <Txt variant="muted" style={{ fontSize: 13 }} numberOfLines={1}>
               {location}
             </Txt>
           </View>
         ) : null}
       </View>
       {countdown ? (
-        <View
-          style={{
-            alignSelf: 'center',
-            borderRadius: radius.pill,
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            backgroundColor: soon ? c.action : c.surface,
-          }}
-        >
-          <Txt style={{ fontSize: 12, fontWeight: '700', color: soon ? c.onAction : c.textMuted }}>
-            {countdown}
-          </Txt>
+        <View style={{ borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: soon ? tint : c.surface }}>
+          <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: soon ? '#fff' : c.textMuted }}>{countdown}</Txt>
         </View>
       ) : null}
     </Pressable>
   )
 }
+
+const styles = StyleSheet.create({
+  card: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  section: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', marginTop: sp.xs, paddingHorizontal: 2 },
+  todayPill: { paddingHorizontal: 12, height: 32, borderRadius: 16, justifyContent: 'center' },
+  navBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+})

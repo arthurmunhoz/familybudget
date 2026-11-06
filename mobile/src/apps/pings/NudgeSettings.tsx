@@ -9,18 +9,21 @@
 import { useEffect, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { GripVertical, Plus, Trash2, X } from 'lucide-react-native'
+import { GripVertical, Plus, Settings2, Trash2, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { TintButton } from '@/components/TintButton'
 import { DraggableList } from '@/components/DraggableList'
 import { useI18n } from '@/hooks/useI18n'
 import { deletePingPreset, presetText, reorderPingPresets } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 import { PresetEditor } from './PresetEditor'
 
-const ROW_H = 60
+const ROW_H = 64
 
 export function NudgeSettings({
   presets,
@@ -32,7 +35,8 @@ export function NudgeSettings({
   onClose: () => void
 }) {
   const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
+  const bottomGap = useBottomGap(sp.xs)
+  const blue = APP_GRADIENT.pings[1]
   const { t } = useI18n()
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<PingPreset | null>(null)
@@ -88,27 +92,29 @@ export function NudgeSettings({
   }
 
   function renderRow(p: PingPreset) {
+    const high = p.high_priority
     return (
       <Pressable
         onPress={() => openEdit(p)}
-        style={({ pressed }) => [
-          styles.row,
-          { borderColor: p.high_priority ? c.expense : c.border, backgroundColor: pressed ? c.surface : c.card },
-        ]}
+        style={({ pressed }) => [styles.row, { borderBottomColor: c.border, backgroundColor: c.card, opacity: pressed ? 0.7 : 1 }]}
         accessibilityRole="button"
       >
-        <GripVertical size={18} color={c.textFaint} />
-        <Txt style={{ fontSize: 22 }}>{p.emoji}</Txt>
-        <Txt style={{ flex: 1, fontWeight: '600', fontSize: 15 }} numberOfLines={1}>
-          {presetText(p, t)}
-        </Txt>
-        {p.high_priority ? (
-          <Txt style={{ color: c.expense, fontSize: 10, fontWeight: '700' }}>
-            {t('pings.highPriority').toUpperCase()}
+        <GripVertical size={16} color={c.textFaint} />
+        <View style={[styles.emojiWell, { backgroundColor: high ? c.expense + '1F' : blue + '17' }]}>
+          <Txt style={{ fontSize: 20 }}>{p.emoji}</Txt>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Txt style={{ fontFamily: fonts.display, fontSize: 16, color: c.text }} numberOfLines={1}>
+            {presetText(p, t)}
           </Txt>
-        ) : null}
+          {high ? (
+            <Txt style={{ color: c.expense, fontSize: 11, fontFamily: fonts.semibold, letterSpacing: 0.5 }}>
+              {t('pings.highPriority').toUpperCase()}
+            </Txt>
+          ) : null}
+        </View>
         <Pressable onPress={() => confirmDelete(p)} hitSlop={8} accessibilityLabel={t('pings.deletePreset')}>
-          <Trash2 size={18} color={c.textFaint} />
+          <Trash2 size={17} color={c.textFaint} />
         </Pressable>
       </Pressable>
     )
@@ -117,47 +123,48 @@ export function NudgeSettings({
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable
-          style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}
-          onPress={() => {}}
-        >
-            <View style={[styles.grab, { backgroundColor: c.border }]} />
-
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <View style={styles.backdrop}>
+          <Pressable style={{ flex: 1 }} onPress={onClose} accessible={false} />
+          <View style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}>
+            {/* 2026-11 restyle: tile + big title, faded "what this is" */}
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.md, paddingHorizontal: sp.lg }}>
+              <GradientBox colors={APP_GRADIENT.pings} radius={16} style={styles.tile}>
+                <Settings2 size={23} color="#fff" />
+              </GradientBox>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt variant="title">{t('pings.settingsTitle')}</Txt>
-                <Txt variant="muted" style={{ marginTop: 2 }}>
-                  {t('pings.settingsDesc')}
+                <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text }}>{t('pings.settingsTitle')}</Txt>
+                <Txt style={{ fontFamily: fonts.display, fontSize: 15.5, lineHeight: 20, color: c.textFaint }}>
+                  {items.length > 1 ? t('pings.reorder') : t('pings.settingsDesc')}
                 </Txt>
               </View>
-              <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t('common.cancel')}>
-                <X size={22} color={c.textMuted} />
+              <Pressable
+                onPress={onClose}
+                hitSlop={10}
+                accessibilityLabel={t('common.close')}
+                style={[styles.close, { backgroundColor: c.surface }]}
+              >
+                <X size={16} color={c.textMuted} />
               </Pressable>
             </View>
 
-            {items.length > 1 ? (
-              <Txt variant="faint" style={{ marginTop: sp.md }}>
-                {t('pings.reorder')}
-              </Txt>
-            ) : null}
-
-            <ScrollView style={{ flexGrow: 0, marginTop: sp.sm }} keyboardShouldPersistTaps="handled">
-              <DraggableList data={items} rowHeight={ROW_H} onReorder={onReorder} renderItem={renderRow} />
-
-              <Pressable
-                onPress={openNew}
-                style={[styles.row, styles.addRow, { borderColor: c.textFaint }]}
-                accessibilityRole="button"
-              >
-                <Plus size={18} color={c.textMuted} />
-                <Txt style={{ fontWeight: '600', fontSize: 15, color: c.textMuted }}>
-                  {t('pings.addPreset')}
-                </Txt>
-              </Pressable>
+            <ScrollView style={{ flexGrow: 0, flexShrink: 1, marginTop: sp.lg }} contentContainerStyle={{ paddingHorizontal: sp.lg }} keyboardShouldPersistTaps="handled">
+              {/* One rounded card, clipped so the last row follows its corners
+                  (a dragged row moves inside the card's own height). */}
+              <View style={[styles.card, { borderColor: c.border, backgroundColor: c.card }]}>
+                <DraggableList data={items} rowHeight={ROW_H} onReorder={onReorder} renderItem={renderRow} />
+              </View>
             </ScrollView>
-          </Pressable>
-        </Pressable>
+
+            <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md }}>
+              <TintButton
+                tint={APP_GRADIENT.pings[0]}
+                title={t('pings.addPreset')}
+                icon={<Plus size={18} color="#fff" strokeWidth={2.6} />}
+                onPress={openNew}
+              />
+            </View>
+          </View>
+        </View>
       </GestureHandlerRootView>
 
       {editorOpen ? (
@@ -175,25 +182,19 @@ export function NudgeSettings({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet: {
-    maxHeight: '85%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: sp.lg,
-    paddingTop: sp.md,
-    paddingBottom: sp.xl,
-  },
-  grab: { width: 40, height: 5, borderRadius: 3, alignSelf: 'center', marginBottom: sp.md },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: { maxHeight: '88%', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: sp.lg },
+  tile: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
+  close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.md,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
     paddingHorizontal: sp.md,
     // Fixed height so the absolutely-positioned drag rows line up on ROW_H.
-    height: ROW_H - sp.sm,
+    height: ROW_H,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  addRow: { borderStyle: 'dashed', justifyContent: 'center', marginTop: sp.sm },
+  emojiWell: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 })

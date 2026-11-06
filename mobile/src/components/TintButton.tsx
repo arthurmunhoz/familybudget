@@ -1,5 +1,5 @@
-// The docked primary button of Pet Care's sheets, in the pet's (or the event
-// type's) colour, its bottom corners following the screen's curve.
+// The docked primary button of the app's sheets, in the feature's own colour (a pet's, an event type's,
+// the Calendar's…), its bottom corners following the screen's curve.
 import type { ReactNode } from 'react'
 import { StyleSheet } from 'react-native'
 

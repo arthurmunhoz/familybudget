@@ -36,7 +36,7 @@ import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetTaskIcon } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { CARE_ICONS, CARE_ICON_IDS } from './petUi'
-import { TintButton } from './TintButton'
+import { TintButton } from '@/components/TintButton'
 import { CADENCE_PRESETS, everyLabel } from './careText'
 
 const ROW_H = 62

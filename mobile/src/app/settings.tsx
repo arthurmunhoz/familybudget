@@ -69,8 +69,6 @@ import {
 import { supabase } from '@/lib/supabase'
 import { dark, fonts, light, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref } from '@/theme/theme-pref'
-import { useSchemePref } from '@/theme/scheme-pref'
-import { GLASS, SCHEMES, SCHEME_IDS, glassTokens, type SchemeId } from '@/theme/glass'
 
 const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Sparkles, key: 'settings.plusFeatureScans' },
@@ -438,67 +436,6 @@ function ThemePreview({ p }: { p: typeof light }) {
 // Mini preview of a COLOUR SCHEME: the wash it paints behind everything, plus a
 // glass card and the accent on top. Rendered in the currently-active light/dark
 // mode, since a scheme defines both and you only ever see one at a time.
-/** The accent colour (2026-11): with the background wash gone, a scheme
- *  only repaints the ACCENT — buttons, switches, selected chips, links — so
- *  the picker says exactly that: a live preview of those controls in the
- *  picked colour, over a row of colour swatches. Schemes themselves are
- *  unchanged (everyone keeps what they chose). */
-function AccentPicker({ value, onChange, dark }: { value: SchemeId; onChange: (id: SchemeId) => void; dark: boolean }) {
-  const { t } = useI18n()
-  const k = glassTokens(dark, value)
-  return (
-    <Card style={{ gap: sp.lg }}>
-      {/* live preview: a primary button, a switch, a selected chip, a link */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-        <View style={{ flex: 1, height: 42, borderRadius: radius.pill, backgroundColor: k.action, alignItems: 'center', justifyContent: 'center' }}>
-          <Txt style={{ fontFamily: fonts.semibold, fontSize: 14.5, color: k.onAction }}>{t('common.save')}</Txt>
-        </View>
-        <View style={{ width: 50, height: 30, borderRadius: 15, backgroundColor: k.action, padding: 3, alignItems: 'flex-end' }}>
-          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff' }} />
-        </View>
-        <View style={{ paddingHorizontal: 12, height: 32, borderRadius: radius.pill, backgroundColor: k.accentSoft, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Check size={14} color={k.accent} strokeWidth={3} />
-          <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: k.accent }}>{t(`settings.scheme.${value}` as TKey)}</Txt>
-        </View>
-      </View>
-      {/* swatches */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-        {SCHEME_IDS.map((id) => {
-          const sc = SCHEMES[id]
-          const col = dark ? sc.accentDark : sc.accent
-          const on = id === value
-          return (
-            <Pressable
-              key={id}
-              onPress={() => onChange(id)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: on }}
-              accessibilityLabel={t(`settings.scheme.${id}` as TKey)}
-              hitSlop={4}
-              style={({ pressed }) => ({
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                borderWidth: 2.5,
-                borderColor: on ? col : 'transparent',
-                padding: 3,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <View style={{ flex: 1, borderRadius: 16, backgroundColor: col, alignItems: 'center', justifyContent: 'center' }}>
-                {on ? <Check size={15} color="#fff" strokeWidth={3} /> : null}
-              </View>
-            </Pressable>
-          )
-        })}
-      </View>
-      <Txt variant="faint" style={{ fontSize: 13, marginTop: -sp.xs }}>
-        {t('settings.accentHint')}
-      </Txt>
-    </Card>
-  )
-}
-
 // A selectable option: a preview thumbnail + label, with a selected ring + check.
 function OptionCard({
   selected,
@@ -547,9 +484,8 @@ const s_ = StyleSheet.create({
 
 export default function Settings() {
   // `dark` is aliased: this module also imports the Warm Hearth `dark` token set.
-  const { c, dark: isDark } = useTheme()
+  const { c } = useTheme()
   const { mode, setMode } = useThemePref()
-  const { scheme, setScheme } = useSchemePref()
   const { hiddenApps, appOrder, toggleApp, setAppOrder } = useAppPrefs()
   // Every app (hidden ones dimmed), in the user's hub order — same ranking the
   // Hub applies, so what you see here is what the home screen does.
@@ -914,17 +850,6 @@ export default function Settings() {
           </View>
         </View>
 
-        {/* Colour scheme — only meaningful under the glass skin, whose accent
-            and background wash are what a scheme repaints. Warm Hearth has a
-            single fixed accent, so this is hidden when GLASS is off. */}
-        {GLASS ? (
-          <>
-            <View style={{ gap: sp.sm }}>
-              <SectionLabel>{t('settings.accent')}</SectionLabel>
-              <AccentPicker value={scheme} onChange={setScheme} dark={isDark} />
-            </View>
-          </>
-        ) : null}
 
 
         {/* Which apps show on the hub, and in what order */}

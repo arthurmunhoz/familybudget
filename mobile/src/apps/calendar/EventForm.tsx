@@ -14,13 +14,16 @@
 // fields scroll in a <KeyboardScroll>, which brings the focused one into view.
 // Without either, Location and Notes were typed blind under the keyboard.
 import { useState } from 'react'
-import { Alert, Modal, StyleSheet, View } from 'react-native'
-import { ChevronsUpDown, X } from 'lucide-react-native'
+import { Alert, Keyboard, Modal, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { CalendarDays, Users, X } from 'lucide-react-native'
 
-import { FormRow, FormSection, RowValue, SelectRow, SelectSheet, ToggleRow } from '@/components/form'
+import { FormSection, SelectRow, ToggleRow } from '@/components/form'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { TintButton } from '@/components/TintButton'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
 import { Pressable } from '@/components/Pressable'
-import { Btn, Txt } from '@/components/ui'
+import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { HOUSEHOLD_COLOR, KIND_EMOJI, memberColor } from '@/lib/calendar'
@@ -29,7 +32,7 @@ import { supabase } from '@/lib/supabase'
 import type { CalendarEvent, EventKind, EventRecurrence, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
-import { sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 import { DangerRow, DateTimeRow, InputRow } from './calendarUi'
 
 const RECURRENCES: EventRecurrence[] = ['none', 'daily', 'weekly', 'monthly', 'yearly']
@@ -58,16 +61,15 @@ const isoToDate = (iso: string): Date | undefined => {
   return y && m && d ? new Date(y, m - 1, d) : undefined
 }
 
-/** "Who": the member's colour dot + name in the row (events are coloured by
- *  owner, so the dot is the point), the list in a checked sheet. */
-function OwnerRow({
-  label,
+/** "Who": the household and each member as a round chip in their own colour
+ *  (events are coloured by owner, so the colour is the point) — one tap, no
+ *  sheet (2026-11). */
+function WhoPicker({
   owner,
   profiles,
   memberEmails,
   onChange,
 }: {
-  label: string
   owner: string | null
   profiles: Profile[]
   memberEmails: string[]
@@ -75,32 +77,50 @@ function OwnerRow({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const [open, setOpen] = useState(false)
-  const current = owner === null ? null : profiles.find((p) => p.email === owner)
-  const color = owner === null ? HOUSEHOLD_COLOR : memberColor(owner, memberEmails)
-  const options = [
-    { value: HOUSEHOLD, label: t('calendar.everyone') },
-    ...profiles.map((p) => ({ value: p.email, label: p.display_name })),
+  const options: { key: string; email: string | null; label: string; color: string }[] = [
+    { key: HOUSEHOLD, email: null, label: t('calendar.everyone'), color: HOUSEHOLD_COLOR },
+    ...profiles.map((p) => ({
+      key: p.email,
+      email: p.email,
+      label: p.display_name.split(' ')[0],
+      color: memberColor(p.email, memberEmails),
+    })),
   ]
   return (
-    <>
-      <FormRow label={label} onPress={() => setOpen(true)}>
-        <View style={{ height: 10, width: 10, borderRadius: 5, backgroundColor: color }} />
-        <RowValue value={owner === null ? t('calendar.everyone') : (current?.display_name ?? owner)} placeholder="" />
-        <ChevronsUpDown size={15} color={c.textFaint} />
-      </FormRow>
-      <SelectSheet
-        visible={open}
-        title={label}
-        value={owner ?? HOUSEHOLD}
-        options={options}
-        onPick={(v) => {
-          onChange(v === HOUSEHOLD || v === '' ? null : v)
-          setOpen(false)
-        }}
-        onClose={() => setOpen(false)}
-      />
-    </>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingVertical: 2 }}>
+      {options.map((o) => {
+        const on = (owner ?? null) === o.email
+        const ini = o.email
+          ? o.label.slice(0, 1).toUpperCase()
+          : null
+        return (
+          <Pressable
+            key={o.key}
+            onPress={() => onChange(o.email)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={o.label}
+            style={{ alignItems: 'center', gap: 5, width: 62 }}
+          >
+            <View style={{ padding: 3, borderRadius: 30, borderWidth: 2.5, borderColor: on ? o.color : 'transparent' }}>
+              <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: o.color, alignItems: 'center', justifyContent: 'center' }}>
+                {ini ? (
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 18, color: '#fff' }}>{ini}</Txt>
+                ) : (
+                  <Users size={20} color="#fff" />
+                )}
+              </View>
+            </View>
+            <Txt
+              style={{ fontSize: 12.5, fontFamily: on ? fonts.semibold : fonts.body, color: on ? c.text : c.textMuted }}
+              numberOfLines={1}
+            >
+              {o.label}
+            </Txt>
+          </Pressable>
+        )
+      })}
+    </ScrollView>
   )
 }
 
@@ -125,8 +145,8 @@ export default function EventForm({
   onSaved: (savedStart: string) => void
   onDelete: (ev: CalendarEvent) => void
 }) {
-  const { c } = useTheme()
-  const bottomGap = useBottomGap(sp.lg)
+  const { c, dark } = useTheme()
+  const bottomGap = useBottomGap(sp.xs)
   const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
   const { t } = useI18n()
   const [saving, setSaving] = useState(false)
@@ -182,19 +202,45 @@ export default function EventForm({
     }
   }
 
+  const red = APP_GRADIENT.calendar as [string, string]
+  const tint = red[1]
+  const soft = tint + (dark ? '2E' : '17')
+  const kindEmoji = KIND_EMOJI[draft.kind]
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop} onLayout={onRootLayout}>
+        <Pressable style={{ flex: 1 }} onPress={() => Keyboard.dismiss()} accessible={false} />
         <View
           style={[
             styles.sheet,
-            // Against what the keyboard leaves, so the sheet never grows
-            // behind it.
+            // Against what the keyboard leaves, so the sheet never grows behind it.
             { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift },
           ]}
         >
+          {/* The event's name leads, large and typed in place, beside a tile in
+              the Calendar's red (or the kind's emoji) — 2026-11. */}
           <View style={styles.sheetHead}>
-            <Txt variant="h2">{editing ? t('calendar.editEvent') : t('calendar.newEvent')}</Txt>
+            <GradientBox colors={red} radius={18} style={styles.tile}>
+              {kindEmoji ? <Txt style={{ fontSize: 26 }}>{kindEmoji}</Txt> : <CalendarDays size={26} color="#fff" />}
+            </GradientBox>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={[styles.kicker, { color: c.textMuted }]}>
+                {editing ? t('calendar.editEvent') : t('calendar.newEvent')}
+              </Txt>
+              <TextInput
+                value={draft.title}
+                onChangeText={(v) => set({ title: v })}
+                placeholder={t('calendar.titlePlaceholder')}
+                placeholderTextColor={c.textFaint}
+                autoFocus={!editing}
+                multiline
+                blurOnSubmit
+                returnKeyType="done"
+                accessibilityLabel={t('calendar.titlePlaceholder')}
+                style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, padding: 0, marginTop: 2 }}
+              />
+            </View>
             <Pressable
               onPress={onClose}
               hitSlop={10}
@@ -214,66 +260,68 @@ export default function EventForm({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <FormSection>
-              <InputRow
-                title
-                value={draft.title}
-                onChangeText={(v) => set({ title: v })}
-                placeholder={t('calendar.titlePlaceholder')}
-                autoFocus={!editing}
-              />
-              <SelectRow
-                label={t('calendar.typeLabel')}
-                value={draft.kind}
-                options={KINDS.map((k) => ({
-                  value: k,
-                  label: `${KIND_EMOJI[k] ? `${KIND_EMOJI[k]} ` : ''}${t(`calendar.kind.${k}` as TKey)}`,
-                }))}
-                onChange={(v) => {
-                  if (v) pickKind(v)
-                }}
-              />
-            </FormSection>
+            {/* kind: chips with their emoji */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: sp.sm }} keyboardShouldPersistTaps="handled">
+              {KINDS.map((k) => {
+                const on = draft.kind === k
+                return (
+                  <Pressable
+                    key={k}
+                    onPress={() => pickKind(k)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    style={({ pressed }) => [styles.chip, { backgroundColor: on ? tint : soft, opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    {KIND_EMOJI[k] ? <Txt style={{ fontSize: 14 }}>{KIND_EMOJI[k]}</Txt> : null}
+                    <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: on ? '#fff' : tint }}>
+                      {t(`calendar.kind.${k}` as TKey)}
+                    </Txt>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
 
-            <FormSection>
-              <ToggleRow label={t('calendar.allDay')} value={draft.allDay} onValueChange={(v) => set({ allDay: v })} />
-              <DateTimeRow
-                label={t('calendar.startLabel')}
-                date={draft.start}
-                time={draft.allDay ? null : draft.startTime}
-                locale={locale}
-                onDate={(v) => set({ start: v, end: draft.end < v ? v : draft.end })}
-                onTime={(v) => set({ startTime: v })}
-              />
-              <DateTimeRow
-                label={t('calendar.endLabel')}
-                date={draft.end}
-                time={draft.allDay ? null : draft.endTime}
-                locale={locale}
-                minimumDate={isoToDate(draft.start)}
-                onDate={(v) => set({ end: v })}
-                onTime={(v) => set({ endTime: v })}
-              />
-              <SelectRow
-                label={t('calendar.repeatLabel')}
-                value={draft.repeat}
-                options={RECURRENCES.map((r) => ({ value: r, label: t(`calendar.repeat.${r}` as TKey) }))}
-                onChange={(v) => {
-                  if (v) set({ repeat: v })
-                }}
-              />
-            </FormSection>
+            {/* when */}
+            <View>
+              <Txt style={[styles.label, { color: c.textMuted }]}>{t('calendar.whenLabel')}</Txt>
+              <FormSection>
+                <ToggleRow label={t('calendar.allDay')} value={draft.allDay} onValueChange={(v) => set({ allDay: v })} />
+                <DateTimeRow
+                  tint={tint}
+                  label={t('calendar.startLabel')}
+                  date={draft.start}
+                  time={draft.allDay ? null : draft.startTime}
+                  locale={locale}
+                  onDate={(v) => set({ start: v, end: draft.end < v ? v : draft.end })}
+                  onTime={(v) => set({ startTime: v })}
+                />
+                <DateTimeRow
+                  tint={tint}
+                  label={t('calendar.endLabel')}
+                  date={draft.end}
+                  time={draft.allDay ? null : draft.endTime}
+                  locale={locale}
+                  minimumDate={isoToDate(draft.start)}
+                  onDate={(v) => set({ end: v })}
+                  onTime={(v) => set({ endTime: v })}
+                />
+                <SelectRow
+                  label={t('calendar.repeatLabel')}
+                  value={draft.repeat}
+                  options={RECURRENCES.map((r) => ({ value: r, label: t(`calendar.repeat.${r}` as TKey) }))}
+                  onChange={(v) => {
+                    if (v) set({ repeat: v })
+                  }}
+                />
+                <ToggleRow label={t('calendar.remind')} value={draft.remind} onValueChange={(v) => set({ remind: v })} />
+              </FormSection>
+            </View>
 
-            <FormSection>
-              <OwnerRow
-                label={t('calendar.ownerLabel')}
-                owner={draft.owner}
-                profiles={profiles}
-                memberEmails={memberEmails}
-                onChange={(owner) => set({ owner })}
-              />
-              <ToggleRow label={t('calendar.remind')} value={draft.remind} onValueChange={(v) => set({ remind: v })} />
-            </FormSection>
+            {/* who */}
+            <View>
+              <Txt style={[styles.label, { color: c.textMuted }]}>{t('calendar.ownerLabel')}</Txt>
+              <WhoPicker owner={draft.owner} profiles={profiles} memberEmails={memberEmails} onChange={(owner) => set({ owner })} />
+            </View>
 
             <FormSection>
               <InputRow
@@ -303,22 +351,13 @@ export default function EventForm({
             ) : null}
           </KeyboardScroll>
 
-          {/* save — docked. iOS with no keyboard: clear the home indicator.
-              Otherwise the sheet already sits above the keyboard / nav bar. */}
-          <View
-            style={{
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.sm,
-              paddingBottom: clearOfBars ? sp.md : bottomGap,
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: c.border,
-            }}
-          >
-            <Btn
+          {/* save — docked, in the Calendar's red, following the screen curve */}
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: clearOfBars ? sp.md : bottomGap }}>
+            <TintButton
+              tint={red[0]}
               title={editing ? t('common.saveChanges') : t('calendar.saveEvent')}
               onPress={save}
               disabled={!canSave}
-              loading={saving}
             />
           </View>
         </View>
@@ -340,11 +379,15 @@ const styles = StyleSheet.create({
   },
   sheetHead: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: sp.md,
     paddingHorizontal: sp.lg,
     paddingBottom: sp.md,
   },
+  tile: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
+  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase' },
+  label: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: sp.sm },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 36, borderRadius: 18 },
   close: {
     width: 30,
     height: 30,

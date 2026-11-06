@@ -93,12 +93,38 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   safe-area edge (scroll gets `paddingTop: insets.top`) so the sky runs under
   the status bar. The day's weather alert is a quiet line under the date
   line now, not a banner.
+- **`ToggleRow` toggles on a tap ANYWHERE in the row** (2026-11): inside a
+  sheet's scroller a tap aimed at the small native switch could be eaten as
+  a scroll start (the owner couldn't flip All day / Remind me). `PickerSheet`
+  (every date/time pop-up) takes a `title` (the row's label) and has the
+  sheet look: title + round ✕, the picker on a card, Done with the curve.
+- **Calendar (2026-11):** round back + Google/Apple round buttons, big
+  title with "n things this week" faded, Month/Upcoming segmented, the month
+  grid in one card (selected day = Calendar-red gradient circle, today a soft
+  red), the day's events as rows of ONE card with a time tile in the owner's
+  colour; Upcoming rows carry a month/day "tear-off" tile + countdown pill.
+  `EventForm`: the title typed large in the header, kind as emoji chips,
+  When grouped, Who as round colour chips (`WhoPicker`), Save docked in the
+  Calendar red. Google / Apple sync screens share `apps/calendar/SyncScreen`.
+- **Nudges screen (2026-11):** big title; WHO as round chips (Everyone +
+  members); presets as a 2-column grid of tiles (urgent = red gradient);
+  "Write your own" is sent EXACTLY as typed (≤120 chars, 💬, one-off — no AI
+  rewording, not saved). Settings/PresetEditor sheets in the same look.
+  `components/TintButton` (moved from pets) is the shared docked gradient
+  button.
+- **New budget sheet (2026-11):** its own sheet in `Budgets.tsx` (not the
+  shared FormSheet): the name typed in place beside a Money-green tile, the
+  grouping as three equal tiles (month / week / day), the Plus-only private
+  switch as one row, and "Create budget" docked in the Money gradient.
 - **Nudge banners on the Hub (`apps/pings/NudgesBanner`, 2026-11):** a
   RECEIVED nudge is a gradient card in the Nudges colour (red when urgent),
   "From Sam · 4m ago", the message large, Got it / Call as pills inside. A
-  SENT nudge is a plain card with a SEEN BY section — who acknowledged,
-  newest first, with their time, then who it went to and hasn't seen it yet
-  (faded "not yet"), and an "n of total" count; ✕ hides it on this device.
+  SENT nudge is a plain card with ONE line "Seen by: Ana, Sam" (first
+  names, the most recent first — a row per person grew too tall for big
+  families) and an "n of total" chip; ✕ hides it on this device.
+  `NewItemButton` takes `colors` to be a filled gradient button (white label
+  + plus) — Money's New budget, New month (the budget's own gradient) and
+  the calendar's New event use it.
 - **Launch (2026-11):** the native splash (expo-splash-screen: cream
   `#FBF6F0` in BOTH appearances, the glass icon at 150pt) is hidden by
   `components/LaunchIntro` on its first layout — that layer starts
@@ -111,9 +137,11 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   a purple gradient card (features, one action inside); apps listed with
   their Home gradient tiles; tinted gradient icon tiles on every card;
   Account is one card of rows (email, sign out, delete).
-  The colour picker is "Accent colour" (`AccentPicker`): swatches + a live
-  preview of a button, switch and chip — since the wash is flat, a scheme
-  only repaints the accent, and the old blob thumbnails promised more. Note the apps list
+  There is NO colour picker any more (owner, 2026-11): each app has its own
+  gradient, and a user-chosen global accent clashed with it (a green Done in
+  the pink Calendar). `SchemePrefProvider` always serves DEFAULT_SCHEME and
+  clears any choice an older build saved. Pickers opened from an app take
+  that app's colour (`PickerSheet tint`, via `DateTimeRow` / `DayRow`). Note the apps list
   is a DraggableList: a scroll gesture that STARTS on a row can pick it up.
 - **The ask bar (`components/home/AskSheet` + `lib/assistant`).** The server
   only UNDERSTANDS (`/api/suggest-ping?action=assistant` → `{intent, items,

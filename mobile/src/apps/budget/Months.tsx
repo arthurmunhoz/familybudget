@@ -47,6 +47,7 @@ import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { TrendCard, type TrendPoint } from './TrendCard'
+import { budgetLook } from '@/components/home/palette'
 import { FormSection, NoteRow } from '@/components/form'
 import { FormSheet } from './FormSheet'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
@@ -398,6 +399,8 @@ export default function Months({ budgetId }: { budgetId: string }) {
         onPress={openCreate}
         loading={creating}
         disabled={loading}
+        // the budget's own gradient — one colour per budget on every Money screen
+        colors={budgetLook(budgetId).colors}
       />
 
       {/* budget options menu */}

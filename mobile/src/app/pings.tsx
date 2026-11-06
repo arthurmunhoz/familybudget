@@ -6,16 +6,17 @@
 // NudgesBanner (which owns its own Supabase Realtime subscription and carries
 // the Got it / Call actions), and it drops off once acknowledged or expired.
 import { useState } from 'react'
-import { Pressable, ScrollView } from 'react-native'
-import { Settings } from 'lucide-react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { router } from 'expo-router'
+import { ChevronLeft, Settings2 } from 'lucide-react-native'
 
-import { AppHeader, Screen } from '@/components/ui'
+import { Screen, Txt } from '@/components/ui'
 import { Toast, type ToastData } from '@/components/Toast'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { fetchPingPresets } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
-import { sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 import PingComposer from '@/apps/pings/PingComposer'
 import { NudgeSettings } from '@/apps/pings/NudgeSettings'
 
@@ -39,26 +40,43 @@ export default function NudgesScreen() {
     <>
       <Screen
         header={
-          <AppHeader
-            title={t('app.nudges')}
-            right={
-              <Pressable
-                onPress={() => setSettingsOpen(true)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={t('pings.settings')}
-              >
-                <Settings size={22} color={c.textMuted} />
-              </Pressable>
-            }
-          />
+          // Home-style top bar: round back, round settings.
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: sp.sm }}>
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.back')}
+              style={({ pressed }) => [roundBtn, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+            >
+              <ChevronLeft size={22} color={c.text} />
+            </Pressable>
+            <Pressable
+              onPress={() => setSettingsOpen(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('pings.settings')}
+              style={({ pressed }) => [roundBtn, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Settings2 size={19} color={c.text} />
+            </Pressable>
+          </View>
         }
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: sp.xxl }}
+          contentContainerStyle={{ paddingBottom: sp.xxl, gap: sp.xl }}
           keyboardShouldPersistTaps="handled"
         >
+          {/* big title, what it's for faded under it */}
+          <View>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8, color: c.text }}>
+              {t('app.nudges')}
+            </Txt>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 26, color: c.textFaint }}>
+              {t('pings.tagline')}
+            </Txt>
+          </View>
           <PingComposer presets={presets} onSent={setToast} />
         </ScrollView>
       </Screen>
@@ -74,4 +92,13 @@ export default function NudgesScreen() {
       ) : null}
     </>
   )
+}
+
+const roundBtn = {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  borderWidth: StyleSheet.hairlineWidth,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
 }

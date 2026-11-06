@@ -104,7 +104,10 @@ export function DateTimeRow({
   onDate,
   onTime,
   minimumDate,
+  tint,
 }: {
+  /** The app's colour for the pickers (Done, the picked day). */
+  tint?: string
   label: string
   /** ISO YYYY-MM-DD. */
   date: string
@@ -125,6 +128,8 @@ export function DateTimeRow({
         ) : null}
       </FormRow>
       <PickerSheet
+        title={label}
+        tint={tint}
         visible={open === 'date'}
         mode="date"
         value={fromISO(date) ?? new Date()}
@@ -134,6 +139,8 @@ export function DateTimeRow({
       />
       {time !== null ? (
         <PickerSheet
+          title={label}
+          tint={tint}
           visible={open === 'time'}
           mode="time"
           value={parseTime(time)}
@@ -149,6 +156,7 @@ export function DateTimeRow({
  *  clears it (that's how a next-due date is removed). */
 export function DayRow({
   label,
+  tint,
   value,
   placeholder,
   onChange,
@@ -156,6 +164,8 @@ export function DayRow({
   maximumDate,
   wheels,
 }: {
+  /** The app's colour for the picker. */
+  tint?: string
   label: string
   /** ISO YYYY-MM-DD, or '' when unset. */
   value: string
@@ -196,6 +206,8 @@ export function DayRow({
         ) : null}
       </FormRow>
       <PickerSheet
+        title={label}
+        tint={tint}
         visible={open}
         mode="date"
         iosDisplay={wheels ? 'spinner' : 'inline'}

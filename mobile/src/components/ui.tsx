@@ -21,13 +21,14 @@ import {
 import { Pressable } from './Pressable'
 import type { ScrollViewProps } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context'
-import { ChevronLeft, Sparkles } from 'lucide-react-native'
+import { ChevronLeft, Plus, Sparkles } from 'lucide-react-native'
 import { router } from 'expo-router'
 
 import { fonts, radius, sp, useTheme } from '../theme/theme'
 import { pickOn } from '../theme/contrast'
 import { useBottomGap } from '../hooks/useBottomGap'
 import { useRevealOnFocus } from './KeyboardScroll'
+import { GradientBox } from './home/GradientBox'
 
 type TxtVariant = 'display' | 'title' | 'h2' | 'body' | 'muted' | 'faint' | 'label'
 
@@ -396,9 +397,13 @@ export function NewItemButton({
   disabled,
   loading,
   plus,
+  colors,
 }: {
   label: string
   onPress: () => void
+  /** Fill it with this gradient (white label + a plus) instead of the dashed
+   *  outline — for a screen whose main action this is (Money's New budget). */
+  colors?: readonly [string, string]
   disabled?: boolean
   /** Swap the label for a spinner (e.g. while a file picker or a create call is
    *  in flight). Also blocks taps, like `disabled`. */
@@ -429,9 +434,9 @@ export function NewItemButton({
         marginTop: sp.sm,
         marginBottom: bottom,
         paddingVertical: 16,
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: c.textFaint,
+        ...(colors
+          ? { overflow: 'hidden' as const, flexDirection: 'row' as const, gap: 8 }
+          : { borderWidth: 1, borderStyle: 'dashed' as const, borderColor: c.textFaint }),
         // Bottom corners follow the iPhone screen curve (normal on Android).
         borderTopLeftRadius: radius.md,
         borderTopRightRadius: radius.md,
@@ -440,8 +445,14 @@ export function NewItemButton({
         opacity: disabled ? 0.5 : pressed ? 0.6 : 1,
       })}
     >
+      {colors ? <GradientBox colors={colors} radius={0} style={StyleSheet.absoluteFill} /> : null}
       {loading ? (
-        <ActivityIndicator color={c.accent} />
+        <ActivityIndicator color={colors ? '#fff' : c.accent} />
+      ) : colors ? (
+        <>
+          <Plus size={18} color="#fff" strokeWidth={2.6} />
+          <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 16 }}>{label.replace(/^[+＋]\s*/, '')}</Txt>
+        </>
       ) : (
         <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 16 }}>{label}</Txt>
       )}
@@ -450,8 +461,8 @@ export function NewItemButton({
           Pulled in from the corner (right: 3) so it straddles the straight run
           of the border instead of the 12pt corner radius. */}
       {plus ? (
-        <View style={{ position: 'absolute', top: -7, right: 3 }}>
-          <Sparkles size={14} color={c.accent} />
+        <View style={{ position: 'absolute', top: colors ? 8 : -7, right: colors ? 14 : 3 }}>
+          <Sparkles size={14} color={colors ? '#fff' : c.accent} />
         </View>
       ) : null}
     </Pressable>

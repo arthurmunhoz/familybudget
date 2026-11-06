@@ -6,11 +6,12 @@
 // Gated behind One Roof Plus like Google. iOS-only — there is no Apple calendar
 // API on the web, so the PWA can't offer this.
 import { useEffect, useState } from 'react'
-import { Alert, View } from 'react-native'
-import { Pressable } from '@/components/Pressable'
+import { Alert } from 'react-native'
 import { router } from 'expo-router'
 
-import { AppHeader, Btn, Card, Loader, Screen, Txt } from '@/components/ui'
+import { SyncScreen } from '@/apps/calendar/SyncScreen'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { AlertTriangle, ArrowLeftRight, CalendarSync, RefreshCw } from 'lucide-react-native'
 import { useI18n } from '@/hooks/useI18n'
 import { usePlus } from '@/lib/plus'
 import { timeAgo } from '@/lib/format'
@@ -22,7 +23,7 @@ import {
   syncAppleCalendar,
   type AppleConnection,
 } from '@/lib/appleCalendar'
-import { sp, useTheme } from '@/theme/theme'
+import { useTheme } from '@/theme/theme'
 import { AppleIcon } from '@/apps/calendar/AppleIcon'
 
 export default function AppleCalendarScreen() {
@@ -104,72 +105,45 @@ export default function AppleCalendarScreen() {
     ])
   }
 
-  const header = <AppHeader title={t('calendar.apple')} />
-
+  const red = APP_GRADIENT.calendar[1]
   if (!isAppleCalendarAvailable) {
     return (
-      <Screen scroll header={header}>
-        <Card style={{ gap: sp.sm }}>
-          <Txt variant="muted">{t('calendar.appleUnavailable')}</Txt>
-        </Card>
-      </Screen>
+      <SyncScreen
+        logo={<AppleIcon size={28} color={c.text} />}
+        title={t('calendar.apple')}
+        state={t('calendar.stateNotConnected')}
+        facts={[{ icon: <AlertTriangle size={17} color={red} />, text: t('calendar.appleUnavailable') }]}
+      />
     )
   }
 
   return (
-    <Screen scroll header={header}>
-      {loading ? (
-        <Loader />
-      ) : conn ? (
-        <View style={{ gap: sp.lg }}>
-          <Card style={{ gap: sp.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-              <AppleIcon size={22} color={c.text} />
-              <Txt variant="h2">{t('calendar.apple')}</Txt>
-            </View>
-            <Txt variant="muted">
-              {t('calendar.appleSynced', { count: String(conn.calendarCount) })}
-            </Txt>
-            <Txt variant="faint">
-              {conn.lastSyncedAt
-                ? t('calendar.lastSynced', { when: timeAgo(conn.lastSyncedAt) })
-                : t('calendar.neverSynced')}
-            </Txt>
-            <Txt variant="faint">{t('calendar.appleSyncDir')}</Txt>
-          </Card>
-
-          <Btn
-            title={busy ? t('calendar.syncing') : t('calendar.syncNow')}
-            onPress={sync}
-            loading={busy}
-            disabled={busy}
-          />
-          <Pressable
-            onPress={disconnect}
-            disabled={busy}
-            style={{ paddingVertical: sp.md, alignItems: 'center' }}
-          >
-            <Txt style={{ color: c.expense, fontWeight: '600' }}>{t('calendar.disconnect')}</Txt>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={{ gap: sp.lg }}>
-          <Card style={{ gap: sp.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-              <AppleIcon size={22} color={c.text} />
-              <Txt variant="h2">{t('calendar.apple')}</Txt>
-            </View>
-            <Txt variant="muted">{t('calendar.appleHint')}</Txt>
-            <Txt variant="faint">{t('calendar.appleSyncDir')}</Txt>
-          </Card>
-          <Btn
-            title={busy ? t('calendar.syncing') : t('calendar.connectApple')}
-            onPress={connect}
-            loading={busy}
-            disabled={busy}
-          />
-        </View>
-      )}
-    </Screen>
+    <SyncScreen
+      logo={<AppleIcon size={28} color={c.text} />}
+      title={t('calendar.apple')}
+      state={conn ? t('calendar.stateConnected') : t('calendar.stateNotConnected')}
+      loading={loading}
+      facts={
+        conn
+          ? [
+              { icon: <CalendarSync size={17} color={red} />, text: t('calendar.appleSynced', { count: String(conn.calendarCount) }) },
+              {
+                icon: <RefreshCw size={17} color={red} />,
+                text: conn.lastSyncedAt ? t('calendar.lastSynced', { when: timeAgo(conn.lastSyncedAt) }) : t('calendar.neverSynced'),
+                tone: 'faint',
+              },
+              { icon: <ArrowLeftRight size={17} color={red} />, text: t('calendar.appleSyncDir'), tone: 'faint' },
+            ]
+          : [
+              { icon: <CalendarSync size={17} color={red} />, text: t('calendar.appleHint') },
+              { icon: <ArrowLeftRight size={17} color={red} />, text: t('calendar.appleSyncDir'), tone: 'faint' },
+            ]
+      }
+      action={conn ? t('calendar.syncNow') : t('calendar.connectApple')}
+      onAction={conn ? sync : connect}
+      busy={busy}
+      onDisconnect={conn ? disconnect : undefined}
+      disconnectLabel={t('calendar.disconnect')}
+    />
   )
 }

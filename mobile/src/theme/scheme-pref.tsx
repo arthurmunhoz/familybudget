@@ -5,17 +5,10 @@
 //
 // Only meaningful while GLASS is on: the Warm Hearth tokens have a single fixed
 // accent, so Settings hides the picker when GLASS is false.
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react'
+import { createContext, useCallback, useContext, useEffect, type ReactNode } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import { DEFAULT_SCHEME, SCHEMES, type SchemeId } from './glass'
+import { DEFAULT_SCHEME, type SchemeId } from './glass'
 
 interface SchemePrefState {
   scheme: SchemeId
@@ -31,26 +24,17 @@ const SchemePrefContext = createContext<SchemePrefState>({
 const CACHE = 'oneroof-scheme'
 
 export function SchemePrefProvider({ children }: { children: ReactNode }) {
-  const [scheme, setSchemeState] = useState<SchemeId>(DEFAULT_SCHEME)
-
+  // The accent is no longer a user choice (owner, 2026-11): every app has its
+  // own gradient now, and a global accent picked in Settings clashed with it
+  // (a green Done inside the pink Calendar). Everyone gets DEFAULT_SCHEME; a
+  // choice saved by an older build is ignored and cleared.
   useEffect(() => {
-    let active = true
-    AsyncStorage.getItem(CACHE).then((v) => {
-      // Guard against a scheme that was removed in a later build.
-      if (active && v && v in SCHEMES) setSchemeState(v as SchemeId)
-    })
-    return () => {
-      active = false
-    }
+    AsyncStorage.removeItem(CACHE).catch(() => {})
   }, [])
-
-  const setScheme = useCallback((s: SchemeId) => {
-    setSchemeState(s)
-    AsyncStorage.setItem(CACHE, s).catch(() => {})
-  }, [])
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const setScheme = useCallback((_s: SchemeId) => {}, [])
   return (
-    <SchemePrefContext.Provider value={{ scheme, setScheme }}>{children}</SchemePrefContext.Provider>
+    <SchemePrefContext.Provider value={{ scheme: DEFAULT_SCHEME, setScheme }}>{children}</SchemePrefContext.Provider>
   )
 }
 

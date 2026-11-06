@@ -365,6 +365,7 @@ export function DateRow({
         ) : null}
       </FormRow>
       <PickerSheet
+        title={label}
         visible={open}
         mode="date"
         iosDisplay={wheels ? 'spinner' : 'inline'}
@@ -484,8 +485,26 @@ export function ToggleRow({
   onValueChange: (v: boolean) => void
 }) {
   const { c } = useTheme()
+  // The WHOLE row toggles (2026-11): inside a sheet's scroller a tap aimed at
+  // the small native switch could be taken as the start of a scroll and
+  // never reach it — the owner couldn't flip All day / Remind me. A row tap
+  // is also what iOS Settings does.
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, minHeight: ROW_MIN_H, paddingHorizontal: sp.md, paddingVertical: 8 }}>
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp.md,
+        minHeight: ROW_MIN_H,
+        paddingHorizontal: sp.md,
+        paddingVertical: 8,
+        opacity: pressed ? 0.75 : 1,
+      })}
+    >
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt style={{ fontSize: 15, color: c.text }}>{label}</Txt>
         {hint ? (
@@ -494,8 +513,8 @@ export function ToggleRow({
           </Txt>
         ) : null}
       </View>
-      <Toggle value={value} onValueChange={onValueChange} accessibilityLabel={label} />
-    </View>
+      <Toggle value={value} onValueChange={onValueChange} accessible={false} />
+    </Pressable>
   )
 }
 
