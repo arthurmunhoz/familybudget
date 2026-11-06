@@ -307,6 +307,13 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     Whereabouts map — MUST use `c.sheet` (opaque) or its content visibly mixes
     with the background. Rule of thumb: inside a `<Modal>`, use `c.sheet`.
     `sheet === card` outside the glass skin, so it's a no-op for Warm Hearth.
+  - **`elevation` + a translucent fill = a smudge on Android.** Android draws
+    the elevation shadow UNDER the view, so behind `c.card` (66% white) it
+    shows through as a grey cast, with a lighter band wherever a child (a
+    TextInput) sits — on every Android, never on iOS (whose shadow is outside
+    only). Anything with `elevation` gets an opaque fill on Android:
+    `Platform.OS === 'android' ? c.sheet : c.card` (Family, the Shopping add
+    capsule and the Calendar segmented tab do this; 2026-11, seen on the S9+).
   - Under GLASS, `c.bg` is TRANSPARENT (that's how the wash shows). Never use it
     as a foreground/inverse colour — the toast's label did and vanished.
   - **Every stack screen paints its OWN wash** (`screenLayout` in `_layout`),

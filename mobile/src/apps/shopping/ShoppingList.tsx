@@ -948,7 +948,11 @@ export default function ShoppingList() {
           <View
             style={[
               styles.capsule,
-              { backgroundColor: c.card, borderColor: c.border },
+              // Opaque on Android: an elevation shadow is drawn UNDER the view,
+              // so a translucent fill (c.card) shows it through the capsule as
+              // a grey smudge with a lighter band where the input sits — on
+              // every Android, not one phone (2026-11). iOS keeps the glass card.
+              { backgroundColor: Platform.OS === 'android' ? c.sheet : c.card, borderColor: c.border },
               // Face ID iPhone: the bottom button's curve (useScreenCorner) —
               // 40pt bottom corners following the display's.
               corner ? { borderBottomLeftRadius: corner.radius, borderBottomRightRadius: corner.radius } : null,

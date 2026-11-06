@@ -10,7 +10,7 @@
 // events arrive via the calendar_events Realtime subscription.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { APP_GRADIENT } from '@/components/home/palette'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { CalendarDays, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
@@ -354,7 +354,8 @@ export default function Calendar() {
                     alignItems: 'center',
                     paddingVertical: 9,
                     borderRadius: radius.pill,
-                    backgroundColor: active ? c.card : 'transparent',
+                    // Opaque on Android — elevation under a translucent fill shows through it.
+                    backgroundColor: active ? (Platform.OS === 'android' ? c.sheet : c.card) : 'transparent',
                     ...(active ? { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 } : {}),
                   }}
                 >
