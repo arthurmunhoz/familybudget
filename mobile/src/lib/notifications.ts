@@ -60,14 +60,16 @@ export async function ensureAndroidChannels(): Promise<void> {
       description: 'Nudges, reminders and the daily digest.',
       importance: Notifications.AndroidImportance.HIGH,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
-      sound: 'default',
+      // No `sound` key on purpose: leaving it out IS the system default sound.
+      // `sound: 'default'` is read as a FILE name — expo looked for
+      // res/raw/default, logged "Custom sound 'default' not found" on every
+      // launch, then fell back to the same system sound anyway.
     })
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL.URGENT, {
       name: 'Urgent nudges',
       description: 'Someone in your household needs a hand right now.',
       importance: Notifications.AndroidImportance.MAX,
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
-      sound: 'default',
       vibrationPattern: [0, 250, 250, 250],
       enableVibrate: true,
     })
