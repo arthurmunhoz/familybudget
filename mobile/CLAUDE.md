@@ -223,6 +223,19 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   switched through `user_settings`. For the shots, a few things were overridden
   in code temporarily (sunny weather, Sam's location "4 min ago", the assistant's
   third example), then reverted — never commit those.
+  Play: `render-play.sh` → `out-play/<lang>/` (8 at 1080×1920, from the
+  Galaxy S9+ captures in `shots-android/`; no Whereabouts, it's off on Android).
+  **Uploading (1.5.0, 2026-11):** App Store Connect's primary slot is now
+  "iPhone with Dynamic Island (medium display)" and takes 6.3" sizes
+  (1206×2622) — 1320×2868 is NOT accepted there; resize. Upload ONE AT A TIME:
+  batch uploads left tiles stuck "processing" forever, which blocks "Add for
+  Review" ("screenshots must finish uploading"); a tile that stays stuck needs
+  removing and re-uploading (the assistant PNG never processed; the same image
+  as JPEG did at once). Reorder by dragging the tile. Only English (U.S.) is
+  localized on either store; pt/es screenshots exist but need translated
+  name/description/keywords before a localization can be added. The Play AAB
+  (~120 MB) must be dragged in by hand — the browser upload tool caps at 10 MB
+  and `eas submit` has no service-account key yet.
 - **`@/components/PhotoHero`** — the full-bleed, swipeable photo header used
   by Pet Care and Family (one page per pet / member; name + badge on the photo,
   side arrows with a tiny avatar of the neighbour, page dots, shrinks with a
