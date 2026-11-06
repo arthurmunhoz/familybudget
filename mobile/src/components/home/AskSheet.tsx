@@ -9,8 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Keyboard,
   Modal,
+  PanResponder,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -49,6 +51,7 @@ import {
   matchStore,
   moneySummary,
   petsDue,
+  setDailyDone,
   type PetsAnswer,
   removeItems,
   restoreItems,
@@ -70,6 +73,7 @@ import type { TKey } from '@/lib/i18n'
 import { useVoice, voiceSupported } from '@/lib/voice'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import {
+  ChooseBudgetView,
   ChooseStoreView,
   DiscountView,
   EventView,
@@ -90,7 +94,7 @@ import { sendPing } from '@/lib/pings'
 import { usePlus } from '@/lib/plus'
 import { categoryById } from '@/lib/categories'
 import { formatMoney, periodLabel } from '@/lib/format'
-import type { CalendarEvent, Profile, ShoppingItem, ShoppingStore } from '@/lib/types'
+import type { Budget, CalendarEvent, Profile, ShoppingItem, ShoppingStore } from '@/lib/types'
 
 const FIELD_LABEL: Record<FamilyField, TKey> = {
   phone: 'family.phone',
@@ -124,6 +128,11 @@ type Answer =
   | { kind: 'added'; res: AddResult; undone: boolean }
   | { kind: 'agenda'; a: AgendaAnswer }
   | { kind: 'chooseStore'; items: string[]; stores: ShoppingStore[]; suggested: string }
+  | {
+      kind: 'chooseBudget'
+      budgets: Budget[]
+      pending: { title: string; amount: number; type: 'expense' | 'income'; date: string }
+    }
   | { kind: 'list'; groups: ListGroup[]; store: ShoppingStore | null }
   | { kind: 'found'; found: Found[]; reply: string }
   | { kind: 'marked'; mode: 'check' | 'remove'; hits: ShoppingItem[]; missing: string[]; undone: boolean }
@@ -217,6 +226,33 @@ export function AskSheet({
     cancelVoice()
     onClose()
   }, [cancelVoice, onClose])
+  // Drag the sheet down by its top strip to dismiss (owner, 2026-11: once a
+  // conversation filled the sheet there was no backdrop left to tap and the
+  // handle didn't move). Follows the finger; a pull past DISMISS_AT or a quick
+  // flick closes, anything less springs back.
+  const [dragY] = useState(() => new Animated.Value(0))
+  const closeRef = useRef(closeSheet)
+  useEffect(() => {
+    closeRef.current = closeSheet
+  }, [closeSheet])
+  const [drag] = useState(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => g.dy > 4,
+      onPanResponderMove: (_e, g) => dragY.setValue(Math.max(0, g.dy)),
+      onPanResponderRelease: (_e, g) => {
+        if (g.dy > 110 || g.vy > 0.9) {
+          Animated.timing(dragY, { toValue: 900, duration: 180, useNativeDriver: true }).start(() => {
+            closeRef.current()
+            dragY.setValue(0)
+          })
+        } else {
+          Animated.spring(dragY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start()
+        }
+      },
+      onPanResponderTerminate: () => Animated.spring(dragY, { toValue: 0, useNativeDriver: true }).start(),
+    }),
+  )
   // `starting` counts as hearing for the layout (stop button, no answer), but
   // the label says "one moment" until the mic is live and the chime plays.
   const hearing = voice.state === 'listening' || voice.state === 'starting'
@@ -266,6 +302,8 @@ export function AskSheet({
             : t('ask.alreadyAll'),
           a.undone,
         )
+      case 'chooseBudget':
+        return t('ask.sumWhichBudget', { amount: formatMoney(a.pending.amount) })
       case 'chooseStore':
         return t('ask.sumWhichList', { items: list(a.items) })
       case 'list':
@@ -419,6 +457,14 @@ export function AskSheet({
       }
       case 'add_money': {
         const res = await addMoney(intent.title, intent.amount, intent.type, intent.date, intent.budget, me?.email ?? '')
+        // Several budgets and none clearly named: ask which (owner, 2026-11).
+        if (!res.ok && res.reason === 'choose_budget') {
+          return {
+            kind: 'chooseBudget',
+            budgets: res.budgets,
+            pending: { title: intent.title, amount: intent.amount, type: intent.type, date: intent.date },
+          }
+        }
         if (!res.ok) {
           return {
             kind: 'say',
@@ -522,6 +568,23 @@ export function AskSheet({
     go('/calc/items')
   }
 
+  async function budgetChosen(a: Extract<Answer, { kind: 'chooseBudget' }>, budget: Budget) {
+    setBusy(true)
+    try {
+      const p = a.pending
+      const res = await addMoney(p.title, p.amount, p.type, p.date, '', profile?.email ?? '', budget.id)
+      if (!res.ok) {
+        setAnswer({ kind: 'say', text: res.reason === 'no_period' ? t('ask.noPeriod', { budget: budget.name }) : t('ask.noBudget') })
+      } else {
+        setAnswer({ kind: 'money', res, type: p.type, amount: p.amount, title: p.title, undone: false })
+      }
+    } catch {
+      setAnswer({ kind: 'error' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function storeChosen(items: string[], store: ShoppingStore | null, createName?: string) {
     setBusy(true)
     try {
@@ -557,15 +620,18 @@ export function AskSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={closeSheet} onShow={autoListen}>
       <View style={{ flex: 1 }} onLayout={onRootLayout}>
         <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} onPress={closeSheet} />
-        <View
+        <Animated.View
           style={{
+            transform: [{ translateY: dragY }],
             marginTop: 'auto',
             // On a Face ID iPhone the sheet floats with the bottom button's
             // geometry (useScreenCorner): 16pt sides, half-inset bottom, 40pt
             // bottom corners. With the keyboard up it rides on the keyboard.
             marginBottom: corner ? lift + (floatingOnKeyboard ? sp.sm : corner.bottom) : lift,
             marginHorizontal: corner?.side ?? 0,
-            maxHeight: room * 0.92 - (corner?.bottom ?? 0),
+            // Capped so a strip of backdrop always shows above it — tap there
+            // to close, even with a long conversation.
+            maxHeight: room * 0.84 - (corner?.bottom ?? 0),
             backgroundColor: c.sheet,
             borderTopLeftRadius: corner ? 30 : sheetRadius,
             borderTopRightRadius: corner ? 30 : sheetRadius,
@@ -575,8 +641,16 @@ export function AskSheet({
             paddingBottom: corner ? sp.md : clearOfBars ? sp.md : bottomGap,
           }}
         >
-          <View style={{ alignItems: 'center', paddingBottom: sp.sm }}>
-            <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: c.border }} />
+          {/* The drag strip: the handle plus a generous full-width zone. */}
+          <View
+            {...drag.panHandlers}
+            accessibilityRole="adjustable"
+            accessibilityLabel={t('common.close')}
+            accessibilityActions={[{ name: 'activate' }]}
+            onAccessibilityAction={() => closeSheet()}
+            style={{ alignItems: 'center', justifyContent: 'center', height: 30, marginTop: -sp.sm, marginBottom: 2 }}
+          >
+            <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: c.textFaint }} />
           </View>
 
           <ScrollView
@@ -689,6 +763,14 @@ export function AskSheet({
                 onScope={(sc) => rescope(answer.a, sc)}
                 onOpen={() => go('/calendar')}
               />
+            ) : answer?.kind === 'chooseBudget' ? (
+              <ChooseBudgetView
+                amount={answer.pending.amount}
+                type={answer.pending.type}
+                title={answer.pending.title}
+                budgets={answer.budgets}
+                onPick={(b) => budgetChosen(answer, b)}
+              />
             ) : answer?.kind === 'chooseStore' ? (
               <ChooseStoreView
                 items={answer.items}
@@ -759,7 +841,7 @@ export function AskSheet({
                 onCancel={() => setAnswer(null)}
               />
             ) : answer?.kind === 'pets' ? (
-              <PetsView p={answer.p} onOpen={() => go('/pets')} />
+              <PetsView p={answer.p} onOpen={() => go('/pets')} onToggle={(id, done) => setDailyDone(id, today, done)} />
             ) : answer?.kind === 'family' ? (
               <FamilyView text={answer.text} onOpen={() => go('/family')} />
             ) : answer?.kind === 'split' ? (
@@ -837,7 +919,7 @@ export function AskSheet({
               </Pressable>
             )}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   )

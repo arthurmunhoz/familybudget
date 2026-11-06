@@ -40,6 +40,7 @@ import {
   eventSeries,
 } from '@/lib/petCare'
 import { getSignedUrls } from '@/lib/signedUrls'
+import { notifyPetCareChange } from '@/lib/petCareNotify'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetEvent, PetEventType, PetTaskDone } from '@/lib/types'
 import { File, Paths } from 'expo-file-system'
@@ -59,7 +60,6 @@ import PetForm from './PetForm'
 import { RoutineSheet } from './RoutineSheet'
 import { OverdueSheet } from './OverdueSheet'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
 /** Local HH:MM for a timestamptz — when a task was checked off. */
 function doneTime(iso: string): string {
@@ -113,25 +113,6 @@ async function mirrorPetPhoto(petId: string, photoPath: string, url: string): Pr
   }
 }
 
-/** Best-effort: tell the server someone changed pet care, so it silent-pushes
- *  every OTHER member's device and their widgets reload. Failures are ignored —
- *  widgets still catch up on their own timeline. */
-function notifyPetCareChange(): void {
-  void (async () => {
-    try {
-      const { data } = await supabase.rpc('widget_token')
-      const token = typeof data === 'string' ? data : null
-      if (!token || !API_BASE) return
-      await fetch(`${API_BASE}/api/widget?action=petcare-notify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      })
-    } catch {
-      /* ignore */
-    }
-  })()
-}
 
 export default function PetCare() {
   const { c } = useTheme()

@@ -171,6 +171,69 @@ Dúvidas ou ideias? one.roof.family.organizer@gmail.com
   compact tiles, so a Hub screenshot taken with the large two-column tiles no
   longer matches a fresh install. Not a rejection risk; reshoot when convenient.
 
+## What's New (v1.5.0) — the 2026-11 redesign
+
+A new look across the whole app plus the assistant. Screenshots: replace ALL
+with `store/app-store-v3/out/<lang>/` (10 per language, 6.9" 1320×2868). Play:
+`store/app-store-v3/out-play/<lang>/` (8, 1080×1920), the feature graphic and
+`store/play-store-icon-512.png`. The Play notes are the short block (500 max).
+
+### English
+
+```
+A whole new One Roof.
+
+• Just ask. Type or talk to the new assistant on the Home screen: "milk and bread on the Walmart list", "what's on tomorrow?", "what does Lola need today?" It remembers the conversation, so follow-ups just work — and it speaks English, Portuguese and Spanish.
+• A brand-new look, everywhere: a calmer Home with today's weather in the sky, colourful app icons, and every screen rebuilt — Calendar, Money, Shopping, Pet Care, Nudges, Whereabouts, Settings.
+• Pet Care: a daily routine you can tick off (even from the assistant), and quick forms for vet visits and vaccines.
+• Nudges: write your own and it's sent exactly as typed.
+• Utilities: split a bill, compare prices, work out a discount, and print luggage tags — with your phone number always formatted for wherever you're travelling.
+• Shopping lists your busiest store first.
+• A new app icon and a smoother launch.
+```
+
+### Português
+
+```
+Um One Roof totalmente novo.
+
+• É só perguntar. Digite ou fale com o novo assistente na tela inicial: "leite e pão na lista do Walmart", "o que tem amanhã?", "o que a Lola precisa hoje?". Ele lembra da conversa, então dá pra continuar perguntando — em português, inglês ou espanhol.
+• Visual novo em todo o app: uma tela inicial mais tranquila com o clima do dia no céu, ícones coloridos e todas as telas refeitas — Calendário, Dinheiro, Compras, Pets, Avisos, Localização e Ajustes.
+• Pets: rotina diária para marcar (até pelo assistente) e formulários rápidos para consultas e vacinas.
+• Avisos: escreva o seu e ele vai exatamente como você escreveu.
+• Utilidades: divida a conta, compare preços, calcule descontos e imprima etiquetas de bagagem — com o telefone sempre formatado para onde você estiver viajando.
+• As compras mostram primeiro o mercado com mais itens.
+• Ícone novo e uma abertura mais suave.
+```
+
+### Español
+
+```
+Un One Roof completamente nuevo.
+
+• Solo pregunta. Escribe o habla con el nuevo asistente en el Inicio: "leche y pan en la lista de Walmart", "¿qué hay mañana?", "¿qué necesita Lola hoy?". Recuerda la conversación, así que puedes seguir preguntando — en español, inglés o portugués.
+• Un diseño nuevo en toda la app: un Inicio más tranquilo con el clima del día en el cielo, íconos de colores y todas las pantallas renovadas — Calendario, Dinero, Compras, Mascotas, Avisos, Ubicación y Ajustes.
+• Mascotas: una rutina diaria para marcar (incluso desde el asistente) y formularios rápidos para visitas al veterinario y vacunas.
+• Avisos: escribe el tuyo y se envía tal cual.
+• Utilidades: divide la cuenta, compara precios, calcula descuentos e imprime etiquetas de equipaje — con tu teléfono siempre bien formateado para donde viajes.
+• Compras muestra primero la tienda con más cosas.
+• Ícono nuevo y un inicio más suave.
+```
+
+### Google Play release notes (500 max each)
+
+```
+<en-US>
+A whole new One Roof: ask the new assistant anything ("milk and bread on the Walmart list"), a redesigned Home and every screen, Pet Care routines you can tick off, Nudges sent exactly as you type them, printable luggage tags, and a new icon.
+</en-US>
+<pt-BR>
+Um One Roof totalmente novo: pergunte qualquer coisa ao novo assistente ("leite e pão na lista do Walmart"), tela inicial e todas as telas redesenhadas, rotina dos pets para marcar, avisos enviados exatamente como você escreve, etiquetas de bagagem para imprimir e um ícone novo.
+</pt-BR>
+<es-419>
+Un One Roof completamente nuevo: pregúntale lo que sea al nuevo asistente ("leche y pan en la lista de Walmart"), Inicio y todas las pantallas rediseñadas, rutinas de mascotas para marcar, avisos enviados tal cual los escribes, etiquetas de equipaje para imprimir y un ícono nuevo.
+</es-419>
+```
+
 ## Screenshots plan (6.7" iPhone required; add 6.5" + iPad if you keep tablet support)
 
 Each screenshot = one screen with a bold caption bar on top. Lead with the differentiators.

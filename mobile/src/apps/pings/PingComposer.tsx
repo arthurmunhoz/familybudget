@@ -48,7 +48,7 @@ function PersonChip({ label, initials, on, onPress, color }: { label: string; in
       accessibilityRole="checkbox"
       accessibilityState={{ checked: on }}
       accessibilityLabel={label}
-      style={{ alignItems: 'center', gap: 5, width: 64 }}
+      style={{ alignItems: 'center', gap: 5, minWidth: 64, maxWidth: 96 }}
     >
       <View style={{ padding: 3, borderRadius: 31, borderWidth: 2.5, borderColor: on ? color : 'transparent' }}>
         <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: on ? color : c.surface, alignItems: 'center', justifyContent: 'center' }}>
@@ -135,9 +135,12 @@ const URGENT: [string, string] = ['#F2605A', '#C9353F']
 export default function PingComposer({
   presets,
   onSent,
+  onWriteFocus,
 }: {
   presets: PingPreset[]
   onSent: (data: ToastData) => void
+  /** The "write your own" field took focus — the host scrolls it into view. */
+  onWriteFocus?: () => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -265,6 +268,7 @@ export default function PingComposer({
             value={text}
             onChangeText={setText}
             onSubmitEditing={sendOwn}
+            onFocus={onWriteFocus}
             returnKeyType="send"
             editable={!aiBusy}
             maxLength={MAX_LEN}

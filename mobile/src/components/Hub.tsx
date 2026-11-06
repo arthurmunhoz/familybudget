@@ -51,6 +51,9 @@ export default function Hub() {
   const corner = useScreenCorner()
   const bottomGap = useBottomGap(sp.md)
   const dockGap = corner ? corner.bottom : bottomGap
+  // Room for the dock vs its own width: equal means it filled the row.
+  const [dockRoom, setDockRoom] = useState(0)
+  const [dockWidth, setDockWidth] = useState(0)
 
   const { hiddenApps, appOrder } = useAppPrefs()
   // Hidden apps drop out; ordered ids come first (registry order for the rest);
@@ -194,16 +197,22 @@ export default function Hub() {
         </View>
       </ScrollView>
 
-      {/* the household, always within reach */}
+      {/* the household, always within reach. The dock hugs its members and
+          sits centred; only a household too big to fit stretches it edge to
+          edge (and scrolls) — that's when it takes the screen's curve. A
+          one-person household used to get a full-width bar with the avatar
+          on one side and "Family" on the other (owner, 2026-11). */}
       <View
         pointerEvents="box-none"
+        onLayout={(e) => setDockRoom(e.nativeEvent.layout.width)}
         style={[styles.dockWrap, { bottom: dockGap }, corner ? { left: corner.side, right: corner.side } : null]}
       >
         <View
+          onLayout={(e) => setDockWidth(e.nativeEvent.layout.width)}
           style={[
             styles.dock,
             { backgroundColor: c.sheet, borderColor: c.border },
-            corner
+            corner && dockWidth >= dockRoom - 1
               ? {
                   borderTopLeftRadius: 24,
                   borderTopRightRadius: 24,
@@ -214,7 +223,7 @@ export default function Hub() {
               : null,
           ]}
         >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.dockRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dockScroll} contentContainerStyle={styles.dockRow}>
             {members.map((p) => {
               const tint = memberColor(p.email, memberEmails)
               const initial = (p.display_name || p.email).trim().charAt(0).toUpperCase()
@@ -271,8 +280,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dockWrap: { position: 'absolute', left: sp.lg, right: sp.lg },
+  dockWrap: { position: 'absolute', left: sp.lg, right: sp.lg, alignItems: 'center' },
   dock: {
+    maxWidth: '100%',
     height: DOCK_H,
     borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
@@ -285,6 +295,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
+  dockScroll: { flexGrow: 0, flexShrink: 1 },
   dockRow: { alignItems: 'center', gap: 10, paddingHorizontal: 12 },
   avatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   familyBtn: { height: 44, borderRadius: 22, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },

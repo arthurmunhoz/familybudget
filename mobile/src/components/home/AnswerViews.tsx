@@ -5,7 +5,7 @@
 // and at most two buttons (Undo / Open …) — so every action reads the same.
 import { useState, type ReactNode } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
-import { CalendarDays, Check, PawPrint, Plus, ReceiptText, RotateCcw, Send, Sparkles, Store, UsersRound } from 'lucide-react-native'
+import { CalendarDays, Check, ChevronRight, PawPrint, Plus, ReceiptText, RotateCcw, Send, Sparkles, Store, UsersRound, Wallet } from 'lucide-react-native'
 import { evenSplit } from '@/apps/calc/splitMath'
 
 import { Pressable } from '@/components/Pressable'
@@ -14,9 +14,10 @@ import StoreLogo from '@/apps/shopping/StoreLogo'
 import { useI18n } from '@/hooks/useI18n'
 import { formatMoney } from '@/lib/format'
 import type { Found, ListGroup, MoneyLine, PetDue, PetsAnswer } from '@/lib/assistant'
-import type { ShoppingStore } from '@/lib/types'
+import type { Budget, ShoppingStore } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { GradientBox } from './GradientBox'
+import { budgetLook } from './palette'
 
 const ORB: readonly [string, string] = ['#8B6CFF', '#20C3A6']
 
@@ -83,6 +84,45 @@ const undoIcon = (color: string) => <RotateCcw size={17} color={color} />
 
 /** "Which list?" — the household's stores, "anywhere", and a new list (pre-
  *  filled with a store that was named but doesn't exist yet). */
+/** "Which budget?" — each budget as a card in its own Money gradient. */
+export function ChooseBudgetView({
+  amount,
+  type,
+  title,
+  budgets,
+  onPick,
+}: {
+  amount: number
+  type: 'expense' | 'income'
+  title: string
+  budgets: Budget[]
+  onPick: (b: Budget) => void
+}) {
+  const { t } = useI18n()
+  const what = `${type === 'income' ? '+' : '−'}${formatMoney(amount)}${title ? ` · ${title}` : ''}`
+  return (
+    <>
+      <Headline text={t('ask.whichBudget')} sub={what} />
+      <View style={{ gap: sp.sm, marginTop: sp.md }}>
+        {budgets.map((b) => {
+          const look = budgetLook(b.id)
+          return (
+            <Pressable key={b.id} onPress={() => onPick(b)} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+              <GradientBox colors={look.colors} radius={18} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.md, height: 58 }}>
+                <Wallet size={20} color="#fff" />
+                <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 17, color: '#fff' }} numberOfLines={1}>
+                  {b.name}
+                </Txt>
+                <ChevronRight size={18} color="rgba(255,255,255,0.85)" />
+              </GradientBox>
+            </Pressable>
+          )
+        })}
+      </View>
+    </>
+  )
+}
+
 export function ChooseStoreView({
   items,
   stores,
@@ -569,46 +609,85 @@ export function DiscountView({ amount, percent, onOpen }: { amount: number; perc
 
 // ── pets, family ─────────────────────────────────────────────────────────────
 
-export function PetsView({ p, onOpen }: { p: PetsAnswer; onOpen: () => void }) {
+export function PetsView({
+  p,
+  onOpen,
+  onToggle,
+}: {
+  p: PetsAnswer
+  onOpen: () => void
+  /** Tick / untick a daily-routine task right here (owner, 2026-11). */
+  onToggle?: (taskId: string, done: boolean) => Promise<boolean>
+}) {
   const { c } = useTheme()
   const { t } = useI18n()
   const { rows, pet, routineDone, routineTotal } = p
-  // Two kinds of "what it needs", shown apart (owner, 2026-11): today's daily
-  // routine, and Care (overdue / due today — a monthly flea pill 18 days late).
+  // Ticked in this answer (optimistic): id → done.
+  const [ticked, setTicked] = useState<Record<string, boolean>>({})
   const routine = rows.filter((r) => r.status === 'routine')
   const care = rows.filter((r) => r.status !== 'routine')
   const late = care.filter((r) => r.status === 'overdue').length
-  // Asked about one pet: the headline is the next ROUTINE item ("what's next
-  // for Lola today?"); Care is said under it and listed below, never hidden.
+  const tickedNow = Object.values(ticked).filter(Boolean).length
+  const nextUp = routine.find((r) => !ticked[r.id])
+  // The headline follows what's still to do as items get ticked here.
   const head = pet
-    ? routine.length
-      ? t('ask.petsNext', { pet, title: routine[0].title })
+    ? nextUp
+      ? t('ask.petsNext', { pet, title: nextUp.title })
       : routineTotal
         ? t('ask.petsAllDone', { pet })
         : care.length
           ? t('ask.petsNext', { pet, title: care[0].title })
           : t('ask.petsNoneFor', { pet })
     : rows.length
-      ? t('ask.petsN', { n: rows.length })
+      ? t('ask.petsN', { n: rows.length - tickedNow })
       : t('ask.petsNone')
   const sub =
-    [pet && routineTotal ? t('ask.petProgress', { done: routineDone, total: routineTotal }) : '', late ? t('ask.petsCareLate', { n: late }) : '']
+    [
+      pet && routineTotal ? t('ask.petProgress', { done: routineDone + tickedNow, total: routineTotal }) : '',
+      late ? t('ask.petsCareLate', { n: late }) : '',
+    ]
       .filter(Boolean)
       .join(' · ') || null
+
+  async function toggle(r: PetDue) {
+    if (!onToggle) return
+    const taskId = r.id.replace(/^daily:/, '')
+    const next = !ticked[r.id]
+    setTicked((m) => ({ ...m, [r.id]: next }))
+    const ok = await onToggle(taskId, next)
+    if (!ok) setTicked((m) => ({ ...m, [r.id]: !next }))
+  }
+
   const row = (r: PetDue) => {
-    const tone = r.status === 'overdue' ? c.expense : r.status === 'routine' ? '#F2603A' : '#F2A93B'
+    const isRoutine = r.status === 'routine'
+    const done = isRoutine && !!ticked[r.id]
+    const tone = r.status === 'overdue' ? c.expense : isRoutine ? '#F2603A' : '#F2A93B'
     return (
-      <View key={r.id} style={v.item}>
+      <View key={r.id} style={[v.item, { opacity: done ? 0.55 : 1 }]}>
         <View style={[v.tile, { backgroundColor: tone + '22' }]}>
           <PawPrint size={17} color={tone} />
         </View>
         <View style={{ flex: 1 }}>
-          <Txt style={{ fontFamily: fonts.semibold, fontSize: 15.5 }}>{r.title}</Txt>
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 15.5, textDecorationLine: done ? 'line-through' : 'none' }}>{r.title}</Txt>
           {r.pet && !pet ? <Txt variant="muted">{r.pet}</Txt> : null}
         </View>
-        <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, color: r.status === 'overdue' ? c.expense : c.textMuted }}>
-          {r.status === 'overdue' ? t('ask.petLate', { n: r.late }) : r.status === 'routine' ? t('ask.petRoutine') : t('home.dueToday')}
-        </Txt>
+        {isRoutine && onToggle ? (
+          // the same big round tick as Pet Care's Today card
+          <Pressable
+            onPress={() => void toggle(r)}
+            hitSlop={8}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: done }}
+            accessibilityLabel={r.title}
+            style={[v.tick, { borderColor: done ? c.income : c.border, backgroundColor: done ? c.income : 'transparent' }]}
+          >
+            {done ? <Check size={16} color="#fff" strokeWidth={3} /> : null}
+          </Pressable>
+        ) : (
+          <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, color: r.status === 'overdue' ? c.expense : c.textMuted }}>
+            {r.status === 'overdue' ? t('ask.petLate', { n: r.late }) : isRoutine ? t('ask.petRoutine') : t('home.dueToday')}
+          </Txt>
+        )}
       </View>
     )
   }
@@ -659,6 +738,7 @@ const v = StyleSheet.create({
   smallBtn: { height: 46, paddingHorizontal: 18, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: sp.md, paddingBottom: 4 },
   item: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 9 },
+  tick: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   box: { width: 20, height: 20, borderRadius: 6, borderWidth: 2 },
   tile: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   choiceCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.md, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },

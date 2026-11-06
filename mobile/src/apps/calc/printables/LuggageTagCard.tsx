@@ -5,6 +5,9 @@
 // drawing at two sizes.
 import { StyleSheet, Text, View } from 'react-native'
 import { Plane } from 'lucide-react-native'
+import * as Localization from 'expo-localization'
+
+import { formatPhone } from '@/lib/phone'
 
 import { pickOn } from '@/theme/contrast'
 import { fonts } from '@/theme/theme'
@@ -89,7 +92,9 @@ export function LuggageTagCard({ values, color, width, label }: PrintableCardPro
                 numberOfLines={r.lines}
                 style={{ color: INK, fontFamily: fonts.medium, fontSize: 14 * s, lineHeight: 18 * s, marginTop: 1 * s }}
               >
-                {v(r.key)}
+                {/* Always printed formatted, with its +country code: whoever finds
+                    the bag may be dialling from another country. */}
+                {r.key === 'phone' ? formatPhone(v('phone'), Localization.getLocales()[0]?.regionCode ?? null) : v(r.key)}
               </Text>
             </View>
           ))}

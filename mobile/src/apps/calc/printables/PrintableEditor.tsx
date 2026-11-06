@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, StyleSheet, useWindowDimensions, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as Localization from 'expo-localization'
 import { router } from 'expo-router'
 import { Check } from 'lucide-react-native'
 
@@ -16,6 +17,7 @@ import { Field, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
 import { DICTS, type TKey } from '@/lib/i18n'
+import { formatPhone } from '@/lib/phone'
 import { fetchMemberPhones } from '@/lib/pings'
 import { pickOn } from '@/theme/contrast'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
@@ -216,6 +218,13 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
             label={template.required.includes(f.key) ? `${t(f.label)} *` : t(f.label)}
             value={values[f.key] ?? ''}
             onChangeText={(s) => set(f.key, s)}
+            // Tidy a phone into its country's format on leaving the field, so
+            // the field shows what the card will print.
+            onBlur={
+              f.keyboardType === 'phone-pad'
+                ? () => set(f.key, formatPhone(values[f.key] ?? '', Localization.getLocales()[0]?.regionCode ?? null))
+                : undefined
+            }
             placeholder={f.placeholder ? t(f.placeholder) : undefined}
             multiline={f.multiline}
             keyboardType={f.keyboardType}

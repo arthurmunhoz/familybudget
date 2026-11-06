@@ -25,6 +25,7 @@ done
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cp "$here/play-feature-graphic.html" "$tmp/graphic.html"
+cp "$here/../assets/images/icon.png" "$tmp/icon.png"   # the app icon in the lockup
 cp "$fonts/fraunces/files/fraunces-latin-full-normal.woff2" "$tmp/fraunces.woff2"
 cp "$fonts/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2" "$tmp/hanken.woff2"
 

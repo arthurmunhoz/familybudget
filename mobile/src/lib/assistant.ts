@@ -12,6 +12,7 @@ import { compareOccurrences, occurrencesByDay, type Occurrence } from './calenda
 import { dailyChecklist, overdueCare, overdueEvents } from './petCare'
 import { suggestCategory } from './categories'
 import { addDaysISO, periodEndISO } from './format'
+import { notifyPetCareChange } from './petCareNotify'
 import type {
   Budget,
   CalendarEvent,
@@ -598,21 +599,39 @@ async function budgetsWithMonths(): Promise<{ budgets: Budget[]; months: Month[]
   return { budgets: (b.data ?? []) as Budget[], months: (m.data ?? []) as Month[] }
 }
 
-/** The budget named (or the household's first one) and its period holding `date`. */
-function periodFor(budgets: Budget[], months: Month[], name: string, date: string) {
-  const budget = (name && budgets.find((b) => norm(b.name) === norm(name))) || budgets[0] || null
-  if (!budget) return { budget: null, month: null }
-  const month =
-    months.find(
-      (m) => m.budget_id === budget.id && m.start_date <= date && date <= periodEndISO(budget.period, m.start_date),
-    ) ?? null
-  return { budget, month }
+/** The period of `budget` that holds `date`; failing that, its LATEST period
+ *  (owner, 2026-11: "add it to the last month/week/day") so a request on a day
+ *  whose period hasn't been opened yet still lands somewhere sensible. */
+export function periodForBudget(budget: Budget, months: Month[], date: string): Month | null {
+  const mine = months.filter((m) => m.budget_id === budget.id)
+  return (
+    mine.find((m) => m.start_date <= date && date <= periodEndISO(budget.period, m.start_date)) ??
+    [...mine].sort((x, y) => y.start_date.localeCompare(x.start_date))[0] ??
+    null
+  )
+}
+
+/** Which budget a request means: the one NAMED (matched loosely), the only
+ *  one, or — with several and none named — none: the caller asks. */
+export function pickBudget(budgets: Budget[], name: string): Budget | null {
+  const n = norm(name)
+  if (n) {
+    const hit =
+      budgets.find((b) => norm(b.name) === n) ??
+      budgets.find((b) => norm(b.name).includes(n) || n.includes(norm(b.name)))
+    if (hit) return hit
+  }
+  return budgets.length === 1 ? budgets[0] : null
 }
 
 export type MoneyResult =
   | { ok: true; entryId: string; budget: Budget; month: Month; category: string }
   | { ok: false; reason: 'no_budget' | 'no_period'; budget: Budget | null }
+  | { ok: false; reason: 'choose_budget'; budgets: Budget[] }
 
+/** Record an expense/income. `budgetId` (from a "which budget?" answer) wins
+ *  over the name said; with several budgets and no clear one, nothing is
+ *  written and the caller is told to ask. */
 export async function addMoney(
   title: string,
   amount: number,
@@ -620,14 +639,21 @@ export async function addMoney(
   date: string,
   budgetName: string,
   me: string,
+  budgetId?: string,
 ): Promise<MoneyResult> {
   const { budgets, months } = await budgetsWithMonths()
-  const { budget, month } = periodFor(budgets, months, budgetName, date)
-  if (!budget) return { ok: false, reason: 'no_budget', budget: null }
+  if (!budgets.length) return { ok: false, reason: 'no_budget', budget: null }
+  const budget = budgetId ? (budgets.find((b) => b.id === budgetId) ?? null) : pickBudget(budgets, budgetName)
+  if (!budget) return { ok: false, reason: 'choose_budget', budgets }
+  const month = periodForBudget(budget, months, date)
   if (!month) return { ok: false, reason: 'no_period', budget }
   const { data: rules } = await supabase.from('category_rules').select('*')
   const label = title.trim() || (type === 'income' ? 'Income' : 'Expense')
   const category = type === 'income' ? 'salary' : suggestCategory(label, (rules ?? []) as CategoryRule[])
+  // A date outside the chosen (latest) period would hide the entry from it —
+  // keep it inside: today if it fits, else the period's last day.
+  const end = periodEndISO(budget.period, month.start_date)
+  const entryDate = date < month.start_date ? month.start_date : date > end ? end : date
   const { data, error } = await supabase
     .from('entries')
     .insert({
@@ -637,7 +663,7 @@ export async function addMoney(
       amount,
       category,
       subcategory: null,
-      entry_date: date,
+      entry_date: entryDate,
       person_email: me,
       recurring: false,
     })
@@ -664,7 +690,7 @@ export async function moneySummary(budgetName: string, today: string): Promise<M
   const pick = budgetName ? budgets.filter((b) => norm(b.name) === norm(budgetName)) : budgets
   const lines: MoneyLine[] = []
   for (const b of pick.length ? pick : budgets) {
-    const { month } = periodFor([b], months, '', today)
+    const month = periodForBudget(b, months, today)
     let income = 0
     let spent = 0
     if (month) {
@@ -739,6 +765,21 @@ export async function petsDue(today: string, petName = ''): Promise<PetsAnswer> 
     routineDone: checklist.filter((r) => r.done).length,
     routineTotal: checklist.length,
   }
+}
+
+/** Tick (or untick) a pet's daily task for `day`, from the assistant's
+ *  answer. Same rows the Pet Care screen writes; 23505 = someone else just
+ *  ticked it, which is fine. */
+export async function setDailyDone(taskId: string, day: string, done: boolean): Promise<boolean> {
+  if (done) {
+    const { error } = await supabase.from('pet_task_done').insert({ task_id: taskId, done_on: day })
+    if (error && error.code !== '23505') return false
+  } else {
+    const { error } = await supabase.from('pet_task_done').delete().eq('task_id', taskId).eq('done_on', day)
+    if (error) return false
+  }
+  notifyPetCareChange()
+  return true
 }
 
 export async function familyInfo(

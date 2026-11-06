@@ -139,8 +139,13 @@ export function Screen({
         // page: the KAV grows a bottom pad the height of the keyboard, so the
         // scroller shrinks to the space left above it and every row can be
         // reached by scrolling WITHOUT the keyboard getting in the way.
+        // On BOTH platforms: under edge-to-edge Android does NOT resize the
+        // window for the keyboard (adjustResize is a no-op there), so leaving
+        // Android to the OS let the keyboard cover any field low on the page —
+        // the Nudges "write your own" box and Settings' home city (2026-11).
+        // Shopping's add bar learned this first.
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior="padding"
           style={{ flex: 1 }}
         >
           <Animated.ScrollView

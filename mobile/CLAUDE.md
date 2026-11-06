@@ -85,6 +85,8 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   round top-bar buttons, tiles instead of chips for the main filter, rows of a
   section grouped into ONE rounded card, uppercase tracked section labels, and
   the input as a floating capsule (Shopping is the reference).
+  Shopping orders its store tiles AND sections by open items, most first
+  (ties keep the household's order; `storesByCount`).
 - **Weather sky (2026-11):** the Hub's header has the current weather drawn
   behind it (`home/WeatherScene`, pure SVG; `sceneFor(code, isDay)` in
   `home/sceneKind.ts` — open-meteo now also returns `is_day`): sun, partly,
@@ -98,6 +100,15 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   a scroll start (the owner couldn't flip All day / Remind me). `PickerSheet`
   (every date/time pop-up) takes a `title` (the row's label) and has the
   sheet look: title + round ✕, the picker on a card, Done with the curve.
+- **Admin (2026-11, `app/admin.tsx`) must stay fast as users grow — never
+  load whole tables.** Overview = `admin_overview(tz)` (today / 7-day people
+  and sessions + a 7-day series; scans only the last 8 days of web_events via
+  the created_at index) and `admin_recent_visitors(lim, before)` (keyset-paged,
+  reads `allowed_users.last_seen_at`, which a trigger on web_events keeps
+  current, ≤1 write/member/minute). Households = `admin_households(lim, off,
+  q)` (paged + searched in SQL). Activity loads 30 at a time; names are looked
+  up only for the people/households on screen. All from migration 087; the
+  Overview says "apply 087" if it's missing.
 - **Calendar (2026-11):** round back + Google/Apple round buttons, big
   title with "n things this week" faded, Month/Upcoming segmented, the month
   grid in one card (selected day = Calendar-red gradient circle, today a soft
@@ -171,6 +182,9 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   A chime REWINDS then plays (`await seekTo(0)` → `play()`): a finished
   expo-audio player sits at the end, and play() before the async seek lands
   is silent — the chimes sounded only every other time.
+  The sheet closes by DRAGGING its top strip down (PanResponder on the handle
+  zone: >110pt or a flick closes via closeSheet, less springs back) and is
+  capped at 84% of the room so some backdrop always shows to tap.
   **It's a conversation (2026-11):** while the sheet is open, each finished
   turn moves up as the question + a one-line summary of the answer
   (`summarize` in AskSheet — written for the user AND sent to Claude), and
@@ -178,9 +192,37 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   ("o que tem no Walmart?" → "tira o leite", "e amanhã?", "e a Lola?").
   Tapping the mic after an answer commits the turn first; "New chat" clears.
   A new Answer kind needs a `summarize` case (tsc enforces the switch).
+  `add_money` with several budgets and none clearly named (or a name that
+  isn't a budget, like a store) asks "which budget?" (`chooseBudget`, cards
+  in each budget's gradient) — never the first budget silently. It lands in
+  the period holding the date, else the budget's LATEST period, with the
+  entry date clamped into it (`pickBudget` / `periodForBudget`, tested).
   `pets_due` takes a `pet` and includes today's daily-routine items not yet
   ticked (`petsDue`: overdue, then the routine in its order, then due today),
   so "what's next for Lola?" leads with the first undone thing.
+  Daily-routine rows in that answer carry the Pet Care tick: tapping marks /
+  unmarks the task for today right there (`setDailyDone`, same
+  pet_task_done rows; the headline and "n of m" follow), and
+  `lib/petCareNotify` reloads widgets on every device — shared with the Pet
+  Care screen.
+- **Phone numbers are shown through `formatPhone(raw, region)`** (`lib/phone.ts`,
+  2026-11, pinned by `__tests__/phone.test.ts`): the country comes from an
+  explicit +code, then the number's shape (11 digits with 9 third = Brazilian
+  mobile), then the device region for the ambiguous 10 digits; it prints
+  "+1 (415) 123-1234" / "+55 (11) 98765-4321" / "+44 207 946 0958" and never
+  guesses a country it can't tell. The luggage tag always prints it this way
+  (whoever finds the bag may be abroad) and the editor tidies the field on blur.
+- **The Hub's family dock hugs its members** (2026-11): centred, as wide as
+  its avatars + "Family"; only a household too big to fit stretches it edge
+  to edge (and scrolls) — and only then does it take the screen's curve.
+- **Store screenshots: `store/app-store-v3/`** (2026-11 redesign) — same
+  pipeline as v2 (`render.sh`, copy per language in `copy.js`, captures in
+  `shots/<lang>/`), 10 slides: hero, assistant, AI receipt, calendar,
+  shopping, money, whereabouts, nudges, pets, utilities. Captured on the iPhone
+  17 Pro Max simulator with the Preview Family demo account; its language is
+  switched through `user_settings`. For the shots, a few things were overridden
+  in code temporarily (sunny weather, Sam's location "4 min ago", the assistant's
+  third example), then reverted — never commit those.
 - **`@/components/PhotoHero`** — the full-bleed, swipeable photo header used
   by Pet Care and Family (one page per pet / member; name + badge on the photo,
   side arrows with a tiny avatar of the neighbour, page dots, shrinks with a
@@ -377,7 +419,12 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     makes tap-to-dismiss sufficient: `KeyboardAvoidingView` with
     `behavior="padding"` (iOS) shrinks the page to the space above the keyboard,
     so every row is reachable by scrolling instead of by hiding the keyboard.
-    Android gets the same from `adjustResize`. A modal can't use KAV (it
+    **Android needs the SAME `padding` KAV** — under edge-to-edge
+    `adjustResize` does NOT resize the window, so `Screen` leaving Android to
+    the OS let the keyboard cover low fields (Nudges' "write your own",
+    Settings' home city; fixed 2026-11, verified on the S9+). A field that is
+    the LAST thing on a page also has to be scrolled into view once the page
+    has shrunk — after `keyboardDidShow` plus a beat (see `app/pings.tsx`). A modal can't use KAV (it
     mis-measures — see `useKeyboardHeight`) and lifts itself instead.
   - **Number pads have no return key**, so a tap is the ONLY way out of one. Any
     new `decimal-pad`/`number-pad` field must sit inside a `Screen`, a

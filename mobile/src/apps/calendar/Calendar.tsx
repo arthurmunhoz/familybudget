@@ -213,10 +213,13 @@ export default function Calendar() {
   }, [locale])
   const firstDow = new Date(view.y, view.m - 1, 1).getDay()
   const dim = new Date(view.y, view.m, 0).getDate()
-  const monthLabel = new Date(view.y, view.m - 1, 1).toLocaleDateString(locale, {
+  // First letter only: textTransform 'capitalize' upper-cased EVERY word,
+  // giving "Novembro De 2026" in Portuguese/Spanish.
+  const monthText = new Date(view.y, view.m - 1, 1).toLocaleDateString(locale, {
     month: 'long',
     year: 'numeric',
   })
+  const monthLabel = monthText.charAt(0).toUpperCase() + monthText.slice(1)
   const cells: (number | null)[] = [
     ...Array(firstDow).fill(null),
     ...Array.from({ length: dim }, (_, i) => i + 1),
@@ -368,7 +371,7 @@ export default function Calendar() {
               {/* month grid */}
               <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, padding: sp.md }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingBottom: sp.sm }}>
-                  <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 21, lineHeight: 26, color: c.text, textTransform: 'capitalize', paddingLeft: 4 }}>
+                  <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 21, lineHeight: 26, color: c.text, paddingLeft: 4 }}>
                     {monthLabel}
                   </Txt>
                   {view.y !== Number(today.slice(0, 4)) || view.m !== Number(today.slice(5, 7)) || selected !== today ? (

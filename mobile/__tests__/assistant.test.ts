@@ -43,7 +43,7 @@ it('unknown requests stay unknown', () => {
   expect(localParse('qual a capital da França?', TODAY)).toBeNull()
 })
 
-import { fromServer, petQuestion } from '@/lib/assistant'
+import { fromServer, periodForBudget, petQuestion, pickBudget } from '@/lib/assistant'
 
 describe('generic lists are not stores (owner report 2026-11)', () => {
   it('"lista de compras" asks instead of creating a store called "compras"', () => {
@@ -230,5 +230,31 @@ describe('sceneFor', () => {
     expect(sceneFor(61)).toBe('rain')
     expect(sceneFor(73)).toBe('snow')
     expect(sceneFor(95)).toBe('storm')
+  })
+})
+
+describe('money: which budget, which period', () => {
+  const B = (id: string, name: string, period = 'monthly') => ({ id, name, period }) as never
+  const home = B('h', 'Household')
+  const trip = B('t', 'Beach Trip')
+  it('asks (null) when there are several budgets and none is named', () => {
+    expect(pickBudget([home, trip], '')).toBeNull()
+    expect(pickBudget([home, trip], 'Walmart')).toBeNull()
+  })
+  it('takes the named budget, loosely, or the only one', () => {
+    expect(pickBudget([home, trip], 'beach trip')).toBe(trip)
+    expect(pickBudget([home, trip], 'trip')).toBe(trip)
+    expect(pickBudget([home], '')).toBe(home)
+  })
+  it('uses the period holding the date, else the latest one', () => {
+    const months = [
+      { id: 'oct', budget_id: 'h', start_date: '2026-10-01' },
+      { id: 'sep', budget_id: 'h', start_date: '2026-09-01' },
+      { id: 'other', budget_id: 't', start_date: '2026-11-01' },
+    ] as never[]
+    expect((periodForBudget(home, months, '2026-10-15') as { id: string }).id).toBe('oct')
+    // November not opened yet → the latest period, October
+    expect((periodForBudget(home, months, '2026-11-05') as { id: string }).id).toBe('oct')
+    expect(periodForBudget(B('x', 'Empty'), months, '2026-11-05')).toBeNull()
   })
 })

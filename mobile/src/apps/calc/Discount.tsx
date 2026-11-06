@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Animated, StyleSheet, TextInput, View, type LayoutChangeEvent } from 'react-native'
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg'
-import { Minus, Pencil, Plus, Tag } from 'lucide-react-native'
+import { Check, Minus, Pencil, Plus, Tag } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Txt } from '@/components/ui'
@@ -19,7 +19,7 @@ import { fonts, sp, useTheme } from '@/theme/theme'
 import { num } from './shared'
 
 const CHIPS = [10, 15, 20, 30, 50]
-const TAG_H = 196
+const TAG_H = 214
 const NOTCH = 34 // width of the tag's pointed end
 
 /** The tag, after a classic shop tag: a coloured card with a pointed end,
@@ -208,7 +208,20 @@ export function Discount() {
                 >
                   <Pencil size={13} color={onTag} />
                 </Pressable>
-              ) : null}
+              ) : (
+                // The decimal pad has no return key and this app has no Done
+                // bar (see CLAUDE.md), so the tag carries its own ✓: confirm
+                // the price, put the keyboard away, strike it (owner, 2026-11).
+                <Pressable
+                  onPress={() => priceRef.current?.blur()}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.done')}
+                  style={styles.confirm}
+                >
+                  <Check size={18} color={c.action} strokeWidth={3} />
+                </Pressable>
+              )}
             </View>
             {/* invisible mirrors: the digits at the current size (sizes the
                 input) and "$ + digits" at the struck size (sizes the line) */}
@@ -254,9 +267,15 @@ export function Discount() {
               gap: 6,
             }}
           >
-            <Txt style={{ fontFamily: fonts.display, fontSize: 44, lineHeight: 50, color: onTag, fontVariant: ['tabular-nums'] }}>
-              {formatMoney(final)}
-            </Txt>
+            <View>
+              {/* named like the original above it (owner, 2026-11) */}
+              <Txt variant="label" style={{ color: onTag, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11 }}>
+                {t('calc.withDiscount')}
+              </Txt>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 44, lineHeight: 50, color: onTag, fontVariant: ['tabular-nums'] }}>
+                {formatMoney(final)}
+              </Txt>
+            </View>
             <View style={[styles.savePill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
               <Tag size={13} color={onTag} />
               <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: onTag }}>
@@ -319,6 +338,7 @@ export function Discount() {
 }
 
 const styles = StyleSheet.create({
+  confirm: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   sticker: {
     position: 'absolute',
     right: 10,

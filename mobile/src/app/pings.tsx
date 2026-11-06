@@ -5,8 +5,8 @@
 // There is no history here: an incoming nudge surfaces on the Hub through
 // NudgesBanner (which owns its own Supabase Realtime subscription and carries
 // the Got it / Call actions), and it drops off once acknowledged or expired.
-import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { useCallback, useRef, useState } from 'react'
+import { Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { ChevronLeft, Settings2 } from 'lucide-react-native'
 
@@ -28,6 +28,28 @@ export default function NudgesScreen() {
   // A NEW object each send so the toast re-triggers even for the same nudge.
   const [toast, setToast] = useState<ToastData | null>(null)
 
+  // "Write your own" is the last thing on the page, so the keyboard would sit
+  // right over it (owner, 2026-11: you couldn't see what you were typing).
+  // Screen's scroll mode shrinks the page to the space above the keyboard;
+  // this then brings the field up into that space once the keyboard is in
+  // (or straight away, when it already was).
+  const scrollRef = useRef<ScrollView>(null)
+  const onWriteFocus = useCallback(() => {
+    const toEnd = () => scrollRef.current?.scrollToEnd({ animated: true })
+    if (Keyboard.isVisible()) {
+      toEnd()
+      return
+    }
+    // After the keyboard is up AND the page has shrunk for it: the shrink is
+    // laid out after keyboardDidShow, and scrolling first leaves the field
+    // half under the keyboard (seen on Android).
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      sub.remove()
+      setTimeout(toEnd, 180)
+    })
+    setTimeout(() => sub.remove(), 1500)
+  }, [])
+
   // Presets are owned here so the composer and the settings modal share one
   // source of truth — editing in settings reflects in the composer without a
   // stale-cache round-trip.
@@ -39,6 +61,8 @@ export default function NudgesScreen() {
   return (
     <>
       <Screen
+        scroll
+        scrollRef={scrollRef}
         header={
           // Home-style top bar: round back, round settings.
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: sp.sm }}>
@@ -63,11 +87,7 @@ export default function NudgesScreen() {
           </View>
         }
       >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: sp.xxl, gap: sp.xl }}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={{ paddingBottom: sp.xxl, gap: sp.xl }}>
           {/* big title, what it's for faded under it */}
           <View>
             <Txt style={{ fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8, color: c.text }}>
@@ -77,8 +97,8 @@ export default function NudgesScreen() {
               {t('pings.tagline')}
             </Txt>
           </View>
-          <PingComposer presets={presets} onSent={setToast} />
-        </ScrollView>
+          <PingComposer presets={presets} onSent={setToast} onWriteFocus={onWriteFocus} />
+        </View>
       </Screen>
 
       <Toast data={toast} />

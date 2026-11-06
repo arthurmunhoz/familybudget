@@ -571,7 +571,18 @@ export default function ShoppingList() {
     )
   }
 
-  // Build sections: one per store (in store order) then "Anywhere". Within each,
+  // Stores with the most open items first (owner, 2026-11); a tie keeps the
+  // household's own order. The tiles AND the sections use this order.
+  const storesByCount = useMemo(() => {
+    const open = new Map<string, number>()
+    for (const i of items) if (!i.checked && i.store_id) open.set(i.store_id, (open.get(i.store_id) ?? 0) + 1)
+    return stores
+      .map((st, idx) => ({ st, idx, n: open.get(st.id) ?? 0 }))
+      .sort((a, b) => b.n - a.n || a.idx - b.idx)
+      .map((x) => x.st)
+  }, [stores, items])
+
+  // Build sections: one per store (most items first) then "Anywhere". Within each,
   // open items above checked ones, each block alphabetical — so checking an item
   // only slides it into the checked block, nothing else reshuffles.
   const sections = useMemo<Section[]>(() => {
@@ -584,7 +595,7 @@ export default function ShoppingList() {
       a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
     const open = items.filter((i) => !i.checked && inScope(i))
     const out: Section[] = []
-    for (const s of stores) {
+    for (const s of storesByCount) {
       if (activeStoreId && s.id !== activeStoreId) continue
       const data = open.filter((i) => i.store_id === s.id).sort(byName)
       if (data.length)
@@ -605,7 +616,7 @@ export default function ShoppingList() {
         data: cartOpen ? cart : [],
       })
     return out
-  }, [items, stores, t, activeStoreId, cartOpen])
+  }, [items, stores, storesByCount, t, activeStoreId, cartOpen])
 
   const inScopeOpen = sections.filter((x) => !x.isCart).reduce((n, x) => n + x.data.length, 0)
   const inScopeCart = items.filter((i) => i.checked && (activeStoreId === null || i.store_id === activeStoreId)).length
@@ -801,7 +812,7 @@ export default function ShoppingList() {
             </GradientBox>
           }
         />
-        {stores.map((st) => (
+        {storesByCount.map((st) => (
           <StoreTile
             key={st.id}
             label={st.name}
