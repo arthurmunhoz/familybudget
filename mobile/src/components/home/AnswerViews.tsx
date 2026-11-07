@@ -301,6 +301,7 @@ export function MarkedView({
 // ── calendar ─────────────────────────────────────────────────────────────────
 
 export function EventView({
+  headline,
   title,
   when,
   who,
@@ -308,6 +309,8 @@ export function EventView({
   onUndo,
   onOpen,
 }: {
+  /** Overrides "Added to the calendar" (a move says so instead). */
+  headline?: string
   title: string
   when: string
   who: string | null
@@ -319,7 +322,7 @@ export function EventView({
   const { t } = useI18n()
   return (
     <>
-      <Headline text={undone ? t('ask.eventUndone') : t('ask.eventAdded')} />
+      <Headline text={headline ?? (undone ? t('ask.eventUndone') : t('ask.eventAdded'))} />
       {!undone ? (
         <Panel>
           <View style={v.item}>

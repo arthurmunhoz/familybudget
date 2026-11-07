@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { APP_GRADIENT } from '@/components/home/palette'
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { CalendarDays, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
 
 import { Loader, NewItemButton, Txt } from '@/components/ui'
@@ -136,12 +136,25 @@ export default function Calendar() {
     }, [load]),
   )
 
-  const [selected, setSelected] = useState(today)
+  // `?date=YYYY-MM-DD` opens on that day (the assistant's "Open in Calendar"
+  // for "what's on tomorrow" landed on today, 2026-11).
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>()
+  const initialDay = typeof dateParam === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : today
+  const [selected, setSelected] = useState(initialDay)
   const [mode, setMode] = useState<'month' | 'upcoming'>('month')
   const [view, setView] = useState(() => {
-    const [y, m] = today.split('-').map(Number)
+    const [y, m] = initialDay.split('-').map(Number)
     return { y, m } // m is 1-indexed
   })
+  // A second deep link while the screen is already mounted (Calendar → Home →
+  // ask → Open in Calendar again) must move it too.
+  useEffect(() => {
+    if (!dateParam || !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) return
+    const [y, m] = dateParam.split('-').map(Number)
+    setView({ y, m })
+    setSelected(dateParam)
+    setMode('month')
+  }, [dateParam])
 
   // Occurrences for the visible month (recurrence expanded + multi-day spread).
   const monthStart = `${view.y}-${pad(view.m)}-01`

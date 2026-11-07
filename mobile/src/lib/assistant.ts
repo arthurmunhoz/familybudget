@@ -48,6 +48,7 @@ export type Intent =
   | { intent: 'remove_items'; items: string[] }
   | { intent: 'agenda'; scope: Scope; person: string; date: string; end: string; label: string }
   | { intent: 'add_event'; title: string; date: string; time: string; person: string }
+  | { intent: 'move_event'; title: string; date: string; newDate: string; time: string }
   | { intent: 'add_money'; title: string; amount: number; type: 'expense' | 'income'; date: string; budget: string }
   | { intent: 'money_summary'; budget: string }
   | { intent: 'send_nudge'; message: string; person: string }
@@ -123,6 +124,12 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     }
     case 'add_event':
       return str('title') ? { intent: 'add_event', title: str('title'), date, time: str('time'), person: str('person') } : null
+    case 'move_event': {
+      const newDate = /^\d{4}-\d{2}-\d{2}$/.test(str('new_date')) ? str('new_date') : ''
+      // Nowhere to go and no new time: not a usable move.
+      if (!newDate && !str('time')) return null
+      return { intent: 'move_event', title: str('title'), date, newDate: newDate || date, time: str('time') }
+    }
     case 'add_money': {
       const amount = typeof j.amount === 'number' ? j.amount : 0
       if (!(amount > 0)) return null
@@ -186,6 +193,27 @@ async function askServer(text: string, ctx: AskContext): Promise<Intent | null> 
   } catch {
     return null
   }
+}
+
+/** Tell the server the app understood a request but couldn't carry it out —
+ *  the intent and a reason CODE only, never what was said (migration 088).
+ *  Fire-and-forget. */
+export function reportGap(intent: string, reason: string, lang: string): void {
+  if (!API_BASE) return
+  void (async () => {
+    try {
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) return
+      await fetch(`${API_BASE}/api/suggest-ping?action=assistant-gap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ intent, reason, lang }),
+      })
+    } catch {
+      /* best-effort */
+    }
+  })()
 }
 
 /** "lista de compras", "shopping list", "mercado"… name the LIST, not a store. */
@@ -583,6 +611,73 @@ export async function addEvent(
     .single()
   if (error) throw error
   return data as CalendarEvent
+}
+
+export type MoveResult =
+  | { ok: true; ev: CalendarEvent; before: CalendarEvent }
+  | { ok: false; reason: 'not_found' | 'ambiguous' | 'recurring'; options: CalendarEvent[] }
+
+const dayShift = (iso: string, days: number) => {
+  const d = new Date(iso + 'T12:00:00')
+  d.setDate(d.getDate() + days)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Move an existing event on `from` to `to` (and to `time` when given),
+ *  keeping its length. Matches the title loosely; with no title, the only
+ *  event that day. Recurring events are left alone — moving one occurrence of
+ *  a series isn't something the data model can express. */
+export async function moveEvent(title: string, from: string, to: string, time: string): Promise<MoveResult> {
+  const { data } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .lte('start_date', from)
+    .gte('end_date', from)
+  const onDay = (data ?? []) as CalendarEvent[]
+  const n = norm(title)
+  let hits = n ? onDay.filter((e) => norm(e.title) === n) : []
+  if (n && !hits.length) hits = onDay.filter((e) => norm(e.title).includes(n) || n.includes(norm(e.title)))
+  if (!n) hits = onDay
+  if (!hits.length) return { ok: false, reason: 'not_found', options: onDay }
+  if (hits.length > 1) return { ok: false, reason: 'ambiguous', options: hits }
+  const before = hits[0]
+  if (before.recurrence && before.recurrence !== 'none') return { ok: false, reason: 'recurring', options: hits }
+  const span = Math.round(
+    (new Date(before.end_date + 'T12:00:00').getTime() - new Date(before.start_date + 'T12:00:00').getTime()) / 86_400_000,
+  )
+  const patch: Partial<CalendarEvent> & { updated_at: string } = {
+    start_date: to,
+    end_date: dayShift(to, span),
+    updated_at: new Date().toISOString(),
+  }
+  if (/^\d{2}:\d{2}$/.test(time)) {
+    // Keep the same duration (1 h when it was all-day).
+    const [h, m] = time.split(':').map(Number)
+    const toMin = (t: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null)
+    const len = before.start_time && before.end_time ? Math.max(15, (toMin(before.end_time) ?? 0) - (toMin(before.start_time) ?? 0)) : 60
+    const endMin = Math.min(23 * 60 + 59, h * 60 + m + len)
+    patch.all_day = false
+    patch.start_time = `${time}:00`
+    patch.end_time = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}:00`
+  }
+  const { data: updated, error } = await supabase.from('calendar_events').update(patch).eq('id', before.id).select('*').single()
+  if (error || !updated) return { ok: false, reason: 'not_found', options: onDay }
+  return { ok: true, ev: updated as CalendarEvent, before }
+}
+
+/** Undo a move: put the date/time fields back. */
+export async function restoreEvent(before: CalendarEvent): Promise<void> {
+  await supabase
+    .from('calendar_events')
+    .update({
+      start_date: before.start_date,
+      end_date: before.end_date,
+      all_day: before.all_day,
+      start_time: before.start_time,
+      end_time: before.end_time,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', before.id)
 }
 
 export async function deleteEvent(id: string): Promise<void> {

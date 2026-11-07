@@ -56,6 +56,7 @@ const INTENTS = [
   'remove_items',
   'agenda',
   'add_event',
+  'move_event',
   'add_money',
   'money_summary',
   'send_nudge',
@@ -82,6 +83,7 @@ const ASSISTANT_SCHEMA = {
         'remove_items = take items off the shopping list.',
         'agenda = asks what is on the calendar for a day.',
         'add_event = schedule something on the calendar.',
+        'move_event = move / reschedule / postpone an EXISTING calendar event to another day or time ("muda o dentista para amanhã", "move it to Friday at 3", "passa a reunião de hoje pra quinta"). Never add_event or agenda for these.',
         'add_money = record money spent or received ("gastei 50 no mercado", "recebi o salário 3000").',
         'money_summary = asks how much was spent / is left / the balance.',
         'send_nudge = send a message to family members ("avisa o Léo que chego 19h").',
@@ -119,7 +121,8 @@ const ASSISTANT_SCHEMA = {
     date: {
       type: 'string',
       description:
-        'agenda / add_event / add_money: the day as YYYY-MM-DD resolved from TODAY ("amanhã", "sexta", "dia 12"). TODAY when no day was named.',
+        'agenda / add_event / add_money: the day as YYYY-MM-DD resolved from TODAY ("amanhã", "sexta", "dia 12"). TODAY when no day was named. ' +
+        'move_event: the day the event is on NOW (from the request or the conversation); TODAY when not said.',
     },
     date_end: {
       type: 'string',
@@ -128,11 +131,15 @@ const ASSISTANT_SCHEMA = {
         '"this week" → the coming Sunday, "next weeks" / "próximas semanas" → 21 days after TODAY, "next 10 days" → TODAY + 10. ' +
         'For a period that includes today, `date` is TODAY (what is still coming). Same as `date` for a single day.',
     },
-    time: { type: 'string', description: 'add_event: start time as HH:MM (24h) when said, else "".' },
+    time: { type: 'string', description: 'add_event: start time as HH:MM (24h) when said. move_event: the NEW start time when said. Else "".' },
+    new_date: {
+      type: 'string',
+      description: 'move_event: the day to move it TO, YYYY-MM-DD resolved from TODAY ("amanhã" = TODAY+1, "o próximo dia" = the day after `date`). Same as `date` when only the time changes. "" otherwise.',
+    },
     title: {
       type: 'string',
       description:
-        'add_event: the event title ("Dentista"). add_money: what it was ("Mercado", "Salário"). send_nudge: the message to send, in the user language, first person, short ("Chego às 19h"). "" otherwise.',
+        'add_event: the event title ("Dentista"). move_event: the event being moved as the user names it, or as named earlier in the conversation for "it"/"that" ("" when it is the only one on that day). add_money: what it was ("Mercado", "Salário"). send_nudge: the message to send, in the user language, first person, short ("Chego às 19h"). "" otherwise.',
     },
     amount: {
       type: 'number',
@@ -159,6 +166,13 @@ const ASSISTANT_SCHEMA = {
     },
     field: { type: 'string', enum: FIELDS, description: 'family_info: which detail. "" otherwise.' },
     app: { type: 'string', enum: APPS, description: 'open_app: which part (budget = money). "" otherwise.' },
+    gap: {
+      type: 'string',
+      description:
+        'unknown ONLY: what the user wanted, rewritten as a short generic task in ENGLISH for the app developers ' +
+        '("move an event to another day", "set a medication reminder for a pet", "ask the weather"). ' +
+        'ANONYMISE: no names, places, stores, amounts, dates, times or any personal detail. "" for every other intent.',
+    },
     reply: {
       type: 'string',
       description:
@@ -177,6 +191,7 @@ const ASSISTANT_SCHEMA = {
     'date',
     'date_end',
     'time',
+    'new_date',
     'title',
     'amount',
     'people',
@@ -188,6 +203,7 @@ const ASSISTANT_SCHEMA = {
     'pet',
     'field',
     'app',
+    'gap',
     'reply',
   ],
   additionalProperties: false,
@@ -198,6 +214,32 @@ const ASSISTANT_CAP = 300
 const str = (v: unknown, max = 60) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 const strList = (v: unknown, n = 30, len = 80) =>
   Array.isArray(v) ? v.map((x) => str(x, len)).filter(Boolean).slice(0, n) : []
+
+/** Log something the assistant couldn't do (migration 088). Best-effort:
+ *  it must never fail the request. Old rows (>90 days) are pruned here. */
+async function recordGap(
+  db: any,
+  household: string | null,
+  g: { kind: 'unknown' | 'failed'; intent?: string; reason?: string; summary?: string; lang?: string },
+) {
+  if (!db) return
+  try {
+    await db.from('assistant_gaps').insert({
+      household_id: household,
+      kind: g.kind,
+      intent: (g.intent ?? '').slice(0, 40),
+      reason: (g.reason ?? '').slice(0, 40),
+      summary: (g.summary ?? '').slice(0, 160),
+      lang: (g.lang ?? '').slice(0, 8),
+    })
+    await db
+      .from('assistant_gaps')
+      .delete()
+      .lt('created_at', new Date(Date.now() - 90 * 86_400_000).toISOString())
+  } catch {
+    /* logging must never break the assistant */
+  }
+}
 
 async function assistant(body: any, db: any, household: string | null, res: any) {
   const text = str(body?.text, 400)
@@ -257,6 +299,10 @@ async function assistant(body: any, db: any, household: string | null, res: any)
     if (!block || block.type !== 'text') return res.status(502).json({ error: 'no_answer' })
     const p = JSON.parse(block.text)
     const intent = (INTENTS as readonly string[]).includes(p.intent) ? p.intent : 'unknown'
+    if (intent === 'unknown') {
+      // The model's anonymised rewrite only — never `text` (see migration 088).
+      await recordGap(db, household, { kind: 'unknown', summary: str(p.gap, 160), lang: str(body?.lang, 8) })
+    }
     const iso = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : today)
     return res.status(200).json({
       intent,
@@ -276,6 +322,7 @@ async function assistant(body: any, db: any, household: string | null, res: any)
         return end < start ? start : end > capIso ? capIso : end
       })(),
       time: typeof p.time === 'string' && /^\d{1,2}:\d{2}$/.test(p.time) ? p.time.padStart(5, '0') : '',
+      new_date: typeof p.new_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.new_date) ? p.new_date : '',
       title: str(p.title, 140),
       amount: typeof p.amount === 'number' && isFinite(p.amount) && p.amount > 0 ? Math.round(p.amount * 100) / 100 : 0,
       people: typeof p.people === 'number' && p.people >= 1 && p.people <= 50 ? Math.floor(p.people) : 0,
@@ -316,6 +363,22 @@ export default async function handler(req: any, res: any) {
   if (!email) return res.status(401).json({ error: 'Unauthorized' })
 
   const isAssistant = req.query?.action === 'assistant'
+
+  // The app reports an understood-but-failed request: intent + reason code
+  // ONLY (no text ever comes here). Needs no AI, so it skips the AI checks.
+  if (req.query?.action === 'assistant-gap') {
+    const serviceKeyGap = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const dbGap = serviceKeyGap ? createClient(supabaseUrl, serviceKeyGap, { auth: { persistSession: false } }) : null
+    let hh: string | null = null
+    if (dbGap) {
+      const { data: caller } = await dbGap.from('allowed_users').select('household_id').eq('email', email).maybeSingle()
+      hh = caller?.household_id ?? null
+    }
+    const code = (v: unknown) => (typeof v === 'string' && /^[a-z_]{1,40}$/.test(v) ? v : '')
+    await recordGap(dbGap, hh, { kind: 'failed', intent: code(req.body?.intent), reason: code(req.body?.reason), lang: code(req.body?.lang) })
+    return res.status(200).json({ ok: true })
+  }
+
   const { text } = req.body ?? {}
   if (!text || typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: 'Missing text' })

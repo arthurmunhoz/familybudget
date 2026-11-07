@@ -7,11 +7,13 @@
 // take the whole Home down with it (see "Don't statically import a native
 // module" in CLAUDE.md). `voiceSupported()` is false there and the mic hides.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AppState } from 'react-native'
 import { requireOptionalNativeModule } from 'expo-modules-core'
 
 type Sub = { remove: () => void }
 interface SpeechModule {
   requestPermissionsAsync: () => Promise<{ granted: boolean }>
+  getPermissionsAsync?: () => Promise<{ granted: boolean }>
   start: (o: {
     lang: string
     interimResults: boolean
@@ -90,6 +92,25 @@ function chime(which: 'start' | 'stop') {
   }
 }
 
+/** Resolve once the app is foreground-ACTIVE again (or after `maxMs`). The
+ *  system permission alerts leave it 'inactive', and starting the recogniser
+ *  then fails to open the microphone. */
+function whenActive(maxMs = 2500): Promise<void> {
+  if (AppState.currentState === 'active') return Promise.resolve()
+  return new Promise((resolve) => {
+    const done = () => {
+      sub.remove()
+      clearTimeout(t)
+      resolve()
+    }
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') done()
+    })
+    const t = setTimeout(done, maxMs)
+  })
+}
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
 export function voiceSupported(): boolean {
   return speech() !== null
 }
@@ -141,6 +162,12 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
   // Audio is really flowing: chime + "listening" — the cue to talk. Once per
   // start (both audiostart and the fallback timer can call it).
   const live = useRef(false)
+  /** One silent retry per tap (see the 'error' listener). */
+  const retryLeft = useRef(false)
+  /** A retry is scheduled: the failed attempt's 'end' is ignored. */
+  const retrying = useRef(false)
+  /** Starts the native recogniser with the current options (set by start). */
+  const begin = useRef<(() => void) | null>(null)
   const fallback = useRef<ReturnType<typeof setTimeout> | null>(null)
   const goLive = useCallback(() => {
     if (fallback.current) clearTimeout(fallback.current)
@@ -181,6 +208,18 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
       }),
       m.addListener('error', (e: { error?: string }) => {
         if (fallback.current) clearTimeout(fallback.current)
+        // Failed BEFORE the mic ever went live, on the first try: the audio
+        // session wasn't ready (typically right after the permission alerts).
+        // Try once more, quietly, instead of "couldn't capture" (2026-11).
+        if (listening.current && !live.current && retryLeft.current && e.error !== 'not-allowed' && e.error !== 'aborted') {
+          retryLeft.current = false
+          retrying.current = true
+          setTimeout(() => {
+            retrying.current = false
+            if (listening.current) begin.current?.()
+          }, 400)
+          return
+        }
         if (listening.current && live.current) chime('stop')
         listening.current = false
         // "no-speech"/"aborted" are a user stopping or saying nothing — just idle.
@@ -191,6 +230,9 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
       m.addListener('end', () => {
         if (fallback.current) clearTimeout(fallback.current)
         if (!listening.current) return
+        // The failed first try ends too — a retry is already on its way, so
+        // this 'end' must not close the listen.
+        if (retrying.current) return
         listening.current = false
         if (live.current) chime('stop')
         setState('idle')
@@ -210,21 +252,35 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
   const start = useCallback(async () => {
     const m = speech()
     if (!m) return
+    // Was this the first time? Then the OS just showed its permission alerts,
+    // and the app is still coming back from them — wait for it to be active
+    // (plus a beat for the audio session) before opening the microphone. Doing
+    // it at once is what made the very first try start and immediately end
+    // with "couldn't capture" (owner, 2026-11).
+    const before = await m.getPermissionsAsync?.().catch(() => null)
     const perm = await m.requestPermissionsAsync()
     if (!perm.granted) {
       setState('denied')
       return
+    }
+    const justAsked = !before?.granted
+    setState('starting')
+    if (justAsked) {
+      await whenActive()
+      await sleep(350)
     }
     latest.current = ''
     segments.current = { done: '', current: '' }
     setTranscript('')
     listening.current = true
     live.current = false
+    retryLeft.current = true
+    retrying.current = false
     // Start AT ONCE, but say "one moment" until the mic is live (goLive):
     // the user waits for the chime instead of talking into a recogniser
     // that isn't hearing yet.
     setState('starting')
-    m.start({
+    begin.current = () => m.start({
       lang: LOCALE[lang] ?? 'en-US',
       interimResults: true,
       continuous: false,
@@ -244,6 +300,7 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
         mode: 'default',
       },
     })
+    begin.current()
   }, [lang])
 
   /** Stop listening; whatever was heard so far is sent. */
@@ -256,6 +313,7 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
    *  sounds like it stopped, because it did. */
   const cancel = useCallback(() => {
     if (fallback.current) clearTimeout(fallback.current)
+    retrying.current = false
     if (!listening.current) return
     listening.current = false
     if (live.current) chime('stop')

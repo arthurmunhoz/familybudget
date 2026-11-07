@@ -42,6 +42,9 @@ import {
   createStore,
   deleteEntry,
   deleteEvent,
+  moveEvent,
+  reportGap,
+  restoreEvent,
   familyInfo,
   fetchStores,
   findItems,
@@ -137,6 +140,7 @@ type Answer =
   | { kind: 'found'; found: Found[]; reply: string }
   | { kind: 'marked'; mode: 'check' | 'remove'; hits: ShoppingItem[]; missing: string[]; undone: boolean }
   | { kind: 'event'; ev: CalendarEvent; who: string | null; undone: boolean }
+  | { kind: 'moved'; ev: CalendarEvent; before: CalendarEvent; undone: boolean }
   | { kind: 'money'; res: Extract<MoneyResult, { ok: true }>; type: 'expense' | 'income'; amount: number; title: string; undone: boolean }
   | { kind: 'summary'; lines: MoneyLine[] }
   | { kind: 'nudge'; message: string; to: Profile | null; sent: boolean; sending: boolean }
@@ -330,6 +334,8 @@ export function AskSheet({
       }
       case 'event':
         return undone(t('ask.sumEvent', { title: a.ev.title, when: whenLabel(a.ev) }), a.undone)
+      case 'moved':
+        return undone(t('ask.sumMoved', { title: a.ev.title, when: whenLabel(a.ev) }), a.undone)
       case 'money':
         return undone(t('ask.sumMoney', { title: a.title, amount: formatMoney(a.amount) }), a.undone)
       case 'summary':
@@ -455,6 +461,27 @@ export function AskSheet({
         invalidateCache('hub:today')
         return { kind: 'event', ev, who: owner && owner.email !== me?.email ? owner.display_name : null, undone: false }
       }
+      case 'move_event': {
+        const r = await moveEvent(intent.title, intent.date, intent.newDate, intent.time)
+        if (r.ok) {
+          invalidateCache('hub:today')
+          return { kind: 'moved', ev: r.ev, before: r.before, undone: false }
+        }
+        reportGap('move_event', r.reason, lang)
+        const day = dayWords(intent.date)
+        const names = r.options.slice(0, 4).map((e) => e.title).join(', ')
+        return {
+          kind: 'say',
+          text:
+            r.reason === 'recurring'
+              ? t('ask.moveRecurring', { title: r.options[0]?.title ?? intent.title })
+              : r.reason === 'ambiguous'
+                ? t('ask.moveWhich', { day, names })
+                : r.options.length
+                  ? t('ask.moveNotFoundSome', { title: intent.title, day, names })
+                  : t('ask.moveNotFound', { day }),
+        }
+      }
       case 'add_money': {
         const res = await addMoney(intent.title, intent.amount, intent.type, intent.date, intent.budget, me?.email ?? '')
         // Several budgets and none clearly named: ask which (owner, 2026-11).
@@ -466,6 +493,7 @@ export function AskSheet({
           }
         }
         if (!res.ok) {
+          reportGap('add_money', res.reason, lang)
           return {
             kind: 'say',
             text: res.reason === 'no_budget' ? t('ask.noBudget') : t('ask.noPeriod', { budget: res.budget?.name ?? '' }),
@@ -761,7 +789,7 @@ export function AskSheet({
                 memberEmails={memberEmails}
                 dayWords={dayWords}
                 onScope={(sc) => rescope(answer.a, sc)}
-                onOpen={() => go('/calendar')}
+                onOpen={() => go(`/calendar?date=${answer.a.date}`)}
               />
             ) : answer?.kind === 'chooseBudget' ? (
               <ChooseBudgetView
@@ -809,7 +837,21 @@ export function AskSheet({
                   invalidateCache('hub:today')
                   setAnswer({ ...answer, undone: true })
                 }}
-                onOpen={() => go('/calendar')}
+                onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
+              />
+            ) : answer?.kind === 'moved' ? (
+              <EventView
+                headline={answer.undone ? t('ask.moveUndone') : t('ask.eventMoved')}
+                title={answer.ev.title}
+                when={whenLabel(answer.ev)}
+                who={null}
+                undone={answer.undone}
+                onUndo={async () => {
+                  await restoreEvent(answer.before)
+                  invalidateCache('hub:today')
+                  setAnswer({ ...answer, undone: true })
+                }}
+                onOpen={() => go(`/calendar?date=${answer.undone ? answer.before.start_date : answer.ev.start_date}`)}
               />
             ) : answer?.kind === 'money' ? (
               <MoneyView
