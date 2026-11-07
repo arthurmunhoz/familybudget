@@ -88,7 +88,10 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   `EntryForm` takes `colors` + `kicker` (MonthDetail passes the budget look +
   period): head tile, RowIcons, pills/category grid/Add and the Save
   `TintButton` follow the budget colour via a local `LookContext`, which
-  `ManageCategoriesSheet` also accepts (`colors`). The amount hero stays
+  `ManageCategoriesSheet` also accepts (`colors`). The category is picked ONLY from the
+  chip under the amount; Description and Subcategory are plain free-text rows
+  — no second category strip, no used-before subcategory pills (owner,
+  2026-11). Only a scanned receipt prefills the subcategory (`initial`). The amount hero stays
   red/green (expense/income semantics). `ToggleRow` takes `icon` + `tint`.
   MonthDetail's bottom Scan / New entry bar MUST use `useBottomGap` (it used
   half the inset and sat under the Android nav bar).

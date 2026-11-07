@@ -10,15 +10,17 @@
 //     category as a chip right under the amount (tap → the full grid in a
 //     sheet, which can also create a household category and links to Manage
 //     categories). "Coffee, $5.42, Dining" reads as one sentence up there.
-//   • What: Label, the household's most-used categories as a strip, then
-//     Subcategory with its used-before suggestions.
+//   • What: Label, then Subcategory — both plain free-text rows. The category
+//     is chosen ONLY from the chip under the amount (no second strip of
+//     categories, no used-before subcategory pills — owner, 2026-11); a
+//     scanned receipt may prefill the subcategory through `initial`.
 //   • Details: Date (Today / Yesterday / 📅), Who (member avatars for ≤4,
 //     a picker beyond), Recurring.
 // The docked save button announces what it does ("Add expense · $12.50").
 // Supports an `initial` prefill (e.g. a scanned receipt) and learns
 // label→category on save.
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Alert, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import {
   ArrowDown,
@@ -26,7 +28,6 @@ import {
   Banknote,
   CalendarDays,
   ChevronDown,
-  ChevronRight,
   LayoutGrid,
   PenLine,
   Plus,
@@ -77,9 +78,6 @@ export interface EntryPrefill {
   subcategory?: string | null
   entry_date?: string | null
 }
-
-/** Chips shown when the household has no history yet. */
-const FALLBACK_TOP = ['groceries', 'dining', 'transport']
 
 const ROW_MIN_H = 50
 
@@ -291,61 +289,6 @@ function WhoChips({
         )
       })}
     </View>
-  )
-}
-
-/** A short horizontal strip of small neutral pills — the quick categories and
- *  the subcategory suggestions. `active` gets a soft accent tint. */
-function PillStrip({ children }: { children: ReactNode }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ gap: sp.sm, paddingHorizontal: sp.md, paddingVertical: 10 }}
-    >
-      {children}
-    </ScrollView>
-  )
-}
-
-function Pill({
-  label,
-  icon,
-  active,
-  onPress,
-}: {
-  label: string
-  icon?: string
-  active?: boolean
-  onPress: () => void
-}) {
-  const { c } = useTheme()
-  const { tint, soft } = useLookTint()
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: !!active }}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 11,
-        paddingVertical: 6,
-        borderRadius: radius.pill,
-        backgroundColor: active ? soft : c.surface,
-        opacity: pressed ? 0.7 : 1,
-      })}
-    >
-      {icon ? <Txt style={{ fontSize: 14 }}>{icon}</Txt> : null}
-      <Txt
-        style={{ fontSize: 13, fontFamily: active ? fonts.semibold : fonts.medium, color: active ? tint : c.textMuted }}
-        numberOfLines={1}
-      >
-        {label}
-      </Txt>
-    </Pressable>
   )
 }
 
@@ -596,10 +539,8 @@ export default function EntryForm({
   profiles,
   myEmail,
   rules,
-  subcategorySuggestions,
   customCategories,
   categoryOverrides,
-  topCategories,
   onCategoryCreated,
   entry,
   initial,
@@ -619,14 +560,10 @@ export default function EntryForm({
   profiles: Profile[]
   myEmail: string
   rules: CategoryRule[]
-  /** category id → subcategories already used by the household, most-used first. */
-  subcategorySuggestions: Record<string, string[]>
   /** Household-defined categories (shown alongside the built-ins). */
   customCategories: CustomCategory[]
   /** Household overrides of the built-in presets (name/icon). */
   categoryOverrides: CategoryOverride[]
-  /** Household's most-used expense category ids, most-used first. */
-  topCategories: string[]
   /** Called after a new custom category is saved, so the parent can refetch. */
   onCategoryCreated: () => void
   /** null = creating a new entry. */
@@ -693,13 +630,8 @@ export default function EntryForm({
     ],
     [localCats, localOverrides],
   )
-  const knownIds = useMemo(() => new Set(allExpenseCats.map((x) => x.id)), [allExpenseCats])
-  const quickIds = (topCategories.length > 0 ? topCategories : FALLBACK_TOP)
-    .filter((id) => id !== category && knownIds.has(id))
-    .slice(0, 3)
 
   const dateIsOther = date !== today && date !== yesterday
-  const subSuggestions = subcategorySuggestions[category] ?? []
 
   function pickCategory(id: string) {
     setCategory(id)
@@ -953,33 +885,7 @@ export default function EntryForm({
           autoCapitalize="sentences"
           returnKeyType="done"
         />
-      </FormSection>
-
-      {type === 'expense' ? (
-        <FormSection>
-          {quickIds.length > 0 ? (
-            <PillStrip>
-              {quickIds.map((id) => {
-                const qc = categoryById(id, localCats, localOverrides)
-                return <Pill key={id} icon={qc.icon} label={catName(qc)} onPress={() => pickCategory(id)} />
-              })}
-              <Pressable
-                onPress={() => setGridOpen(true)}
-                accessibilityRole="button"
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 2,
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  opacity: pressed ? 0.6 : 1,
-                })}
-              >
-                <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: tint }}>{t('common.all')}</Txt>
-                <ChevronRight size={14} color={tint} />
-              </Pressable>
-            </PillStrip>
-          ) : null}
+        {type === 'expense' ? (
           <TextRow
             icon={ri(Tag)}
             label={t('entry.subcategory')}
@@ -990,17 +896,11 @@ export default function EntryForm({
                 ? t(`entry.sub.${category}` as TKey)
                 : t('entry.subcategoryPlaceholder')
             }
+            autoCapitalize="sentences"
+            returnKeyType="done"
           />
-          {subSuggestions.length > 0 ? (
-            <PillStrip>
-              {subSuggestions.map((s) => {
-                const active = subcategory.trim().toLowerCase() === s.toLowerCase()
-                return <Pill key={s} label={s} active={active} onPress={() => setSubcategory(active ? '' : s)} />
-              })}
-            </PillStrip>
-          ) : null}
-        </FormSection>
-      ) : null}
+        ) : null}
+      </FormSection>
 
       <FormSection>
         <FormRow label={t('entry.date')} icon={ri(CalendarDays)}>

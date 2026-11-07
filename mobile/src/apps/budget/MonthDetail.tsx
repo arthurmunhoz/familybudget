@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
@@ -54,7 +54,6 @@ export default function MonthDetail({
 }) {
   const { c, dark } = useTheme()
   const { t } = useI18n()
-  const insets = useSafeAreaInsets()
   const bottomGap = useBottomGap(sp.xs)
   const { profile, profiles } = useAuth()
 
@@ -71,14 +70,12 @@ export default function MonthDetail({
 
   // Cached (stale-while-revalidate) so the period renders instantly on return.
   const {
-    data: { month, entries, rules, subcatSuggestions, customCats, overrides, topCategories } = {
+    data: { month, entries, rules, customCats, overrides } = {
       month: null,
       entries: [],
       rules: [],
-      subcatSuggestions: {},
       customCats: [],
       overrides: [],
-      topCategories: [],
     },
     loading,
     revalidate: load,
@@ -86,53 +83,23 @@ export default function MonthDetail({
     month: MonthWithBudget | null
     entries: Entry[]
     rules: CategoryRule[]
-    subcatSuggestions: Record<string, string[]>
     customCats: CustomCategory[]
     overrides: CategoryOverride[]
-    topCategories: string[]
   }>(`month:${monthId}`, async () => {
-    const [m, e, r, subs, custom, ovr] = await Promise.all([
+    const [m, e, r, custom, ovr] = await Promise.all([
       supabase.from('months').select('*, budgets(name, period)').eq('id', monthId).single(),
       supabase.from('entries').select('*').eq('month_id', monthId),
       supabase.from('category_rules').select('keyword, category'),
-      // Household-wide usage: feeds both the subcategory autocomplete and the
-      // entry form's most-used category chips.
-      supabase.from('entries').select('type, category, subcategory'),
       supabase.from('custom_categories').select('*').order('created_at'),
       supabase.from('category_overrides').select('base_id, name, icon'),
     ])
-
-    const counts = new Map<string, Map<string, number>>()
-    const catCounts = new Map<string, number>()
-    for (const row of (subs.data ?? []) as {
-      type: string
-      category: string
-      subcategory: string | null
-    }[]) {
-      if (row.type === 'expense' && row.category !== 'salary') {
-        catCounts.set(row.category, (catCounts.get(row.category) ?? 0) + 1)
-      }
-      const key = row.subcategory?.trim()
-      if (!key) continue
-      if (!counts.has(row.category)) counts.set(row.category, new Map())
-      const bucket = counts.get(row.category)!
-      const existing = [...bucket.keys()].find((k) => k.toLowerCase() === key.toLowerCase())
-      const useKey = existing ?? key
-      bucket.set(useKey, (bucket.get(useKey) ?? 0) + 1)
-    }
-    const map: Record<string, string[]> = {}
-    for (const [cat, bucket] of counts) {
-      map[cat] = [...bucket.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s)
-    }
 
     return {
       month: (m.data as MonthWithBudget) ?? null,
       entries: (e.data as Entry[]) ?? [],
       rules: (r.data as CategoryRule[]) ?? [],
-      subcatSuggestions: map,
       customCats: (custom.data as CustomCategory[]) ?? [],
       overrides: (ovr.data as CategoryOverride[]) ?? [],
-      topCategories: [...catCounts.entries()].sort((a, b) => b[1] - a[1]).map(([x]) => x),
     }
   })
 
@@ -505,10 +472,8 @@ export default function MonthDetail({
           profiles={profiles}
           myEmail={profile.email}
           rules={rules}
-          subcategorySuggestions={subcatSuggestions}
           customCategories={customCats}
           categoryOverrides={overrides}
-          topCategories={topCategories}
           onCategoryCreated={load}
           entry={editing}
           initial={prefill}
