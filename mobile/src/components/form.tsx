@@ -19,7 +19,7 @@
 // their own tree, never as a sibling of the open modal (that fails on iOS).
 import { Children, isValidElement, useRef, useState, type ReactNode } from 'react'
 import { Modal, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from 'react-native'
-import { Check, ChevronRight, ChevronsUpDown, X } from 'lucide-react-native'
+import { Check, ChevronRight, ChevronsUpDown, X, type LucideIcon } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Toggle } from '@/components/Toggle'
@@ -94,15 +94,20 @@ export function FormRow({
   children,
   onPress,
   chevron,
+  icon,
 }: {
   label: string
   children?: ReactNode
   onPress?: () => void
   chevron?: boolean
+  /** Optional leading icon tile (see RowIcon) — the 2026-11 sheets put one
+   *  before each label so a long form scans by shape. */
+  icon?: ReactNode
 }) {
   const { c } = useTheme()
   const body = (
     <>
+      {icon}
       <Txt style={{ fontSize: 15, color: c.text }} numberOfLines={1}>
         {label}
       </Txt>
@@ -127,6 +132,15 @@ export function FormRow({
   )
 }
 
+/** The small tinted tile a row can lead with: `icon={<RowIcon Icon={Phone} tint={…} />}`. */
+export function RowIcon({ Icon, tint }: { Icon: LucideIcon; tint: string }) {
+  return (
+    <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: tint + '1F', alignItems: 'center', justifyContent: 'center' }}>
+      <Icon size={16} strokeWidth={2.2} color={tint} />
+    </View>
+  )
+}
+
 /** Value text on the right of a row: real value, or a faint placeholder. */
 export function RowValue({ value, placeholder }: { value?: string | null; placeholder: string }) {
   const { c } = useTheme()
@@ -141,15 +155,16 @@ export function RowValue({ value, placeholder }: { value?: string | null; placeh
 export function TextRow({
   label,
   placeholder,
+  icon,
   ...input
-}: TextInputProps & { label: string }) {
+}: TextInputProps & { label: string; icon?: ReactNode }) {
   const { c } = useTheme()
   const { t } = useI18n()
   const reveal = useRevealOnFocus()
   const row = useRef<View>(null)
   return (
     <View ref={row}>
-      <FormRow label={label}>
+      <FormRow label={label} icon={icon}>
         <TextInput
           placeholder={placeholder ?? t('form.add')}
           placeholderTextColor={c.textFaint}
@@ -173,14 +188,21 @@ export function TextRow({
 }
 
 /** Multi-line text: label on top, the text under it, full width. */
-export function NoteRow({ label, placeholder, ...input }: TextInputProps & { label: string }) {
+export function NoteRow({ label, placeholder, icon, ...input }: TextInputProps & { label: string; icon?: ReactNode }) {
   const { c } = useTheme()
   const { t } = useI18n()
   const reveal = useRevealOnFocus()
   const row = useRef<View>(null)
   return (
     <View ref={row} style={{ paddingHorizontal: sp.md, paddingTop: 12, paddingBottom: 10, gap: 4 }}>
-      <Txt style={{ fontSize: 13, color: c.textMuted }}>{label}</Txt>
+      {icon ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, marginBottom: 2 }}>
+          {icon}
+          <Txt style={{ fontSize: 15, color: c.text }}>{label}</Txt>
+        </View>
+      ) : (
+        <Txt style={{ fontSize: 13, color: c.textMuted }}>{label}</Txt>
+      )}
       <TextInput
         multiline
         placeholder={placeholder ?? t('form.add')}
@@ -190,7 +212,7 @@ export function NoteRow({ label, placeholder, ...input }: TextInputProps & { lab
           reveal(row.current)
           input.onFocus?.(e)
         }}
-        style={{ fontSize: 15, color: c.text, fontFamily: fonts.body, minHeight: 22, paddingVertical: 2 }}
+        style={{ fontSize: 15, color: c.text, fontFamily: fonts.body, minHeight: 22, paddingVertical: 2, marginLeft: icon ? 30 + sp.md : 0 }}
       />
     </View>
   )
@@ -207,6 +229,7 @@ export function SelectRow<T extends string>({
   onChange,
   allowNone,
   placeholder,
+  icon,
 }: {
   label: string
   value: T | '' | null
@@ -214,6 +237,7 @@ export function SelectRow<T extends string>({
   onChange: (v: T | '') => void
   allowNone?: boolean
   placeholder?: string
+  icon?: ReactNode
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -221,7 +245,7 @@ export function SelectRow<T extends string>({
   const current = options.find((o) => o.value === value)
   return (
     <>
-      <FormRow label={label} onPress={() => setOpen(true)}>
+      <FormRow label={label} icon={icon} onPress={() => setOpen(true)}>
         <RowValue value={current?.label} placeholder={placeholder ?? t('family.notSet')} />
         <ChevronsUpDown size={15} color={c.textFaint} />
       </FormRow>
@@ -326,8 +350,10 @@ export function DateRow({
   onChange,
   maximumDate,
   wheels,
+  icon,
 }: {
   label: string
+  icon?: ReactNode
   /** ISO YYYY-MM-DD, or '' when unset. */
   value: string
   /** Formatted value for the row. */
@@ -350,7 +376,7 @@ export function DateRow({
   })()
   return (
     <>
-      <FormRow label={label} onPress={() => setOpen(true)}>
+      <FormRow label={label} icon={icon} onPress={() => setOpen(true)}>
         <RowValue value={value ? display : null} placeholder={t('family.notSet')} />
         {value ? (
           <Pressable
@@ -428,11 +454,14 @@ export function UnitButton<T extends string>({
   value,
   options,
   onChange,
+  tint,
 }: {
   title: string
   value: T
   options: Option<T>[]
   onChange: (v: T) => void
+  /** The host app's colour; defaults to the accent. */
+  tint?: string
 }) {
   const { c } = useTheme()
   const [open, setOpen] = useState(false)
@@ -450,12 +479,12 @@ export function UnitButton<T extends string>({
           paddingHorizontal: 8,
           paddingVertical: 6,
           borderRadius: radius.pill,
-          backgroundColor: c.accentSoft,
+          backgroundColor: tint ? tint + '1F' : c.accentSoft,
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Txt style={{ fontSize: 13, color: c.accent, fontFamily: fonts.semibold }}>{current?.label ?? value}</Txt>
-        <ChevronsUpDown size={12} color={c.accent} />
+        <Txt style={{ fontSize: 13, color: tint ?? c.accent, fontFamily: fonts.semibold }}>{current?.label ?? value}</Txt>
+        <ChevronsUpDown size={12} color={tint ?? c.accent} />
       </Pressable>
       <SelectSheet
         visible={open}
@@ -478,11 +507,17 @@ export function ToggleRow({
   hint,
   value,
   onValueChange,
+  icon,
+  tint,
 }: {
   label: string
   hint?: string
   value: boolean
   onValueChange: (v: boolean) => void
+  /** Leading RowIcon (2026-11 sheets). */
+  icon?: ReactNode
+  /** The sheet's app colour for the switch (see Toggle). */
+  tint?: string
 }) {
   const { c } = useTheme()
   // The WHOLE row toggles (2026-11): inside a sheet's scroller a tap aimed at
@@ -505,6 +540,7 @@ export function ToggleRow({
         opacity: pressed ? 0.75 : 1,
       })}
     >
+      {icon}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt style={{ fontSize: 15, color: c.text }}>{label}</Txt>
         {hint ? (
@@ -513,7 +549,7 @@ export function ToggleRow({
           </Txt>
         ) : null}
       </View>
-      <Toggle value={value} onValueChange={onValueChange} accessible={false} />
+      <Toggle tint={tint} value={value} onValueChange={onValueChange} accessible={false} />
     </Pressable>
   )
 }

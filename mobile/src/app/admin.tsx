@@ -15,12 +15,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { Redirect, router, useFocusEffect } from 'expo-router'
-import { Activity, BarChart3, Bug, ChevronLeft, ChevronRight, Home, LayoutDashboard, LayoutGrid, Plus, Search, X, type LucideIcon } from 'lucide-react-native'
+import { Activity, BarChart3, Bug, ChevronLeft, ChevronRight, Home, LayoutDashboard, LayoutGrid, Plus, Search, Sparkles, X, type LucideIcon } from 'lucide-react-native'
 
 import { Toggle } from '@/components/Toggle'
 import { Pressable } from '@/components/Pressable'
 import { Loader, Screen, Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
+import { ADMIN_LOOK } from '@/components/home/palette'
 import { useAuth } from '@/lib/auth'
 import { usePlus } from '@/lib/plus'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
@@ -37,7 +38,8 @@ const PERIODS = [7, 30, 90]
 const PAGE = 15
 const HH_PAGE = 20
 const FEED_PAGE = 30
-const ADMIN_GRADIENT: [string, string] = ['#3B4A6B', '#1E2638']
+const ADMIN_GRADIENT = ADMIN_LOOK.colors
+const TINT = ADMIN_LOOK.tint
 
 interface Overview {
   today_people: number
@@ -84,7 +86,7 @@ const TZ = (() => {
 const humanizeEvent = (type: string) => type.replace(/[._]/g, ' ')
 
 export default function Admin() {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
   const { profile, profileLoaded } = useAuth()
   const { isPlus, refresh: refreshPlus } = usePlus()
@@ -201,6 +203,31 @@ export default function Admin() {
       }
     },
   )
+  // What the Home assistant couldn't do (migration 088): anonymised rewrites
+  // for requests it didn't understand, intent · reason for ones it couldn't
+  // carry out — grouped and counted, the most asked first.
+  const { data: gaps = [] } = useCachedQuery<{ label: string; failed: boolean; n: number }[]>(
+    `admin:gaps:${days}`,
+    async () => {
+      const since = new Date(Date.now() - days * 86_400_000).toISOString()
+      const { data } = await supabase
+        .from('assistant_gaps')
+        .select('kind, intent, reason, summary')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(500)
+      const counts = new Map<string, { label: string; failed: boolean; n: number }>()
+      for (const g of (data ?? []) as { kind: string; intent: string; reason: string; summary: string }[]) {
+        const failed = g.kind === 'failed'
+        const label = failed ? `${humanizeEvent(g.intent)} · ${humanizeEvent(g.reason)}` : g.summary.trim().toLowerCase() || '—'
+        const k = `${g.kind}:${label}`
+        const cur = counts.get(k) ?? { label, failed, n: 0 }
+        cur.n++
+        counts.set(k, cur)
+      }
+      return [...counts.values()].sort((a, b) => b.n - a.n).slice(0, 20)
+    },
+  )
   const usageRows = SEMANTIC_EVENTS.map((type) => ({ type, n: usageData.usage[type] ?? 0 })).sort((a, b) => b.n - a.n)
 
   // Names for the people / households the feed and errors mention — looked up
@@ -309,10 +336,10 @@ export default function Admin() {
                 onPress={() => setTab(tb.key)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}
-                style={[s.tab, { backgroundColor: on ? c.text : c.card, borderColor: on ? c.text : c.border }]}
+                style={[s.tab, on ? { backgroundColor: TINT + (dark ? '2E' : '1A'), borderColor: TINT, borderWidth: 1.5 } : { backgroundColor: c.card, borderColor: c.border }]}
               >
-                <tb.icon size={15} color={on ? c.sheet : c.textMuted} />
-                <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? c.sheet : c.textMuted }}>{tb.label}</Txt>
+                <tb.icon size={15} color={on ? TINT : c.textMuted} />
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? TINT : c.textMuted }}>{tb.label}</Txt>
               </Pressable>
             )
           })}
@@ -384,7 +411,7 @@ export default function Admin() {
                     {planBusy ? t('admin.updating') : t('admin.plusPreviewHint')}
                   </Txt>
                 </View>
-                <Toggle value={isPlus} onValueChange={togglePlus} disabled={planBusy} />
+                <Toggle tint={TINT} value={isPlus} onValueChange={togglePlus} disabled={planBusy} />
               </View>
             </View>
           </>
@@ -420,8 +447,8 @@ export default function Admin() {
                     onPress={() => router.push(`/admin/household/${h.id}`)}
                     style={({ pressed }) => [s.row, { borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: c.border, opacity: pressed ? 0.6 : 1 }]}
                   >
-                    <View style={[s.tile, { backgroundColor: c.surface }]}>
-                      <Home size={17} color={c.textMuted} />
+                    <View style={[s.tile, { backgroundColor: TINT + (dark ? '2E' : '1A') }]}>
+                      <Home size={17} color={TINT} />
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Txt style={{ fontFamily: fonts.display, fontSize: 16, color: c.text }} numberOfLines={1}>
@@ -453,9 +480,9 @@ export default function Admin() {
                 <Pressable
                   onPress={createHousehold}
                   disabled={!newHousehold.trim() || creating}
-                  style={{ paddingHorizontal: 14, height: 38, borderRadius: 19, justifyContent: 'center', backgroundColor: c.action, opacity: !newHousehold.trim() || creating ? 0.4 : 1 }}
+                  style={{ paddingHorizontal: 14, height: 38, borderRadius: 19, justifyContent: 'center', backgroundColor: TINT, opacity: !newHousehold.trim() || creating ? 0.4 : 1 }}
                 >
-                  <Txt style={{ color: c.onAction, fontFamily: fonts.semibold }}>{t('admin.create')}</Txt>
+                  <Txt style={{ color: '#fff', fontFamily: fonts.semibold }}>{t('admin.create')}</Txt>
                 </Pressable>
               </View>
             </View>
@@ -473,8 +500,8 @@ export default function Admin() {
               {PERIODS.map((p) => {
                 const on = p === days
                 return (
-                  <Pressable key={p} onPress={() => setDays(p)} style={[s.tab, { backgroundColor: on ? c.text : c.card, borderColor: on ? c.text : c.border }]}>
-                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? c.sheet : c.textMuted }}>{t('admin.days', { n: p })}</Txt>
+                  <Pressable key={p} onPress={() => setDays(p)} style={[s.tab, on ? { backgroundColor: TINT + (dark ? '2E' : '1A'), borderColor: TINT, borderWidth: 1.5 } : { backgroundColor: c.card, borderColor: c.border }]}>
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? TINT : c.textMuted }}>{t('admin.days', { n: p })}</Txt>
                   </Pressable>
                 )
               })}
@@ -512,6 +539,34 @@ export default function Admin() {
                     <Txt style={{ fontSize: 13.5, fontFamily: fonts.semibold, color: r.n === 0 ? c.textFaint : c.text }}>{r.n}</Txt>
                   </View>
                 ))}
+              </View>
+            </View>
+
+            <View>
+              <Label>{t('admin.assistantGaps')}</Label>
+              <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                {gaps.length === 0 ? (
+                  <View style={{ padding: sp.lg }}>
+                    <Txt variant="faint">{t('admin.noAssistantGaps')}</Txt>
+                  </View>
+                ) : (
+                  gaps.map((g, i) => (
+                    <View key={`${g.failed}:${g.label}`} style={[s.row, { borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: c.border }]}>
+                      <View style={[s.tile, { backgroundColor: g.failed ? c.expense + '1F' : TINT + (dark ? '2E' : '1A') }]}>
+                        {g.failed ? <Bug size={16} color={c.expense} /> : <Sparkles size={16} color={TINT} />}
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Txt style={{ fontSize: 14.5, color: c.text }} numberOfLines={2}>
+                          {g.label}
+                        </Txt>
+                        <Txt variant="faint" style={{ fontSize: 12 }}>
+                          {g.failed ? t('admin.gapFailed') : t('admin.gapUnknown')}
+                        </Txt>
+                      </View>
+                      <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.text }}>{g.n}×</Txt>
+                    </View>
+                  ))
+                )}
               </View>
             </View>
 
@@ -584,16 +639,16 @@ function WeekBars({ daily }: { daily: Overview['daily'] }) {
         const wd = new Date(y, m - 1, dd).toLocaleDateString(undefined, { weekday: 'narrow' })
         return (
           <View key={d.day} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-            <Txt style={{ fontSize: 11, fontFamily: fonts.semibold, color: 'rgba(255,255,255,0.85)' }}>{d.people || ''}</Txt>
+            <Txt style={{ fontSize: 11.5, fontFamily: fonts.semibold, color: '#fff' }}>{d.people || ''}</Txt>
             <View
               style={{
                 width: '100%',
                 height: Math.max(4, (d.people / max) * 52),
                 borderRadius: 6,
-                backgroundColor: last ? '#fff' : 'rgba(255,255,255,0.35)',
+                backgroundColor: last ? '#fff' : 'rgba(255,255,255,0.5)',
               }}
             />
-            <Txt style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{wd}</Txt>
+            <Txt style={{ fontSize: 11.5, fontFamily: last ? fonts.semibold : fonts.body, color: last ? '#fff' : 'rgba(255,255,255,0.85)' }}>{wd}</Txt>
           </View>
         )
       })}
@@ -602,12 +657,12 @@ function WeekBars({ daily }: { daily: Overview['daily'] }) {
 }
 
 function Initials({ name }: { name: string }) {
-  const { c } = useTheme()
+  const { dark } = useTheme()
   const parts = name.trim().split(/\s+/).filter(Boolean)
   const ini = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
   return (
-    <View style={[s.tile, { borderRadius: 19, backgroundColor: c.accentSoft }]}>
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.accent }}>{ini}</Txt>
+    <View style={[s.tile, { borderRadius: 19, backgroundColor: TINT + (dark ? '2E' : '1A') }]}>
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: TINT }}>{ini}</Txt>
     </View>
   )
 }

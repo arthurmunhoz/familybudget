@@ -5,20 +5,26 @@
 // same household. The toggles here are UX, not the security boundary.
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Users, X } from 'lucide-react-native'
 import { Toggle } from '@/components/Toggle'
+import { GradientBox } from '@/components/home/GradientBox'
+import { budgetLook } from '@/components/home/palette'
 
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { useTheme, radius, sp } from '@/theme/theme'
+import { useTheme, fonts, sp } from '@/theme/theme'
 import { Txt } from '@/components/ui'
 import type { Budget } from '@/lib/types'
 
 export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose: () => void }) {
   const { t } = useI18n()
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const bottomGap = useBottomGap(sp.xl)
+  const colors = budgetLook(budget.id).colors
+  const tint = colors[1]
+  const soft = tint + (dark ? '2E' : '1A')
   const { profile, profiles } = useAuth()
   const [shared, setShared] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
@@ -70,19 +76,42 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
           style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}
           onPress={() => {}}
         >
-          <View style={[styles.grab, { backgroundColor: c.border }]} />
-
-          <Txt variant="title">{t('budget.whoCanViewTitle')}</Txt>
-          <Txt variant="muted" style={{ marginTop: 2, marginBottom: sp.md }}>
+          {/* 2026-11 head: the budget's gradient tile, its name as the kicker. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+            <GradientBox colors={colors} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={26} color="#fff" />
+            </GradientBox>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }} numberOfLines={1}>
+                {budget.name}
+              </Txt>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: c.text, marginTop: 2 }} numberOfLines={2}>
+                {t('budget.whoCanViewTitle')}
+              </Txt>
+            </View>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }}
+            >
+              <X size={16} color={c.textMuted} />
+            </Pressable>
+          </View>
+          <Txt variant="muted" style={{ marginTop: sp.md, marginBottom: sp.md, lineHeight: 20 }}>
             {isOwner
               ? t('budget.whoCanViewDesc', { name: budget.name })
               : t('budget.sharedWithYou', { name: budget.name })}
           </Txt>
 
-          <ScrollView style={{ flexGrow: 0 }}>
+          <ScrollView
+            style={{ flexGrow: 0, backgroundColor: c.card, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border }}
+            contentContainerStyle={{ paddingHorizontal: sp.md }}
+          >
             {/* owner */}
-            <View style={[styles.row, { borderBottomColor: c.border }]}>
-              <Initial name={ownerName} accent />
+            <View style={[styles.row, { borderBottomColor: c.border, borderBottomWidth: others.length ? StyleSheet.hairlineWidth : 0 }]}>
+              <Initial name={ownerName} tint={tint} soft={soft} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt style={{ fontWeight: '600' }} numberOfLines={1}>
                   {ownerName}
@@ -94,13 +123,13 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
               </View>
               <View
                 style={{
-                  backgroundColor: c.accentSoft,
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: radius.sm,
+                  backgroundColor: soft,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 999,
                 }}
               >
-                <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 10 }}>
+                <Txt style={{ color: tint, fontFamily: fonts.semibold, fontSize: 11, letterSpacing: 0.4 }}>
                   {t('budget.ownerBadge')}
                 </Txt>
               </View>
@@ -113,7 +142,7 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
                   key={p.email}
                   style={[
                     styles.row,
-                    { borderBottomColor: c.border, borderBottomWidth: i < others.length - 1 ? 1 : 0 },
+                    { borderBottomColor: c.border, borderBottomWidth: i < others.length - 1 ? StyleSheet.hairlineWidth : 0 },
                   ]}
                 >
                   <Initial name={p.display_name} />
@@ -130,6 +159,7 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
                   </View>
                   {isOwner ? (
                     <Toggle
+                      tint={tint}
                       value={on}
                       onValueChange={(v) => void toggle(p.email, v)}
                       disabled={busy !== null}
@@ -140,7 +170,7 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
             })}
           </ScrollView>
 
-          <Txt variant="faint" style={{ marginTop: sp.md }}>
+          <Txt variant="faint" style={{ marginTop: sp.md, paddingHorizontal: sp.xs, fontSize: 12.5, lineHeight: 18 }}>
             {isOwner ? t('budget.accessNote') : t('budget.accessNoteMember', { name: ownerName })}
           </Txt>
         </Pressable>
@@ -149,7 +179,7 @@ export function BudgetAccessSheet({ budget, onClose }: { budget: Budget; onClose
   )
 }
 
-function Initial({ name, accent }: { name: string; accent?: boolean }) {
+function Initial({ name, tint, soft }: { name: string; tint?: string; soft?: string }) {
   const { c } = useTheme()
   return (
     <View
@@ -159,10 +189,10 @@ function Initial({ name, accent }: { name: string; accent?: boolean }) {
         borderRadius: 17,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: accent ? c.accentSoft : c.surface,
+        backgroundColor: soft ?? c.surface,
       }}
     >
-      <Txt style={{ fontWeight: '700', fontSize: 13, color: accent ? c.accent : c.textMuted }}>
+      <Txt style={{ fontWeight: '700', fontSize: 13, color: tint ?? c.textMuted }}>
         {(name.trim().charAt(0) || '?').toUpperCase()}
       </Txt>
     </View>
@@ -176,10 +206,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: sp.lg,
-    paddingTop: sp.md,
+    paddingTop: sp.lg,
     paddingBottom: sp.xl,
   },
-  grab: { width: 40, height: 5, borderRadius: 3, alignSelf: 'center', marginBottom: sp.md },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

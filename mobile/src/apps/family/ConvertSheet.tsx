@@ -1,14 +1,26 @@
-// Bottom sheet shown when a member card field's "?" is tapped. For height /
+// Bottom sheet shown when a member's measured field is tapped. For height /
 // weight / shoe it lists the value converted to other popular units (the stored
-// one flagged "current"); for blood type — which has no units — it shows
-// donor/recipient compatibility instead.
+// one highlighted in the field's gradient); for blood type — which has no units
+// — it shows donor/recipient compatibility instead. 2026-11 look: the field's
+// own gradient icon + kicker + display value head, tiles below (matches the
+// Family page's stat tiles).
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { X } from 'lucide-react-native'
 
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { useTheme, sp, radius } from '@/theme/theme'
+import { useTheme, sp, fonts } from '@/theme/theme'
 import { Txt } from '@/components/ui'
+import type { MemberProfile } from '@/lib/types'
+import { FIELD_LOOK, IconTile } from './MemberDetail'
 import { bloodCompat, convertRows, primaryLabel, type ConvertKind } from './units'
+
+const KIND_FIELD: Record<ConvertKind, keyof MemberProfile> = {
+  height: 'height',
+  weight: 'weight',
+  shoe: 'shoe_size',
+  blood: 'blood_type',
+}
 
 export function ConvertSheet({
   kind,
@@ -22,8 +34,11 @@ export function ConvertSheet({
   onClose: () => void
 }) {
   const { t } = useI18n()
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const bottomGap = useBottomGap(sp.xxl)
+  const look = FIELD_LOOK[KIND_FIELD[kind]]!
+  const ink = look.colors[1]
+  const soft = ink + (dark ? '2E' : '1A')
 
   const compat = kind === 'blood' ? bloodCompat(raw) : null
   const rows = kind === 'blood' ? null : convertRows(kind, raw)
@@ -36,48 +51,48 @@ export function ConvertSheet({
           style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: bottomGap }]}
           onPress={() => {}}
         >
-          <View style={[styles.grab, { backgroundColor: c.border }]} />
-
-          <Txt variant="label">{label}</Txt>
-          <Txt variant="display" style={{ marginTop: 2, marginBottom: sp.md }}>
-            {primaryLabel(kind, raw)}
-          </Txt>
+          <View style={styles.head}>
+            <IconTile Icon={look.icon} colors={look.colors} size={52} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={[styles.kicker, { color: c.textMuted }]} numberOfLines={1}>
+                {label}
+              </Txt>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 28, lineHeight: 33, marginTop: 2 }} numberOfLines={1}>
+                {primaryLabel(kind, raw)}
+              </Txt>
+            </View>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface }]}
+            >
+              <X size={16} color={c.textMuted} />
+            </Pressable>
+          </View>
 
           {compat ? (
-            <View style={{ gap: sp.md }}>
+            <View style={{ gap: sp.lg }}>
               {compat.universalDonor || compat.universalRecipient ? (
-                <View
-                  style={{
-                    alignSelf: 'flex-start',
-                    backgroundColor: 'rgba(52,199,89,0.16)',
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderRadius: radius.pill,
-                  }}
-                >
-                  <Txt style={{ color: '#1f7a37', fontWeight: '700', fontSize: 13 }}>
-                    {compat.universalDonor
-                      ? t('family.universalDonor')
-                      : t('family.universalRecipient')}
+                <View style={{ alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: soft }}>
+                  <Txt style={{ color: ink, fontFamily: fonts.semibold, fontSize: 13.5 }}>
+                    {compat.universalDonor ? t('family.universalDonor') : t('family.universalRecipient')}
                   </Txt>
                 </View>
               ) : null}
 
-              <View>
-                <Txt variant="muted" style={{ marginBottom: 6 }}>
-                  {t('family.donateTo')}
-                </Txt>
+              <View style={{ gap: sp.sm }}>
+                <Txt style={[styles.kicker, { color: c.textMuted }]}>{t('family.donateTo')}</Txt>
                 <View style={styles.chips}>
                   {compat.give.map((b) => (
-                    <BloodChip key={b} label={b} good />
+                    <BloodChip key={b} label={b} ink={ink} soft={soft} />
                   ))}
                 </View>
               </View>
 
-              <View>
-                <Txt variant="muted" style={{ marginBottom: 6 }}>
-                  {t('family.receiveFrom')}
-                </Txt>
+              <View style={{ gap: sp.sm }}>
+                <Txt style={[styles.kicker, { color: c.textMuted }]}>{t('family.receiveFrom')}</Txt>
                 <View style={styles.chips}>
                   {compat.get.map((b) => (
                     <BloodChip key={b} label={b} />
@@ -86,31 +101,38 @@ export function ConvertSheet({
               </View>
             </View>
           ) : rows ? (
-            <ScrollView style={{ flexGrow: 0 }}>
-              {rows.map((r, i) => (
-                <View
-                  key={i}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingVertical: 12,
-                    borderBottomWidth: i < rows.length - 1 ? StyleSheet.hairlineWidth : 0,
-                    borderBottomColor: c.border,
-                  }}
-                >
-                  <Txt style={{ fontSize: 18, fontWeight: r.primary ? '700' : '500' }}>
-                    {r.value}
-                  </Txt>
-                  {r.primary ? (
-                    <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 12 }}>
-                      {t('family.convertCurrent')}
+            <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: sp.md }}>
+              <View style={styles.chips}>
+                {rows.map((r, i) => (
+                  // Selected = a soft wash of the field's colour + outline (like
+                  // the new-budget period tiles); the rest stay neutral. The
+                  // head's icon is the one solid fill on the sheet.
+                  <View
+                    key={i}
+                    style={[
+                      styles.unit,
+                      r.primary
+                        ? { backgroundColor: soft, borderWidth: 1.5, borderColor: ink }
+                        : { backgroundColor: c.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border },
+                    ]}
+                  >
+                    <Txt
+                      style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 25, color: r.primary ? ink : c.text }}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                    >
+                      {r.value}
                     </Txt>
-                  ) : null}
-                </View>
-              ))}
+                    {r.primary ? (
+                      <Txt style={{ color: ink, fontFamily: fonts.semibold, fontSize: 11.5, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 2 }}>
+                        {t('family.convertCurrent')}
+                      </Txt>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
               {kind === 'shoe' ? (
-                <Txt variant="faint" style={{ marginTop: sp.md }}>
+                <Txt variant="faint" style={{ fontSize: 13 }}>
                   {t('family.convertApprox')}
                 </Txt>
               ) : null}
@@ -122,20 +144,18 @@ export function ConvertSheet({
   )
 }
 
-function BloodChip({ label, good }: { label: string; good?: boolean }) {
+function BloodChip({ label, ink, soft }: { label: string; ink?: string; soft?: string }) {
   const { c } = useTheme()
   return (
     <View
-      style={{
-        paddingHorizontal: 11,
-        paddingVertical: 6,
-        borderRadius: radius.sm,
-        backgroundColor: good ? 'rgba(52,199,89,0.16)' : c.surface,
-      }}
+      style={[
+        styles.blood,
+        ink
+          ? { backgroundColor: soft, borderWidth: 1.5, borderColor: ink }
+          : { backgroundColor: c.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border },
+      ]}
     >
-      <Txt style={{ fontWeight: '700', fontSize: 14, color: good ? '#1f7a37' : c.text }}>
-        {label}
-      </Txt>
+      <Txt style={{ fontFamily: fonts.display, fontSize: 17, color: ink ?? c.text }}>{label}</Txt>
     </View>
   )
 }
@@ -143,29 +163,20 @@ function BloodChip({ label, good }: { label: string; good?: boolean }) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   sheet: {
     maxHeight: '80%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    // Roomy insets: the blood-type chips wrap into several rows and read as
-    // cramped when they run close to the sheet's edges.
-    paddingHorizontal: sp.xl,
+    paddingHorizontal: sp.lg,
     paddingTop: sp.lg,
-    paddingBottom: sp.xxl,
   },
-  grab: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginBottom: sp.md,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: sp.sm,
-  },
+  head: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingBottom: sp.lg },
+  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase' },
+  close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
+  unit: { flexBasis: '47%', flexGrow: 1, minHeight: 64, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center' },
+  blood: { borderRadius: 14, minWidth: 56, height: 44, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
 })

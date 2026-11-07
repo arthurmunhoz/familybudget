@@ -17,15 +17,33 @@
 // The docked save button announces what it does ("Add expense · $12.50").
 // Supports an `initial` prefill (e.g. a scanned receipt) and learns
 // label→category on save.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { ArrowDown, ArrowUp, CalendarDays, ChevronDown, ChevronRight, Plus } from 'lucide-react-native'
+import {
+  ArrowDown,
+  ArrowUp,
+  Banknote,
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  LayoutGrid,
+  PenLine,
+  Plus,
+  Receipt,
+  Repeat,
+  Settings2,
+  Tag,
+  UserRound,
+} from 'lucide-react-native'
 
-import { Btn, Txt } from '@/components/ui'
+import { Txt } from '@/components/ui'
+import { TintButton } from '@/components/TintButton'
+import type { Gradient } from '@/components/home/palette'
 import {
   FormRow,
   FormSection,
+  RowIcon,
   RowValue,
   SelectRow,
   TextRow,
@@ -64,6 +82,17 @@ export interface EntryPrefill {
 const FALLBACK_TOP = ['groceries', 'dining', 'transport']
 
 const ROW_MIN_H = 50
+
+/** The budget's gradient (budgetLook), shared with the pieces below — the
+ *  pills, the category grid, its Add button — so a choice in this form is in
+ *  the budget's colour instead of the old clay accent (2026-11). */
+const LookContext = createContext<Gradient | null>(null)
+function useLookTint(): { tint: string; soft: string; colors: Gradient | null } {
+  const colors = useContext(LookContext)
+  const { c, dark } = useTheme()
+  const tint = colors?.[1] ?? c.accent
+  return { tint, soft: tint + (dark ? '2E' : '1A'), colors }
+}
 
 /** Strip a hint's wrapping parentheses: "(suggested as you type)" was
  *  written to sit inline after a label; under one, the brackets are noise. */
@@ -292,6 +321,7 @@ function Pill({
   onPress: () => void
 }) {
   const { c } = useTheme()
+  const { tint, soft } = useLookTint()
   return (
     <Pressable
       onPress={onPress}
@@ -304,13 +334,13 @@ function Pill({
         paddingHorizontal: 11,
         paddingVertical: 6,
         borderRadius: radius.pill,
-        backgroundColor: active ? c.action : c.surface,
+        backgroundColor: active ? soft : c.surface,
         opacity: pressed ? 0.7 : 1,
       })}
     >
       {icon ? <Txt style={{ fontSize: 14 }}>{icon}</Txt> : null}
       <Txt
-        style={{ fontSize: 13, fontFamily: active ? fonts.semibold : fonts.medium, color: active ? c.onAction : c.textMuted }}
+        style={{ fontSize: 13, fontFamily: active ? fonts.semibold : fonts.medium, color: active ? tint : c.textMuted }}
         numberOfLines={1}
       >
         {label}
@@ -338,6 +368,7 @@ function NewCategoryRow({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const { tint } = useLookTint()
   const reveal = useRevealOnFocus()
   const row = useRef<View>(null)
   const canAdd = !busy && Boolean(name.trim())
@@ -381,14 +412,14 @@ function NewCategoryRow({
         disabled={!canAdd}
         accessibilityRole="button"
         style={({ pressed }) => ({
-          backgroundColor: c.action,
+          backgroundColor: tint,
           borderRadius: radius.pill,
           paddingHorizontal: 14,
           paddingVertical: 8,
           opacity: !canAdd ? 0.5 : pressed ? 0.85 : 1,
         })}
       >
-        <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 14 }}>{t('common.add')}</Txt>
+        <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>{t('common.add')}</Txt>
       </Pressable>
     </View>
   )
@@ -423,6 +454,7 @@ function CategorySheet({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const { tint, soft, colors } = useLookTint()
   const [newOpen, setNewOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newIcon, setNewIcon] = useState('')
@@ -454,6 +486,8 @@ function CategorySheet({
   return (
     <FormSheet
       visible={visible}
+      icon={colors ? LayoutGrid : undefined}
+      colors={colors ?? undefined}
       title={t('entry.category')}
       onClose={onClose}
       onBackdropPress={onClose}
@@ -461,6 +495,7 @@ function CategorySheet({
       overlay={
         manageOpen ? (
           <ManageCategoriesSheet
+            colors={colors ?? undefined}
             categories={customCats}
             overrides={overrides}
             onChanged={onManageChanged}
@@ -485,7 +520,10 @@ function CategorySheet({
                 paddingVertical: 10,
                 paddingHorizontal: 2,
                 borderRadius: radius.md,
-                backgroundColor: active ? c.action : c.surface,
+                // Selected = soft wash + outline in the budget colour.
+                backgroundColor: active ? soft : c.surface,
+                borderWidth: 1.5,
+                borderColor: active ? tint : 'transparent',
                 opacity: pressed ? 0.7 : 1,
               })}
             >
@@ -494,7 +532,7 @@ function CategorySheet({
                 style={{
                   fontSize: 11,
                   marginTop: 3,
-                  color: active ? c.accent : c.textMuted,
+                  color: active ? tint : c.textMuted,
                   fontFamily: active ? fonts.semibold : fonts.body,
                 }}
                 numberOfLines={1}
@@ -516,12 +554,12 @@ function CategorySheet({
             borderRadius: radius.md,
             borderWidth: 1,
             borderStyle: 'dashed',
-            borderColor: newOpen ? c.accent : c.textFaint,
+            borderColor: newOpen ? tint : c.textFaint,
             opacity: pressed ? 0.7 : 1,
           })}
         >
-          <Plus size={20} color={newOpen ? c.accent : c.textMuted} />
-          <Txt style={{ fontSize: 11, marginTop: 3, color: newOpen ? c.accent : c.textMuted }} numberOfLines={1}>
+          <Plus size={20} color={newOpen ? tint : c.textMuted} />
+          <Txt style={{ fontSize: 11, marginTop: 3, color: newOpen ? tint : c.textMuted }} numberOfLines={1}>
             {t('entry.newCategory')}
           </Txt>
         </Pressable>
@@ -545,7 +583,7 @@ function CategorySheet({
 
       {/* edit / delete the household's categories, rename the built-ins */}
       <FormSection>
-        <FormRow label={t('manageCats.title')} onPress={() => setManageOpen(true)} chevron />
+        <FormRow label={t('manageCats.title')} icon={<RowIcon Icon={Settings2} tint={tint} />} onPress={() => setManageOpen(true)} chevron />
       </FormSection>
     </FormSheet>
   )
@@ -567,7 +605,13 @@ export default function EntryForm({
   initial,
   onClose,
   onSaved,
+  colors,
+  kicker,
 }: {
+  /** The budget's gradient (budgetLook) — head tile, row icons, Save. */
+  colors?: Gradient
+  /** Above the title: the period ("July 2026"). */
+  kicker?: string
   monthId: string
   /** Inclusive ISO date bounds of the budget period this entry belongs to. */
   periodStart: string
@@ -594,6 +638,8 @@ export default function EntryForm({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const tint = colors?.[1] ?? c.accent
+  const ri = (Icon: typeof Tag) => <RowIcon Icon={Icon} tint={tint} />
 
   const today = todayISO()
   const yesterday = addDaysISO(today, -1)
@@ -780,29 +826,40 @@ export default function EntryForm({
   const whoRow =
     profiles.length > 4 ? (
       <SelectRow
+        icon={ri(UserRound)}
         label={t('entry.who')}
         value={personEmail}
         options={profiles.map((p) => ({ value: p.email, label: shortName(p.display_name) }))}
         onChange={(v) => v && setPersonEmail(v)}
       />
     ) : profiles.length > 1 ? (
-      <FormRow label={t('entry.who')}>
+      <FormRow label={t('entry.who')} icon={ri(UserRound)}>
         <WhoChips profiles={profiles} value={personEmail} onChange={setPersonEmail} />
       </FormRow>
     ) : (
-      <FormRow label={t('entry.who')}>
+      <FormRow label={t('entry.who')} icon={ri(UserRound)}>
         <RowValue value={who ? shortName(who.display_name) : null} placeholder="—" />
       </FormRow>
     )
 
   return (
+    <LookContext.Provider value={colors ?? null}>
     <FormSheet
+      icon={colors ? (type === 'expense' ? Receipt : Banknote) : undefined}
+      colors={colors}
+      kicker={kicker}
       title={title}
       onClose={onClose}
       footer={
         <>
           {error ? <Txt style={{ color: c.expense, fontSize: 13 }}>{error}</Txt> : null}
-          <Btn title={saveTitle} onPress={save} loading={saving} />
+          <TintButton
+            tint={tint}
+            colors={colors}
+            title={saving ? t('common.saving') : saveTitle}
+            onPress={save}
+            disabled={saving}
+          />
           {entry ? (
             <Pressable
               onPress={remove}
@@ -819,6 +876,8 @@ export default function EntryForm({
         <>
           {/* Nested inside the form's Modal (a sibling Modal fails on iOS). */}
           <DatePickerModal
+            tint={tint}
+            title={t('entry.date')}
             visible={pickOpen}
             value={date}
             onChange={setDate}
@@ -884,6 +943,7 @@ export default function EntryForm({
 
       <FormSection>
         <TextRow
+          icon={ri(PenLine)}
           label={t('entry.label')}
           value={label}
           onChangeText={setLabel}
@@ -915,12 +975,13 @@ export default function EntryForm({
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
-                <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: c.accent }}>{t('common.all')}</Txt>
-                <ChevronRight size={14} color={c.accent} />
+                <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: tint }}>{t('common.all')}</Txt>
+                <ChevronRight size={14} color={tint} />
               </Pressable>
             </PillStrip>
           ) : null}
           <TextRow
+            icon={ri(Tag)}
             label={t('entry.subcategory')}
             value={subcategory}
             onChangeText={setSubcategory}
@@ -942,18 +1003,21 @@ export default function EntryForm({
       ) : null}
 
       <FormSection>
-        <FormRow label={t('entry.date')}>
+        <FormRow label={t('entry.date')} icon={ri(CalendarDays)}>
           <MiniSegment value={dateKey} options={dateOptions} onPress={pickDateKey} />
         </FormRow>
         {whoRow}
         <ToggleRow
-          label={t('entry.recurring')}
+          icon={ri(Repeat)}
+          tint={tint}
+          label={t('entry.recurring').replace(/^↻\s*/, '')}
           hint={bareHint(t('entry.recurringHint'))}
           value={recurring}
           onValueChange={setRecurring}
         />
       </FormSection>
     </FormSheet>
+    </LookContext.Provider>
   )
 }
 

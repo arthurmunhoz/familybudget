@@ -13,14 +13,16 @@
 // Event text is Wikipedia's (CC BY-SA): keep the credit line, and every item
 // opens its article.
 import { useMemo, type ReactNode } from 'react'
-import { View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { useLocalSearchParams } from 'expo-router'
 import { Image } from 'expo-image'
 import * as WebBrowser from 'expo-web-browser'
-import { ChevronRight } from 'lucide-react-native'
+import { ChevronRight, Flag, HeartPulse, type LucideIcon } from 'lucide-react-native'
 
-import { AppHeader, Card, Screen, Txt } from '@/components/ui'
+import { AppHeader, Screen, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT, CARD_GRADIENT, type Gradient } from '@/components/home/palette'
 import { Skeleton } from '@/components/Skeleton'
 import { BirthdayCake } from '@/components/BirthdayCake'
 import { useAuth } from '@/lib/auth'
@@ -41,7 +43,7 @@ import {
   zodiacSign,
 } from '@/lib/birthday'
 import { birthYearFacts, type YearEvent, type YearPerson } from '@/lib/birthYear'
-import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 
 const LOCALE: Record<string, string> = { en: 'en-US', es: 'es-ES', pt: 'pt-BR' }
 
@@ -106,35 +108,41 @@ export default function Birthday() {
   return (
     <Screen scroll header={header}>
       <View style={{ gap: sp.md }}>
-        {/* Countdown — the app's own glass card and a drawn cake (the user
-            found the 🎂 emoji on an orange gradient "too generic"). */}
-        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: sp.md }}>
-          <BirthdayCake size={92} candles={Math.min(5, Math.max(1, Math.round(next.turning / 10)))} />
-          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-            <Txt style={{ fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: c.text }}>
+        {/* Countdown — a gradient card like the Home's "Today" cards, with the
+            drawn cake on a glass disc (the 🎂 emoji read "too generic"). */}
+        <GradientBox colors={CARD_GRADIENT.birthday} radius={28} style={{ padding: 20, flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={styles.onKicker} numberOfLines={1}>
+              {isToday ? t('birthday.today') : dateFmt(next.date, locale, { weekday: 'long', day: 'numeric', month: 'long' })}
+            </Txt>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 27, lineHeight: 32, color: '#fff', marginTop: 4 }}>
               {isToday
                 ? t('birthday.turnsToday', { name: first, age: next.turning })
                 : t('birthday.turns', { name: first, age: next.turning })}
             </Txt>
-            <Txt style={{ color: c.accent, fontSize: 15, fontFamily: fonts.semibold }}>
-              {isToday ? t('birthday.today') : t('birthday.inDays', { count: next.inDays })}
-            </Txt>
             {!isToday ? (
-              <Txt variant="muted" style={{ fontSize: 13 }}>
-                {dateFmt(next.date, locale, { weekday: 'long', day: 'numeric', month: 'long' })}
-              </Txt>
+              <View style={styles.onPill}>
+                <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>
+                  {t('birthday.inDays', { count: next.inDays })}
+                </Txt>
+              </View>
             ) : null}
           </View>
-        </Card>
-        <Txt variant="faint" style={{ fontSize: 12, marginTop: -sp.xs, paddingHorizontal: sp.xs }}>
+          <View style={styles.cakeDisc}>
+            <BirthdayCake size={70} candles={Math.min(5, Math.max(1, Math.round(next.turning / 10)))} />
+          </View>
+        </GradientBox>
+        <Txt variant="faint" style={{ fontSize: 12.5, paddingHorizontal: sp.xs }}>
           {t('birthday.born')}:{' '}
           {dateFmt(birth, locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </Txt>
 
         {/* Days of life + milestone */}
         <View style={{ flexDirection: 'row', gap: sp.md }}>
-          <Stat label={t('birthday.daysAlive')} value={num(facts.alive)} />
+          <Stat Icon={HeartPulse} colors={APP_GRADIENT.calendar} label={t('birthday.daysAlive')} value={num(facts.alive)} />
           <Stat
+            Icon={Flag}
+            colors={APP_GRADIENT.pings}
             label={t('birthday.milestone')}
             value={num(facts.milestone.days)}
             sub={dateFmt(facts.milestone.date, locale, { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -142,11 +150,11 @@ export default function Birthday() {
         </View>
 
         {/* On-device facts */}
-        <Card style={{ gap: 0, paddingVertical: sp.xs }}>
-          <FactRow emoji={ZODIAC_EMOJI[facts.sign]} label={t('birthday.sign')} value={t(`zodiac.${facts.sign}` as TKey)} />
-          <FactRow emoji={MOON_EMOJI[facts.moon]} label={t('birthday.moon')} value={t(`moon.${facts.moon}` as TKey)} />
-          <FactRow emoji="👥" label={t('birthday.generation')} value={t(`gen.${facts.gen}` as TKey)} last />
-        </Card>
+        <View style={{ flexDirection: 'row', gap: sp.md }}>
+          <Fact emoji={ZODIAC_EMOJI[facts.sign]} label={t('birthday.sign')} value={t(`zodiac.${facts.sign}` as TKey)} />
+          <Fact emoji={MOON_EMOJI[facts.moon]} label={t('birthday.moon')} value={t(`moon.${facts.moon}` as TKey)} />
+          <Fact emoji="👥" label={t('birthday.generation')} value={t(`gen.${facts.gen}` as TKey)} />
+        </View>
 
         {/* The year they were born */}
         {world.events.length ? (
@@ -175,80 +183,104 @@ export default function Birthday() {
   )
 }
 
+/** The page's surface for tiles and lists — opaque card + hairline, no
+ *  elevation (Android smears it under a translucent fill). */
+function useTile() {
+  const { c } = useTheme()
+  return { backgroundColor: c.card, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border }
+}
+
 /** The whole page while the member's profile loads — same blocks, same sizes
- *  (countdown, two stats, the facts card). */
+ *  (countdown, two stats, three facts). */
 function PageSkeleton() {
   return (
     <View style={{ gap: sp.md }}>
-      <Skeleton style={{ height: 124, borderRadius: radius.lg }} />
+      <Skeleton style={{ height: 150, borderRadius: 28 }} />
       <View style={{ flexDirection: 'row', gap: sp.md }}>
-        <Skeleton style={{ flex: 1, height: 84, borderRadius: radius.lg }} />
-        <Skeleton style={{ flex: 1, height: 84, borderRadius: radius.lg }} />
+        <Skeleton style={{ flex: 1, height: 116, borderRadius: 20 }} />
+        <Skeleton style={{ flex: 1, height: 116, borderRadius: 20 }} />
       </View>
-      <Card style={{ gap: 0, paddingVertical: sp.xs }}>
+      <View style={{ flexDirection: 'row', gap: sp.md }}>
         {[0, 1, 2].map((i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 12 }}>
-            <Skeleton style={{ width: 24, height: 24, borderRadius: 12 }} />
-            <Skeleton style={{ width: 90, height: 12 }} />
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Skeleton style={{ width: 80, height: 14 }} />
-            </View>
-          </View>
+          <Skeleton key={i} style={{ flex: 1, height: 108, borderRadius: 20 }} />
         ))}
-      </Card>
+      </View>
     </View>
   )
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ Icon, colors, label, value, sub }: { Icon: LucideIcon; colors: Gradient; label: string; value: string; sub?: string }) {
   const { c } = useTheme()
+  const tile = useTile()
   return (
-    <Card style={{ flex: 1, gap: 2 }}>
-      <Txt variant="faint" style={{ fontSize: 12 }}>
-        {label}
-      </Txt>
-      <Txt style={{ fontFamily: fonts.display, fontSize: 24, color: c.text }}>{value}</Txt>
-      {sub ? (
-        <Txt variant="faint" style={{ fontSize: 12 }}>
-          {sub}
+    <View style={[tile, { flex: 1, padding: 14, gap: 10 }]}>
+      <GradientBox colors={colors} radius={10} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon size={16} color="#fff" strokeWidth={2.2} />
+      </GradientBox>
+      <View>
+        <Txt style={{ fontFamily: fonts.display, fontSize: 24, lineHeight: 29, color: c.text }} numberOfLines={1} adjustsFontSizeToFit>
+          {value}
         </Txt>
-      ) : null}
-    </Card>
+        <Txt style={{ color: c.textMuted, fontSize: 12.5 }} numberOfLines={2}>
+          {label}
+          {sub ? ` · ${sub}` : ''}
+        </Txt>
+      </View>
+    </View>
   )
 }
 
-function FactRow({ emoji, label, value, last }: { emoji: string; label: string; value: string; last?: boolean }) {
+function Fact({ emoji, label, value }: { emoji: string; label: string; value: string }) {
   const { c } = useTheme()
+  const tile = useTile()
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: sp.md,
-        paddingVertical: 11,
-        borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: c.border,
-      }}
-    >
-      <Txt style={{ fontSize: 20, width: 28, textAlign: 'center' }}>{emoji}</Txt>
-      <Txt style={{ color: c.textMuted, fontSize: 14 }}>{label}</Txt>
-      <Txt style={{ flex: 1, textAlign: 'right', fontSize: 15, fontFamily: fonts.semibold }} numberOfLines={1}>
-        {value}
-      </Txt>
+    <View style={[tile, { flex: 1, padding: 12, gap: 8 }]}>
+      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+        <Txt style={{ fontSize: 19 }}>{emoji}</Txt>
+      </View>
+      <View>
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 14.5, lineHeight: 18 }} numberOfLines={2}>
+          {value}
+        </Txt>
+        <Txt style={{ color: c.textMuted, fontSize: 11.5, marginTop: 2 }} numberOfLines={1}>
+          {label}
+        </Txt>
+      </View>
     </View>
   )
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
+  const { c } = useTheme()
+  const tile = useTile()
   return (
-    <Card style={{ gap: 0, paddingVertical: sp.sm }}>
-      <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: sp.xs }}>
-        {title}
-      </Txt>
-      {children}
-    </Card>
+    <View style={{ gap: sp.sm, marginTop: sp.sm }}>
+      <Txt style={[styles.kicker, { color: c.textMuted }]}>{title}</Txt>
+      <View style={[tile, { paddingHorizontal: 14, paddingVertical: 4 }]}>{children}</View>
+    </View>
   )
 }
+
+const styles = StyleSheet.create({
+  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', paddingHorizontal: sp.xs },
+  onKicker: { color: 'rgba(255,255,255,0.85)', fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase' },
+  onPill: {
+    alignSelf: 'flex-start',
+    marginTop: sp.md,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  cakeDisc: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})
 
 const open = (url: string | null) => (url ? () => void WebBrowser.openBrowserAsync(url) : undefined)
 

@@ -25,6 +25,7 @@ import { CalendarDays, CalendarRange, Camera, Check, ChevronDown, ChevronRight, 
 import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
 import { APP_GRADIENT, BUDGET_GRADIENTS, budgetLook } from '@/components/home/palette'
+import { AnimatedLock } from '@/components/AnimatedLock'
 import { Toggle } from '@/components/Toggle'
 import { Pressable as SafePressable } from '@/components/Pressable'
 import { useBottomGap } from '@/hooks/useBottomGap'
@@ -313,8 +314,9 @@ function NewBudgetSheet({
   const { c, dark } = useTheme()
   const bottomGap = useBottomGap(sp.xs)
   const corner = useScreenCorner()
-  const bottomR = corner?.radius ?? radius.md
-  const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
+  const { lift, room, clearOfBars, onRootLayout, kb } = useSheetLift()
+  // Floating above the keyboard → a plain pill (see TintButton).
+  const bottomR = kb > 0 ? 27 : (corner?.radius ?? radius.md)
   const green = APP_GRADIENT.budget as [string, string]
   const tint = green[1]
   const soft = tint + (dark ? '2E' : '1A')
@@ -389,12 +391,16 @@ function NewBudgetSheet({
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 6,
-                        backgroundColor: on ? tint : soft,
+                        // Selected = a soft green wash + green outline; the rest
+                        // stay neutral (solid green tiles read far too loud).
+                        backgroundColor: on ? soft : c.card,
+                        borderWidth: on ? 1.5 : StyleSheet.hairlineWidth,
+                        borderColor: on ? tint : c.border,
                         opacity: pressed ? 0.75 : 1,
                       })}
                     >
-                      <Icon size={20} color={on ? '#fff' : tint} />
-                      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? '#fff' : tint }}>
+                      <Icon size={20} color={on ? tint : c.textMuted} />
+                      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? tint : c.text }}>
                         {t(`budget.${p}` as TKey)}
                       </Txt>
                     </Pressable>
@@ -404,7 +410,13 @@ function NewBudgetSheet({
             </View>
 
             {showPrivate ? (
-              <View
+              // The whole row flips it (as ToggleRow does): a tap aimed at the
+              // small native switch could miss it.
+              <Pressable
+                onPress={() => onPrivate(!isPrivate)}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: isPrivate }}
+                accessibilityLabel={t('budget.private')}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -416,8 +428,8 @@ function NewBudgetSheet({
                   backgroundColor: c.card,
                 }}
               >
-                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isPrivate ? tint : c.surface, alignItems: 'center', justifyContent: 'center' }}>
-                  <Lock size={18} color={isPrivate ? '#fff' : c.textMuted} />
+                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: isPrivate ? soft : c.surface, alignItems: 'center', justifyContent: 'center' }}>
+                  <AnimatedLock locked={isPrivate} color={isPrivate ? tint : c.textMuted} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('budget.private')}</Txt>
@@ -425,8 +437,8 @@ function NewBudgetSheet({
                     {t('budget.privateHint')}
                   </Txt>
                 </View>
-                <Toggle value={isPrivate} onValueChange={onPrivate} />
-              </View>
+                <Toggle tint={tint} value={isPrivate} onValueChange={onPrivate} />
+              </Pressable>
             ) : null}
           </View>
 
@@ -440,7 +452,7 @@ function NewBudgetSheet({
             >
               <GradientBox
                 colors={green}
-                radius={radius.md}
+                radius={kb > 0 ? 27 : radius.md}
                 style={{
                   height: 54,
                   borderBottomLeftRadius: bottomR,

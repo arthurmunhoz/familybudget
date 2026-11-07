@@ -15,9 +15,9 @@
 // Without either, Location and Notes were typed blind under the keyboard.
 import { useState } from 'react'
 import { Alert, Keyboard, Modal, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { CalendarDays, Users, X } from 'lucide-react-native'
+import { Bell, CalendarCheck, CalendarDays, MapPin, Repeat, StickyNote, Sun, Users, X, type LucideIcon } from 'lucide-react-native'
 
-import { FormSection, SelectRow, ToggleRow } from '@/components/form'
+import { FormSection, RowIcon, SelectRow, ToggleRow } from '@/components/form'
 import { GradientBox } from '@/components/home/GradientBox'
 import { APP_GRADIENT } from '@/components/home/palette'
 import { TintButton } from '@/components/TintButton'
@@ -206,6 +206,7 @@ export default function EventForm({
   const tint = red[1]
   const soft = tint + (dark ? '2E' : '17')
   const kindEmoji = KIND_EMOJI[draft.kind]
+  const ri = (Icon: LucideIcon) => <RowIcon Icon={Icon} tint={tint} />
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -270,10 +271,18 @@ export default function EventForm({
                     onPress={() => pickKind(k)}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: on }}
-                    style={({ pressed }) => [styles.chip, { backgroundColor: on ? tint : soft, opacity: pressed ? 0.7 : 1 }]}
+                    // Selected = soft wash + outline (2026-11): the head tile is the
+                    // sheet's one solid colour; the rest stay neutral.
+                    style={({ pressed }) => [
+                      styles.chip,
+                      on
+                        ? { backgroundColor: soft, borderWidth: 1.5, borderColor: tint }
+                        : { backgroundColor: c.card, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border },
+                      { opacity: pressed ? 0.7 : 1 },
+                    ]}
                   >
                     {KIND_EMOJI[k] ? <Txt style={{ fontSize: 14 }}>{KIND_EMOJI[k]}</Txt> : null}
-                    <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: on ? '#fff' : tint }}>
+                    <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: on ? tint : c.text }}>
                       {t(`calendar.kind.${k}` as TKey)}
                     </Txt>
                   </Pressable>
@@ -285,9 +294,10 @@ export default function EventForm({
             <View>
               <Txt style={[styles.label, { color: c.textMuted }]}>{t('calendar.whenLabel')}</Txt>
               <FormSection>
-                <ToggleRow label={t('calendar.allDay')} value={draft.allDay} onValueChange={(v) => set({ allDay: v })} />
+                <ToggleRow icon={ri(Sun)} tint={tint} label={t('calendar.allDay')} value={draft.allDay} onValueChange={(v) => set({ allDay: v })} />
                 <DateTimeRow
                   tint={tint}
+                  icon={ri(CalendarDays)}
                   label={t('calendar.startLabel')}
                   date={draft.start}
                   time={draft.allDay ? null : draft.startTime}
@@ -297,6 +307,7 @@ export default function EventForm({
                 />
                 <DateTimeRow
                   tint={tint}
+                  icon={ri(CalendarCheck)}
                   label={t('calendar.endLabel')}
                   date={draft.end}
                   time={draft.allDay ? null : draft.endTime}
@@ -306,6 +317,7 @@ export default function EventForm({
                   onTime={(v) => set({ endTime: v })}
                 />
                 <SelectRow
+                  icon={ri(Repeat)}
                   label={t('calendar.repeatLabel')}
                   value={draft.repeat}
                   options={RECURRENCES.map((r) => ({ value: r, label: t(`calendar.repeat.${r}` as TKey) }))}
@@ -313,7 +325,7 @@ export default function EventForm({
                     if (v) set({ repeat: v })
                   }}
                 />
-                <ToggleRow label={t('calendar.remind')} value={draft.remind} onValueChange={(v) => set({ remind: v })} />
+                <ToggleRow icon={ri(Bell)} tint={tint} label={t('calendar.remind')} value={draft.remind} onValueChange={(v) => set({ remind: v })} />
               </FormSection>
             </View>
 
@@ -325,11 +337,13 @@ export default function EventForm({
 
             <FormSection>
               <InputRow
+                icon={ri(MapPin)}
                 value={draft.location}
                 onChangeText={(v) => set({ location: v })}
                 placeholder={t('calendar.locationPlaceholder')}
               />
               <InputRow
+                icon={ri(StickyNote)}
                 multiline
                 value={draft.notes}
                 onChangeText={(v) => set({ notes: v })}
@@ -354,7 +368,8 @@ export default function EventForm({
           {/* save — docked, in the Calendar's red, following the screen curve */}
           <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: clearOfBars ? sp.md : bottomGap }}>
             <TintButton
-              tint={red[0]}
+              tint={tint}
+              colors={red}
               title={editing ? t('common.saveChanges') : t('calendar.saveEvent')}
               onPress={save}
               disabled={!canSave}

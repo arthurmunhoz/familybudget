@@ -15,13 +15,14 @@
 // also feeds the Pet Care home-screen widget: a fresh App Group snapshot +
 // a best-effort ?action=petcare-notify so OTHER members' widgets reload ASAP.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Animated, Pressable, View } from 'react-native'
+import { Alert, Animated, Pressable, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
-import { PawPrint, Plus, Stethoscope, Syringe } from 'lucide-react-native'
+import { Bone, PawPrint, Pill, Plus, Scale, Stethoscope, Syringe, type LucideIcon } from 'lucide-react-native'
 import { useScreenCorner } from '@/hooks/useScreenCorner'
 
-import { AppHeader, Btn, EmptyState, Loader, Txt } from '@/components/ui'
+import { AppHeader, Btn, Loader, Txt } from '@/components/ui'
+import { TintButton } from '@/components/TintButton'
 import { Toast, type ToastData } from '@/components/Toast'
 import { PhotoHero, type HeroItem } from '@/components/PhotoHero'
 import { useAuth } from '@/lib/auth'
@@ -51,7 +52,7 @@ import { TodayCard, CareGrid, EventsCard, EventSeriesSheet, type CareItem } from
 import { CARE_ICONS, TYPE_ICON } from './petUi'
 import { petColor, petColorMap, TYPE_COLOR } from './petColors'
 import { GradientBox } from '@/components/home/GradientBox'
-import { shade } from '@/components/home/palette'
+import { APP_GRADIENT, shade } from '@/components/home/palette'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { speciesEmoji } from './petMeta'
 import EventForm, { type EventDraft } from './EventForm'
@@ -113,6 +114,64 @@ async function mirrorPetPhoto(petId: string, photoPath: string, url: string): Pr
   }
 }
 
+
+/** No pets yet — the 2026-11 empty card (same shape as Family's
+ *  EmptyProfile): gradient tile, display title, what you can track as chips,
+ *  and the add button inside the card. */
+function EmptyPets({ onAdd }: { onAdd: () => void }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const [g0, g1] = APP_GRADIENT.pets
+  const chips: [LucideIcon, string][] = [
+    [Stethoscope, t('pets.type.vet')],
+    [Syringe, t('pets.type.vaccine')],
+    [Pill, t('pets.type.medication')],
+    [Bone, t('pets.emptyRoutines')],
+    [Scale, t('pets.weight')],
+  ]
+  return (
+    <View
+      style={{
+        backgroundColor: c.card,
+        borderRadius: 24,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: c.border,
+        padding: sp.lg,
+        gap: sp.md,
+      }}
+    >
+      <GradientBox colors={[g0, g1]} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+        <PawPrint size={26} color="#fff" />
+      </GradientBox>
+      <View style={{ gap: 6 }}>
+        <Txt style={{ fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: c.text }}>{t('pets.noPets')}</Txt>
+        <Txt variant="muted" style={{ lineHeight: 21 }}>
+          {t('pets.emptyBody')}
+        </Txt>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+        {chips.map(([Icon, label]) => (
+          <View
+            key={label}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              height: 32,
+              paddingHorizontal: 12,
+              borderRadius: 999,
+              backgroundColor: g1 + '17',
+            }}
+          >
+            <Icon size={14} strokeWidth={2.2} color={g1} />
+            <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: g1 }}>{label}</Txt>
+          </View>
+        ))}
+      </View>
+      <TintButton tint={g1} title={t('pets.addPet')} icon={<Plus size={18} color="#fff" strokeWidth={2.4} />} onPress={onAdd} inline />
+    </View>
+  )
+}
 
 export default function PetCare() {
   const { c } = useTheme()
@@ -578,12 +637,9 @@ export default function PetCare() {
         <Loader />
       ) : pets.length === 0 ? (
         <>
-          <EmptyState title={t('pets.noPets')} subtitle={t('pets.noPetsHint')} />
-          <SafeAreaView edges={['bottom']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-            <View style={{ paddingHorizontal: sp.lg, paddingVertical: sp.sm }}>
-              <Btn title={t('pets.addPet')} onPress={() => setShowPetForm(true)} />
-            </View>
-          </SafeAreaView>
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.md }}>
+            <EmptyPets onAdd={() => setShowPetForm(true)} />
+          </View>
         </>
       ) : (
         <>

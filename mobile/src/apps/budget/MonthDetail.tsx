@@ -31,6 +31,7 @@ import type {
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import EntryForm, { type EntryPrefill } from './EntryForm'
 import SummaryChart from './SummaryChart'
+import { useBottomGap } from '@/hooks/useBottomGap'
 import { budgetLook } from '@/components/home/palette'
 import { GradientBox } from '@/components/home/GradientBox'
 import { CameraArt } from './CameraArt'
@@ -54,6 +55,7 @@ export default function MonthDetail({
   const { c, dark } = useTheme()
   const { t } = useI18n()
   const insets = useSafeAreaInsets()
+  const bottomGap = useBottomGap(sp.xs)
   const { profile, profiles } = useAuth()
 
   const [person, setPerson] = useState<string>('all')
@@ -328,8 +330,8 @@ export default function MonthDetail({
                   backgroundColor: pressed ? c.surface : 'transparent',
                 })}
               >
-                <Txt style={{ fontWeight: '500', color: person === opt.key ? c.accent : c.text }}>{opt.label}</Txt>
-                {person === opt.key ? <Check size={16} color={c.accent} /> : null}
+                <Txt style={{ fontWeight: '500', color: person === opt.key ? look[1] : c.text }}>{opt.label}</Txt>
+                {person === opt.key ? <Check size={16} color={look[1]} /> : null}
               </Pressable>
             ),
           )}
@@ -352,11 +354,12 @@ export default function MonthDetail({
           <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 20 }}>{t('detail.entries')}</Txt>
           <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: 12, padding: 3 }}>
             <SortBtn
+              tint={look[1]}
               active={sortBy === 'date'}
               label={`${t('detail.byDate')} ${dateAsc ? '↑' : '↓'}`}
               onPress={() => (sortBy === 'date' ? setDateAsc((d) => !d) : setSortBy('date'))}
             />
-            <SortBtn active={sortBy === 'amount'} label={t('detail.byAmount')} onPress={() => setSortBy('amount')} />
+            <SortBtn tint={look[1]} active={sortBy === 'amount'} label={t('detail.byAmount')} onPress={() => setSortBy('amount')} />
           </View>
         </View>
 
@@ -432,14 +435,16 @@ export default function MonthDetail({
           secondary pill, and New entry filled in the budget's own gradient —
           the one loud thing on the screen. In NORMAL FLOW (not an overlay) so
           the list ends at it instead of scrolling underneath. Bottom padding
-          is half the home-indicator inset (floored), matching NewItemButton. */}
+          is useBottomGap, matching NewItemButton: half the inset on iOS, the
+          WHOLE inset on Android, where the nav bar overlays edge-to-edge (half
+          left Scan / New entry partly under it on an S9+). */}
       <View
         style={{
           flexDirection: 'row',
           gap: 10,
           paddingHorizontal: sp.lg,
           paddingTop: sp.sm,
-          paddingBottom: Math.max(Math.round(insets.bottom / 2), sp.xs),
+          paddingBottom: bottomGap,
         }}
       >
         {/* Scan receipt: a realistic greyscale camera fills the button,
@@ -469,7 +474,7 @@ export default function MonthDetail({
           {scanning ? <ActivityIndicator color={c.text} /> : null}
           <Txt style={{ fontFamily: fonts.display, fontSize: 15.5, color: c.text }}>{t('detail.scanReceipt')}</Txt>
           {/* The AI mark sits on the button's corner, so the label stays centred. */}
-          <Sparkles size={15} color={c.accent} style={{ position: 'absolute', top: 8, right: 10 }} />
+          <Sparkles size={15} color={look[1]} style={{ position: 'absolute', top: 8, right: 10 }} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -492,6 +497,8 @@ export default function MonthDetail({
 
       {formOpen && profile && (
         <EntryForm
+          colors={look}
+          kicker={periodTitle(period, month.start_date)}
           monthId={month.id}
           periodStart={month.start_date}
           periodEnd={periodEndISO(period, month.start_date)}
@@ -520,8 +527,8 @@ export default function MonthDetail({
   )
 }
 
-function SortBtn({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
-  const { c } = useTheme()
+function SortBtn({ active, label, onPress, tint }: { active: boolean; label: string; onPress: () => void; tint: string }) {
+  const { c, dark } = useTheme()
   return (
     <Pressable
       onPress={onPress}
@@ -529,10 +536,11 @@ function SortBtn({ active, label, onPress }: { active: boolean; label: string; o
         borderRadius: 9,
         paddingHorizontal: 12,
         paddingVertical: 6,
-        backgroundColor: active ? c.action : 'transparent',
+        // A choice, not an action: the budget colour as a soft wash (2026-11).
+        backgroundColor: active ? tint + (dark ? '2E' : '1A') : 'transparent',
       }}
     >
-      <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, color: active ? c.onAction : c.textMuted }}>{label}</Txt>
+      <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, color: active ? tint : c.textMuted }}>{label}</Txt>
     </Pressable>
   )
 }

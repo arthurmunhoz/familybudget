@@ -7,6 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import { CalendarDays, ChevronDown } from 'lucide-react-native'
 
 import { Btn, Txt } from '@/components/ui'
+import { PickerSheet } from '@/components/PickerSheet'
 import { useI18n } from '@/hooks/useI18n'
 import { formatDay } from '@/lib/format'
 import { useBottomGap } from '@/hooks/useBottomGap'
@@ -39,62 +40,29 @@ export function DatePickerModal({
   value,
   onChange,
   onClose,
+  tint,
+  title,
 }: {
   visible: boolean
   value: string
   onChange: (iso: string) => void
   onClose: () => void
+  /** The budget's colour (2026-11) — the picked day and Done. */
+  tint?: string
+  title?: string
 }) {
-  const { c, dark } = useTheme()
-  const bottomGap = useBottomGap(sp.xl)
-  const { t } = useI18n()
-
-  if (Platform.OS === 'android') {
-    return visible ? (
-      <DateTimePicker
-        mode="date"
-        display="default"
-        value={value ? fromISO(value) : new Date()}
-        onChange={(event, date) => {
-          onClose()
-          if (event.type !== 'dismissed' && date) onChange(toISO(date))
-        }}
-      />
-    ) : null
-  }
-
+  // The shared 2026-11 picker sheet (Calendar/Pets use it): localized
+  // calendar, app-coloured Done, same sheet chrome as the rest.
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable
-        onPress={onClose}
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
-      >
-        {/* Inner press-catcher so a tap on the sheet doesn't dismiss it. */}
-        <Pressable
-          onPress={() => {}}
-          style={{
-            backgroundColor: c.sheet,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-            paddingHorizontal: sp.lg,
-            paddingTop: sp.md,
-            paddingBottom: bottomGap,
-            gap: sp.md,
-          }}
-        >
-          <DateTimePicker
-            mode="date"
-            display="inline"
-            value={value ? fromISO(value) : new Date()}
-            onChange={(_event, date) => {
-              if (date) onChange(toISO(date))
-            }}
-            themeVariant={dark ? 'dark' : 'light'}
-          />
-          <Btn title={t('common.done')} onPress={onClose} />
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <PickerSheet
+      visible={visible}
+      mode="date"
+      tint={tint}
+      title={title}
+      value={value ? fromISO(value) : new Date()}
+      onChange={(d) => onChange(toISO(d))}
+      onClose={onClose}
+    />
   )
 }
 

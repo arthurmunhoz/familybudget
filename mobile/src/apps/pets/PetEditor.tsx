@@ -14,9 +14,12 @@
 import { useState, type ReactNode } from 'react'
 import { Alert, StyleSheet, TextInput, View } from 'react-native'
 
-import { FormRow, FormSection, NoteRow, NumberBox, SelectRow, TextRow, UnitButton } from '@/components/form'
+import { Brush, Cake, Cpu, Dna, Palette, PawPrint, Ruler, Scale, StickyNote } from 'lucide-react-native'
+
+import { FormRow, FormSection, NoteRow, NumberBox, RowIcon, SelectRow, TextRow, UnitButton } from '@/components/form'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { TintButton } from '@/components/TintButton'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
-import { Btn } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { track } from '@/lib/analytics'
@@ -32,6 +35,9 @@ import { SPECIES, speciesEmoji } from './petMeta'
 type LengthUnit = 'cm' | 'in'
 const CM_PER_IN = 2.54
 const round1 = (n: number) => Math.round(n * 10) / 10
+
+/** Pet Care's colour (the Home grid's pets gradient, deep stop). */
+const TINT = APP_GRADIENT.pets[1]
 
 /** "40 cm" / "16 in" → value + unit; a bare number has no unit (null). */
 function parseLength(raw: string): { value: number; unit: LengthUnit } | null {
@@ -87,9 +93,10 @@ function PetWeightRow({
   }
 
   return (
-    <FormRow label={label}>
+    <FormRow label={label} icon={<RowIcon Icon={Scale} tint={TINT} />}>
       <NumberBox value={v} onChangeText={changeV} width={64} />
       <UnitButton
+        tint={TINT}
         title={t('family.unit')}
         value={unit}
         onChange={pick}
@@ -131,9 +138,10 @@ function PetLengthRow({
   }
 
   return (
-    <FormRow label={label}>
+    <FormRow label={label} icon={<RowIcon Icon={Ruler} tint={TINT} />}>
       <NumberBox value={v} onChangeText={changeV} width={64} />
       <UnitButton
+        tint={TINT}
         title={t('family.unit')}
         value={unit}
         onChange={pick}
@@ -246,6 +254,7 @@ export function PetEditor({
         {/* species — a picker instead of nine wrapping pills */}
         <SelectRow
           label={t('pets.species')}
+          icon={<RowIcon Icon={PawPrint} tint={TINT} />}
           value={species}
           placeholder={t('pets.speciesPlaceholder')}
           options={SPECIES.map((s) => ({ value: s.id as string, label: `${s.emoji}  ${t(`pets.species.${s.id}` as TKey)}` }))}
@@ -255,12 +264,15 @@ export function PetEditor({
         />
         <TextRow
           label={t('pets.breed')}
+          icon={<RowIcon Icon={Dna} tint={TINT} />}
           value={breed}
           onChangeText={setBreed}
           placeholder={t('pets.breedPlaceholder')}
         />
         <DayRow
           label={t('pets.birthday')}
+          icon={<RowIcon Icon={Cake} tint={TINT} />}
+          tint={TINT}
           value={birthday}
           onChange={setBirthday}
           optional
@@ -272,12 +284,14 @@ export function PetEditor({
       <FormSection>
         <TextRow
           label={t('pets.color')}
+          icon={<RowIcon Icon={Palette} tint={TINT} />}
           value={color}
           onChangeText={setColor}
           placeholder={t('pets.colorPlaceholder')}
         />
         <TextRow
           label={t('pets.colorSecondary')}
+          icon={<RowIcon Icon={Brush} tint={TINT} />}
           value={colorSecondary}
           onChangeText={setColorSecondary}
           placeholder={t('pets.colorSecondaryPlaceholder')}
@@ -289,6 +303,7 @@ export function PetEditor({
         <PetLengthRow label={t('pets.length')} initial={length} metric={metric} onChange={setLength} />
         <TextRow
           label={t('pets.microchip')}
+          icon={<RowIcon Icon={Cpu} tint={TINT} />}
           value={microchip}
           onChangeText={setMicrochip}
           placeholder={t('pets.microchipPlaceholder')}
@@ -300,6 +315,7 @@ export function PetEditor({
       <FormSection>
         <NoteRow
           label={t('pets.petNotes')}
+          icon={<RowIcon Icon={StickyNote} tint={TINT} />}
           value={notes}
           onChangeText={setNotes}
           placeholder={t('pets.petNotesPlaceholder')}
@@ -309,12 +325,12 @@ export function PetEditor({
   )
 
   const saveBtn = (
-    <Btn
+    <TintButton
+      tint={TINT}
       title={saving ? t('common.saving') : pet ? t('common.saveChanges') : t('pets.addPet')}
       onPress={save}
-      disabled={!name.trim()}
-      loading={saving}
-      curveBottom
+      disabled={!name.trim() || saving}
+      inline={!dock}
     />
   )
 
@@ -347,8 +363,6 @@ export function PetEditor({
           paddingHorizontal: sp.lg,
           paddingTop: sp.sm,
           paddingBottom: dock.clearOfBars ? sp.md : bottomGap,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: c.border,
         }}
       >
         {saveBtn}

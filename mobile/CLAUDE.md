@@ -57,8 +57,70 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   (platform date pop-up, × clears), `NumberBox` + `UnitButton` for measures
   ("170 lb ⌄" — the unit is a small chip that opens a list, not a visible
   segmented pill). Accent is for what's actionable (unit chips, checkmarks,
-  the primary button), not for every selected chip. `EditProfile` is the
-  reference. Sheets nest inside the row's tree (sibling Modals fail on iOS).
+  the primary button), not for every selected chip. Sheets nest inside the
+  row's tree (sibling Modals fail on iOS).
+  **The 2026-11 sheet look on top of these rows:** `icon={<RowIcon Icon={…}
+  tint={appColour} />}` on any row (FormRow/TextRow/NoteRow/SelectRow/DateRow)
+  puts a tinted tile before the label; `UnitButton` takes the same `tint`; the
+  head is a tile/photo + tracked kicker + the main field typed large; Save is a
+  docked `TintButton` in the app's colour (`inline` makes it a plain pill
+  inside a card). `EditProfile` (Family purple) and Pet Care's `VisitForm` are
+  the references. Family's empty profile is `EmptyProfile` in `Family.tsx`.
+  A filled profile (`MemberDetails` in `apps/family/MemberDetail.tsx`) has NO
+  wrapping card: birthday is a `CARD_GRADIENT.birthday` card, phone a tile row
+  with a green "Call" pill (not on your own profile), short fields a 2-column
+  grid of stat tiles each with its own `APP_GRADIENT` icon (`FIELD_LOOK`), and
+  allergies/notes kicker + text tiles. Tiles have a hairline border and no `elevation`.
+  `ConvertSheet` heads with the field's own `FIELD_LOOK` gradient tile, units
+  are tiles (stored one in the gradient); the Birthday page is a
+  `CARD_GRADIENT.birthday` countdown + stat/fact tiles + kicker sections. Pet
+  Care's no-pets state is `EmptyPets` (same shape as `EmptyProfile`), and
+  `PetEditor` rows carry pets-orange `RowIcon`s + a `TintButton`. `DayRow` takes
+  `icon`. `Toggle` takes an optional `tint` — the sheet's APP colour only.
+  `AnimatedLock` (components/) is the private-budget padlock: shackle lifts when
+  off, clamps shut with a bounce when on.
+  Money's `FormSheet` takes `icon` + `colors` (+ `kicker`) for the 2026-11 head
+  (gradient tile, kicker, display title, no footer hairline); without them it
+  keeps the plain head (EntryForm/categories still do). Months' new-period,
+  rename, "…" menu and `BudgetAccessSheet` use the budget's own `budgetLook`
+  gradient; `TintButton` takes `colors` for that. Money's `DatePickerModal` is
+  now a thin wrapper over the shared `PickerSheet` (takes `tint`).
+  `EntryForm` takes `colors` + `kicker` (MonthDetail passes the budget look +
+  period): head tile, RowIcons, pills/category grid/Add and the Save
+  `TintButton` follow the budget colour via a local `LookContext`, which
+  `ManageCategoriesSheet` also accepts (`colors`). The amount hero stays
+  red/green (expense/income semantics). `ToggleRow` takes `icon` + `tint`.
+  MonthDetail's bottom Scan / New entry bar MUST use `useBottomGap` (it used
+  half the inset and sat under the Android nav bar).
+- **Background is soft grey-white, not cream (2026-11).** Glass light tokens:
+  every branded scheme's light wash base is `#F2F2F3`, `sheet` is `#F6F6F7`,
+  and text greys/border are neutral (`#1E1E22`/`#66666D`/`#6E6E75`). The NATIVE
+  splash (`app.json`, `#FBF6F0`), `LaunchIntro`'s BG and the widget bg are
+  still cream — they must change together and need a native rebuild.
+  Calendar's `EventForm`: kind chips are neutral with the selected one as soft
+  wash + outline; rows carry RowIcons; `DateTimeRow`/`InputRow` take `icon`.
+  `HOUSEHOLD_COLOR` (clay) is data colour for household events — not restyled.
+- **Assistant gaps (migration 088, 2026-11):** what the Home assistant
+  couldn't do is logged to `assistant_gaps` for Admin › Usage — and the
+  request TEXT is never stored. `unknown` rows carry the MODEL'S anonymised
+  English rewrite (schema field `gap`); `failed` rows only `intent` + a reason
+  code, reported by the app via `reportGap()` → `suggest-ping?action=assistant-gap`.
+  Keep it that way: web-style analytics are readable by the global admin across
+  every household.
+- **Assistant `move_event`** (server + `moveEvent`/`restoreEvent`): moves a
+  non-recurring event keeping its length; recurring ones are refused (a single
+  occurrence can't be expressed). Calendar accepts `?date=YYYY-MM-DD`.
+- **Nudges stack (Home):** from `STACK_FROM` (3) nudges `NudgesBanner` shows the
+  newest card with two slices behind it + "+N · See all", opening a dimmed
+  overlay Modal with every card. Tapping a `location-request` nudge PUSH acks
+  it, uploads a fix and lands on Home (`backgroundNotifications.answerLocationRequests`).
+- **Admin (2026-11):** `ADMIN_LOOK` (palette.ts) — vivid indigo gradient for
+  the overview card (the old navy made the week bars muddy on light) + `tint`
+  for tabs/period pills (soft wash + outline), toggles, initials and Create.
+  `admin/household/[id]` is in the same language: gradient-tile head, Plus
+  switch row, members/add/activity/danger-zone tile cards; all strings i18n'd.
+  The demo account isn't `is_admin`, so to look at these on the simulator
+  bypass the `Redirect` gate temporarily (and revert).
 - **Home + "Comando" look (2026-11).** The Hub is `TodaySection` (date ·
   weather · household line, "Hi, Ana. 3 things for today.", the ask bar,
   today's agenda as gradient cards — it also owns the Today WIDGET sync, so it
@@ -215,6 +277,10 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 - **The Hub's family dock hugs its members** (2026-11): centred, as wide as
   its avatars + "Family"; only a household too big to fit stretches it edge
   to edge (and scrolls) — and only then does it take the screen's curve.
+  While the members load (an empty list — a household always has you) it
+  shows two breathing placeholder circles (`DockSkeleton`), not an empty bar.
+  The household-of-one invite (`InviteBanner`) is a Family-gradient card like
+  a received nudge, with one "Share your invite code" pill → Settings.
 - **Store screenshots: `store/app-store-v3/`** (2026-11 redesign) — same
   pipeline as v2 (`render.sh`, copy per language in `copy.js`, captures in
   `shots/<lang>/`), 10 slides: hero, assistant, AI receipt, calendar,
@@ -756,6 +822,17 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   primes a fresh fix when it had to. Symptom if this ever regresses: your own
   pin frozen while everyone else's moves, and no place crossings — so no
   arrival/departure alerts about you — while the UI still says sharing is on.
+- **iOS `pausesUpdatesAutomatically` must stay FALSE in the saver profile
+  (2026-11).** iOS pauses a still phone's stream and never resumes it for a
+  backgrounded app — a member drove to the supermarket while the map showed
+  her at home until she opened the app. The 60 m distance filter already keeps
+  a still phone quiet. Belt and braces: the geofence task now uploads a FRESH
+  fix on every place crossing and calls `kickBackgroundUpdates()` to restart
+  the stream (a crossing recorded the event but never moved the pin).
+- **Opening frame:** `framePoints` fits you + members within `NEARBY_FRAME_M`
+  (30 km), never tighter than `MIN_FRAME_SPAN_M`, clearing the roster; the
+  recenter button fits EVERYONE. Place labels hang BELOW their point (anchor
+  y 0 + 28pt spacer, `pointerEvents="none"`) — centred, "Home" covered you.
 - **`timeInterval` is ANDROID-ONLY and must be set.** With `distanceInterval`
   alone the fused provider picks its own cadence. `activityType`,
   `pausesUpdatesAutomatically` and `showsBackgroundLocationIndicator` are

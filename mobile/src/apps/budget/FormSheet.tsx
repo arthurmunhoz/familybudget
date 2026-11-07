@@ -9,11 +9,13 @@
 // to present on iOS.
 import type { ReactNode } from 'react'
 import { Keyboard, Modal, StyleSheet, View } from 'react-native'
-import { X } from 'lucide-react-native'
+import { X, type LucideIcon } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Txt } from '@/components/ui'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
+import { GradientBox } from '@/components/home/GradientBox'
+import type { Gradient } from '@/components/home/palette'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useI18n } from '@/hooks/useI18n'
 import { useSheetLift } from '@/hooks/useSheetLift'
@@ -28,7 +30,16 @@ export function FormSheet({
   footer,
   overlay,
   maxShare = 0.94,
+  icon,
+  colors,
+  kicker,
 }: {
+  /** 2026-11 head: a gradient tile with this icon, a tracked kicker above a
+   *  display title. Pass icon + colors to opt in; without them the sheet keeps
+   *  the plain title head (EntryForm, categories). */
+  icon?: LucideIcon
+  colors?: Gradient
+  kicker?: string
   visible?: boolean
   title: string
   onClose: () => void
@@ -63,14 +74,38 @@ export function FormSheet({
             { backgroundColor: c.sheet, maxHeight: room * maxShare, marginBottom: lift },
           ]}
         >
-          <View style={styles.head}>
-            <Txt
-              variant="h2"
-              style={{ fontFamily: fonts.displaySemi, fontSize: 20, flex: 1, minWidth: 0 }}
-              numberOfLines={1}
-            >
-              {title}
-            </Txt>
+          <View style={[styles.head, icon && colors ? { alignItems: 'center', paddingBottom: sp.lg } : null]}>
+            {icon && colors ? (
+              <>
+                <GradientBox colors={colors} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+                  {(() => {
+                    const Icon = icon
+                    return <Icon size={26} color="#fff" />
+                  })()}
+                </GradientBox>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  {kicker ? (
+                    <Txt
+                      style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}
+                      numberOfLines={1}
+                    >
+                      {kicker}
+                    </Txt>
+                  ) : null}
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, marginTop: 2 }} numberOfLines={1}>
+                    {title}
+                  </Txt>
+                </View>
+              </>
+            ) : (
+              <Txt
+                variant="h2"
+                style={{ fontFamily: fonts.displaySemi, fontSize: 20, flex: 1, minWidth: 0 }}
+                numberOfLines={1}
+              >
+                {title}
+              </Txt>
+            )}
             <Pressable
               onPress={onClose}
               hitSlop={10}
@@ -109,7 +144,7 @@ export function FormSheet({
                 paddingTop: sp.sm,
                 paddingBottom: edgePad,
                 gap: sp.sm,
-                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopWidth: icon && colors ? 0 : StyleSheet.hairlineWidth,
                 borderTopColor: c.border,
               }}
             >

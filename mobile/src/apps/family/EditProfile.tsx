@@ -7,13 +7,27 @@
 // accent-filled blood-type chips and permanently visible unit pills. Now:
 // compact rows, a picker for blood type, and the unit as a small "lb ⌄" chip.
 import { useState } from 'react'
-import { Alert, Modal, StyleSheet, View } from 'react-native'
+import type React from 'react'
+import { Alert, Modal, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { File } from 'expo-file-system'
-import { Camera, X } from 'lucide-react-native'
+import {
+  AlertTriangle,
+  Cake,
+  Camera,
+  Droplet,
+  Footprints,
+  PersonStanding,
+  Phone,
+  Ruler,
+  Scale,
+  Shirt,
+  StickyNote,
+  X,
+} from 'lucide-react-native'
 
 import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
@@ -22,7 +36,9 @@ import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
 import { useTheme, sp, fonts } from '@/theme/theme'
-import { Btn, Txt } from '@/components/ui'
+import { Txt } from '@/components/ui'
+import { TintButton } from '@/components/TintButton'
+import { APP_GRADIENT } from '@/components/home/palette'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
 import {
   DateRow,
@@ -30,6 +46,7 @@ import {
   FormSection,
   NoteRow,
   NumberBox,
+  RowIcon,
   SelectRow,
   TextRow,
   UnitButton,
@@ -97,8 +114,10 @@ function HeightRow({
   initial,
   metric,
   onChange,
+  icon,
 }: {
   label: string
+  icon?: React.ReactNode
   initial: string
   metric: boolean
   onChange: (v: string) => void
@@ -148,7 +167,7 @@ function HeightRow({
   }
 
   return (
-    <FormRow label={label}>
+    <FormRow label={label} icon={icon}>
       {unit === 'cm' ? (
         <NumberBox value={a} onChangeText={changeA} width={64} />
       ) : (
@@ -158,6 +177,7 @@ function HeightRow({
         </>
       )}
       <UnitButton
+        tint={APP_GRADIENT.family[1]}
         title={t('family.unit')}
         value={unit}
         onChange={toggle}
@@ -175,8 +195,10 @@ function WeightRow({
   initial,
   metric,
   onChange,
+  icon,
 }: {
   label: string
+  icon?: React.ReactNode
   initial: string
   metric: boolean
   onChange: (v: string) => void
@@ -199,9 +221,10 @@ function WeightRow({
   }
 
   return (
-    <FormRow label={label}>
+    <FormRow label={label} icon={icon}>
       <NumberBox value={v} onChangeText={changeV} width={64} />
       <UnitButton
+        tint={APP_GRADIENT.family[1]}
         title={t('family.unit')}
         value={unit}
         onChange={toggle}
@@ -221,8 +244,10 @@ function ShoeRow({
   initial,
   metric,
   onChange,
+  icon,
 }: {
   label: string
+  icon?: React.ReactNode
   initial: string
   metric: boolean
   onChange: (v: string) => void
@@ -258,9 +283,10 @@ function ShoeRow({
   ])
 
   return (
-    <FormRow label={label}>
+    <FormRow label={label} icon={icon}>
       <NumberBox value={v} onChangeText={changeV} width={52} />
       <UnitButton
+        tint={APP_GRADIENT.family[1]}
         title={t('family.unit')}
         value={`${system}-${gender}` as ShoeKey}
         onChange={pick}
@@ -402,6 +428,12 @@ export function EditProfile({
 
   const { lift, room, clearOfBars, onRootLayout } = useSheetLift()
 
+  // Family's colour (the Home tile's gradient) runs through the sheet: the
+  // icon tiles, the photo's fallback and the docked button (2026-11 look,
+  // like Pet Care's VisitForm — it used to be a plain grey grouped list).
+  const tint = APP_GRADIENT.family[1]
+  const icon = (I: Parameters<typeof RowIcon>[0]['Icon']) => <RowIcon Icon={I} tint={tint} />
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop} onLayout={onRootLayout}>
@@ -411,85 +443,79 @@ export function EditProfile({
             { backgroundColor: c.sheet, maxHeight: room * 0.94, marginBottom: lift },
           ]}
         >
-          {/* header: Cancel-less — the × closes, Save is docked at the bottom */}
-          <View style={styles.sheetHead}>
-            <Txt variant="h2">{t('family.editTitle')}</Txt>
+          {/* Head: the photo leads (tap to change), the name is typed large
+              beside it — no separate "Your name" row. */}
+          <View style={styles.head}>
             <Pressable
-              onPress={onClose}
-              hitSlop={10}
+              onPress={pickPhoto}
+              disabled={uploadingPhoto}
               accessibilityRole="button"
-              accessibilityLabel={t('common.close')}
-              style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityLabel={photoPreview ? t('family.changePhoto') : t('family.addPhoto')}
             >
-              <X size={16} color={c.textMuted} />
+              <View style={[styles.photo, { backgroundColor: tint, opacity: uploadingPhoto ? 0.5 : 1 }]}>
+                {photoPreview ? (
+                  <Image source={{ uri: photoPreview }} style={styles.photo} contentFit="cover" />
+                ) : (
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 30, color: '#fff' }}>
+                    {initialOf(displayName || profile.display_name)}
+                  </Txt>
+                )}
+              </View>
+              <View style={[styles.fab, { backgroundColor: c.text, borderColor: c.sheet }]}>
+                <Camera size={13} color={c.sheet} />
+              </View>
             </Pressable>
-          </View>
-
-          <KeyboardScroll
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Photo: tap it to change; one quiet text action to remove. */}
-            <View style={{ alignItems: 'center', gap: sp.sm }}>
-              <Pressable
-                onPress={pickPhoto}
-                disabled={uploadingPhoto}
-                accessibilityRole="button"
-                accessibilityLabel={photoPreview ? t('family.changePhoto') : t('family.addPhoto')}
-              >
-                <View
-                  style={{
-                    width: 92,
-                    height: 92,
-                    borderRadius: 46,
-                    backgroundColor: c.accentSoft,
-                    overflow: 'hidden',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: uploadingPhoto ? 0.5 : 1,
-                  }}
-                >
-                  {photoPreview ? (
-                    <Image source={{ uri: photoPreview }} style={{ width: 92, height: 92 }} contentFit="cover" />
-                  ) : (
-                    <Txt style={{ fontFamily: fonts.display, fontSize: 36, color: c.accent }}>
-                      {initialOf(displayName || profile.display_name)}
-                    </Txt>
-                  )}
-                </View>
-                <View style={[styles.fab, { backgroundColor: c.text, borderColor: c.sheet }]}>
-                  <Camera size={14} color={c.sheet} />
-                </View>
-              </Pressable>
-              <View style={{ flexDirection: 'row', gap: sp.lg }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={[styles.kicker, { color: c.textMuted }]} numberOfLines={1}>
+                {t('family.editTitle')}
+              </Txt>
+              <TextInput
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder={t('family.myNameHint')}
+                placeholderTextColor={c.textFaint}
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={40}
+                returnKeyType="done"
+                accessibilityLabel={t('family.myName')}
+                style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, padding: 0, marginTop: 2 }}
+              />
+              <View style={{ flexDirection: 'row', gap: sp.md, marginTop: 4 }}>
                 <Pressable onPress={pickPhoto} hitSlop={8} disabled={uploadingPhoto}>
-                  <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 14 }}>
+                  <Txt style={{ color: tint, fontFamily: fonts.semibold, fontSize: 13.5 }}>
                     {photoPreview ? t('family.changePhoto') : t('family.addPhoto')}
                   </Txt>
                 </Pressable>
                 {photoPreview ? (
                   <Pressable onPress={removePhoto} hitSlop={8}>
-                    <Txt style={{ color: c.textMuted, fontFamily: fonts.semibold, fontSize: 14 }}>
+                    <Txt style={{ color: c.textMuted, fontFamily: fonts.semibold, fontSize: 13.5 }}>
                       {t('family.removePhoto')}
                     </Txt>
                   </Pressable>
                 ) : null}
               </View>
             </View>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={[styles.close, { backgroundColor: c.surface }]}
+            >
+              <X size={16} color={c.textMuted} />
+            </Pressable>
+          </View>
 
+          <KeyboardScroll
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            contentContainerStyle={{ gap: sp.lg, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <FormSection title={t('family.section.about')}>
-              <TextRow
-                label={t('family.myName')}
-                value={displayName}
-                onChangeText={setDisplayName}
-                autoCapitalize="words"
-                autoCorrect={false}
-                maxLength={40}
-                placeholder={t('family.myNameHint')}
-              />
               <DateRow
+                icon={icon(Cake)}
                 label={t('family.birthday')}
                 value={form.birthday}
                 display={form.birthday ? formatDay(form.birthday) : ''}
@@ -498,6 +524,7 @@ export function EditProfile({
                 wheels
               />
               <TextRow
+                icon={icon(Phone)}
                 label={t('family.phone')}
                 value={form.phone}
                 onChangeText={(v) => set('phone', v)}
@@ -508,6 +535,7 @@ export function EditProfile({
 
             <FormSection title={t('family.section.health')}>
               <SelectRow
+                icon={icon(Droplet)}
                 label={t('family.bloodType')}
                 value={form.blood_type}
                 options={BLOOD_TYPES.map((b) => ({ value: b, label: b }))}
@@ -515,6 +543,7 @@ export function EditProfile({
                 allowNone
               />
               <NoteRow
+                icon={icon(AlertTriangle)}
                 label={t('family.allergies')}
                 value={form.allergies}
                 onChangeText={(v) => set('allergies', v)}
@@ -522,16 +551,18 @@ export function EditProfile({
             </FormSection>
 
             <FormSection title={t('family.section.sizes')}>
-              <HeightRow label={t('family.height')} initial={form.height} metric={metric} onChange={(v) => set('height', v)} />
-              <WeightRow label={t('family.weight')} initial={form.weight} metric={metric} onChange={(v) => set('weight', v)} />
-              <ShoeRow label={t('family.shoeSize')} initial={form.shoe_size} metric={metric} onChange={(v) => set('shoe_size', v)} />
+              <HeightRow icon={icon(Ruler)} label={t('family.height')} initial={form.height} metric={metric} onChange={(v) => set('height', v)} />
+              <WeightRow icon={icon(Scale)} label={t('family.weight')} initial={form.weight} metric={metric} onChange={(v) => set('weight', v)} />
+              <ShoeRow icon={icon(Footprints)} label={t('family.shoeSize')} initial={form.shoe_size} metric={metric} onChange={(v) => set('shoe_size', v)} />
               <TextRow
+                icon={icon(PersonStanding)}
                 label={t('family.pantsSize')}
                 value={form.pants_size}
                 onChangeText={(v) => set('pants_size', v)}
                 autoCapitalize="characters"
               />
               <TextRow
+                icon={icon(Shirt)}
                 label={t('family.shirtSize')}
                 value={form.shirt_size}
                 onChangeText={(v) => set('shirt_size', v)}
@@ -541,6 +572,7 @@ export function EditProfile({
 
             <FormSection title={t('family.section.notes')}>
               <NoteRow
+                icon={icon(StickyNote)}
                 label={t('family.notes')}
                 placeholder={t('family.notesPlaceholder')}
                 value={form.notes}
@@ -549,17 +581,9 @@ export function EditProfile({
             </FormSection>
           </KeyboardScroll>
 
-          {/* save — docked */}
-          <View
-            style={{
-              paddingHorizontal: sp.lg,
-              paddingTop: sp.sm,
-              paddingBottom: clearOfBars ? sp.md : bottomGap,
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: c.border,
-            }}
-          >
-            <Btn title={saving ? t('common.saving') : t('common.saveChanges')} onPress={save} loading={saving} />
+          {/* Save — docked, in Family's colour. */}
+          <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.sm, paddingBottom: clearOfBars ? sp.md : bottomGap }}>
+            <TintButton tint={tint} title={saving ? t('common.saving') : t('common.saveChanges')} onPress={save} disabled={saving} />
           </View>
         </View>
       </View>
@@ -570,7 +594,7 @@ export function EditProfile({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -578,20 +602,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingTop: sp.lg,
   },
-  sheetHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: sp.lg,
-    paddingBottom: sp.md,
-  },
+  head: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.md, paddingHorizontal: sp.lg, paddingBottom: sp.md },
+  photo: { width: 64, height: 64, borderRadius: 32, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase' },
+  close: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   fab: {
     position: 'absolute',
     right: 0,
     bottom: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',

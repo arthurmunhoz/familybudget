@@ -53,8 +53,10 @@ export function useSheetLift() {
     kb,
     /** The sheet's marginBottom. */
     lift,
-    /** Height left above the lift — base the sheet's maxHeight on this. */
-    room: available - lift,
+    /** Height left above the lift — base the sheet's maxHeight on this.
+     *  Excludes the TOP safe area (+8): with the keyboard up a tall sheet grew
+     *  under the Dynamic Island / status bar, its title half hidden (2026-11). */
+    room: available - lift - insets.top - 8,
     /** True when the sheet's own last row needs no system-bar padding: the
      *  keyboard is under it, or (Android) it's already above the nav bar. */
     clearOfBars: kb > 0 || Platform.OS === 'android',

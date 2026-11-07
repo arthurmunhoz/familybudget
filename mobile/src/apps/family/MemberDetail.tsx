@@ -1,10 +1,12 @@
-// The info rows for a member (rendered inside Family's card, in a scroll view so
-// only the rows scroll). Every filled member_profiles field gets a related icon;
-// the phone row has a call button — but NOT on your own card. A measured field
-// (height/weight/shoe) or blood type gets a "?" button next to its value that
-// opens the conversion / compatibility sheet — only when the stored value is
-// actually parseable (canConvert), so legacy unit-less free text just has no "?".
-import { Linking, View } from 'react-native'
+// A member's info, laid straight onto the page under the photo (2026-11 redo, in
+// the Home's language — no wrapping card). Birthday is a gradient card like the
+// Home's "Today" cards; phone is a row with a call button (NOT on your own
+// profile); the short measured fields are stat tiles in a two-column grid, each
+// with its own gradient icon; allergies/notes are text blocks. A measured field
+// (height/weight/shoe) or blood type opens the conversion / compatibility sheet
+// on tap — only when the stored value is actually parseable (canConvert), so
+// legacy unit-less free text just isn't tappable.
+import { Linking, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import {
   AlertTriangle,
@@ -23,8 +25,10 @@ import {
 
 import { formatPhone, formatDay, todayISO } from '@/lib/format'
 import { useI18n } from '@/hooks/useI18n'
-import { useTheme, sp } from '@/theme/theme'
+import { useTheme, sp, fonts } from '@/theme/theme'
 import { BirthdayCake } from '@/components/BirthdayCake'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT, CARD_GRADIENT, type Gradient } from '@/components/home/palette'
 import { Txt } from '@/components/ui'
 import type { MemberProfile } from '@/lib/types'
 import { ageOf, FIELDS, type Member } from './familyShared'
@@ -33,19 +37,21 @@ import { canConvert, displayValue, type ConvertKind } from './units'
 // iOS Phone-app green, so the call button reads as "call" at a glance.
 const CALL_GREEN = '#34C759'
 
-const FIELD_ICON: Partial<Record<keyof MemberProfile, LucideIcon>> = {
-  phone: Phone,
-  blood_type: Droplet,
-  height: Ruler,
-  weight: Scale,
-  shoe_size: Footprints,
-  pants_size: PersonStanding,
-  shirt_size: Shirt,
-  allergies: AlertTriangle,
-  notes: StickyNote,
+// Each field gets its own icon AND its own colour, like the Home's app grid —
+// so the page scans by colour instead of being a column of identical tiles.
+export const FIELD_LOOK: Partial<Record<keyof MemberProfile, { icon: LucideIcon; colors: Gradient }>> = {
+  phone: { icon: Phone, colors: APP_GRADIENT.budget },
+  blood_type: { icon: Droplet, colors: APP_GRADIENT.calendar },
+  height: { icon: Ruler, colors: APP_GRADIENT.location },
+  weight: { icon: Scale, colors: APP_GRADIENT.pings },
+  shoe_size: { icon: Footprints, colors: APP_GRADIENT.pets },
+  pants_size: { icon: PersonStanding, colors: APP_GRADIENT.calc },
+  shirt_size: { icon: Shirt, colors: APP_GRADIENT.family },
+  allergies: { icon: AlertTriangle, colors: APP_GRADIENT.shopping },
+  notes: { icon: StickyNote, colors: APP_GRADIENT.docs },
 }
 
-// Which fields get the "?" → conversion / compatibility sheet.
+// Which fields get the conversion / compatibility sheet.
 const CONVERT_KIND: Partial<Record<keyof MemberProfile, ConvertKind>> = {
   height: 'height',
   weight: 'weight',
@@ -53,14 +59,46 @@ const CONVERT_KIND: Partial<Record<keyof MemberProfile, ConvertKind>> = {
   blood_type: 'blood',
 }
 
+// Free-text fields read as paragraphs, not tiles.
+const LONG: (keyof MemberProfile)[] = ['allergies', 'notes']
+
 interface Item {
+  key: keyof MemberProfile
   icon: LucideIcon
+  colors: Gradient
   label: string
   value: string
-  phone?: string
   convert?: { kind: ConvertKind; raw: string }
-  /** Whole row opens something (birthday → the Birthday page). */
-  onPress?: () => void
+}
+
+export function IconTile({ Icon, colors, size = 34 }: { Icon: LucideIcon; colors: Gradient; size?: number }) {
+  return (
+    <GradientBox
+      colors={colors}
+      radius={size * 0.32}
+      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <Icon size={size * 0.5} color="#fff" strokeWidth={2.2} />
+    </GradientBox>
+  )
+}
+
+function Kicker({ text }: { text: string }) {
+  const { c } = useTheme()
+  return (
+    <Txt
+      style={{
+        fontFamily: fonts.semibold,
+        fontSize: 12,
+        letterSpacing: 1.1,
+        textTransform: 'uppercase',
+        color: c.textMuted,
+        marginTop: sp.sm,
+      }}
+    >
+      {text}
+    </Txt>
+  )
 }
 
 export function MemberDetails({
@@ -74,7 +112,7 @@ export function MemberDetails({
   profile: MemberProfile | undefined
   isMe: boolean
   onConvert: (kind: ConvertKind, raw: string, label: string) => void
-  /** Tapping the birthday row opens the Birthday page. */
+  /** Tapping the birthday card opens the Birthday page. */
   onBirthday?: () => void
 }) {
   const { t } = useI18n()
@@ -88,163 +126,170 @@ export function MemberDetails({
     if (!v) continue
     const raw = String(v)
     const kind = CONVERT_KIND[key]
+    const look = FIELD_LOOK[key] ?? { icon: StickyNote, colors: APP_GRADIENT.docs }
     items.push({
-      icon: FIELD_ICON[key] ?? StickyNote,
+      key,
+      icon: look.icon,
+      colors: look.colors,
       label: t(labelKey),
-      value:
-        key === 'phone'
-          ? formatPhone(raw)
-          : kind === 'shoe'
-            ? displayValue('shoe', raw)
-            : raw,
-      ...(key === 'phone' ? { phone: raw } : {}),
+      value: key === 'phone' ? formatPhone(raw) : kind === 'shoe' ? displayValue('shoe', raw) : raw,
       ...(kind && canConvert(kind, raw) ? { convert: { kind, raw } } : {}),
     })
   }
 
-  function call(rawPhone: string) {
+  const birthday = profile?.birthday ?? null
+  if (items.length === 0 && !birthday) {
+    return <Txt variant="muted">{t('family.empty')}</Txt>
+  }
+
+  const phone = items.find((it) => it.key === 'phone')
+  const stats = items.filter((it) => it.key !== 'phone' && !LONG.includes(it.key))
+  const longs = items.filter((it) => LONG.includes(it.key))
+  const rawPhone = profile?.phone ? String(profile.phone) : ''
+
+  function call() {
     const dialable = rawPhone.trim().replace(/[^\d+]/g, '')
     if (dialable) void Linking.openURL(`tel:${dialable}`)
   }
 
-  if (items.length === 0 && !profile?.birthday) {
-    return <Txt variant="muted">{t('family.empty')}</Txt>
+  // Tiles sit on the page itself, so they need their own surface — opaque and
+  // shadow-free (an Android `elevation` under a translucent fill smears).
+  const tile = {
+    backgroundColor: c.card,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.border,
   }
 
-  const birthday = profile?.birthday ?? null
-
   return (
-    <View>
-      {/* Birthday: one row that is both the field and the way into the
-          Birthday page (merged from a separate "Alex turns 40" card above the
-          info, at the user's request). */}
+    <View style={{ gap: sp.md }}>
       {birthday ? (
         <Pressable
           onPress={onBirthday}
           disabled={!onBirthday}
           accessibilityRole="button"
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: sp.md,
-            paddingVertical: 14,
-            borderBottomWidth: items.length ? 1 : 0,
-            borderBottomColor: c.border,
-            opacity: pressed ? 0.6 : 1,
-          })}
+          style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
         >
-          <BirthdayCake size={52} />
-          {/* Label, then the date as the headline, then the invitation. The
-              countdown ("turns 40 in 228 days") lives on the Birthday page —
-              the user wanted the row to state the field, not the statistic. */}
-          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-            <Txt style={{ color: c.textMuted, fontSize: 13 }}>{t('family.birthday')}</Txt>
-            <Txt style={{ color: c.text, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>
-              {formatDay(birthday)}
-              {age != null ? ` · ${t('family.yrs', { years: age })}` : ''}
-            </Txt>
-            {onBirthday ? (
-              <Txt style={{ color: c.accent, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
-                {t('birthday.tapForFacts')}
-              </Txt>
-            ) : null}
-          </View>
-          {onBirthday ? <ChevronRight size={16} color={c.accent} /> : null}
-        </Pressable>
-      ) : null}
-
-      {items.map((it, i) => {
-        const Icon = it.icon
-        // The whole row is the target — the birthday row opens the Birthday
-        // page, and a convertible field (the "?") opens its conversion sheet.
-        // The "?" alone was a 22pt target, too small to hit reliably.
-        const onRow =
-          it.onPress ?? (it.convert ? () => onConvert(it.convert!.kind, it.convert!.raw, it.label) : undefined)
-        const Row = onRow ? Pressable : View
-        return (
-          <Row
-            key={it.label}
-            onPress={onRow}
-            accessibilityRole={onRow ? 'button' : undefined}
-            accessibilityLabel={it.convert ? `${t('family.fieldDetails')}: ${it.label}` : undefined}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: sp.md,
-              paddingVertical: 10,
-              borderBottomWidth: i < items.length - 1 ? 1 : 0,
-              borderBottomColor: c.border,
-            }}
+          <GradientBox
+            colors={CARD_GRADIENT.birthday}
+            radius={24}
+            style={{ padding: 18, flexDirection: 'row', alignItems: 'center', gap: sp.md }}
           >
-            <View
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 9,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: c.surface,
-              }}
-            >
-              <Icon size={16} color={c.accent} />
-            </View>
-            <Txt style={{ color: c.textMuted, fontSize: 13 }}>{it.label}</Txt>
-            {/* Value and its "?" ride together, right-aligned, so the button sits
-                against the value rather than drifting to the row's edge. */}
-            <View
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: 6,
-              }}
-            >
-              <Txt
-                style={{ flexShrink: 1, fontSize: 14, fontWeight: '500', textAlign: 'right' }}
-                numberOfLines={2}
-              >
-                {it.value}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12.5, fontFamily: fonts.semibold, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+                {t('family.birthday')}
               </Txt>
-              {it.convert ? (
-                // Just the cue now — the row itself handles the tap.
-                <View
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: c.accentSoft,
-                  }}
-                >
-                  <CircleHelp size={14} color={c.accent} />
+              <Txt style={{ color: '#fff', fontFamily: fonts.display, fontSize: 24, lineHeight: 29, marginTop: 4 }} numberOfLines={1}>
+                {formatDay(birthday)}
+              </Txt>
+              {age != null ? (
+                <Txt style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, fontFamily: fonts.semibold, marginTop: 2 }}>
+                  {t('family.yrs', { years: age })}
+                </Txt>
+              ) : null}
+              {onBirthday ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: sp.sm }}>
+                  <Txt style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12.5, flexShrink: 1 }} numberOfLines={1}>
+                    {t('birthday.tapForFacts')}
+                  </Txt>
+                  <ChevronRight size={14} color="rgba(255,255,255,0.8)" />
                 </View>
               ) : null}
             </View>
-            {it.phone && !isMe ? (
-              <Pressable
-                onPress={() => call(it.phone!)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('family.call')} ${member.display_name}`}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  // iOS Phone-app green (soft tint + vivid glyph), not the clay accent.
-                  backgroundColor: 'rgba(52,199,89,0.16)',
-                }}
-              >
-                <Phone size={15} color={CALL_GREEN} />
-              </Pressable>
-            ) : null}
-            {it.onPress ? <ChevronRight size={16} color={c.textFaint} /> : null}
-          </Row>
-        )
-      })}
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+              <BirthdayCake size={48} />
+            </View>
+          </GradientBox>
+        </Pressable>
+      ) : null}
+
+      {phone ? (
+        <View style={[tile, { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: 14 }]}>
+          <IconTile Icon={phone.icon} colors={phone.colors} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={{ color: c.textMuted, fontSize: 12.5 }}>{phone.label}</Txt>
+            <Txt style={{ fontSize: 17, fontFamily: fonts.semibold, marginTop: 1 }} numberOfLines={1}>
+              {phone.value}
+            </Txt>
+          </View>
+          {!isMe ? (
+            <Pressable
+              onPress={call}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('family.call')} ${member.display_name}`}
+              style={({ pressed }) => ({
+                height: 40,
+                paddingHorizontal: 16,
+                borderRadius: 20,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: CALL_GREEN,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Phone size={15} color="#fff" strokeWidth={2.4} />
+              <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14.5 }}>{t('family.call')}</Txt>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {stats.length ? (
+        <>
+          <Kicker text={t('family.measures')} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.md }}>
+            {stats.map((it) => {
+              const onTile = it.convert ? () => onConvert(it.convert!.kind, it.convert!.raw, it.label) : undefined
+              return (
+                <Pressable
+                  key={it.key}
+                  onPress={onTile}
+                  disabled={!onTile}
+                  accessibilityRole={onTile ? 'button' : undefined}
+                  accessibilityLabel={onTile ? `${t('family.fieldDetails')}: ${it.label}` : undefined}
+                  style={({ pressed }) => [
+                    tile,
+                    {
+                      flexBasis: '45%',
+                      flexGrow: 1,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  <IconTile Icon={it.icon} colors={it.colors} size={36} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Txt style={{ fontFamily: fonts.display, fontSize: 19, lineHeight: 23 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                      {it.value}
+                    </Txt>
+                    <Txt style={{ color: c.textMuted, fontSize: 12 }} numberOfLines={1}>
+                      {it.label}
+                    </Txt>
+                  </View>
+                  {onTile ? (
+                    <CircleHelp size={15} color={c.textFaint} style={{ position: 'absolute', top: 8, right: 8 }} />
+                  ) : null}
+                </Pressable>
+              )
+            })}
+          </View>
+        </>
+      ) : null}
+
+      {longs.map((it) => (
+        <View key={it.key} style={{ gap: sp.sm }}>
+          <Kicker text={it.label} />
+          <View style={[tile, { flexDirection: 'row', gap: sp.md, padding: 14 }]}>
+            <IconTile Icon={it.icon} colors={it.colors} size={32} />
+            <Txt style={{ flex: 1, fontSize: 15, lineHeight: 21, paddingTop: 5 }}>{it.value}</Txt>
+          </View>
+        </View>
+      ))}
     </View>
   )
 }

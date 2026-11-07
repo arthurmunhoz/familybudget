@@ -2,13 +2,16 @@
 // AdminHousehold page. Reuses admin_user_activity (30d) and the admin RLS
 // exception on allowed_users/households.
 import { useState } from 'react'
-import { Alert, TextInput, View } from 'react-native'
+import { Alert, StyleSheet, TextInput, View } from 'react-native'
 import { Toggle } from '@/components/Toggle'
 import { Pressable } from '@/components/Pressable'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
-import { Award, Trash2, X } from 'lucide-react-native'
+import { Award, ChevronLeft, Home, Mail, Trash2, UserRound } from 'lucide-react-native'
 
-import { AppHeader, Card, Loader, Screen, Txt } from '@/components/ui'
+import { Loader, Screen, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { ADMIN_LOOK } from '@/components/home/palette'
+import { TintButton } from '@/components/TintButton'
 import { useAuth } from '@/lib/auth'
 // memberLimit mirrors the DB trigger (migration 059): free 4, Plus 12.
 import { memberLimit } from '@/lib/plus'
@@ -19,7 +22,9 @@ import { buildFeed, type EventRow } from '@/lib/activityFeed'
 import { formatDay, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import type { Household, Profile } from '@/lib/types'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
+
+const TINT = ADMIN_LOOK.tint
 
 interface UserActivity {
   user_email: string
@@ -36,7 +41,7 @@ type DetailData = {
 }
 
 export default function AdminHousehold() {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
   const { profile, profileLoaded } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -207,246 +212,243 @@ export default function AdminHousehold() {
     )
   }
 
-  const inputStyle = {
-    backgroundColor: c.card,
-    borderRadius: radius.md,
-    paddingHorizontal: sp.md,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: c.text,
-  } as const
+  const soft = TINT + (dark ? '2E' : '1A')
+  const tile = { backgroundColor: c.card, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, overflow: 'hidden' as const }
+  const canAdd = !!mName.trim() && !!mEmail.trim() && !busy
 
   return (
-    <Screen scroll header={<AppHeader title={household?.name ?? 'Household'} />}>
-      {loading ? (
+    <Screen
+      scroll
+      header={
+        <View style={{ flexDirection: 'row', paddingVertical: sp.sm }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/admin'))}
+            hitSlop={8}
+            style={({ pressed }) => [st.round, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+          >
+            <ChevronLeft size={22} color={c.text} />
+          </Pressable>
+        </View>
+      }
+    >
+      {loading && !household ? (
         <Loader />
       ) : !household ? (
         <Txt variant="faint" style={{ textAlign: 'center', marginTop: sp.xl }}>
-          Household not found.
+          {t('admin.notFound')}
         </Txt>
       ) : (
-        <View style={{ gap: sp.md }}>
-          <Txt variant="muted">
-            {members.length}/{maxMembers} members · created {formatDay(household.created_at.slice(0, 10))}
+        <View style={{ gap: sp.lg }}>
+          {/* Head: gradient tile + the family's name, like the Home's sheets. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+            <GradientBox colors={ADMIN_LOOK.colors} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+              <Home size={26} color="#fff" />
+            </GradientBox>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={[st.kicker, { color: c.textMuted }]}>{t('admin.household')}</Txt>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 28, lineHeight: 33, color: c.text }} numberOfLines={2}>
+                {household.name}
+              </Txt>
+            </View>
+          </View>
+          <Txt variant="muted" style={{ marginTop: -sp.sm }}>
+            {t('admin.memberCount', { n: members.length, max: maxMembers, date: formatDay(household.created_at.slice(0, 10)) })}
           </Txt>
 
-          {/* Comp this household to One Roof Plus for free (admin-only). */}
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-              <View
-                style={{
-                  height: 40,
-                  width: 40,
-                  borderRadius: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: isPlus ? c.accentSoft : c.surface,
-                }}
-              >
-                <Award size={20} color={isPlus ? c.accent : c.textMuted} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt style={{ fontWeight: '700' }}>One Roof Plus</Txt>
-                <Txt variant="faint" style={{ fontSize: 11 }}>
-                  {isPlus
-                    ? 'Comped to Plus (free) · unlimited scans, unlimited budgets'
-                    : 'Free plan · turn on to comp this household to Plus'}
-                  {planBusy ? ' · updating…' : ''}
-                </Txt>
-              </View>
-              <Toggle
-                value={isPlus}
-                onValueChange={setPlan}
-                disabled={planBusy}
-              />
+          {/* Plus comp — one switch row; the whole row toggles. */}
+          <Pressable
+            onPress={() => setPlan(!isPlus)}
+            disabled={planBusy}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: isPlus }}
+            style={[tile, st.row]}
+          >
+            <View style={[st.tileIcon, { backgroundColor: isPlus ? soft : c.surface }]}>
+              <Award size={18} color={isPlus ? TINT : c.textMuted} />
             </View>
-          </Card>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>One Roof Plus</Txt>
+              <Txt variant="faint" style={{ fontSize: 12.5 }}>
+                {planBusy ? t('admin.updating') : isPlus ? t('admin.plusComped') : t('admin.plusFree')}
+              </Txt>
+            </View>
+            <Toggle tint={TINT} value={isPlus} onValueChange={setPlan} disabled={planBusy} />
+          </Pressable>
 
           {members.length > 0 && !hasOwner ? (
-            <View
-              style={{
-                backgroundColor: c.expense + '18',
-                borderRadius: radius.md,
-                padding: sp.md,
-              }}
-            >
-              <Txt style={{ color: c.expense, fontWeight: '600', fontSize: 13 }}>
-                {t('admin.noOwnerWarning')}
-              </Txt>
+            <View style={{ backgroundColor: c.expense + '18', borderRadius: 18, padding: sp.md }}>
+              <Txt style={{ color: c.expense, fontFamily: fonts.semibold, fontSize: 13 }}>{t('admin.noOwnerWarning')}</Txt>
             </View>
           ) : null}
 
-          <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            Members
-          </Txt>
-          {members.length === 0 ? (
-            <Card>
-              <Txt variant="muted">No members yet — add the first one below.</Txt>
-            </Card>
-          ) : (
-            members.map((u) => (
-              <Card key={u.email}>
-                <View style={{ gap: sp.sm }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+          {/* Members */}
+          <View>
+            <Txt style={[st.label, { color: c.textMuted }]}>{t('admin.membersLabel')}</Txt>
+            <View style={tile}>
+              {members.length === 0 ? (
+                <View style={{ padding: sp.lg }}>
+                  <Txt variant="faint">{t('admin.noMembers')}</Txt>
+                </View>
+              ) : (
+                members.map((u, i) => (
+                  <View key={u.email} style={[st.row, { alignItems: 'flex-start', borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: c.border }]}>
+                    <View style={[st.tileIcon, { borderRadius: 19, backgroundColor: soft }]}>
+                      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: TINT }}>{initials(u.display_name)}</Txt>
+                    </View>
                     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                        <Txt style={{ fontWeight: '600' }} numberOfLines={1}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Txt style={{ fontFamily: fonts.display, fontSize: 16, color: c.text }} numberOfLines={1}>
                           {u.display_name}
                         </Txt>
-                        {u.role === 'owner' ? (
-                          <View style={{ backgroundColor: c.income + '22', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                            <Txt style={{ color: c.income, fontWeight: '700', fontSize: 10 }}>
-                              {t('admin.owner').toUpperCase()}
-                            </Txt>
-                          </View>
-                        ) : null}
-                        {u.is_admin ? (
-                          <View style={{ backgroundColor: c.accentSoft, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                            <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 10 }}>ADMIN</Txt>
-                          </View>
-                        ) : null}
+                        {u.role === 'owner' ? <Badge label={t('admin.owner')} color={c.income} /> : null}
+                        {u.is_admin ? <Badge label="Admin" color={TINT} /> : null}
                       </View>
-                      <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
+                      <Txt variant="faint" style={{ fontSize: 12.5 }} numberOfLines={1}>
                         {u.email}
                       </Txt>
-                      <Txt variant="faint" style={{ fontSize: 11 }}>
+                      <Txt variant="faint" style={{ fontSize: 12.5 }}>
                         {activity[u.email]
-                          ? `Active ${timeAgo(activity[u.email].last_seen)} · ${activity[u.email].events} events / 30d`
-                          : 'Never accessed'}
+                          ? t('admin.activeAgo', { ago: timeAgo(activity[u.email].last_seen), n: activity[u.email].events })
+                          : t('admin.neverAccessed')}
                       </Txt>
+                      {u.role !== 'owner' ? (
+                        <Pressable
+                          onPress={() => setOwner(u)}
+                          accessibilityRole="button"
+                          style={({ pressed }) => [st.pill, { backgroundColor: soft, opacity: pressed ? 0.7 : 1 }]}
+                        >
+                          <Award size={14} color={TINT} />
+                          <Txt style={{ color: TINT, fontFamily: fonts.semibold, fontSize: 12.5 }}>{t('admin.makeOwner')}</Txt>
+                        </Pressable>
+                      ) : null}
                     </View>
                     {!u.is_admin ? (
-                      <Pressable onPress={() => removeMember(u)} hitSlop={8} accessibilityLabel={`Remove ${u.display_name}`}>
-                        <X size={18} color={c.textFaint} />
+                      <Pressable
+                        onPress={() => removeMember(u)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('admin.remove')} ${u.display_name}`}
+                        style={({ pressed }) => [st.trash, { backgroundColor: c.expense + '14', opacity: pressed ? 0.6 : 1 }]}
+                      >
+                        <Trash2 size={15} color={c.expense} />
                       </Pressable>
                     ) : null}
                   </View>
-                  {u.role !== 'owner' ? (
-                    <Pressable
-                      onPress={() => setOwner(u)}
-                      style={{
-                        alignSelf: 'flex-start',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingVertical: 6,
-                        paddingHorizontal: 10,
-                        borderRadius: radius.md,
-                        backgroundColor: c.surface,
-                      }}
-                    >
-                      <Award size={14} color={c.accent} />
-                      <Txt style={{ color: c.accent, fontWeight: '600', fontSize: 12 }}>
-                        {t('admin.makeOwner')}
+                ))
+              )}
+            </View>
+          </View>
+
+          {/* Add member */}
+          <View>
+            <Txt style={[st.label, { color: c.textMuted }]}>{t('admin.addMember')}</Txt>
+            {atLimit ? (
+              <View style={[tile, { padding: sp.lg }]}>
+                <Txt variant="faint">{t('admin.householdFull', { max: maxMembers })}</Txt>
+              </View>
+            ) : (
+              <View style={tile}>
+                <View style={st.row}>
+                  <View style={[st.tileIcon, { backgroundColor: soft }]}>
+                    <UserRound size={17} color={TINT} />
+                  </View>
+                  <TextInput
+                    value={mName}
+                    onChangeText={setMName}
+                    placeholder={t('admin.memberName')}
+                    placeholderTextColor={c.textFaint}
+                    style={[st.input, { color: c.text }]}
+                  />
+                </View>
+                <View style={[st.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
+                  <View style={[st.tileIcon, { backgroundColor: soft }]}>
+                    <Mail size={17} color={TINT} />
+                  </View>
+                  <TextInput
+                    value={mEmail}
+                    onChangeText={setMEmail}
+                    placeholder={t('admin.memberEmail')}
+                    placeholderTextColor={c.textFaint}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    onSubmitEditing={addMember}
+                    style={[st.input, { color: c.text }]}
+                  />
+                </View>
+                <View style={{ padding: sp.md, paddingTop: 0 }}>
+                  <TintButton tint={TINT} colors={ADMIN_LOOK.colors} title={t('admin.addMember')} onPress={addMember} disabled={!canAdd} inline />
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Recent activity */}
+          <View>
+            <Txt style={[st.label, { color: c.textMuted }]}>{t('admin.recentActivity')}</Txt>
+            <View style={tile}>
+              {feed.length === 0 ? (
+                <View style={{ padding: sp.lg }}>
+                  <Txt variant="faint">{t('admin.noActivityYet')}</Txt>
+                </View>
+              ) : (
+                feed.map((f, i) => (
+                  <View key={f.id} style={[st.row, { alignItems: 'flex-start', borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: c.border }]}>
+                    <View style={[st.tileIcon, { backgroundColor: f.isError ? c.expense + '1F' : c.surface }]}>
+                      <f.icon size={16} color={f.isError ? c.expense : c.text} />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                      <Txt style={{ fontSize: 14, color: c.text }}>
+                        <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.text }}>{nameFor(f.user_email)}</Txt> {f.predicate}
                       </Txt>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </Card>
-            ))
-          )}
-
-          <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginTop: sp.sm }}>
-            Add member
-          </Txt>
-          {atLimit ? (
-            <Card>
-              <Txt variant="muted">This household is full ({maxMembers} members max).</Txt>
-            </Card>
-          ) : (
-            <View style={{ flexDirection: 'row', gap: sp.sm }}>
-              <TextInput
-                value={mName}
-                onChangeText={setMName}
-                placeholder={t('admin.memberName')}
-                placeholderTextColor={c.textFaint}
-                style={[inputStyle, { width: 90 }]}
-              />
-              <TextInput
-                value={mEmail}
-                onChangeText={setMEmail}
-                placeholder={t('admin.memberEmail')}
-                placeholderTextColor={c.textFaint}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                style={[inputStyle, { flex: 1, minWidth: 0 }]}
-              />
-              <Pressable
-                onPress={addMember}
-                disabled={!mName.trim() || !mEmail.trim() || busy}
-                style={{
-                  paddingHorizontal: sp.md,
-                  borderRadius: radius.md,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: c.action,
-                  opacity: !mName.trim() || !mEmail.trim() || busy ? 0.5 : 1,
-                }}
-              >
-                <Txt style={{ color: c.onAction, fontWeight: '700' }}>Add</Txt>
-              </Pressable>
-            </View>
-          )}
-
-          <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.5, marginTop: sp.sm }}>
-            Recent activity
-          </Txt>
-          {feed.length === 0 ? (
-            <Card>
-              <Txt variant="muted">No activity recorded yet.</Txt>
-            </Card>
-          ) : (
-            <View style={{ gap: sp.sm }}>
-              {feed.map((f) => (
-                <View key={f.id} style={{ flexDirection: 'row', gap: sp.md, alignItems: 'flex-start' }}>
-                  <View
-                    style={{
-                      height: 32,
-                      width: 32,
-                      borderRadius: radius.md,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: f.isError ? c.accentSoft : c.surface,
-                    }}
-                  >
-                    <f.icon size={15} color={f.isError ? c.expense : c.accent} />
+                      <Txt variant="faint" style={{ fontSize: 12 }}>
+                        {[f.app, timeAgo(f.created_at)].filter(Boolean).join(' · ')}
+                      </Txt>
+                      {f.detail ? <Txt style={{ color: c.expense, fontSize: 12 }}>{f.detail}</Txt> : null}
+                    </View>
                   </View>
-                  <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                    <Txt style={{ fontSize: 13 }}>
-                      <Txt style={{ fontSize: 13, fontWeight: '700' }}>{nameFor(f.user_email)}</Txt>
-                      {' '}
-                      {f.predicate}
-                    </Txt>
-                    <Txt variant="faint" style={{ fontSize: 11 }}>
-                      {[f.app, timeAgo(f.created_at)].filter(Boolean).join(' · ')}
-                    </Txt>
-                    {f.detail ? (
-                      <Txt style={{ color: c.expense, fontSize: 11 }}>{f.detail}</Txt>
-                    ) : null}
-                  </View>
-                </View>
-              ))}
+                ))
+              )}
             </View>
-          )}
+          </View>
 
-          <Pressable
-            onPress={removeHousehold}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: sp.sm,
-              backgroundColor: c.card,
-              borderRadius: radius.md,
-              paddingVertical: 14,
-              marginTop: sp.lg,
-            }}
-          >
-            <Trash2 size={18} color={c.expense} />
-            <Txt style={{ color: c.expense, fontWeight: '600' }}>Delete household</Txt>
-          </Pressable>
+          {/* Danger zone */}
+          <View>
+            <Txt style={[st.label, { color: c.textMuted }]}>{t('admin.dangerZone')}</Txt>
+            <Pressable onPress={removeHousehold} accessibilityRole="button" style={({ pressed }) => [tile, st.row, { opacity: pressed ? 0.7 : 1 }]}>
+              <View style={[st.tileIcon, { backgroundColor: c.expense + '1F' }]}>
+                <Trash2 size={17} color={c.expense} />
+              </View>
+              <Txt style={{ flex: 1, color: c.expense, fontFamily: fonts.semibold, fontSize: 15 }}>{t('admin.deleteHousehold')}</Txt>
+            </Pressable>
+          </View>
         </View>
       )}
     </Screen>
   )
 }
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
+}
+
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <View style={{ backgroundColor: color + '1F', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+      <Txt style={{ color, fontFamily: fonts.semibold, fontSize: 10.5, letterSpacing: 0.5, textTransform: 'uppercase' }}>{label}</Txt>
+    </View>
+  )
+}
+
+const st = StyleSheet.create({
+  round: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase' },
+  label: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: sp.sm, paddingHorizontal: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.md, paddingVertical: 12 },
+  tileIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  pill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
+  trash: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, minWidth: 0, fontSize: 16, paddingVertical: 8 },
+})

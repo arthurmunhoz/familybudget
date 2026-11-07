@@ -4,16 +4,24 @@
 // suggests the current/next period and copies recurring entries forward. The
 // header menu renames or deletes the budget. RN port of budget/Months.tsx.
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import {
   CalendarDays,
+  CalendarPlus,
   ChevronLeft,
   ChevronRight,
+  Lock,
+  LockOpen,
   MoreHorizontal,
+  Pencil,
   Trash2,
+  Users,
+  Wallet,
+  X,
+  type LucideIcon,
 } from 'lucide-react-native'
 
 import {
@@ -47,8 +55,10 @@ import type { Budget, Entry, Month, Period } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { TrendCard, type TrendPoint } from './TrendCard'
-import { budgetLook } from '@/components/home/palette'
-import { FormSection, NoteRow } from '@/components/form'
+import { budgetLook, type Gradient } from '@/components/home/palette'
+import { TintButton } from '@/components/TintButton'
+import { GradientBox } from '@/components/home/GradientBox'
+import { FormSection, NoteRow, RowIcon } from '@/components/form'
 import { FormSheet } from './FormSheet'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { DatePickerModal } from './shared'
@@ -403,67 +413,103 @@ export default function Months({ budgetId }: { budgetId: string }) {
         colors={budgetLook(budgetId).colors}
       />
 
-      {/* budget options menu */}
+      {/* budget options menu — 2026-11: a sheet with the budget's gradient
+          tile + name as its head, and icon rows (delete in red, last). */}
       {menuOpen && canManage && (
-        <Modal visible animationType="fade" transparent onRequestClose={() => setMenuOpen(false)}>
+        <Modal visible animationType="slide" transparent onRequestClose={() => setMenuOpen(false)}>
           <Pressable
             onPress={() => setMenuOpen(false)}
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
           >
             <Pressable
               onPress={(e) => e.stopPropagation()}
               style={{
                 backgroundColor: c.sheet,
-                borderTopLeftRadius: radius.lg,
-                borderTopRightRadius: radius.lg,
-                padding: sp.md,
+                borderTopLeftRadius: 28,
+                borderTopRightRadius: 28,
+                paddingHorizontal: sp.lg,
+                paddingTop: sp.lg,
                 paddingBottom: bottomGap,
-                gap: sp.xs,
+                gap: sp.lg,
               }}
             >
-              <MenuRow
-                label={t('months.rename')}
-                onPress={() => {
-                  setMenuOpen(false)
-                  setName(budget?.name ?? '')
-                  setRenameOpen(true)
-                }}
-              />
-              {budget?.visibility === 'private' ? (
-                <>
-                  <MenuRow
-                    label={t('budget.whoCanViewTitle')}
-                    onPress={() => {
-                      setMenuOpen(false)
-                      setAccessOpen(true)
-                    }}
-                  />
-                  <MenuRow
-                    label={t('budget.makeShared')}
-                    onPress={() => {
-                      setMenuOpen(false)
-                      makeHousehold()
-                    }}
-                  />
-                </>
-              ) : isOwner ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                <GradientBox colors={budgetLook(budgetId).colors} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+                  <Wallet size={26} color="#fff" />
+                </GradientBox>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}>
+                    {t(budget?.visibility === 'private' ? 'budget.private' : 'app.budget.name')}
+                  </Txt>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, marginTop: 2 }} numberOfLines={1}>
+                    {budget?.name ?? ''}
+                  </Txt>
+                </View>
+                <Pressable
+                  onPress={() => setMenuOpen(false)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.close')}
+                  style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }}
+                >
+                  <X size={16} color={c.textMuted} />
+                </Pressable>
+              </View>
+              <View style={{ backgroundColor: c.card, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, overflow: 'hidden' }}>
                 <MenuRow
-                  label={t('budget.makePrivate')}
+                  Icon={Pencil}
+                  tint={budgetLook(budgetId).colors[1]}
+                  label={t('months.rename')}
                   onPress={() => {
                     setMenuOpen(false)
-                    makePrivate()
+                    setName(budget?.name ?? '')
+                    setRenameOpen(true)
                   }}
                 />
-              ) : null}
-              <MenuRow
-                label={t('months.delete')}
-                destructive
-                onPress={() => {
-                  setMenuOpen(false)
-                  deleteBudget()
-                }}
-              />
-              <Btn title={t('common.cancel')} variant="secondary" onPress={() => setMenuOpen(false)} style={{ marginTop: sp.sm }} />
+                {budget?.visibility === 'private' ? (
+                  <>
+                    <MenuRow
+                      Icon={Users}
+                      tint={budgetLook(budgetId).colors[1]}
+                      label={t('budget.whoCanViewTitle')}
+                      onPress={() => {
+                        setMenuOpen(false)
+                        setAccessOpen(true)
+                      }}
+                    />
+                    <MenuRow
+                      Icon={LockOpen}
+                      tint={budgetLook(budgetId).colors[1]}
+                      label={t('budget.makeShared')}
+                      onPress={() => {
+                        setMenuOpen(false)
+                        makeHousehold()
+                      }}
+                    />
+                  </>
+                ) : isOwner ? (
+                  <MenuRow
+                    Icon={Lock}
+                    tint={budgetLook(budgetId).colors[1]}
+                    label={t('budget.makePrivate')}
+                    onPress={() => {
+                      setMenuOpen(false)
+                      makePrivate()
+                    }}
+                  />
+                ) : null}
+                <MenuRow
+                  Icon={Trash2}
+                  tint={c.expense}
+                  label={t('months.delete')}
+                  destructive
+                  last
+                  onPress={() => {
+                    setMenuOpen(false)
+                    deleteBudget()
+                  }}
+                />
+              </View>
             </Pressable>
           </Pressable>
         </Modal>
@@ -472,6 +518,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
       {/* rename sheet */}
       {renameOpen && (
         <RenameBudgetSheet
+          colors={budgetLook(budgetId).colors}
           name={name}
           onName={setName}
           saving={saving}
@@ -483,6 +530,8 @@ export default function Months({ budgetId }: { budgetId: string }) {
       {/* create-period sheet */}
       {createOpen && (
         <NewPeriodSheet
+          colors={budgetLook(budgetId).colors}
+          kicker={budget?.name ?? ''}
           title={t(`months.new${pk}Title` as TKey)}
           which={t(`months.which${pk}` as TKey)}
           period={period}
@@ -511,12 +560,14 @@ export default function Months({ budgetId }: { budgetId: string }) {
 
 /** Rename the budget (2026-11 form redesign): one row, Save docked. */
 function RenameBudgetSheet({
+  colors,
   name,
   onName,
   saving,
   onSave,
   onClose,
 }: {
+  colors: Gradient
   name: string
   onName: (v: string) => void
   saving: boolean
@@ -526,9 +577,11 @@ function RenameBudgetSheet({
   const { t } = useI18n()
   return (
     <FormSheet
+      icon={Pencil}
+      colors={colors}
       title={t('months.renameTitle')}
       onClose={onClose}
-      footer={<Btn title={t('common.save')} onPress={onSave} loading={saving} disabled={!name.trim()} />}
+      footer={<TintButton tint={colors[1]} colors={colors} title={t('common.save')} onPress={onSave} disabled={!name.trim() || saving} />}
     >
       <FormSection>
         <NoteRow
@@ -551,6 +604,8 @@ function RenameBudgetSheet({
  *  on the normalized pickedStart so prev/next land on clean period
  *  boundaries. Create is docked. */
 function NewPeriodSheet({
+  colors,
+  kicker,
   title,
   which,
   period,
@@ -563,6 +618,8 @@ function NewPeriodSheet({
   onCreate,
   onClose,
 }: {
+  colors: Gradient
+  kicker: string
   title: string
   which: string
   period: Period
@@ -577,24 +634,31 @@ function NewPeriodSheet({
   onCreate: () => void
   onClose: () => void
 }) {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
   const [pickerOpen, setPickerOpen] = useState(false)
   const base = pickedStart ?? currentPeriodStart(period)
+  const tint = colors[1]
+  const soft = tint + (dark ? '2E' : '1A')
   const stepBtn = {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: c.surface,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: soft,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   }
   return (
     <FormSheet
+      icon={CalendarPlus}
+      colors={colors}
+      kicker={kicker}
       title={title}
       onClose={onClose}
       footer={
-        <Btn
+        <TintButton
+          tint={tint}
+          colors={colors}
           title={t('common.create')}
           disabled={!pickedStart || alreadyExists || creating}
           onPress={onCreate}
@@ -602,6 +666,8 @@ function NewPeriodSheet({
       }
       overlay={
         <DatePickerModal
+          tint={tint}
+          title={title}
           visible={pickerOpen}
           value={pickStart}
           onChange={onPickStart}
@@ -618,7 +684,7 @@ function NewPeriodSheet({
             hitSlop={6}
             style={({ pressed }) => [stepBtn, pressed && { opacity: 0.6 }]}
           >
-            <ChevronLeft size={18} color={c.text} />
+            <ChevronLeft size={19} color={tint} strokeWidth={2.4} />
           </Pressable>
           <Pressable
             onPress={() => setPickerOpen(true)}
@@ -633,8 +699,8 @@ function NewPeriodSheet({
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <CalendarDays size={17} color={c.accent} />
-            <Txt style={{ fontFamily: fonts.displaySemi, fontSize: 18, color: c.text }} numberOfLines={1}>
+            <CalendarDays size={18} color={tint} />
+            <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: c.text }} numberOfLines={1}>
               {pickedStart ? periodLabel(period, pickedStart) : ''}
             </Txt>
           </Pressable>
@@ -645,7 +711,7 @@ function NewPeriodSheet({
             hitSlop={6}
             style={({ pressed }) => [stepBtn, pressed && { opacity: 0.6 }]}
           >
-            <ChevronRight size={18} color={c.text} />
+            <ChevronRight size={19} color={tint} strokeWidth={2.4} />
           </Pressable>
         </View>
       </FormSection>
@@ -764,19 +830,40 @@ function PeriodCard({
   )
 }
 
-function MenuRow({ label, onPress, destructive }: { label: string; onPress: () => void; destructive?: boolean }) {
+function MenuRow({
+  Icon,
+  tint,
+  label,
+  onPress,
+  destructive,
+  last,
+}: {
+  Icon: LucideIcon
+  tint: string
+  label: string
+  onPress: () => void
+  destructive?: boolean
+  last?: boolean
+}) {
   const { c } = useTheme()
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
       style={({ pressed }) => ({
-        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: sp.md,
+        minHeight: 54,
         paddingHorizontal: sp.md,
-        borderRadius: radius.md,
         backgroundColor: pressed ? c.surface : 'transparent',
+        borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth,
+        borderBottomColor: c.border,
       })}
     >
-      <Txt style={{ fontWeight: '600', color: destructive ? c.expense : c.text }}>{label}</Txt>
+      <RowIcon Icon={Icon} tint={tint} />
+      <Txt style={{ flex: 1, fontSize: 16, fontFamily: fonts.semibold, color: destructive ? c.expense : c.text }}>{label}</Txt>
+      {destructive ? null : <ChevronRight size={16} color={c.textFaint} />}
     </Pressable>
   )
 }

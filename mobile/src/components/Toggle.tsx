@@ -12,13 +12,28 @@ import { Platform, Switch, type SwitchProps } from 'react-native'
 
 import { useTheme } from '@/theme/theme'
 
-export function Toggle(props: Omit<SwitchProps, 'trackColor' | 'thumbColor' | 'ios_backgroundColor'>) {
-  const { c } = useTheme()
+export function Toggle({
+  tint,
+  ...props
+}: Omit<SwitchProps, 'trackColor' | 'thumbColor' | 'ios_backgroundColor'> & {
+  /** The 2026-11 sheets are in their app's colour (Money green…): pass that
+   *  app colour here — and ONLY that, so a toggle still never drifts into an
+   *  arbitrary colour. Same shape either way. */
+  tint?: string
+}) {
+  const { c, dark } = useTheme()
+  const on = tint ?? c.accent
+  const soft = tint ? tint + (dark ? '55' : '40') : c.accentSoft
+  // The OFF track must be an explicit, solid grey: iOS's default is a faint
+  // translucent fill that vanished (white thumb on near-white) once the page
+  // went from cream to grey-white (2026-11) — "Remind me" read as no control.
+  const offTrack = dark ? '#3A3A42' : '#D4D4DA'
   return (
     <Switch
       {...props}
-      trackColor={Platform.OS === 'android' ? { true: c.accentSoft, false: c.border } : { true: c.accent }}
-      thumbColor={Platform.OS === 'android' ? c.accent : undefined}
+      trackColor={Platform.OS === 'android' ? { true: soft, false: offTrack } : { true: on, false: offTrack }}
+      ios_backgroundColor={offTrack}
+      thumbColor={Platform.OS === 'android' ? on : undefined}
     />
   )
 }

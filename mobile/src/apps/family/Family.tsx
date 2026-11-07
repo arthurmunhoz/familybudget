@@ -6,9 +6,10 @@
 // the coverflow of round photos + synced card pager (2026-11). RLS scopes
 // every read/write to my household.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertTriangle, Cake, Droplet, Pencil, Phone, Ruler, UserRound, type LucideIcon } from 'lucide-react-native'
 import { Animated, Platform, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { supabase } from '@/lib/supabase'
 import { getSignedUrl, getSignedUrls } from '@/lib/signedUrls'
@@ -17,9 +18,12 @@ import { memberColor } from '@/lib/calendar'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { useTheme, sp, radius } from '@/theme/theme'
-import { AppHeader, Btn, Txt, Loader, EmptyState } from '@/components/ui'
-import { PhotoHero, type HeroItem } from '@/components/PhotoHero'
+import { useTheme, sp, radius, fonts } from '@/theme/theme'
+import { AppHeader, Txt, Loader, EmptyState } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT } from '@/components/home/palette'
+import { TintButton } from '@/components/TintButton'
+import { HERO_OPEN, HERO_SHUT, PhotoHero, type HeroItem } from '@/components/PhotoHero'
 import type { MemberProfile } from '@/lib/types'
 import { MemberDetails } from './MemberDetail'
 import { EditProfile } from './EditProfile'
@@ -27,11 +31,78 @@ import { ConvertSheet } from './ConvertSheet'
 import { hasDetails, initial, type Member } from './familyShared'
 import { type ConvertKind } from './units'
 
+/** A member with nothing filled in (2026-11): one card in the Home's language
+ *  — the Family gradient tile, a display title, what you could add as faint
+ *  chips and the docked-style gradient button — instead of a grey paragraph
+ *  and a plain button. Someone else's empty card gets the same frame minus
+ *  the chips and the button (only you can fill in your own). */
+function EmptyProfile({ isMe, name, onAdd }: { isMe: boolean; name: string; onAdd: () => void }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const [g0, g1] = APP_GRADIENT.family
+  const chips: [LucideIcon, string][] = [
+    [Cake, t('family.birthday')],
+    [Phone, t('family.phone')],
+    [Droplet, t('family.bloodType')],
+    [Ruler, t('family.section.sizes')],
+    [AlertTriangle, t('family.allergies')],
+  ]
+  return (
+    <View
+      style={{
+        backgroundColor: Platform.OS === 'android' ? c.sheet : c.card,
+        borderRadius: 24,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: c.border,
+        padding: sp.lg,
+        gap: sp.md,
+      }}
+    >
+      <GradientBox colors={[g0, g1]} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+        <UserRound size={26} color="#fff" />
+      </GradientBox>
+      <View style={{ gap: 6 }}>
+        <Txt style={{ fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: c.text }}>
+          {isMe ? t('family.emptyMineTitle') : t('family.emptyOther', { name })}
+        </Txt>
+        <Txt variant="muted" style={{ lineHeight: 21 }}>
+          {isMe ? t('family.emptyMine') : t('family.emptyOtherBody')}
+        </Txt>
+      </View>
+      {isMe ? (
+        <>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
+            {chips.map(([Icon, label]) => (
+              <View
+                key={label}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 32,
+                  paddingHorizontal: 12,
+                  borderRadius: radius.pill,
+                  backgroundColor: g1 + '17',
+                }}
+              >
+                <Icon size={14} strokeWidth={2.2} color={g1} />
+                <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: g1 }}>{label}</Txt>
+              </View>
+            ))}
+          </View>
+          <TintButton tint={g1} title={t('family.addMyInfo')} onPress={onAdd} inline />
+        </>
+      ) : null}
+    </View>
+  )
+}
+
 export default function Family({ initialEmail }: { initialEmail?: string } = {}) {
   const { profile, profiles, refreshProfile } = useAuth()
   const { t } = useI18n()
   const { c } = useTheme()
   const bottomGap = useBottomGap(sp.lg)
+  const insets = useSafeAreaInsets()
 
   const [editing, setEditing] = useState(false)
   const [initialPhoto, setInitialPhoto] = useState<string | null>(null)
@@ -90,7 +161,14 @@ export default function Family({ initialEmail }: { initialEmail?: string } = {})
   // Scrolling the info rows shrinks the photo. Reset when the member changes:
   // the new card's scroll starts at the top, so the photo should be open again.
   const scrollY = useRef(new Animated.Value(0)).current
-  const collapse = scrollY.interpolate({ inputRange: [0, 140], outputRange: [0, 1], extrapolate: 'clamp' })
+  // The hero FLOATS over the page (absolute) and the list scrolls under it
+  // with a top pad of the open hero's height. It used to sit ABOVE the list in
+  // the layout, so shrinking it moved and resized the scroll view every frame
+  // of the scroll, the platform re-clamped the offset, and the card shook
+  // (owner, 2026-11). Collapse over exactly the height it loses, so the card's
+  // top stays glued to the hero's bottom until it's shut.
+  const collapse = scrollY.interpolate({ inputRange: [0, HERO_OPEN - HERO_SHUT], outputRange: [0, 1], extrapolate: 'clamp' })
+  const heroTop = insets.top + HERO_OPEN
   useEffect(() => {
     scrollY.setValue(0)
   }, [selected?.email, scrollY])
@@ -163,74 +241,54 @@ export default function Family({ initialEmail }: { initialEmail?: string } = {})
   return (
     // No top edge: the photo runs under the status bar (PhotoHero pads itself).
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right']}>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }} pointerEvents="box-none">
       <PhotoHero
         items={heroItems}
         selectedId={m?.email ?? null}
         onSelect={setSelectedEmail}
         collapse={collapse}
+        // Edit lives on the photo, always on screen: under a long card it
+        // fell behind Android's navigation bar and looked impossible (2026-11).
+        action={
+          isMe && hasDetails(p)
+            ? { icon: <Pencil size={15} strokeWidth={2.4} color="#fff" />, text: t('family.edit'), onPress: openEditMine }
+            : undefined
+        }
       />
+      </View>
 
-      <View style={{ flex: 1, paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: bottomGap }}>
+      <View style={{ flex: 1, paddingHorizontal: sp.lg, paddingBottom: bottomGap }}>
         {!m ? null : !hasDetails(p) ? (
-          // Nothing filled in yet → no card at all. A full-height card around
-          // one line of grey text read as a loading failure.
-          <View style={{ flex: 1, paddingHorizontal: sp.md, justifyContent: 'center', alignItems: 'center', gap: sp.lg }}>
-            <Txt variant="muted" style={{ textAlign: 'center', lineHeight: 22 }}>
-              {isMe ? t('family.emptyMine') : t('family.emptyOther', { name: m.display_name })}
-            </Txt>
-            {isMe ? (
-              // Bounded rather than edge-to-edge: a lone button stretched
-              // across a phone reads as a form footer, not an invitation.
-              <View style={{ width: '100%', maxWidth: 320 }}>
-                <Btn title={t('family.addMyInfo')} onPress={openEditMine} />
-              </View>
-            ) : null}
+          <View style={{ paddingTop: heroTop + sp.md }}>
+            <EmptyProfile
+              isMe={isMe}
+              name={m.display_name}
+              onAdd={openEditMine}
+            />
           </View>
         ) : (
-          // The PAGE scrolls, not the inside of the card: the card is only as
-          // tall as its rows, so a short profile is a compact card instead of
-          // a few rows stranded at the top of a full-height box (2026-11).
-          // Scrolling a long one shrinks the photo above.
+          // The info sits straight on the page (no wrapping card, 2026-11 —
+          // MemberDetails draws its own tiles in the Home's language).
+          // Scrolling a long one shrinks the photo, which floats above it —
+          // the scroll view itself never moves or resizes.
           <Animated.ScrollView
             key={m.email}
             style={{ flex: 1, marginHorizontal: -sp.lg }}
-            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
+            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: heroTop + sp.md, paddingBottom: sp.md, gap: sp.md }}
             showsVerticalScrollIndicator={false}
             onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
               useNativeDriver: false,
             })}
             scrollEventThrottle={16}
           >
-            <View
-              style={{
-                // Opaque on Android: `elevation` paints its shadow BEHIND the
-                // view, and through the glass skin's translucent c.card it
-                // showed as a grey band framing the card's contents.
-                backgroundColor: Platform.OS === 'android' ? c.sheet : c.card,
-                borderRadius: radius.lg,
-                paddingHorizontal: sp.lg,
-                paddingVertical: sp.xs,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: c.border,
-                shadowColor: '#000',
-                shadowOpacity: 0.08,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 4,
-              }}
-            >
-              {/* Info only — the name is on the photo above. */}
-              <MemberDetails
-                member={m}
-                profile={p}
-                isMe={isMe}
-                onConvert={(kind, raw, label) => setConvert({ kind, raw, label })}
-                onBirthday={openBirthday}
-              />
-            </View>
-
-            {/* Edit — only on my own card, right under it. */}
-            {isMe ? <Btn title={t('family.editMine')} variant="secondary" onPress={openEditMine} /> : null}
+            {/* Info only — the name is on the photo above. */}
+            <MemberDetails
+              member={m}
+              profile={p}
+              isMe={isMe}
+              onConvert={(kind, raw, label) => setConvert({ kind, raw, label })}
+              onBirthday={openBirthday}
+            />
           </Animated.ScrollView>
         )}
       </View>

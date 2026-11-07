@@ -11,12 +11,14 @@
 //
 // 2026-11 redesign: grouped FormSections (rows + hairlines on a card) inside
 // the shared FormSheet, instead of bare rows and a dashed add-button.
-import { useRef, useState, type ReactNode } from 'react'
-import { Alert, StyleSheet, TextInput, View } from 'react-native'
+import { createContext, useContext, useRef, useState, type ReactNode } from 'react'
+import { Alert, Keyboard, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { ChevronRight, Plus, RotateCcw, Trash2, X } from 'lucide-react-native'
+import { ChevronRight, Plus, RotateCcw, Settings2, Trash2 } from 'lucide-react-native'
 
-import { Btn, Txt } from '@/components/ui'
+import { Txt } from '@/components/ui'
+import { TintButton } from '@/components/TintButton'
+import type { Gradient } from '@/components/home/palette'
 import { FormSection } from '@/components/form'
 import { useRevealOnFocus } from '@/components/KeyboardScroll'
 import { useI18n } from '@/hooks/useI18n'
@@ -31,6 +33,14 @@ import { FormSheet } from './FormSheet'
 const PRESETS = CATEGORIES.filter((c) => c.id !== 'salary')
 
 const ROW_MIN_H = 50
+
+/** The budget's gradient when opened from a budget's entry form (2026-11). */
+const LookContext = createContext<Gradient | null>(null)
+function useTint(): string {
+  const colors = useContext(LookContext)
+  const { c } = useTheme()
+  return colors?.[1] ?? c.accent
+}
 
 /** The inline editor that replaces a row while it's being edited: emoji +
  *  name + Save. Module scope so its inputs keep focus across re-renders. */
@@ -54,6 +64,7 @@ function EditorRow({
   busy: boolean
 }) {
   const { c } = useTheme()
+  const tint = useTint()
   const { t } = useI18n()
   const reveal = useRevealOnFocus()
   const row = useRef<View>(null)
@@ -112,30 +123,29 @@ function EditorRow({
         disabled={!canSave}
         accessibilityRole="button"
         style={({ pressed }) => ({
-          backgroundColor: c.action,
+          backgroundColor: tint,
           borderRadius: radius.pill,
           paddingHorizontal: 14,
           paddingVertical: 8,
           opacity: !canSave ? 0.5 : pressed ? 0.85 : 1,
         })}
       >
-        <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 14 }}>{saveLabel}</Txt>
+        <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14 }}>{saveLabel}</Txt>
       </Pressable>
+      {/* A worded Cancel, not an ✕ — next to a category an ✕ reads as "delete". */}
       <Pressable
         onPress={onCancel}
-        hitSlop={8}
+        hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel={t('common.cancel')}
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: 13,
+        style={({ pressed }) => ({
+          borderRadius: radius.pill,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
           backgroundColor: c.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+          opacity: pressed ? 0.7 : 1,
+        })}
       >
-        <X size={14} color={c.textMuted} />
+        <Txt style={{ color: c.textMuted, fontFamily: fonts.semibold, fontSize: 14 }}>{t('common.cancel')}</Txt>
       </Pressable>
     </View>
   )
@@ -182,19 +192,24 @@ function CategoryRow({
 }
 
 export default function ManageCategoriesSheet({
+  colors,
   categories,
   overrides,
   onChanged,
   onClose,
 }: {
+  /** The budget's gradient (head tile, accents, Done). */
+  colors?: Gradient
   categories: CustomCategory[]
   overrides: CategoryOverride[]
   /** Called after any create/edit/delete/override so the parent can re-sync. */
   onChanged: () => void
   onClose: () => void
 }) {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
+  const tint = colors?.[1] ?? c.accent
+  const soft = colors ? tint + (dark ? '2E' : '1A') : c.accentSoft
   const [customList, setCustomList] = useState<CustomCategory[]>(categories)
   const [ovr, setOvr] = useState<CategoryOverride[]>(overrides)
   // Row being edited: a preset id, a custom id, 'new', or null.
@@ -222,7 +237,10 @@ export default function ManageCategoriesSheet({
     setDraftName('')
     setDraftIcon('')
   }
+  // Also the end of a save: the keyboard goes down with the edit row, and Done
+  // comes back (it's hidden while a row is being edited — Save is the action).
   function cancelEdit() {
+    Keyboard.dismiss()
     setEditingId(null)
     setDraftName('')
     setDraftIcon('')
@@ -356,10 +374,17 @@ export default function ManageCategoriesSheet({
   }
 
   return (
+    <LookContext.Provider value={colors ?? null}>
     <FormSheet
+      icon={colors ? Settings2 : undefined}
+      colors={colors}
       title={t('manageCats.title')}
       onClose={onClose}
-      footer={<Btn title={t('common.done')} onPress={onClose} />}
+      footer={
+        editingId === null ? (
+          <TintButton tint={tint} colors={colors} title={t('common.done')} onPress={onClose} />
+        ) : undefined
+      }
     >
       {/* Defaults (built-in presets) */}
       <FormSection title={t('manageCats.defaults')}>
@@ -379,9 +404,9 @@ export default function ManageCategoriesSheet({
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel={t('manageCats.reset')}
-                    style={[iconBtn, { backgroundColor: c.accentSoft }]}
+                    style={[iconBtn, { backgroundColor: soft }]}
                   >
-                    <RotateCcw size={14} color={c.accent} />
+                    <RotateCcw size={14} color={tint} />
                   </Pressable>
                 ) : undefined
               }
@@ -437,14 +462,15 @@ export default function ManageCategoriesSheet({
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <View style={[styles.addDot, { backgroundColor: c.accentSoft }]}>
-              <Plus size={15} color={c.accent} strokeWidth={2.5} />
+            <View style={[styles.addDot, { backgroundColor: soft }]}>
+              <Plus size={15} color={tint} strokeWidth={2.5} />
             </View>
-            <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 15 }}>{t('manageCats.add')}</Txt>
+            <Txt style={{ color: tint, fontFamily: fonts.semibold, fontSize: 15 }}>{t('manageCats.add')}</Txt>
           </Pressable>
         )}
       </FormSection>
     </FormSheet>
+    </LookContext.Provider>
   )
 }
 

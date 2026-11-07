@@ -30,8 +30,10 @@ import { useI18n } from '@/hooks/useI18n'
 import { fonts, useTheme } from '@/theme/theme'
 
 /** Hero height BELOW the status bar, expanded and collapsed. */
-const HERO_OPEN = 250
-const HERO_SHUT = 104
+/** Hero heights below the status bar, open and fully collapsed — exported so a
+ *  host can lay its content out under a FLOATING hero (see Family). */
+export const HERO_OPEN = 250
+export const HERO_SHUT = 104
 const RADIUS = 28
 const GLASS_BTN = 'rgba(0,0,0,0.32)'
 
@@ -58,11 +60,16 @@ type Props = {
   /** Shows a "+" button top-right when given. */
   onAdd?: () => void
   addLabel?: string
+  /** A labelled glass pill top-right (icon + text) — for an action that must
+   *  stay visible whatever the screen size, e.g. Family's "Edit" on your own
+   *  card, which used to sit under a long card where small Android screens
+   *  hid it behind the navigation bar (2026-11). Takes the "+" slot. */
+  action?: { icon: ReactNode; text: string; onPress: () => void }
   /** 0 = host scrolled to the top (hero open), 1 = collapsed. Optional. */
   collapse?: Animated.AnimatedInterpolation<number> | Animated.Value
 }
 
-export function PhotoHero({ items, selectedId, onSelect, onPressItem, onAdd, addLabel, collapse = STILL }: Props) {
+export function PhotoHero({ items, selectedId, onSelect, onPressItem, onAdd, addLabel, action, collapse = STILL }: Props) {
   const { c } = useTheme()
   const { t } = useI18n()
   const { width } = useWindowDimensions()
@@ -240,7 +247,27 @@ export function PhotoHero({ items, selectedId, onSelect, onPressItem, onAdd, add
         <GlassButton onPress={back} label={t('common.back')}>
           <ChevronLeft size={24} color="#fff" />
         </GlassButton>
-        {onAdd ? (
+        {action ? (
+          <Pressable
+            onPress={action.onPress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={action.text}
+            style={({ pressed }) => ({
+              height: 40,
+              borderRadius: 20,
+              paddingHorizontal: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: GLASS_BTN,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            {action.icon}
+            <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14.5 }}>{action.text}</Txt>
+          </Pressable>
+        ) : onAdd ? (
           <GlassButton onPress={onAdd} label={addLabel ?? ''}>
             <Plus size={22} color="#fff" />
           </GlassButton>

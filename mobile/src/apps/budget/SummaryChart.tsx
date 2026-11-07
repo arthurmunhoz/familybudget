@@ -252,7 +252,7 @@ export default function SummaryChart({
         </View>
         {categories.length > TOP_CATS ? (
           <Pressable onPress={() => setAllCats((v) => !v)} hitSlop={6} style={{ alignSelf: 'center' }}>
-            <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 14 }}>
+            <Txt style={{ color: look[1], fontFamily: fonts.semibold, fontSize: 14 }}>
               {allCats ? t('detail.showLess') : t('detail.showAllCats', { n: categories.length })}
             </Txt>
           </Pressable>

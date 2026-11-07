@@ -56,3 +56,8 @@ export function shade(hex: string, amt: number): string {
   const b = ch(n & 255)
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
 }
+
+/** Admin screens (2026-11): a vivid indigo like the Home's "Today" cards — the
+ *  old navy (#3B4A6B→#1E2638) made the week chart's bars read muddy grey.
+ *  `tint` is the solid for soft washes, toggles and accents on those screens. */
+export const ADMIN_LOOK = { colors: ['#4F7BF7', '#5847E8'] as Gradient, tint: '#4B57E6' }

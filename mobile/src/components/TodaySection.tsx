@@ -7,7 +7,7 @@
 // sync (syncTodayConfig/syncTodayWidget below), so it must stay mounted on the
 // Hub. Reloads on focus so it reflects new events / a changed home city.
 import { createElement, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Pressable, ScrollView, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import {
@@ -102,7 +102,7 @@ export default function TodaySection({
   right?: ReactNode
 }) {
   const insets = useSafeAreaInsets()
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t, lang } = useI18n()
   const locale = LOCALE[lang] ?? 'en-US'
   // Not `todayISO()`: this card is on the Hub, the screen most likely to be the
@@ -287,12 +287,28 @@ export default function TodaySection({
         {right}
       </View>
 
-      {/* today's weather alert, up here with the weather (owner, 2026-11) —
-          one quiet line instead of a banner further down */}
+      {/* today's weather alert, up here with the weather (owner, 2026-11):
+          centred in a faint glass chip so it reads apart from the date ·
+          weather line above it, without turning into a banner. */}
       {alertMeta && AlertIcon ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+        <View
+          style={{
+            alignSelf: 'center',
+            maxWidth: '100%',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: sp.md,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 999,
+            backgroundColor: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.55)',
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: dark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.06)',
+          }}
+        >
           <AlertIcon size={15} color={c.text} />
-          <Txt style={{ flex: 1, fontSize: 13.5, fontFamily: fonts.semibold, color: c.text }} numberOfLines={1}>
+          <Txt style={{ flexShrink: 1, fontSize: 13.5, fontFamily: fonts.semibold, color: c.text }} numberOfLines={1}>
             {t(alertMeta.key)}
           </Txt>
         </View>

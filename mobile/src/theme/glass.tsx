@@ -23,16 +23,19 @@ export const glassLight: ThemeTokens = {
   // what actually makes this look like glass. Panels that sit over DETAILED
   // content (a sheet on the map) use `sheet` instead, so they stay legible.
   card: 'rgba(255,255,255,0.66)',
-  sheet: '#FBF4EC',
+  // Soft grey-white (2026-11: the cream paper read yellowish; owner wanted a
+  // white that's "smoked" toward grey, not toward cream). Cards sit on it as
+  // near-white, like iOS grouped sheets.
+  sheet: '#F6F6F7',
   cardActive: 'rgba(255,255,255,0.86)',
   surface: 'rgba(255,255,255,0.5)',
   surface2: 'rgba(255,255,255,0.36)',
-  text: '#241F1B',
-  textMuted: '#6B615A',
+  text: '#1E1E22',
+  textMuted: '#66666D',
   // Darker than a "faint" grey normally would be: this text lands on a
   // translucent card over a warm wash, so the old #9A908A only reached 2.7:1.
   // 4.6:1 clears WCAG AA. (Applies to hints, placeholders and timestamps too.)
-  textFaint: '#73695F',
+  textFaint: '#6E6E75',
   // Overridden per colour scheme — see SCHEMES / glassTokens below.
   accent: '#E2683F',
   accentSoft: 'rgba(226,104,63,0.15)',
@@ -41,7 +44,7 @@ export const glassLight: ThemeTokens = {
   onAction: '#FFFFFF',
   income: '#1F9E68',
   expense: '#E4554A',
-  border: 'rgba(60,45,38,0.12)',
+  border: 'rgba(30,30,40,0.11)',
 }
 
 export const glassDark: ThemeTokens = {
@@ -81,7 +84,9 @@ export const glassDark: ThemeTokens = {
 // White-on-accent contrast is noted per scheme; 'sunset' is the weakest at
 // 3.3:1 (large/bold text only) and is kept solely because it's what shipped.
 // Two families:
-//  - BRANDED (sunset…plum): a warm, tinted wash — the One Roof look.
+//  - BRANDED (sunset…plum): the accent carries the identity; their light base
+//    is now the shared soft grey-white #F2F2F3 (2026-11 — the cream read
+//    yellowish). Dark bases are unchanged.
 //  - PALETTES (field…slateGreen): a near-NEUTRAL wash where the accent does all
 //    the work. These read very differently and, usefully, give the accent more
 //    room: against grey, a green accent no longer competes with the income
@@ -121,7 +126,7 @@ export const SCHEMES: Record<SchemeId, Scheme> = {
   sunset: {
     accent: '#E2683F',
     accentSoft: 'rgba(226,104,63,0.15)',
-    wash: { base: '#F7EFE6', blobs: [{ color: '#FFC489', o: 0.72 }, { color: '#FF9C80', o: 0.62 }, { color: '#FFD98C', o: 0.7 }] },
+    wash: { base: '#F2F2F3', blobs: [{ color: '#FFC489', o: 0.72 }, { color: '#FF9C80', o: 0.62 }, { color: '#FFD98C', o: 0.7 }] },
     accentDark: '#F2884F',
     accentSoftDark: 'rgba(242,136,79,0.20)',
     washDark: { base: '#121013', blobs: [{ color: '#6B4326', o: 0.6 }, { color: '#5E2F33', o: 0.55 }, { color: '#4A3D1E', o: 0.52 }] },
@@ -132,7 +137,7 @@ export const SCHEMES: Record<SchemeId, Scheme> = {
   clay: {
     accent: '#B65A3B',
     accentSoft: 'rgba(182,90,59,0.15)',
-    wash: { base: '#F8F1E8', blobs: [{ color: '#F5CDA0', o: 0.72 }, { color: '#EBA98F', o: 0.62 }, { color: '#F2D9A6', o: 0.7 }] },
+    wash: { base: '#F2F2F3', blobs: [{ color: '#F5CDA0', o: 0.72 }, { color: '#EBA98F', o: 0.62 }, { color: '#F2D9A6', o: 0.7 }] },
     accentDark: '#DA7A5B',
     accentSoftDark: 'rgba(218,122,91,0.20)',
     washDark: { base: '#131110', blobs: [{ color: '#5E3A22', o: 0.6 }, { color: '#532E2A', o: 0.55 }, { color: '#46391C', o: 0.52 }] },
@@ -141,7 +146,7 @@ export const SCHEMES: Record<SchemeId, Scheme> = {
   honey: {
     accent: '#B87A2B',
     accentSoft: 'rgba(184,122,43,0.15)',
-    wash: { base: '#FAF3E8', blobs: [{ color: '#F6D9A4', o: 0.72 }, { color: '#EFC98D', o: 0.62 }, { color: '#F3E3B8', o: 0.7 }] },
+    wash: { base: '#F2F2F3', blobs: [{ color: '#F6D9A4', o: 0.72 }, { color: '#EFC98D', o: 0.62 }, { color: '#F3E3B8', o: 0.7 }] },
     accentDark: '#E0A54A',
     accentSoftDark: 'rgba(224,165,74,0.20)',
     washDark: { base: '#121010', blobs: [{ color: '#5C4520', o: 0.6 }, { color: '#4E3A1C', o: 0.55 }, { color: '#443A16', o: 0.52 }] },
@@ -150,7 +155,7 @@ export const SCHEMES: Record<SchemeId, Scheme> = {
   harbor: {
     accent: '#2C6E8F',
     accentSoft: 'rgba(44,110,143,0.15)',
-    wash: { base: '#F4F1EC', blobs: [{ color: '#C6DBE2', o: 0.72 }, { color: '#9CC4D4', o: 0.62 }, { color: '#EFDCC2', o: 0.7 }] },
+    wash: { base: '#F2F2F3', blobs: [{ color: '#C6DBE2', o: 0.72 }, { color: '#9CC4D4', o: 0.62 }, { color: '#EFDCC2', o: 0.7 }] },
     accentDark: '#5AA8C8',
     accentSoftDark: 'rgba(90,168,200,0.20)',
     washDark: { base: '#0F1216', blobs: [{ color: '#1F3E4E', o: 0.6 }, { color: '#24485A', o: 0.55 }, { color: '#3D3A2C', o: 0.52 }] },
@@ -159,7 +164,7 @@ export const SCHEMES: Record<SchemeId, Scheme> = {
   plum: {
     accent: '#8A5673',
     accentSoft: 'rgba(138,86,115,0.15)',
-    wash: { base: '#F8F0EC', blobs: [{ color: '#E7C6CE', o: 0.72 }, { color: '#D9B3C4', o: 0.62 }, { color: '#F2DCC2', o: 0.7 }] },
+    wash: { base: '#F2F2F3', blobs: [{ color: '#E7C6CE', o: 0.72 }, { color: '#D9B3C4', o: 0.62 }, { color: '#F2DCC2', o: 0.7 }] },
     accentDark: '#C489A8',
     accentSoftDark: 'rgba(196,137,168,0.20)',
     washDark: { base: '#131015', blobs: [{ color: '#452A3B', o: 0.6 }, { color: '#3E2536', o: 0.55 }, { color: '#453521', o: 0.52 }] },

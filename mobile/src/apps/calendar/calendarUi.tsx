@@ -15,7 +15,7 @@
 // Pickers open in their own sheet, never inline (PickerSheet), and every
 // sheet is rendered inside the row's tree so it NESTS in the open form modal
 // instead of sitting beside it (a sibling Modal fails to present on iOS).
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { TextInput, View, type TextInputProps } from 'react-native'
 import { X } from 'lucide-react-native'
 
@@ -46,12 +46,16 @@ const toHHMM = (d: Date): string =>
 
 /** Full-width text input in a FormSection, placeholder only. `title` makes it
  *  the form's headline field (larger, semibold). */
-export function InputRow({ title, ...input }: TextInputProps & { title?: boolean }) {
+export function InputRow({ title, icon, ...input }: TextInputProps & { title?: boolean; icon?: ReactNode }) {
   const { c } = useTheme()
   const reveal = useRevealOnFocus()
   const row = useRef<View>(null)
   return (
-    <View ref={row} style={{ paddingHorizontal: sp.md, minHeight: 50, justifyContent: 'center' }}>
+    <View
+      ref={row}
+      style={{ paddingHorizontal: sp.md, minHeight: 50, flexDirection: 'row', alignItems: input.multiline ? 'flex-start' : 'center', gap: sp.md }}
+    >
+      {icon ? <View style={{ paddingTop: input.multiline ? 8 : 0 }}>{icon}</View> : null}
       <TextInput
         placeholderTextColor={c.textFaint}
         {...input}
@@ -60,6 +64,7 @@ export function InputRow({ title, ...input }: TextInputProps & { title?: boolean
           input.onFocus?.(e)
         }}
         style={{
+          flex: 1,
           fontSize: title ? 17 : 15,
           fontFamily: title ? fonts.semibold : fonts.body,
           color: c.text,
@@ -73,7 +78,7 @@ export function InputRow({ title, ...input }: TextInputProps & { title?: boolean
 
 /** A tappable value chip inside a row (a date or a time). Accent text while
  *  its picker is open, so you can see which one you're changing. */
-function ValueChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function ValueChip({ label, active, onPress, tint }: { label: string; active: boolean; onPress: () => void; tint?: string }) {
   const { c } = useTheme()
   return (
     <Pressable
@@ -88,7 +93,7 @@ function ValueChip({ label, active, onPress }: { label: string; active: boolean;
         opacity: pressed ? 0.6 : 1,
       })}
     >
-      <Txt style={{ fontSize: 15, color: active ? c.accent : c.text, fontFamily: active ? fonts.semibold : fonts.body }}>
+      <Txt style={{ fontSize: 15, color: active ? tint ?? c.accent : c.text, fontFamily: active ? fonts.semibold : fonts.body }}>
         {label}
       </Txt>
     </Pressable>
@@ -105,9 +110,12 @@ export function DateTimeRow({
   onTime,
   minimumDate,
   tint,
+  icon,
 }: {
   /** The app's colour for the pickers (Done, the picked day). */
   tint?: string
+  /** Leading RowIcon (2026-11 sheets). */
+  icon?: ReactNode
   label: string
   /** ISO YYYY-MM-DD. */
   date: string
@@ -121,10 +129,10 @@ export function DateTimeRow({
   const [open, setOpen] = useState<'date' | 'time' | null>(null)
   return (
     <>
-      <FormRow label={label}>
-        <ValueChip label={date ? formatDay(date) : '–'} active={open === 'date'} onPress={() => setOpen('date')} />
+      <FormRow label={label} icon={icon}>
+        <ValueChip tint={tint} label={date ? formatDay(date) : '–'} active={open === 'date'} onPress={() => setOpen('date')} />
         {time !== null ? (
-          <ValueChip label={formatTime(time, locale)} active={open === 'time'} onPress={() => setOpen('time')} />
+          <ValueChip tint={tint} label={formatTime(time, locale)} active={open === 'time'} onPress={() => setOpen('time')} />
         ) : null}
       </FormRow>
       <PickerSheet
@@ -163,9 +171,12 @@ export function DayRow({
   optional,
   maximumDate,
   wheels,
+  icon,
 }: {
   /** The app's colour for the picker. */
   tint?: string
+  /** Leading RowIcon (2026-11 sheets). */
+  icon?: ReactNode
   label: string
   /** ISO YYYY-MM-DD, or '' when unset. */
   value: string
@@ -181,7 +192,7 @@ export function DayRow({
   const [open, setOpen] = useState(false)
   return (
     <>
-      <FormRow label={label} onPress={() => setOpen(true)}>
+      <FormRow label={label} icon={icon} onPress={() => setOpen(true)}>
         <RowValue value={value ? formatDay(value) : null} placeholder={placeholder ?? t('family.notSet')} />
         {value && optional ? (
           <Pressable

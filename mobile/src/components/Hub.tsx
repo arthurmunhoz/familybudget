@@ -9,7 +9,7 @@
 // Light is the default appearance; every surface here reads from the theme,
 // only the app icons and agenda cards carry their own fixed colours.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Settings } from 'lucide-react-native'
@@ -38,6 +38,33 @@ import { channelName } from '@/lib/realtime'
 import { fonts, sp, useTheme } from '../theme/theme'
 
 const DOCK_H = 72
+
+/** The dock while the household's members load: a household always has at
+ *  least you, so an empty list means "not here yet" — it used to render an
+ *  empty bar with just "Family" in it (owner, 2026-11). Two soft circles the
+ *  size of the avatars breathe until the real ones arrive. */
+function DockSkeleton({ color }: { color: string }) {
+  // Faint ink breathing between 12% and 26%: visible on the dock's opaque
+  // fill in either theme without reading as real (coloured) avatars.
+  const [pulse] = useState(() => new Animated.Value(0.12))
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.26, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.12, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+  return (
+    <>
+      {[0, 1].map((i) => (
+        <Animated.View key={i} style={[styles.avatar, { backgroundColor: color, opacity: pulse }]} />
+      ))}
+    </>
+  )
+}
 
 export default function Hub() {
   const { c } = useTheme()
@@ -224,6 +251,7 @@ export default function Hub() {
           ]}
         >
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dockScroll} contentContainerStyle={styles.dockRow}>
+            {members.length === 0 ? <DockSkeleton color={c.textFaint} /> : null}
             {members.map((p) => {
               const tint = memberColor(p.email, memberEmails)
               const initial = (p.display_name || p.email).trim().charAt(0).toUpperCase()
