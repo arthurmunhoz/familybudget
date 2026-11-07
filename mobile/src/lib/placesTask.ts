@@ -13,7 +13,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 
-import { fetchMyLocation, isSharingEnabled } from './location'
+import { fetchMyLocation, isSharingEnabled, upsertMyPosition } from './location'
+import { kickBackgroundUpdates } from './locationTask'
 import { fetchPlaces, recordPlaceEvent } from './places'
 import { WHEREABOUTS_ENABLED } from './features'
 
@@ -101,6 +102,28 @@ TaskManager.defineTask(GEOFENCE_TASK, async ({ data, error }) => {
   } catch {
     // best-effort — a missed crossing must never crash the task
   }
+  // A crossing used to record the event and nothing else, so the map kept the
+  // last fix — leaving Home showed you AT home until the location stream next
+  // reported (and on iOS a paused stream never did). Spend the wake on a fresh
+  // fix, then restart the stream so the trip keeps reporting.
+  try {
+    // A FRESH fix first: the last known one is usually from inside the place
+    // just left. Fall back to it only if the fresh one fails.
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() =>
+      Location.getLastKnownPositionAsync(),
+    )
+    if (pos) {
+      await upsertMyPosition({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy ?? null,
+        speed: pos.coords.speed ?? null,
+      })
+    }
+  } catch {
+    // best-effort
+  }
+  await kickBackgroundUpdates().catch(() => {})
 })
 
 /** Importing this module registers the task; call from _layout so the import

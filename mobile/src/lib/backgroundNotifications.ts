@@ -13,7 +13,9 @@ import * as Notifications from 'expo-notifications'
 import * as TaskManager from 'expo-task-manager'
 
 import { reloadPetCareWidget, writeAckStatus } from './widget'
-import { captureLiveFixIfSharing } from './location'
+import { captureAndUpload, captureLiveFixIfSharing, fetchMyLocation, isSharingEnabled } from './location'
+import { ackPing, fetchActivePings } from './pings'
+import { supabase } from './supabase'
 import { respondToLiveWake } from './locationTask'
 import { WHEREABOUTS_ENABLED } from './features'
 
@@ -155,11 +157,52 @@ function routeFromNotification(response: Notifications.NotificationResponse | nu
   // iPhone household member still carries '/location' — open the app as-is
   // rather than bouncing through a route that redirects home.
   if (!WHEREABOUTS_ENABLED && url.startsWith('/location')) return
+  // A nudge tap may be answering a "share your location" request — that one
+  // is handled in a single tap instead of landing on Nudges (see below).
+  if (url === '/pings') {
+    void answerLocationRequests().then((handled) => go(handled ? '/' : url))
+    return
+  }
+  go(url)
+}
+
+/** Tapping the push for a Whereabouts "your location is out of date" request
+ *  (kind `location-request`, sent from a stale member card) IS the answer:
+ *  mark it seen — which also drops it from the Home banner — send a fresh fix
+ *  if I'm sharing, and land on Home. It used to open Nudges and still need a
+ *  "Got it" tap before the asker saw anything (2026-11). Returns whether there
+ *  was such a request; any other nudge routes to Nudges as before. */
+async function answerLocationRequests(): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const me = data.session?.user?.email?.toLowerCase()
+    if (!me) return false
+    const pending = (await fetchActivePings()).filter(
+      (p) =>
+        p.kind === 'location-request' &&
+        p.sender_email !== me &&
+        (!p.recipients || p.recipients.includes(me)) &&
+        !p.acks.some((a) => a.user_email === me),
+    )
+    if (!pending.length) return false
+    await Promise.all(pending.map((p) => ackPing(p.id).catch(() => {})))
+    if (WHEREABOUTS_ENABLED && isSharingEnabled(await fetchMyLocation())) {
+      await captureAndUpload().catch(() => null)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+function go(url: string): void {
   // A cold start routes before the first screen has mounted, so let the
   // navigator settle rather than pushing into nothing.
   setTimeout(() => {
     try {
-      router.push(url as Parameters<typeof router.push>[0])
+      // navigate, not push, for Home: it's already the root of the stack.
+      if (url === '/') router.navigate('/')
+      else router.push(url as Parameters<typeof router.push>[0])
     } catch {
       /* a route that no longer exists must not crash the launch */
     }

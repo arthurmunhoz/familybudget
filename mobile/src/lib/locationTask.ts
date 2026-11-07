@@ -118,7 +118,14 @@ function taskOptions(mode: 'saver' | 'live', labels: FgLabels): Location.Locatio
           // steadily can go a long time between reports. iOS ignores it.
           timeInterval: 60_000,
           deferredUpdatesInterval: 60_000, // ms — batch to save battery
-          pausesUpdatesAutomatically: true,
+          // MUST stay false (2026-11). With auto-pause on, iOS pauses the
+          // stream once the phone sits still (at home) and NEVER resumes it on
+          // its own — Apple leaves the restart to the app, and a backgrounded
+          // app gets no callback to do it from. Real bug: a member drove to the
+          // supermarket and the map kept showing her at home until she opened
+          // the app. The 60 m distance filter already keeps a still phone
+          // quiet, so no fixes are spent while she stays put.
+          pausesUpdatesAutomatically: false,
           activityType: Location.ActivityType.Other,
           showsBackgroundLocationIndicator: false,
         }
@@ -163,6 +170,19 @@ async function relaxBackgroundUpdates(): Promise<void> {
   const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
   if (!running) return
   await Location.startLocationUpdatesAsync(LOCATION_TASK, await reconfigureOptions('saver'))
+}
+
+/** Re-issue the current cadence so a stream the OS paused or shed starts
+ *  delivering again. Called from the geofence task on every place crossing —
+ *  a crossing is exactly the moment the person started moving, and the one
+ *  background wake iOS reliably gives us. No-op when background updates aren't
+ *  registered (sharing off / no Always permission). */
+export async function kickBackgroundUpdates(): Promise<void> {
+  if (!WHEREABOUTS_ENABLED) return
+  const running = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK).catch(() => false)
+  if (!running) return
+  const mode = (await isLiveRamped()) ? 'live' : 'saver'
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, await reconfigureOptions(mode)).catch(() => {})
 }
 
 /** Extend ramped mode from the DB while a watcher's heartbeat keeps the

@@ -122,6 +122,15 @@ const rosterHeightFor = (gap: number) => CARD_H + ROSTER_SHADOW_PAD * 2 + gap
 /** Frame a place with room around its circle rather than flush to the edges. */
 const PLACE_FRAME_MARGIN = 1.7
 
+/** Opening framing (2026-11): you plus whoever is within this distance of you.
+ *  Someone far away (at work across the state, travelling) is left out so the
+ *  map doesn't zoom out to a whole region and lose you in it. */
+const NEARBY_FRAME_M = 30_000
+/** The tightest the opening frame gets — a box this many metres across. One
+ *  person alone, or two people in the same house, would otherwise zoom to
+ *  street-furniture level. */
+const MIN_FRAME_SPAN_M = 450
+
 /** Member profiles' photo + phone, keyed by email (for pins + the Call button). */
 async function fetchMemberMeta(): Promise<{
   avatars: Record<string, string | null>
@@ -606,9 +615,47 @@ export default function Whereabouts() {
     return [-98.5, 39.5] // continental US fallback until a fix arrives
   }, [myLive, deviceCenter, livePins])
 
-  // On first load, frame the user (or, if I'm not sharing, whoever is live) at a
-  // comfortable neighborhood zoom — not zoomed in too tight. Runs once, so it
-  // never fights the user's own panning afterward.
+  /** Frame a set of points with the roster cleared at the bottom, never
+   *  tighter than MIN_FRAME_SPAN_M across. */
+  const framePoints = useCallback(
+    (pts: { lat: number; lng: number }[], animationDuration: number) => {
+      const camera = cameraRef.current
+      if (!camera || !pts.length) return
+      let minLat = pts[0].lat
+      let maxLat = pts[0].lat
+      let minLng = pts[0].lng
+      let maxLng = pts[0].lng
+      for (const q of pts) {
+        minLat = Math.min(minLat, q.lat)
+        maxLat = Math.max(maxLat, q.lat)
+        minLng = Math.min(minLng, q.lng)
+        maxLng = Math.max(maxLng, q.lng)
+      }
+      const midLat = (minLat + maxLat) / 2
+      const midLng = (minLng + maxLng) / 2
+      const cosLat = Math.max(0.01, Math.cos((midLat * Math.PI) / 180))
+      const halfLat = Math.max((maxLat - minLat) / 2, MIN_FRAME_SPAN_M / 2 / 111_320)
+      const halfLng = Math.max((maxLng - minLng) / 2, MIN_FRAME_SPAN_M / 2 / (111_320 * cosLat))
+      camera.setCamera({
+        bounds: { ne: [midLng + halfLng, midLat + halfLat], sw: [midLng - halfLng, midLat - halfLat] },
+        padding: {
+          paddingTop: 80,
+          paddingLeft: sp.xl * 2,
+          paddingRight: sp.xl * 2,
+          // Clear the floating roster, or the people land behind the cards.
+          // + room for a place label hanging under a pin near the bottom.
+          paddingBottom: rosterHeight + sp.xl + 40,
+        },
+        animationDuration,
+      })
+    },
+    [rosterHeight],
+  )
+
+  // On first load, frame YOU plus the family members near you (NEARBY_FRAME_M),
+  // close enough that your own pin is unmistakable — it used to open at a fixed
+  // neighbourhood zoom where a "Home" place label sat on top of you. Runs once,
+  // so it never fights the user's own panning afterward.
   useEffect(() => {
     if (centeredOnce.current) return
     const focus = myLive ?? deviceCenter ?? livePins[0]?.loc
@@ -617,15 +664,14 @@ export default function Whereabouts() {
     // mounts a beat after this screen (it waits for the stored style), and
     // marking it done against a null ref would spend the single centring pass
     // on nothing — leaving the map parked on the fallback view.
-    const camera = cameraRef.current
-    if (!camera) return
+    if (!cameraRef.current) return
     centeredOnce.current = true
-    camera.setCamera({
-      centerCoordinate: [focus.lng, focus.lat],
-      zoomLevel: INITIAL_ZOOM,
-      animationDuration: 0,
-    })
-  }, [myLive, deviceCenter, livePins])
+    const anchor = { lat: focus.lat, lng: focus.lng }
+    const near = livePins
+      .map((x) => ({ lat: x.loc.lat, lng: x.loc.lng }))
+      .filter((q) => haversineMeters(anchor, q) <= NEARBY_FRAME_M)
+    framePoints([anchor, ...near], 0)
+  }, [myLive, deviceCenter, livePins, framePoints])
 
   /** Frame a saved place, fitting its RADIUS rather than picking a zoom: a 100 m
    *  Home and a 2 km "the lake" want very different ones, and guessing gets one
@@ -656,24 +702,13 @@ export default function Whereabouts() {
   }, [rosterHeight])
 
   const recenter = useCallback(() => {
-    const pts = livePins.map((x) => [x.loc.lng, x.loc.lat] as [number, number])
-    if (!pts.length) return
-    if (pts.length === 1) {
-      cameraRef.current?.setCamera({ centerCoordinate: pts[0], zoomLevel: 14, animationDuration: 500 })
-      return
-    }
-    let minLng = pts[0][0]
-    let maxLng = pts[0][0]
-    let minLat = pts[0][1]
-    let maxLat = pts[0][1]
-    for (const [lng, lat] of pts) {
-      minLng = Math.min(minLng, lng)
-      maxLng = Math.max(maxLng, lng)
-      minLat = Math.min(minLat, lat)
-      maxLat = Math.max(maxLat, lat)
-    }
-    cameraRef.current?.fitBounds([maxLng, maxLat], [minLng, minLat], 90, 600)
-  }, [livePins])
+    // Everyone sharing, however far — the button is the explicit "show me
+    // all of us"; the opening frame is the one that stays local.
+    framePoints(
+      livePins.map((x) => ({ lat: x.loc.lat, lng: x.loc.lng })),
+      600,
+    )
+  }, [livePins, framePoints])
 
   // Sheet ordering: me first, then live members, then paused/off.
   const rows = useMemo(() => {
@@ -872,7 +907,7 @@ export default function Whereabouts() {
             <Camera
               ref={cameraRef}
               // Wide fallback until a fix is known (avoids flashing a zoomed-in
-              // random spot); the effect above snaps to the user at INITIAL_ZOOM.
+              // random spot); the effect above then frames you + nearby family.
               defaultSettings={{
                 centerCoordinate: initialCenter,
                 zoomLevel: myLive || deviceCenter || livePins.length ? INITIAL_ZOOM : 3,
@@ -922,9 +957,13 @@ export default function Whereabouts() {
                 </ShapeSource>
               ))}
 
-            {/* Saved places — drawn first so member pins sit on top */}
+            {/* Saved places — drawn first so member pins sit on top. The label
+                hangs BELOW its point (anchored at its top, pushed down past a
+                pin's radius): centred on the point it covered whoever was
+                standing there — at home you saw "Home" and not yourself. */}
             {places.map((pl) => (
-              <MarkerView key={`place-${pl.id}`} coordinate={[pl.lng, pl.lat]} anchor={{ x: 0.5, y: 0.5 }}>
+              <MarkerView key={`place-${pl.id}`} coordinate={[pl.lng, pl.lat]} anchor={{ x: 0.5, y: 0 }}>
+                <View pointerEvents="none" style={{ paddingTop: 28, alignItems: 'center' }}>
                 <View
                   style={{
                     flexDirection: 'row',
@@ -943,6 +982,7 @@ export default function Whereabouts() {
                   <Txt style={{ fontFamily: fonts.semibold, fontSize: 11, color: c.textMuted }}>
                     {pl.name}
                   </Txt>
+                </View>
                 </View>
               </MarkerView>
             ))}

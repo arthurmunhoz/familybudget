@@ -24,9 +24,9 @@
 // ETA / reverse-geocode / live-mode hooks can live in here rather than being
 // hoisted — a household of ten doesn't fire ten Directions requests.
 import { useEffect, useRef, useState } from 'react'
-import { Linking, Pressable, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native'
 import * as Location from 'expo-location'
-import { BatteryFull, BatteryLow, BatteryMedium, BatteryWarning, Bell, Navigation, Phone, X } from 'lucide-react-native'
+import { AlertTriangle, BatteryFull, BatteryLow, BatteryMedium, BatteryWarning, Bell, Check, Navigation, Phone, RefreshCw, X } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -38,8 +38,9 @@ import {
   isPaused,
   isSharingLive,
 } from '@/lib/location'
-import { useWatchLive } from '@/lib/liveLocation'
+import { requestLive, useWatchLive } from '@/lib/liveLocation'
 import { placeAt } from '@/lib/places'
+import { sendPing } from '@/lib/pings'
 import type { MemberLocation, Place, Profile } from '@/lib/types'
 import { fonts, radius, sp } from '@/theme/theme'
 import { ON_CARD } from './onCard'
@@ -132,6 +133,112 @@ function IconAction({
         {label}
       </Txt>
     </Pressable>
+  )
+}
+
+/** A fix older than this gets the "stale" chip instead of ETA/distance. A
+ *  still phone legitimately reports nothing for hours (60 m distance filter),
+ *  but opening the card wakes it anyway (see StaleChip), so it's cheap. */
+const STALE_MS = 10 * 60 * 1000
+/** How long to wait for the woken phone before offering a visible nudge. */
+const WAKE_WAIT_MS = 45_000
+
+function isStale(updatedAt: string | null | undefined): boolean {
+  return !updatedAt || Date.now() - new Date(updatedAt).getTime() > STALE_MS
+}
+
+/** Shown on an expanded card whose location is old. Opening the card already
+ *  fired a live request — a SILENT push that wakes their app to report
+ *  (liveLocation.requestLive) — so this makes that visible: "asking for the
+ *  current one…", and the chip disappears by itself when the fresh fix lands
+ *  (keyed on updated_at). If nothing comes back (app force-quit, Low Power
+ *  Mode, iOS rationing silent pushes) it offers a VISIBLE nudge asking them to
+ *  open the app, plus a retry. */
+function StaleChip({ email, name, ago }: { email: string; name: string; ago: string }) {
+  const { t } = useI18n()
+  const [phase, setPhase] = useState<'waiting' | 'noAnswer' | 'nudged'>('waiting')
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function wait() {
+    setPhase('waiting')
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setPhase('noAnswer'), WAKE_WAIT_MS)
+  }
+  useEffect(() => {
+    wait()
+    return () => {
+      if (timer.current) clearTimeout(timer.current)
+    }
+  }, [])
+
+  function retry() {
+    void requestLive(email)
+    wait()
+  }
+  async function nudge() {
+    try {
+      await sendPing('location-request', '📍', t('location.stale.nudgeMessage'), [email])
+      setPhase('nudged')
+    } catch {
+      // keep the button; they can try again
+    }
+  }
+
+  return (
+    <View
+      style={{
+        height: 43,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        backgroundColor: ON_CARD.soft,
+      }}
+    >
+      {phase === 'waiting' ? (
+        <ActivityIndicator size="small" color={ON_CARD.text} />
+      ) : phase === 'nudged' ? (
+        <Check size={15} color={ON_CARD.text} strokeWidth={2.6} />
+      ) : (
+        <AlertTriangle size={15} color={ON_CARD.text} />
+      )}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt style={{ fontSize: 11, lineHeight: 13, color: ON_CARD.muted }} numberOfLines={1}>
+          {t('location.stale.from', { ago })}
+        </Txt>
+        <Txt style={{ fontSize: 12.5, lineHeight: 15, fontFamily: fonts.semibold, color: ON_CARD.text }} numberOfLines={1}>
+          {phase === 'waiting'
+            ? t('location.stale.asking')
+            : phase === 'nudged'
+              ? t('location.stale.nudged', { name })
+              : t('location.stale.noAnswer')}
+        </Txt>
+      </View>
+      {phase === 'noAnswer' ? (
+        <>
+          <Pressable onPress={retry} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('location.stale.retry')}>
+            <RefreshCw size={15} color={ON_CARD.text} />
+          </Pressable>
+          <Pressable
+            onPress={nudge}
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              height: 28,
+              paddingHorizontal: 10,
+              borderRadius: 14,
+              justifyContent: 'center',
+              backgroundColor: ON_CARD.text,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Txt style={{ fontSize: 11.5, fontFamily: fonts.semibold, color: '#1E1E22' }} numberOfLines={1}>
+              {t('location.stale.nudge', { name })}
+            </Txt>
+          </Pressable>
+        </>
+      ) : null}
+    </View>
   )
 }
 
@@ -293,6 +400,16 @@ export function MemberDetailCard({
 
         {live && !isMe ? (
           <>
+            {isStale(live.updated_at) ? (
+              // An old fix: ETA/distance from it would be confidently wrong, so
+              // the stats make way for the refresh state.
+              <StaleChip
+                key={live.updated_at}
+                email={profile.email}
+                name={profile.display_name.trim().split(/\s+/)[0] ?? profile.display_name}
+                ago={timeAgo(live.updated_at, t)}
+              />
+            ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', height: 43 }}>
               {/* ETA leads — Arthur's call, and it's the thing you open this for. */}
               <Stat label={t('location.stat.eta')} value={etaText} primary />
@@ -305,6 +422,7 @@ export function MemberDetailCard({
                 icon={live?.battery != null ? <BatteryGlyph level={live.battery} /> : null}
               />
             </View>
+            )}
             {/* Three actions, not five: the map apps live behind "Navigate" so
                 these keep enough width for a readable label. */}
             <View style={{ flexDirection: 'row', gap: 6, marginTop: 'auto' }}>
