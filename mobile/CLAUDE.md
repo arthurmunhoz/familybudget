@@ -71,6 +71,12 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   with a green "Call" pill (not on your own profile), short fields a 2-column
   grid of stat tiles each with its own `APP_GRADIENT` icon (`FIELD_LOOK`), and
   allergies/notes kicker + text tiles. Tiles have a hairline border and no `elevation`.
+  Under the birthday card sits `MemberToday` ("Today for Sam", 2026-11): that
+  member's calendar today (owner_email = them; else their next event), expenses
+  they logged today (+ 7-day total), Whereabouts place/last seen + battery
+  (only when sharing, gated on `WHEREABOUTS_ENABLED`) and items they added to
+  the shopping list today. Plain RLS reads, so private budgets just don't count.
+  It shows on an empty profile too.
   `ConvertSheet` heads with the field's own `FIELD_LOOK` gradient tile, units
   are tiles (stored one in the gradient); the Birthday page is a
   `CARD_GRADIENT.birthday` countdown + stat/fact tiles + kicker sections. Pet

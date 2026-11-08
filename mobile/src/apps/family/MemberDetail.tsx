@@ -33,6 +33,7 @@ import { Txt } from '@/components/ui'
 import type { MemberProfile } from '@/lib/types'
 import { ageOf, FIELDS, type Member } from './familyShared'
 import { canConvert, displayValue, type ConvertKind } from './units'
+import { MemberToday } from './MemberToday'
 
 // iOS Phone-app green, so the call button reads as "call" at a glance.
 const CALL_GREEN = '#34C759'
@@ -139,7 +140,12 @@ export function MemberDetails({
 
   const birthday = profile?.birthday ?? null
   if (items.length === 0 && !birthday) {
-    return <Txt variant="muted">{t('family.empty')}</Txt>
+    return (
+      <View style={{ gap: sp.md }}>
+        <MemberToday email={member.email} firstName={member.display_name.trim().split(/\s+/)[0]} />
+        <Txt variant="muted">{t('family.empty')}</Txt>
+      </View>
+    )
   }
 
   const phone = items.find((it) => it.key === 'phone')
@@ -202,6 +208,8 @@ export function MemberDetails({
           </GradientBox>
         </Pressable>
       ) : null}
+
+      <MemberToday email={member.email} firstName={member.display_name.trim().split(/\s+/)[0]} />
 
       {phone ? (
         <View style={[tile, { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: 14 }]}>

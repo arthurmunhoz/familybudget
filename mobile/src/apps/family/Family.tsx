@@ -7,7 +7,7 @@
 // every read/write to my household.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Cake, Droplet, Pencil, Phone, Ruler, UserRound, type LucideIcon } from 'lucide-react-native'
-import { Animated, Platform, StyleSheet, View } from 'react-native'
+import { Animated, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -26,6 +26,7 @@ import { TintButton } from '@/components/TintButton'
 import { HERO_OPEN, HERO_SHUT, PhotoHero, type HeroItem } from '@/components/PhotoHero'
 import type { MemberProfile } from '@/lib/types'
 import { MemberDetails } from './MemberDetail'
+import { MemberToday } from './MemberToday'
 import { EditProfile } from './EditProfile'
 import { ConvertSheet } from './ConvertSheet'
 import { hasDetails, initial, type Member } from './familyShared'
@@ -259,13 +260,20 @@ export default function Family({ initialEmail }: { initialEmail?: string } = {})
 
       <View style={{ flex: 1, paddingHorizontal: sp.lg, paddingBottom: bottomGap }}>
         {!m ? null : !hasDetails(p) ? (
-          <View style={{ paddingTop: heroTop + sp.md }}>
+          <ScrollView
+            key={m.email}
+            style={{ flex: 1, marginHorizontal: -sp.lg }}
+            contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: heroTop + sp.md, paddingBottom: sp.md, gap: sp.md }}
+            showsVerticalScrollIndicator={false}
+          >
             <EmptyProfile
               isMe={isMe}
               name={m.display_name}
               onAdd={openEditMine}
             />
-          </View>
+            {/* Their day still shows with an empty profile. */}
+            <MemberToday email={m.email} firstName={m.display_name.trim().split(/\s+/)[0]} />
+          </ScrollView>
         ) : (
           // The info sits straight on the page (no wrapping card, 2026-11 —
           // MemberDetails draws its own tiles in the Home's language).
