@@ -116,9 +116,41 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   code, reported by the app via `reportGap()` → `suggest-ping?action=assistant-gap`.
   Keep it that way: web-style analytics are readable by the global admin across
   every household.
-- **Assistant `move_event`** (server + `moveEvent`/`restoreEvent`): moves a
-  non-recurring event keeping its length; recurring ones are refused (a single
-  occurrence can't be expressed). Calendar accepts `?date=YYYY-MM-DD`.
+- **Assistant events** (`locateEvent` in lib/assistant): finds the event by
+  loose title on a day, or its NEXT occurrence (recurring series expanded).
+  `move_event` keeps the length; `remove_event` / `edit_event` (rename, place,
+  note, reminder) work on anyone's event (RLS). A recurring one asks first:
+  move / delete the WHOLE series, or stop it from that day (`recurrence_until`)
+  — one occurrence can't be expressed. Events from a connected Apple/Google
+  calendar are refused (the next sync would undo it). Calendar accepts
+  `?date=YYYY-MM-DD`; Documents accepts `?open=<id>` (inside VaultGate).
+- **Assistant, how a request flows (2026-11 review):** `understandWithSource`
+  in `lib/assistant.ts`. The local regex parser (`localParse`) is ONLY the
+  fallback when the server is unreachable or says `unknown`. When the server
+  names a known intent but a slot is missing (`fromServer` → null), the app
+  answers `need_detail` (asks for it, `ask.need.*`); an intent this build
+  doesn't know → `needs_update` ("update the app"). Never let the regexes
+  guess there: "apaga o gasto do X" read as a list item. `localParse` also
+  refuses list intents when the words say money/calendar (`NOT_LIST`).
+  Refs: `recentContext()` sends the last 8 entries (`e1…`) and the coming
+  events (`v1…`, 3 days back to 45 ahead) and keeps a ref → row map; the
+  server returns `ref`, and `locateEvent` / `lastEntry` act on exactly that
+  row before falling back to name matching. AskSheet loads the whole context
+  once when it opens (`loadContext`) and refreshes it after every answer.
+  Gaps: `local_guess` / `need_detail` / `needs_update` are reported as
+  codes. Server: `parseAssistant()` is exported (pure parse, no auth);
+  the GROUPED schema is the default (slots nested per area, flattened back so
+  the app sees the same shape; eval 56/56 at ~126 output tokens vs ~227 flat);
+  `ASSISTANT_SCHEMA=flat` (Vercel env) falls back to the flat one. Run the eval before every assistant deploy:
+  `ANTHROPIC_API_KEY=… npx --yes tsx scripts/assistant-eval.ts both`; add
+  every phrase that misfired on a device to `scripts/assistant-eval.json`.
+- **Assistant, newer actions (2026-11):** data in `lib/assistantActions.ts`,
+  wording in `components/home/askActions.ts`, one generic `ActionView` (headline,
+  rows, Undo / two choices / Open). AskSheet hands any intent it doesn't handle
+  to `actMore()`. Every write returns what its Undo needs. Context sent to
+  Claude also has `PET TASKS` and `CATEGORIES`. Each new intent ships in the
+  APP (the server only understands), so it needs a store release; older apps
+  get null from `fromServer` and fall back.
 - **Nudges stack (Home):** from `STACK_FROM` (3) nudges `NudgesBanner` shows the
   newest card with two slices behind it + "+N · See all", opening a dimmed
   overlay Modal with every card. Tapping a `location-request` nudge PUSH acks
@@ -236,10 +268,17 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   `__tests__/assistant.test.ts` green when touching it. New intent = schema +
   `understand` branch + an executor here + an answer view (AnswerViews).
   Intents today: shopping (add — asks WHICH list when none matches, never
-  invents one —, list, find, check, remove), agenda (a day or a PERIOD via
-  `date_end`), add event, add money / summary, nudge (sent only on a tap),
-  pets due, family details, open app, split a bill (asks equal vs by item;
-  opens `/calc/even?bill=&people=&tip=` prefilled), discount. Claude gets the
+  invents one —, list, find, check, remove, move to a store, clear bought,
+  uncheck), agenda (a day or a PERIOD via `date_end`), events (add with end
+  time / repeat / special date / place / reminder; move; remove; edit; "when
+  is the next X"; birthdays), money (add; summary, total or one category /
+  thing; latest entries; fix or delete the last one), nudge (sent only on a
+  tap; urgent = high priority; "who saw it"), pets (due, mark done, log a
+  visit/vaccine with next due, next due, weight), family details (read and
+  change), where is someone (respects paused/off sharing), weather (Home
+  city, 16 days), which is cheaper per unit, open a document, day overview,
+  open app, split a bill (asks equal vs by item; opens
+  `/calc/even?bill=&people=&tip=` prefilled), discount. Claude gets the
   open shopping items as context so questions match across languages; where
   the local parser sees a period or a utility phrasing, it overrides an older
   server's weaker answer (see `understand`).

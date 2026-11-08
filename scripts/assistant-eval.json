@@ -1,0 +1,600 @@
+{
+  "context": {
+    "today": "2026-11-09",
+    "weekday": "Monday",
+    "lang": "pt",
+    "me": "Arthur Munhoz",
+    "stores": [
+      "Costco",
+      "Walmart",
+      "Publix"
+    ],
+    "members": [
+      "Arthur Munhoz",
+      "Ana Munhoz",
+      "Léo Munhoz"
+    ],
+    "budgets": [
+      "Casa",
+      "Viagem Orlando"
+    ],
+    "pets": [
+      "Lola",
+      "Chloe"
+    ],
+    "petTasks": [
+      "Lola: Comida, Passeio, Remédio",
+      "Chloe: Comida, Escovar"
+    ],
+    "categories": [
+      "groceries = Mercado",
+      "dining = Restaurante",
+      "transport = Transporte",
+      "health = Saúde",
+      "home = Casa"
+    ],
+    "openItems": [
+      "Leite integral @ Costco",
+      "Ovos (30) @ Costco",
+      "Agua de coco 🥥 @ Publix",
+      "Pão @ anywhere"
+    ],
+    "recentEntries": [
+      "e1 = Ford's Garage · 54.20 · expense · 2026-11-09 · Arthur",
+      "e2 = Publix · 132.80 · expense · 2026-11-08 · Ana",
+      "e3 = Uber · 18.40 · expense · 2026-11-07 · Arthur",
+      "e4 = Salário · 3000.00 · income · 2026-11-05 · Arthur"
+    ],
+    "events": [
+      "v1 = Unha · 2026-11-10 14:00 · Ana",
+      "v2 = Dentista · 2026-11-12 15:00 · Arthur",
+      "v3 = Natação · 2026-11-10 18:00 · Léo",
+      "v4 = Natação · 2026-11-17 18:00 · Léo",
+      "v5 = Reunião escola · 2026-11-13 08:30"
+    ]
+  },
+  "cases": [
+    {
+      "text": "põe leite e ovos no Costco",
+      "expect": {
+        "intent": "add_items",
+        "store": "Costco"
+      }
+    },
+    {
+      "text": "adiciona 2 pacotes de café na lista",
+      "expect": {
+        "intent": "add_items",
+        "store": ""
+      }
+    },
+    {
+      "text": "tem água de coco na lista?",
+      "expect": {
+        "intent": "find_items",
+        "items": [
+          "Agua de coco 🥥"
+        ]
+      }
+    },
+    {
+      "text": "já comprei o leite",
+      "expect": {
+        "intent": "check_items",
+        "items": [
+          "Leite integral"
+        ]
+      }
+    },
+    {
+      "text": "tira o pão da lista",
+      "expect": {
+        "intent": "remove_items",
+        "items": [
+          "Pão"
+        ]
+      }
+    },
+    {
+      "text": "passa os ovos pro Walmart",
+      "expect": {
+        "intent": "move_items",
+        "items": [
+          "Ovos (30)"
+        ],
+        "store": "Walmart"
+      }
+    },
+    {
+      "text": "limpa os comprados do Costco",
+      "expect": {
+        "intent": "clear_checked",
+        "store": "Costco"
+      }
+    },
+    {
+      "text": "o que tem na lista do Costco?",
+      "expect": {
+        "intent": "list_items",
+        "store": "Costco"
+      }
+    },
+    {
+      "text": "what's on the shopping list?",
+      "expect": {
+        "intent": "list_items",
+        "store": ""
+      }
+    },
+    {
+      "text": "o que tenho amanhã?",
+      "expect": {
+        "intent": "agenda",
+        "date": "2026-11-10"
+      }
+    },
+    {
+      "text": "what does the family have this week?",
+      "expect": {
+        "intent": "agenda",
+        "scope": "all",
+        "date_end": "2026-11-15"
+      }
+    },
+    {
+      "text": "dentista sexta às 15h",
+      "expect": {
+        "intent": "add_event",
+        "date": "2026-11-13",
+        "time": "15:00"
+      }
+    },
+    {
+      "text": "natação do Léo toda terça às 18h",
+      "expect": {
+        "intent": "add_event",
+        "recurrence": "weekly",
+        "time": "18:00"
+      }
+    },
+    {
+      "text": "aniversário da Ana dia 12 de março",
+      "expect": {
+        "intent": "add_event",
+        "event_kind": "birthday",
+        "recurrence": "yearly"
+      }
+    },
+    {
+      "text": "remover unha do calendário",
+      "expect": {
+        "intent": "remove_event",
+        "ref": "v1"
+      }
+    },
+    {
+      "text": "cancela o dentista",
+      "expect": {
+        "intent": "remove_event",
+        "ref": "v2"
+      }
+    },
+    {
+      "text": "muda o dentista para sexta às 10h",
+      "expect": {
+        "intent": "move_event",
+        "ref": "v2",
+        "new_date": "2026-11-13",
+        "time": "10:00"
+      }
+    },
+    {
+      "text": "me lembra 1h antes do dentista",
+      "expect": {
+        "intent": "edit_event",
+        "ref": "v2",
+        "reminder": 60
+      }
+    },
+    {
+      "text": "quando é o próximo dentista?",
+      "expect": {
+        "intent": "find_event",
+        "ref": "v2"
+      }
+    },
+    {
+      "text": "próximos aniversários",
+      "expect": {
+        "intent": "birthdays"
+      }
+    },
+    {
+      "text": "move it to Thursday",
+      "history": [
+        {
+          "q": "when is the school meeting?",
+          "a": "Reunião escola is on Fri 13 Nov at 08:30."
+        }
+      ],
+      "expect": {
+        "intent": "move_event",
+        "ref": "v5",
+        "new_date": "2026-11-12"
+      }
+    },
+    {
+      "text": "gastei 50 no mercado",
+      "expect": {
+        "intent": "add_money",
+        "amount": 50,
+        "money_type": "expense"
+      }
+    },
+    {
+      "text": "recebi 3000 de salário",
+      "expect": {
+        "intent": "add_money",
+        "amount": 3000,
+        "money_type": "income"
+      }
+    },
+    {
+      "text": "quanto gastei com mercado esse mês?",
+      "expect": {
+        "intent": "money_summary",
+        "category": "groceries"
+      }
+    },
+    {
+      "text": "quanto gastei de Uber?",
+      "expect": {
+        "intent": "money_summary",
+        "title": "Uber"
+      }
+    },
+    {
+      "text": "quais foram os últimos gastos?",
+      "expect": {
+        "intent": "list_money",
+        "money_type": "expense"
+      }
+    },
+    {
+      "text": "quais foram meus gastos esse mês?",
+      "expect": {
+        "intent": "list_money",
+        "person": "Arthur Munhoz",
+        "money_type": "expense",
+        "money_range": "month"
+      }
+    },
+    {
+      "text": "quais foram meus gastos hoje?",
+      "expect": {
+        "intent": "list_money",
+        "person": "Arthur Munhoz",
+        "money_type": "expense",
+        "money_range": "day",
+        "date": "2026-11-09"
+      }
+    },
+    {
+      "text": "quanto gastamos essa semana?",
+      "expect": {
+        "intent": "money_summary",
+        "money_range": "week",
+        "person": ""
+      }
+    },
+    {
+      "text": "quanto gastei ontem?",
+      "expect": {
+        "intent": "money_summary",
+        "money_range": "day",
+        "date": "2026-11-08"
+      }
+    },
+    {
+      "text": "quanto a Ana gastou esse mês?",
+      "expect": {
+        "intent": "money_summary",
+        "person": "Ana Munhoz",
+        "money_type": "expense"
+      }
+    },
+    {
+      "text": "quanto entrou esse mês?",
+      "expect": {
+        "intent": "money_summary",
+        "money_type": "income",
+        "person": ""
+      }
+    },
+    {
+      "text": "quais foram os últimos lançamentos da casa?",
+      "expect": {
+        "intent": "list_money",
+        "money_type": "all",
+        "person": ""
+      }
+    },
+    {
+      "text": "e no mês anterior?",
+      "history": [
+        {
+          "q": "quanto gastei de Uber?",
+          "a": "Gastou $18.40 em Uber [novembro 2026]"
+        }
+      ],
+      "expect": {
+        "intent": "money_summary",
+        "title": "Uber",
+        "date": "2026-10-09"
+      }
+    },
+    {
+      "text": "quanto gastei com mercado no mês passado?",
+      "expect": {
+        "intent": "money_summary",
+        "category": "groceries",
+        "date": "2026-10-09"
+      }
+    },
+    {
+      "text": "era 45, não 54",
+      "expect": {
+        "intent": "fix_money",
+        "amount": 45,
+        "ref": "e1"
+      }
+    },
+    {
+      "text": "esqueci a gorjeta, foram mais 12",
+      "history": [
+        {
+          "q": "gastei 54,20 no Ford's Garage",
+          "a": "Gasto lançado no orçamento: Ford's Garage, $54.20."
+        }
+      ],
+      "expect": {
+        "intent": "fix_money",
+        "delta": 12,
+        "amount": 0,
+        "ref": "e1"
+      }
+    },
+    {
+      "text": "põe 10% de gorjeta nesse gasto",
+      "history": [
+        {
+          "q": "gastei 54,20 no Ford's Garage",
+          "a": "Gasto lançado no orçamento: Ford's Garage, $54.20."
+        }
+      ],
+      "expect": {
+        "intent": "fix_money",
+        "tip_pct": 10,
+        "amount": 0,
+        "ref": "e1"
+      }
+    },
+    {
+      "text": "pagar o gasto do Ford's Garage",
+      "history": [
+        {
+          "q": "gastei 54,20 no Ford's Garage",
+          "a": "Gasto lançado no orçamento: Ford's Garage, $54.20."
+        }
+      ],
+      "expect": {
+        "intent": "remove_money",
+        "ref": "e1"
+      }
+    },
+    {
+      "text": "apaga o gasto do Ford's Garage",
+      "expect": {
+        "intent": "remove_money",
+        "ref": "e1"
+      }
+    },
+    {
+      "text": "apaga esse",
+      "history": [
+        {
+          "q": "gastei 54,20 no Ford's Garage",
+          "a": "Gasto lançado no orçamento: Ford's Garage, $54.20."
+        }
+      ],
+      "expect": {
+        "intent": "remove_money",
+        "ref": "e1"
+      }
+    },
+    {
+      "text": "remove o gasto do Uber",
+      "expect": {
+        "intent": "remove_money",
+        "ref": "e3"
+      }
+    },
+    {
+      "text": "delete the last expense",
+      "expect": {
+        "intent": "remove_money"
+      }
+    },
+    {
+      "text": "divide 58,71 em 3",
+      "expect": {
+        "intent": "split_bill",
+        "amount": 58.71,
+        "people": 3
+      }
+    },
+    {
+      "text": "quanto fica 80 com 30% de desconto",
+      "expect": {
+        "intent": "discount",
+        "amount": 80,
+        "percent": 30
+      }
+    },
+    {
+      "text": "2 litros por 8 ou 3 litros por 11, qual compensa?",
+      "expect": {
+        "intent": "better_deal"
+      }
+    },
+    {
+      "text": "avisa o Léo que chego às 19h",
+      "expect": {
+        "intent": "send_nudge",
+        "person": "Léo Munhoz",
+        "urgent": false
+      }
+    },
+    {
+      "text": "socorro, preciso de ajuda urgente",
+      "expect": {
+        "intent": "send_nudge",
+        "urgent": true
+      }
+    },
+    {
+      "text": "quem viu meu aviso?",
+      "expect": {
+        "intent": "nudge_seen"
+      }
+    },
+    {
+      "text": "o que a Lola precisa hoje?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Lola"
+      }
+    },
+    {
+      "text": "como está a rotina da Lola e da Chloe hoje?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Lola, Chloe"
+      }
+    },
+    {
+      "text": "já dei comida pra Lola",
+      "expect": {
+        "intent": "pet_done",
+        "pet": "Lola",
+        "items": [
+          "Comida"
+        ]
+      }
+    },
+    {
+      "text": "a Cloe tomou a antirrábica hoje, próxima em 1 ano",
+      "expect": {
+        "intent": "pet_log",
+        "pet": "Chloe",
+        "pet_event_type": "vaccine",
+        "new_date": "2027-11-09"
+      }
+    },
+    {
+      "text": "quando é a próxima vacina da Lola?",
+      "expect": {
+        "intent": "pet_next",
+        "pet": "Lola",
+        "pet_event_type": "vaccine"
+      }
+    },
+    {
+      "text": "a Lola está com 8 kg",
+      "expect": {
+        "intent": "pet_weight",
+        "pet": "Lola",
+        "amount": 8
+      }
+    },
+    {
+      "text": "quanto o Léo calça?",
+      "expect": {
+        "intent": "family_info",
+        "person": "Léo Munhoz",
+        "field": "shoe_size"
+      }
+    },
+    {
+      "text": "o Léo agora calça 34",
+      "expect": {
+        "intent": "family_update",
+        "person": "Léo Munhoz",
+        "field": "shoe_size",
+        "value": "34"
+      }
+    },
+    {
+      "text": "onde está a Ana?",
+      "expect": {
+        "intent": "where_is",
+        "person": "Ana Munhoz"
+      }
+    },
+    {
+      "text": "o Léo já chegou na escola?",
+      "expect": {
+        "intent": "where_is",
+        "person": "Léo Munhoz",
+        "title": "escola"
+      }
+    },
+    {
+      "text": "vai chover amanhã?",
+      "expect": {
+        "intent": "weather",
+        "date": "2026-11-10"
+      }
+    },
+    {
+      "text": "abre o passaporte do Léo",
+      "expect": {
+        "intent": "open_document",
+        "person": "Léo Munhoz"
+      }
+    },
+    {
+      "text": "resumo do meu dia",
+      "expect": {
+        "intent": "day_summary"
+      }
+    },
+    {
+      "text": "abre o orçamento",
+      "expect": {
+        "intent": "open_app",
+        "app": "budget"
+      }
+    },
+    {
+      "text": "¿qué hay en la lista de Publix?",
+      "expect": {
+        "intent": "list_items",
+        "store": "Publix"
+      }
+    },
+    {
+      "text": "gasté 20 en el uber",
+      "expect": {
+        "intent": "add_money",
+        "amount": 20
+      }
+    },
+    {
+      "text": "escreve um poema sobre gatos",
+      "expect": {
+        "intent": "unknown"
+      }
+    }
+  ]
+}

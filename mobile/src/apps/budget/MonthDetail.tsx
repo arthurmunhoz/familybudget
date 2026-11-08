@@ -45,12 +45,15 @@ export default function MonthDetail({
   monthId,
   autoAdd = false,
   autoScan = false,
+  openEntryId,
 }: {
   monthId: string
   /** True when arriving from the home card's "＋ New entry" (?add=1). */
   autoAdd?: boolean
   /** True when arriving from the home card's scan button (?scan=1). */
   autoScan?: boolean
+  /** Open this entry's form once loaded (?entry=<id>). */
+  openEntryId?: string
 }) {
   const { c, dark } = useTheme()
   const { t } = useI18n()
@@ -113,6 +116,11 @@ export default function MonthDetail({
     setPrefill(undefined)
     setFormOpen(true)
   }, [autoAdd, loading, month])
+
+  // Arriving from a tapped entry elsewhere (a member's Today): that entry's
+  // form is open on arrival — derived, not set in an effect — until closed.
+  const [autoEntryClosed, setAutoEntryClosed] = useState(false)
+  const autoEntry = openEntryId && !autoEntryClosed && !formOpen ? (entries.find((e) => e.id === openEntryId) ?? null) : null
 
   // Arriving via the home card's scan button starts the receipt scan once (per
   // mount) as soon as the period has loaded.
@@ -462,7 +470,7 @@ export default function MonthDetail({
         </Pressable>
       </View>
 
-      {formOpen && profile && (
+      {(formOpen || autoEntry) && profile && (
         <EntryForm
           colors={look}
           kicker={periodTitle(period, month.start_date)}
@@ -475,14 +483,16 @@ export default function MonthDetail({
           customCategories={customCats}
           categoryOverrides={overrides}
           onCategoryCreated={load}
-          entry={editing}
+          entry={autoEntry ?? editing}
           initial={prefill}
           onClose={() => {
             setFormOpen(false)
+            setAutoEntryClosed(true)
             setPrefill(undefined)
           }}
           onSaved={() => {
             setFormOpen(false)
+            setAutoEntryClosed(true)
             setPrefill(undefined)
             load()
           }}

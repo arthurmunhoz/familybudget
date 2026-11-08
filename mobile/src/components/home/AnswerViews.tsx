@@ -80,6 +80,64 @@ function Actions({
 
 const undoIcon = (color: string) => <RotateCcw size={17} color={color} />
 
+// ── generic action ───────────────────────────────────────────────────────────
+
+export interface ActionRowData {
+  emoji?: string
+  title: string
+  sub?: string
+  /** Highlighted (e.g. the cheaper option). */
+  strong?: boolean
+}
+
+/** The shape every newer action shares (components/home/askActions.ts): the
+ *  answer, an optional panel of rows, and up to two buttons — Undo or a
+ *  second choice on the left, a confirm / Open … on the right. */
+export function ActionView({
+  headline,
+  sub,
+  rows,
+  quiet,
+  main,
+}: {
+  headline: string
+  sub?: string | null
+  rows: ActionRowData[]
+  quiet?: { label: string; undo?: boolean; onPress: () => void } | null
+  main?: { label: string; onPress: () => void } | null
+}) {
+  const { c } = useTheme()
+  return (
+    <>
+      <Headline text={headline} sub={sub} />
+      {rows.length ? (
+        <Panel>
+          {rows.map((r, i) => (
+            <View key={i} style={v.item}>
+              {r.emoji ? (
+                <View style={[v.tile, { backgroundColor: r.strong ? c.income + '22' : c.accentSoft }]}>
+                  <Txt style={{ fontSize: 19 }}>{r.emoji}</Txt>
+                </View>
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }}>{r.title}</Txt>
+                {r.sub ? <Txt variant="muted">{r.sub}</Txt> : null}
+              </View>
+              {r.strong ? <Check size={20} color={c.income} strokeWidth={3} /> : null}
+            </View>
+          ))}
+        </Panel>
+      ) : null}
+      {quiet || main ? (
+        <Actions
+          quiet={quiet ? { label: quiet.label, icon: quiet.undo ? undoIcon(c.text) : undefined, onPress: quiet.onPress } : null}
+          main={main ?? null}
+        />
+      ) : null}
+    </>
+  )
+}
+
 // ── shopping ─────────────────────────────────────────────────────────────────
 
 /** "Which list?" — the household's stores, "anywhere", and a new list (pre-
@@ -445,7 +503,12 @@ export function NudgeView({
   sending,
   onSend,
   onCancel,
+  emoji = '📣',
+  urgent = false,
 }: {
+  emoji?: string
+  /** High priority: goes to everyone with sound (the urgent-nudge rules). */
+  urgent?: boolean
   message: string
   to: string
   sent: boolean
@@ -457,10 +520,13 @@ export function NudgeView({
   const { t } = useI18n()
   return (
     <>
-      <Headline text={sent ? t('ask.nudgeSent', { to }) : t('ask.nudgeConfirm', { to })} />
+      <Headline
+        text={sent ? t('ask.nudgeSent', { to }) : t('ask.nudgeConfirm', { to })}
+        sub={urgent ? t('ask.nudgeUrgent') : null}
+      />
       <Panel>
         <View style={[v.item, { paddingVertical: sp.md }]}>
-          <Txt style={{ fontSize: 22 }}>📣</Txt>
+          <Txt style={{ fontSize: 22 }}>{emoji}</Txt>
           <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 17 }}>“{message}”</Txt>
           {sent ? <Check size={20} color={c.income} strokeWidth={3} /> : null}
         </View>
@@ -632,8 +698,11 @@ export function PetsView({
   const late = care.filter((r) => r.status === 'overdue').length
   const tickedNow = Object.values(ticked).filter(Boolean).length
   const nextUp = routine.find((r) => !ticked[r.id])
+  // Several pets asked about ("Lola, Aninha"): the all-pets headline, and
+  // each row says whose it is.
+  const several = pet.includes(',')
   // The headline follows what's still to do as items get ticked here.
-  const head = pet
+  const head = pet && !several
     ? nextUp
       ? t('ask.petsNext', { pet, title: nextUp.title })
       : routineTotal
@@ -672,7 +741,7 @@ export function PetsView({
         </View>
         <View style={{ flex: 1 }}>
           <Txt style={{ fontFamily: fonts.semibold, fontSize: 15.5, textDecorationLine: done ? 'line-through' : 'none' }}>{r.title}</Txt>
-          {r.pet && !pet ? <Txt variant="muted">{r.pet}</Txt> : null}
+          {r.pet && (!pet || several) ? <Txt variant="muted">{r.pet}</Txt> : null}
         </View>
         {isRoutine && onToggle ? (
           // the same big round tick as Pet Care's Today card

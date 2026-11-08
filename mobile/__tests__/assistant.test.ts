@@ -3,6 +3,7 @@
 jest.mock('@/lib/supabase', () => ({ supabase: {} }))
 
 import { localParse } from '@/lib/assistant'
+import { compareDeals } from '@/lib/assistantActions'
 
 const TODAY = '2026-11-05'
 
@@ -43,7 +44,7 @@ it('unknown requests stay unknown', () => {
   expect(localParse('qual a capital da França?', TODAY)).toBeNull()
 })
 
-import { fromServer, periodForBudget, petQuestion, pickBudget } from '@/lib/assistant'
+import { fromServer, moneyRange, periodForBudget, petQuestion, petsAsked, pickBudget } from '@/lib/assistant'
 
 describe('generic lists are not stores (owner report 2026-11)', () => {
   it('"lista de compras" asks instead of creating a store called "compras"', () => {
@@ -256,5 +257,138 @@ describe('money: which budget, which period', () => {
     // November not opened yet → the latest period, October
     expect((periodForBudget(home, months, '2026-11-05') as { id: string }).id).toBe('oct')
     expect(periodForBudget(B('x', 'Empty'), months, '2026-11-05')).toBeNull()
+  })
+})
+
+describe('fromServer — the newer intents (2026-11)', () => {
+  it('add_event keeps the extras that were said', () => {
+    expect(
+      fromServer(
+        { intent: 'add_event', title: 'Natação', date: '2026-11-10', time: '18:00', end_time: '19:00', recurrence: 'weekly', event_kind: 'event', reminder: 60, location: '', notes: '' },
+        TODAY,
+      ),
+    ).toEqual({
+      intent: 'add_event',
+      title: 'Natação',
+      date: '2026-11-10',
+      time: '18:00',
+      person: '',
+      opts: { end: undefined, endTime: '19:00', recurrence: 'weekly', kind: 'event', location: '', notes: '', reminder: 60 },
+    })
+  })
+  it('a birthday repeats every year even when the model said none', () => {
+    const r = fromServer({ intent: 'add_event', title: 'Aniversário da Ana', date: '2027-03-12', event_kind: 'birthday', recurrence: 'none', reminder: -1 }, TODAY)
+    expect(r).toMatchObject({ opts: { kind: 'birthday', recurrence: 'yearly', reminder: null } })
+  })
+  it('remove / edit / find keep "" when no day was said', () => {
+    expect(fromServer({ intent: 'remove_event', title: 'Unha', date: '' }, TODAY)).toEqual({ intent: 'remove_event', title: 'Unha', date: '' })
+    expect(fromServer({ intent: 'find_event', title: 'Dentista', date: '' }, TODAY)).toEqual({ intent: 'find_event', title: 'Dentista', date: '' })
+    expect(fromServer({ intent: 'edit_event', title: 'Dentista', date: '', reminder: 60 }, TODAY)).toMatchObject({ intent: 'edit_event', date: '', reminder: 60 })
+    // An edit that changes nothing is not usable.
+    expect(fromServer({ intent: 'edit_event', title: 'Dentista', reminder: -1 }, TODAY)).toBeNull()
+  })
+  it('money corrections and per-category totals', () => {
+    expect(fromServer({ intent: 'fix_money', title: '', amount: 45 }, TODAY)).toEqual({ intent: 'fix_money', title: '', amount: 45, newTitle: '', delta: 0, tipPct: 0 })
+    expect(fromServer({ intent: 'fix_money', title: '', delta: 12 }, TODAY)).toEqual({ intent: 'fix_money', title: '', amount: 0, newTitle: '', delta: 12, tipPct: 0 })
+    expect(fromServer({ intent: 'fix_money', title: 'Ford', tip_pct: 10 }, TODAY)).toEqual({ intent: 'fix_money', title: 'Ford', amount: 0, newTitle: '', delta: 0, tipPct: 10 })
+    expect(fromServer({ intent: 'fix_money', title: '' }, TODAY)).toBeNull()
+    expect(fromServer({ intent: 'money_summary', budget: '', category: 'groceries' }, TODAY)).toEqual({ intent: 'money_summary', budget: '', category: 'groceries', title: '' })
+  })
+  it('pets', () => {
+    expect(fromServer({ intent: 'pet_done', pet: 'Lola', items: ['Comida'] }, TODAY)).toEqual({ intent: 'pet_done', pet: 'Lola', tasks: ['Comida'] })
+    expect(fromServer({ intent: 'pet_log', pet: 'Chloe', pet_event_type: 'vaccine', title: 'Antirrábica', date: TODAY, new_date: '2027-11-05' }, TODAY)).toEqual({
+      intent: 'pet_log',
+      pet: 'Chloe',
+      type: 'vaccine',
+      title: 'Antirrábica',
+      date: TODAY,
+      next: '2027-11-05',
+    })
+    expect(fromServer({ intent: 'pet_weight', pet: 'Lola', amount: 8 }, TODAY)).toEqual({ intent: 'pet_weight', pet: 'Lola', weight: 8 })
+    expect(fromServer({ intent: 'pet_weight', pet: 'Lola', amount: 0 }, TODAY)).toBeNull()
+  })
+  it('urgent nudges, better deals, documents', () => {
+    expect(fromServer({ intent: 'send_nudge', title: 'Preciso de ajuda', person: '', urgent: true }, TODAY)).toMatchObject({ urgent: true })
+    expect(fromServer({ intent: 'better_deal', deals: [{ price: 8, size: 2, label: '2 L' }] }, TODAY)).toBeNull()
+    expect(fromServer({ intent: 'better_deal', deals: [{ price: 8, size: 2, label: 'a' }, { price: 11, size: 3, label: 'b' }] }, TODAY)).toMatchObject({ intent: 'better_deal' })
+    expect(fromServer({ intent: 'open_document', title: 'Passaporte', person: 'Léo' }, TODAY)).toEqual({ intent: 'open_document', title: 'Passaporte', person: 'Léo' })
+  })
+})
+
+describe('compareDeals', () => {
+  it('marks the cheapest per unit and how much cheaper it is', () => {
+    const { rows, savingPct } = compareDeals([
+      { price: 8, size: 2, label: '2 L por 8' },
+      { price: 11, size: 3, label: '3 L por 11' },
+    ])
+    expect(rows.find((r) => r.best)?.label).toBe('3 L por 11')
+    expect(savingPct).toBe(8) // 3.67 vs 4.00 per litre
+  })
+})
+
+describe('money / calendar words never become list items (owner report 2026-11)', () => {
+  it('leaves "apaga o gasto do Ford\'s Garage" to the server', () => {
+    expect(localParse("apaga o gasto do Ford's Garage", TODAY)).toBeNull()
+    expect(localParse('remove o evento unha do calendário', TODAY)).toBeNull()
+    expect(localParse('delete the last expense', TODAY)).toBeNull()
+  })
+  it('still removes real list items', () => {
+    expect(localParse('tira o leite da lista', TODAY)).toEqual({ intent: 'remove_items', items: ['leite'] })
+  })
+})
+
+describe('refs from the server', () => {
+  it('carries the row the model pointed at', () => {
+    expect(fromServer({ intent: 'remove_money', title: '', ref: 'e1' }, TODAY)).toEqual({ intent: 'remove_money', title: '', ref: 'e1' })
+    expect(fromServer({ intent: 'remove_event', title: '', date: '', ref: 'v3' }, TODAY)).toEqual({ intent: 'remove_event', title: '', date: '', ref: 'v3' })
+    expect(fromServer({ intent: 'remove_money', title: 'Uber', ref: 'x9' }, TODAY)).toEqual({ intent: 'remove_money', title: 'Uber' })
+  })
+})
+
+describe('money questions about an earlier period', () => {
+  it('carries a past day as `at`, never today', () => {
+    expect(fromServer({ intent: 'money_summary', budget: '', category: '', title: 'Uber', date: '2026-10-05' }, TODAY)).toEqual({
+      intent: 'money_summary', budget: '', category: '', title: 'Uber', at: '2026-10-05',
+    })
+    expect(fromServer({ intent: 'list_money', budget: '', category: '', title: '', date: TODAY }, TODAY)).toEqual({
+      intent: 'list_money', budget: '', category: '', title: '',
+    })
+  })
+  it('finds the period that held the day, with no stand-in when strict', () => {
+    const b = { id: 'b', name: 'Casa', period: 'monthly' } as any
+    const months = [{ id: 'm10', budget_id: 'b', start_date: '2026-10-01' }, { id: 'm11', budget_id: 'b', start_date: '2026-11-01' }] as any
+    expect(periodForBudget(b, months, '2026-10-05', true)?.id).toBe('m10')
+    expect(periodForBudget(b, months, '2026-08-05', true)).toBeNull()
+    expect(periodForBudget(b, months, '2026-08-05')?.id).toBe('m11')
+  })
+})
+
+describe('whose money, and which kind (owner report 2026-11)', () => {
+  it('"meus gastos" keeps the person and expenses only', () => {
+    expect(fromServer({ intent: 'list_money', budget: '', category: '', title: '', person: 'Arthur Munhoz', money_type: 'expense' }, TODAY)).toEqual({
+      intent: 'list_money', budget: '', category: '', title: '', person: 'Arthur Munhoz', kind: 'expense',
+    })
+    expect(fromServer({ intent: 'list_money', budget: '', category: '', title: '', person: '', money_type: 'all' }, TODAY)).toEqual({
+      intent: 'list_money', budget: '', category: '', title: '',
+    })
+  })
+})
+
+describe('money over an explicit day / week / month (owner report 2026-11)', () => {
+  it('"meus gastos hoje" filters to that day', () => {
+    expect(fromServer({ intent: 'list_money', budget: '', category: '', title: '', person: 'Arthur', money_type: 'expense', money_range: 'day', date: TODAY }, TODAY)).toEqual({
+      intent: 'list_money', budget: '', category: '', title: '', person: 'Arthur', kind: 'expense', range: { span: 'day', from: TODAY, to: TODAY },
+    })
+  })
+  it('weeks run Monday to Sunday, months to their last day', () => {
+    expect(moneyRange('week', '2026-11-05')).toEqual({ span: 'week', from: '2026-11-02', to: '2026-11-08' })
+    expect(moneyRange('month', '2026-02-10')).toEqual({ span: 'month', from: '2026-02-01', to: '2026-02-28' })
+  })
+})
+
+describe('routine questions naming several pets (owner report 2026-11)', () => {
+  it('keeps every pet named', () => {
+    expect(petsAsked('como está a rotina da Lola e da Aninha hoje?', ['Lola', 'Aninha'])).toEqual(['Lola', 'Aninha'])
+    expect(petQuestion('como está a rotina da Lola e da Aninha hoje?', ['Lola', 'Aninha'])).toBe('Lola')
   })
 })

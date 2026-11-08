@@ -8,7 +8,7 @@
 // sheet shows it and waits for a tap. Writes come back with what Undo needs.
 import { supabase } from './supabase'
 import { STORE_CATALOG } from './stores'
-import { compareOccurrences, occurrencesByDay, type Occurrence } from './calendar'
+import { compareOccurrences, occurrencesByDay, occurrencesInRange, upcomingOccurrences, type Occurrence } from './calendar'
 import { dailyChecklist, overdueCare, overdueEvents } from './petCare'
 import { suggestCategory } from './categories'
 import { addDaysISO, periodEndISO } from './format'
@@ -17,10 +17,14 @@ import type {
   Budget,
   CalendarEvent,
   CategoryRule,
+  Entry,
+  EventKind,
+  EventRecurrence,
   MemberProfile,
   Month,
   PetCareTask,
   PetEvent,
+  PetEventType,
   PetTaskDone,
   Profile,
   ShoppingItem,
@@ -47,17 +51,86 @@ export type Intent =
   | { intent: 'check_items'; items: string[] }
   | { intent: 'remove_items'; items: string[] }
   | { intent: 'agenda'; scope: Scope; person: string; date: string; end: string; label: string }
-  | { intent: 'add_event'; title: string; date: string; time: string; person: string }
-  | { intent: 'move_event'; title: string; date: string; newDate: string; time: string }
+  | { intent: 'add_event'; title: string; date: string; time: string; person: string; opts?: EventOpts }
+  | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; ref?: string }
+  | { intent: 'find_event'; title: string; date: string; ref?: string }
+  | { intent: 'move_event'; title: string; date: string; newDate: string; time: string; ref?: string }
+  /** `date` is "" when no day was said: the coming weeks are searched. */
+  | { intent: 'remove_event'; title: string; date: string; ref?: string }
   | { intent: 'add_money'; title: string; amount: number; type: 'expense' | 'income'; date: string; budget: string }
-  | { intent: 'money_summary'; budget: string }
-  | { intent: 'send_nudge'; message: string; person: string }
+  /** `at`: a day inside an EARLIER period asked about ("last month"); absent = the current one. */
+  /** `kind`: only expenses or only income ("meus gastos"); absent = both. */
+  /** `range`: an explicit day / week / month asked about ("hoje"), inclusive ISO days. */
+  | { intent: 'money_summary'; budget: string; category?: string; title?: string; at?: string; person?: string; kind?: 'expense' | 'income'; range?: MoneyRange }
+  | { intent: 'list_money'; budget: string; category: string; title: string; at?: string; person?: string; kind?: 'expense' | 'income'; range?: MoneyRange }
+  | { intent: 'fix_money'; title: string; amount: number; newTitle: string; delta: number; tipPct: number; ref?: string }
+  | { intent: 'remove_money'; title: string; ref?: string }
+  /** The server knew what was meant but a detail was missing: ask, never guess. */
+  | { intent: 'need_detail'; about: string }
+  /** The server answered with something this app version can't do yet. */
+  | { intent: 'needs_update'; about: string }
+  | { intent: 'send_nudge'; message: string; person: string; urgent?: boolean }
+  | { intent: 'nudge_seen' }
+  | { intent: 'pet_done'; pet: string; tasks: string[] }
+  | { intent: 'pet_log'; pet: string; type: PetEventType; title: string; date: string; next: string }
+  | { intent: 'pet_next'; pet: string; type: PetEventType | '' }
+  | { intent: 'pet_weight'; pet: string; weight: number }
+  | { intent: 'family_update'; person: string; field: FamilyField | ''; value: string }
+  | { intent: 'birthdays' }
+  | { intent: 'where_is'; person: string; place: string }
+  | { intent: 'move_items'; items: string[]; store: string }
+  | { intent: 'clear_checked'; store: string }
+  | { intent: 'uncheck_items'; items: string[] }
+  | { intent: 'weather'; date: string }
+  | { intent: 'better_deal'; deals: Deal[] }
+  | { intent: 'open_document'; title: string; person: string }
+  | { intent: 'day_summary'; date: string }
   | { intent: 'pets_due'; pet: string }
   | { intent: 'family_info'; person: string; field: FamilyField | '' }
   | { intent: 'open_app'; app: string }
   | { intent: 'split_bill'; amount: number; people: number; mode: 'even' | 'items' | ''; tip: number }
   | { intent: 'discount'; amount: number; percent: number }
   | { intent: 'unknown'; reply: string }
+
+/** add_event's extras beyond title/day/time (all optional). */
+export interface EventOpts {
+  /** Last day of a multi-day event (> date). */
+  end?: string
+  endTime?: string
+  recurrence?: EventRecurrence
+  kind?: EventKind
+  location?: string
+  notes?: string
+  /** Minutes before; null/undefined = none. */
+  reminder?: number | null
+}
+
+/** One option of a "which is cheaper?" comparison. */
+export interface Deal {
+  price: number
+  size: number
+  label: string
+}
+
+export interface MoneyRange {
+  span: 'day' | 'week' | 'month'
+  from: string
+  to: string
+}
+
+/** The inclusive days of the day / week (Mon–Sun) / calendar month around `date`. */
+export function moneyRange(span: MoneyRange['span'], date: string): MoneyRange {
+  if (span === 'day') return { span, from: date, to: date }
+  if (span === 'week') {
+    const dow = (new Date(date + 'T12:00:00').getDay() + 6) % 7 // Monday = 0
+    const from = addDays(date, -dow)
+    return { span, from, to: addDays(from, 6) }
+  }
+  const [y, m] = date.split('-').map(Number)
+  const last = new Date(y, m, 0).getDate()
+  const mm = String(m).padStart(2, '0')
+  return { span, from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, '0')}` }
+}
 
 export interface AskContext {
   today: string
@@ -67,8 +140,16 @@ export interface AskContext {
   members: string[]
   budgets: string[]
   pets: string[]
+  /** Each pet's routine, "Lola: Comida, Passeio". */
+  petTasks?: string[]
+  /** Spending categories, "groceries = Groceries". */
+  categories?: string[]
   /** What's still to buy, "label @ store" — Claude matches questions to it. */
   openItems: string[]
+  /** Latest money entries, "e1 = Ford's Garage · 54.20 · expense · 2026-11-08 · Arthur". */
+  recentEntries?: string[]
+  /** Coming events, "v1 = Unha · 2026-11-10 14:00 · Ana". */
+  events?: string[]
   me: string
   /** This conversation so far, oldest first: what was asked and a one-line
    *  account of what the app answered — so "remove the milk" / "and for
@@ -80,24 +161,61 @@ export interface AskContext {
 
 /** Ask the server; fall back to the local parser when it can't answer. Returns
  *  null only when neither understood the request. */
-export async function understand(text: string, ctx: AskContext): Promise<Intent | null> {
-  const remote = await askServer(text, ctx)
+/** Every intent this app version can carry out (what fromServer handles). */
+const KNOWN_INTENTS = new Set([
+  'add_items', 'list_items', 'find_items', 'check_items', 'remove_items', 'move_items', 'clear_checked', 'uncheck_items',
+  'agenda', 'add_event', 'edit_event', 'find_event', 'move_event', 'remove_event', 'birthdays', 'day_summary',
+  'add_money', 'money_summary', 'list_money', 'fix_money', 'remove_money', 'split_bill', 'discount', 'better_deal',
+  'send_nudge', 'nudge_seen', 'pets_due', 'pet_done', 'pet_log', 'pet_next', 'pet_weight',
+  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'unknown',
+])
+
+/** What the server said: an intent, an intent with a detail missing, an
+ *  intent newer than this app, or nothing (offline / old deploy / error). */
+type ServerReply =
+  | { kind: 'ok'; intent: Intent }
+  | { kind: 'incomplete'; name: string }
+  | { kind: 'unsupported'; name: string }
+  | { kind: 'offline' }
+
+export type Source = 'server' | 'local' | 'asked' | 'none'
+
+/** understand() plus where the answer came from (for gap logging). */
+export async function understandWithSource(text: string, ctx: AskContext): Promise<{ intent: Intent | null; source: Source }> {
+  const r = await askServer(text, ctx)
+  const remote = r.kind === 'ok' ? r.intent : null
   const local = localParse(text, ctx.today)
   // A server that answered a single day to "this month" (an older deploy, or a
   // miss) loses to a period the local parser can see in the words.
   if (remote?.intent === 'agenda' && remote.end === remote.date && local?.intent === 'agenda' && local.end > local.date) {
-    return { ...remote, date: local.date, end: local.end }
+    return { intent: { ...remote, date: local.date, end: local.end }, source: 'server' }
   }
   // The utilities are clear-cut phrasings; an older server that doesn't know
   // them yet would file "divide 58,71 em 3" as an expense.
-  if ((local?.intent === 'split_bill' || local?.intent === 'discount') && remote?.intent !== local.intent) return local
+  if ((local?.intent === 'split_bill' || local?.intent === 'discount') && remote?.intent !== local.intent) return { intent: local, source: 'local' }
   // A pet of THIS household named next to "need / next / routine…" is a
   // routine question, whatever an older server made of it ("what does Lola
   // need next today?" came back as family_info / unknown — owner, 2026-11).
-  const pet = petQuestion(text, ctx.pets, ctx.members)
-  if (pet && (remote?.intent !== 'pets_due' || !remote.pet)) return { intent: 'pets_due', pet }
-  if (remote && remote.intent !== 'unknown') return remote
-  return local ?? remote
+  const asked = petsAsked(text, ctx.pets, ctx.members)
+  // Several pets named: all of them, whatever single one the server kept.
+  if (asked.length > 1 && (!remote || remote.intent === 'pets_due' || remote.intent === 'unknown')) {
+    return { intent: { intent: 'pets_due', pet: asked.join(', ') }, source: remote ? 'server' : 'local' }
+  }
+  const pet = asked[0] ?? ''
+  if (pet && (remote?.intent !== 'pets_due' || !remote.pet)) return { intent: { intent: 'pets_due', pet }, source: 'local' }
+  if (remote && remote.intent !== 'unknown') return { intent: remote, source: 'server' }
+  // The server UNDERSTOOD the request but a detail was missing. The local
+  // regexes are far dumber ("apaga o gasto do X" reads as a list item), so
+  // never let them guess here: ask for what's missing (owner, 2026-11).
+  if (r.kind === 'incomplete') return { intent: { intent: 'need_detail', about: r.name }, source: 'asked' }
+  if (r.kind === 'unsupported') return { intent: { intent: 'needs_update', about: r.name }, source: 'asked' }
+  // Offline, or the server said "unknown": the local parser is the fallback.
+  if (local) return { intent: local, source: 'local' }
+  return { intent: remote, source: remote ? 'server' : 'none' }
+}
+
+export async function understand(text: string, ctx: AskContext): Promise<Intent | null> {
+  return (await understandWithSource(text, ctx)).intent
 }
 
 /** The server's JSON → a typed intent (null when it isn't usable). */
@@ -106,6 +224,11 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
   const str = (k: string) => (typeof j[k] === 'string' ? (j[k] as string) : '')
   const items = Array.isArray(j.items) ? (j.items as unknown[]).filter((x): x is string => typeof x === 'string' && !!x.trim()) : []
   const date = /^\d{4}-\d{2}-\d{2}$/.test(str('date')) ? str('date') : today
+  /** A YYYY-MM-DD field, or "" when not given. */
+  const isoOr = (k: string) => (/^\d{4}-\d{2}-\d{2}$/.test(str(k)) ? str(k) : '')
+  const num = (k: string) => (typeof j[k] === 'number' && isFinite(j[k] as number) ? (j[k] as number) : 0)
+  /** The row the model pointed at ("e1", "v3") — only when given. */
+  const ref = /^[ev]\d{1,2}$/.test(str('ref')) ? { ref: str('ref') } : {}
   switch (j.intent) {
     case 'add_items':
       return items.length ? { intent: 'add_items', items, store: str('store') } : null
@@ -122,13 +245,52 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
       const end = /^\d{4}-\d{2}-\d{2}$/.test(str('date_end')) && str('date_end') > date ? str('date_end') : date
       return { intent: 'agenda', scope: (str('scope') as Scope) || 'me', person: str('person'), date, end, label: str('reply') }
     }
-    case 'add_event':
-      return str('title') ? { intent: 'add_event', title: str('title'), date, time: str('time'), person: str('person') } : null
+    case 'add_event': {
+      if (!str('title')) return null
+      const end = isoOr('date_end')
+      const rec = str('recurrence') as EventRecurrence
+      const kind = str('event_kind') as EventKind
+      const opts: EventOpts = {
+        end: end && end > date ? end : undefined,
+        endTime: str('end_time'),
+        recurrence: ['daily', 'weekly', 'monthly', 'yearly'].includes(rec) ? rec : kind === 'birthday' || kind === 'anniversary' ? 'yearly' : 'none',
+        kind: ['birthday', 'anniversary', 'renewal', 'other'].includes(kind) ? kind : 'event',
+        location: str('location'),
+        notes: str('notes'),
+        // Absent or -1 = no reminder (0 is a real "at the time").
+        reminder: typeof j.reminder === 'number' && (j.reminder as number) >= 0 ? (j.reminder as number) : null,
+      }
+      const plain =
+        !opts.end && !opts.endTime && opts.recurrence === 'none' && opts.kind === 'event' && !opts.location && !opts.notes && opts.reminder == null
+      return { intent: 'add_event', title: str('title'), date, time: str('time'), person: str('person'), ...(plain ? {} : { opts }) }
+    }
+    case 'edit_event': {
+      const reminder = typeof j.reminder === 'number' ? (j.reminder as number) : -1
+      if (!str('new_title') && !str('location') && !str('notes') && reminder === -1) return null
+      return {
+        intent: 'edit_event',
+        title: str('title'),
+        date: isoOr('date'),
+        newTitle: str('new_title'),
+        location: str('location'),
+        notes: str('notes'),
+        reminder,
+        ...ref,
+      }
+    }
+    case 'find_event':
+      return str('title') || ref.ref ? { intent: 'find_event', title: str('title'), date: isoOr('date'), ...ref } : null
     case 'move_event': {
       const newDate = /^\d{4}-\d{2}-\d{2}$/.test(str('new_date')) ? str('new_date') : ''
       // Nowhere to go and no new time: not a usable move.
       if (!newDate && !str('time')) return null
-      return { intent: 'move_event', title: str('title'), date, newDate: newDate || date, time: str('time') }
+      return { intent: 'move_event', title: str('title'), date, newDate: newDate || date, time: str('time'), ...ref }
+    }
+    case 'remove_event': {
+      const day = /^\d{4}-\d{2}-\d{2}$/.test(str('date')) ? str('date') : ''
+      // Neither a name nor a day: nothing to go on.
+      if (!str('title') && !day && !ref.ref) return null
+      return { intent: 'remove_event', title: str('title'), date: day, ...ref }
     }
     case 'add_money': {
       const amount = typeof j.amount === 'number' ? j.amount : 0
@@ -143,9 +305,84 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
       }
     }
     case 'money_summary':
-      return { intent: 'money_summary', budget: str('budget') }
+    case 'list_money': {
+      // A past day = an earlier period ("mês passado"); today / future = the current one.
+      const at = date < today ? { at: date } : {}
+      // `person`: whose money ("meus gastos" = the asker); absent = the household.
+      const who = str('person') ? { person: str('person') } : {}
+      const mt = str('money_type')
+      // A plain summary (no filter) stays the income/spent overview; a list
+      // or a narrowed summary takes the kind the words said.
+      const kind = mt === 'income' || mt === 'expense' ? { kind: mt as 'income' | 'expense' } : {}
+      // An explicit span ("gastos de hoje", "essa semana") filters by date
+      // instead of the budget's whole period (owner report 2026-11).
+      const span = str('money_range')
+      const range = span === 'day' || span === 'week' || span === 'month' ? { range: moneyRange(span, date) } : {}
+      const base = { budget: str('budget'), category: str('category'), title: str('title'), ...(range.range ? {} : at), ...who, ...kind, ...range }
+      return j.intent === 'money_summary' ? { intent: 'money_summary', ...base } : { intent: 'list_money', ...base }
+    }
+    case 'fix_money':
+    {
+      // A new total, a new description, or something to add / take off
+      // ("forgot the tip": a delta or a tip percent on top of what was logged).
+      const delta = num('delta')
+      const tipPct = num('tip_pct') > 0 ? num('tip_pct') : 0
+      return num('amount') > 0 || str('new_title') || delta !== 0 || tipPct > 0
+        ? { intent: 'fix_money', title: str('title'), amount: num('amount'), newTitle: str('new_title'), delta, tipPct, ...ref }
+        : null
+    }
+    case 'remove_money':
+      return { intent: 'remove_money', title: str('title'), ...ref }
     case 'send_nudge':
-      return str('title') ? { intent: 'send_nudge', message: str('title'), person: str('person') } : null
+      return str('title') ? { intent: 'send_nudge', message: str('title'), person: str('person'), ...(j.urgent === true ? { urgent: true } : {}) } : null
+    case 'nudge_seen':
+      return { intent: 'nudge_seen' }
+    case 'pet_done':
+      return items.length ? { intent: 'pet_done', pet: str('pet'), tasks: items } : null
+    case 'pet_log': {
+      const type = str('pet_event_type') as PetEventType
+      if (!str('title') && !type) return null
+      return {
+        intent: 'pet_log',
+        pet: str('pet'),
+        type: ['vet', 'vaccine', 'medication', 'grooming'].includes(type) ? type : 'other',
+        title: str('title'),
+        date,
+        next: isoOr('new_date'),
+      }
+    }
+    case 'pet_next': {
+      const type = str('pet_event_type') as PetEventType | ''
+      return { intent: 'pet_next', pet: str('pet'), type: ['vet', 'vaccine', 'medication', 'grooming', 'other'].includes(type) ? type : '' }
+    }
+    case 'pet_weight':
+      return num('amount') > 0 ? { intent: 'pet_weight', pet: str('pet'), weight: num('amount') } : null
+    case 'family_update':
+      return str('field') && str('value')
+        ? { intent: 'family_update', person: str('person'), field: str('field') as FamilyField, value: str('value') }
+        : null
+    case 'birthdays':
+      return { intent: 'birthdays' }
+    case 'where_is':
+      return { intent: 'where_is', person: str('person'), place: str('title') }
+    case 'move_items':
+      return items.length && str('store') ? { intent: 'move_items', items, store: str('store') } : null
+    case 'clear_checked':
+      return { intent: 'clear_checked', store: str('store') }
+    case 'uncheck_items':
+      return items.length ? { intent: 'uncheck_items', items } : null
+    case 'weather':
+      return { intent: 'weather', date }
+    case 'better_deal': {
+      const deals = (Array.isArray(j.deals) ? (j.deals as Record<string, unknown>[]) : [])
+        .filter((d) => typeof d?.price === 'number' && typeof d?.size === 'number' && (d.price as number) > 0 && (d.size as number) > 0)
+        .map((d) => ({ price: d.price as number, size: d.size as number, label: typeof d.label === 'string' ? d.label : '' }))
+      return deals.length >= 2 ? { intent: 'better_deal', deals } : null
+    }
+    case 'open_document':
+      return str('title') ? { intent: 'open_document', title: str('title'), person: str('person') } : null
+    case 'day_summary':
+      return { intent: 'day_summary', date }
     case 'pets_due':
       return { intent: 'pets_due', pet: str('pet') }
     case 'family_info':
@@ -175,23 +412,27 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
   }
 }
 
-async function askServer(text: string, ctx: AskContext): Promise<Intent | null> {
-  if (!API_BASE) return null
+async function askServer(text: string, ctx: AskContext): Promise<ServerReply> {
+  if (!API_BASE) return { kind: 'offline' }
   try {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
-    if (!token) return null
+    if (!token) return { kind: 'offline' }
     const res = await fetch(`${API_BASE}/api/suggest-ping?action=assistant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ text, ...ctx }),
     })
-    if (!res.ok) return null
+    if (!res.ok) return { kind: 'offline' }
     // An older deploy answers this URL as a plain nudge ({kind, emoji, message}),
-    // which has no `intent` — fromServer treats it as "can't do this yet".
-    return fromServer(await res.json(), ctx.today)
+    // which has no `intent` — treated like no answer.
+    const j = (await res.json()) as Record<string, unknown> | null
+    if (!j || typeof j.intent !== 'string') return { kind: 'offline' }
+    const intent = fromServer(j, ctx.today)
+    if (intent) return { kind: 'ok', intent }
+    return KNOWN_INTENTS.has(j.intent) ? { kind: 'incomplete', name: j.intent } : { kind: 'unsupported', name: j.intent }
   } catch {
-    return null
+    return { kind: 'offline' }
   }
 }
 
@@ -245,22 +486,27 @@ const PET_NEED =
  *  AND asks what it needs ("what does Lola need next today?", "o que falta
  *  pra Chloe?", "a Lola já comeu?"). "" when it isn't that kind of question. */
 export function petQuestion(raw: string, pets: string[], members: string[] = []): string {
+  return petsAsked(raw, pets, members)[0] ?? ''
+}
+
+/** Every pet of the household named in a routine question, in the order they
+ *  appear in `pets` ("a rotina da Lola e da Aninha" → both, owner 2026-11). */
+export function petsAsked(raw: string, pets: string[], members: string[] = []): string[] {
   const fold = (x: string) => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const lw = fold(raw)
-  if (!PET_NEED.test(lw)) return ''
+  if (!PET_NEED.test(lw)) return []
   const words = lw.split(/[^a-z0-9]+/).filter(Boolean)
   const firsts = pets.map((name) => ({ name, n: fold(name).trim(), first: fold(name).trim().split(/\s+/)[0] }))
   // the whole name, or its first word ("Lola" for "Lola Bean")
-  for (const p of firsts) if (p.n && (lw.includes(p.n) || words.includes(p.first))) return p.name
+  const exact = firsts.filter((p) => p.n && (lw.includes(p.n) || words.includes(p.first))).map((p) => p.name)
   // One slip away — autocorrect and dictation turn "Cloe" into "Cole" — as
   // long as the word isn't a family member's name.
   const people = new Set(members.map((m) => fold(m).split(/\s+/)[0]))
-  for (const w of words) {
-    if (w.length < 4 || people.has(w)) continue
-    const hit = firsts.find((p) => p.first.length >= 4 && oneSlip(w, p.first))
-    if (hit) return hit.name
-  }
-  return ''
+  const slips = firsts
+    .filter((p) => !exact.includes(p.name) && p.first.length >= 4)
+    .filter((p) => words.some((w) => w.length >= 4 && !people.has(w) && oneSlip(w, p.first)))
+    .map((p) => p.name)
+  return pets.filter((name) => exact.includes(name) || slips.includes(name))
 }
 
 /** Equal but for one substitution, insertion, deletion or swap of neighbours. */
@@ -277,7 +523,17 @@ function oneSlip(a: string, b: string): boolean {
   return false
 }
 
+/** Words that put a request in money or the calendar — never the shopping
+ *  list ("apaga o gasto do Ford's Garage" is not a list item, owner 2026-11). */
+const NOT_LIST = /\b(gastos?|despesas?|lan[cç]amentos?|expenses?|charges?|gast[eé]|calend[aá]rio|calendar|eventos?|events?|compromissos?|agenda|or[cç]amento|budget|presupuesto)\b/i
+const LIST_INTENTS = new Set(['add_items', 'check_items', 'remove_items', 'move_items', 'uncheck_items'])
+
 export function localParse(raw: string, today: string): Intent | null {
+  const r = parseLocal(raw, today)
+  return r && LIST_INTENTS.has(r.intent) && NOT_LIST.test(raw) ? null : r
+}
+
+function parseLocal(raw: string, today: string): Intent | null {
   // "58 dólares e 71 centavos" → "58.71" (how people SAY an amount)
   const text = raw
     .trim()
@@ -410,7 +666,7 @@ export interface AddResult {
   createdStore: boolean
 }
 
-const norm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+export const norm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
 export async function fetchStores(): Promise<ShoppingStore[]> {
   const { data } = await supabase.from('shopping_stores').select('*').order('created_at')
@@ -586,25 +842,29 @@ export async function addEvent(
   date: string,
   time: string,
   owner: Profile | null,
+  opts: EventOpts = {},
 ): Promise<CalendarEvent> {
   const timed = /^\d{2}:\d{2}$/.test(time)
   const [h, m] = timed ? time.split(':').map(Number) : [0, 0]
   const endH = Math.min(23, h + 1)
+  const defaultEnd = `${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
+  // A said end time only counts when it's after the start (else 1 h).
+  const endTime = timed && opts.endTime && /^\d{2}:\d{2}$/.test(opts.endTime) && opts.endTime > time ? `${opts.endTime}:00` : defaultEnd
   const { data, error } = await supabase
     .from('calendar_events')
     .insert({
       title: title.trim(),
       start_date: date,
-      end_date: date,
+      end_date: opts.end && opts.end > date ? opts.end : date,
       all_day: !timed,
       start_time: timed ? `${time}:00` : null,
-      end_time: timed ? `${String(endH).padStart(2, '0')}:${String(m).padStart(2, '0')}:00` : null,
+      end_time: timed ? endTime : null,
       owner_email: owner?.email ?? null,
-      kind: 'event',
-      recurrence: 'none',
-      reminder_minutes: null,
-      location: null,
-      notes: null,
+      kind: opts.kind ?? 'event',
+      recurrence: opts.recurrence ?? 'none',
+      reminder_minutes: opts.reminder ?? null,
+      location: opts.location?.trim() || null,
+      notes: opts.notes?.trim() || null,
       updated_at: new Date().toISOString(),
     })
     .select('*')
@@ -613,71 +873,186 @@ export async function addEvent(
   return data as CalendarEvent
 }
 
-export type MoveResult =
-  | { ok: true; ev: CalendarEvent; before: CalendarEvent }
-  | { ok: false; reason: 'not_found' | 'ambiguous' | 'recurring'; options: CalendarEvent[] }
+// ── refs: the rows the model can point at ────────────────────────────────────
 
-const dayShift = (iso: string, days: number) => {
-  const d = new Date(iso + 'T12:00:00')
-  d.setDate(d.getDate() + days)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/** "e1" → an entry, "v3" → one occurrence of an event. Rebuilt with every
+ *  context (recentContext), so a ref always means what the model was shown. */
+export type Ref = { kind: 'entry'; id: string } | { kind: 'event'; id: string; start: string }
+let refs = new Map<string, Ref>()
+export const refTo = (ref?: string): Ref | undefined => (ref ? refs.get(ref) : undefined)
+
+const shortTime = (t: string | null) => (t ? ` ${t.slice(0, 5)}` : '')
+
+/** The latest money entries and the coming events as numbered lines for the
+ *  model, and the ref map that resolves its answer back to the exact row. */
+export async function recentContext(
+  today: string,
+  nameOf: (email: string | null) => string,
+): Promise<{ entries: string[]; events: string[] }> {
+  const [e, v] = await Promise.all([
+    supabase.from('entries').select('id, label, amount, type, entry_date, person_email').order('created_at', { ascending: false }).limit(8),
+    supabase.from('calendar_events').select('*'),
+  ])
+  const next = new Map<string, Ref>()
+  const entries = ((e.data ?? []) as Entry[]).map((x, i) => {
+    next.set(`e${i + 1}`, { kind: 'entry', id: x.id })
+    return `e${i + 1} = ${x.label} · ${Number(x.amount).toFixed(2)} · ${x.type} · ${x.entry_date} · ${nameOf(x.person_email)}`
+  })
+  // A few days back too ("remove yesterday's dentist"), then what's coming.
+  const occ = upcomingOccurrences((v.data ?? []) as CalendarEvent[], addDays(today, -3), 45).slice(0, 40)
+  const events = occ.map((o, i) => {
+    next.set(`v${i + 1}`, { kind: 'event', id: o.event.id, start: o.start })
+    const who = nameOf(o.event.owner_email)
+    return `v${i + 1} = ${o.event.title} · ${o.start}${shortTime(o.event.start_time)}${who ? ` · ${who}` : ''}`
+  })
+  refs = next
+  return { entries, events }
 }
 
-/** Move an existing event on `from` to `to` (and to `time` when given),
- *  keeping its length. Matches the title loosely; with no title, the only
- *  event that day. Recurring events are left alone — moving one occurrence of
- *  a series isn't something the data model can express. */
-export async function moveEvent(title: string, from: string, to: string, time: string): Promise<MoveResult> {
-  const { data } = await supabase
-    .from('calendar_events')
-    .select('*')
-    .lte('start_date', from)
-    .gte('end_date', from)
-  const onDay = (data ?? []) as CalendarEvent[]
+export type Located =
+  | { ok: true; occ: Occurrence }
+  | { ok: false; reason: 'not_found' | 'ambiguous'; options: Occurrence[] }
+
+/** Find the event the user means, by (loose) title: on `date` when given, else
+ *  its NEXT occurrence from `today` within `withinDays` ("remove unha" = the
+ *  coming one). Recurring series are expanded, so "the swimming on Tuesday"
+ *  finds that week's occurrence. With no title, the only event that day. */
+export async function locateEvent(title: string, date: string, today: string, withinDays = 92, ref?: string): Promise<Located> {
+  const { data } = await supabase.from('calendar_events').select('*')
+  const events = (data ?? []) as CalendarEvent[]
+  // The model pointed at a row it was shown: that exact occurrence.
+  const r = refTo(ref)
+  const byRef = r?.kind === 'event' ? events.find((ev) => ev.id === r.id) : undefined
+  if (byRef && r?.kind === 'event') {
+    const occ = occurrencesInRange([byRef], r.start, r.start)[0] ?? { event: byRef, start: byRef.start_date, end: byRef.end_date }
+    return { ok: true, occ }
+  }
+  const pool = date ? occurrencesInRange(events, date, date) : upcomingOccurrences(events, today, withinDays)
   const n = norm(title)
-  let hits = n ? onDay.filter((e) => norm(e.title) === n) : []
-  if (n && !hits.length) hits = onDay.filter((e) => norm(e.title).includes(n) || n.includes(norm(e.title)))
-  if (!n) hits = onDay
-  if (!hits.length) return { ok: false, reason: 'not_found', options: onDay }
-  if (hits.length > 1) return { ok: false, reason: 'ambiguous', options: hits }
-  const before = hits[0]
-  if (before.recurrence && before.recurrence !== 'none') return { ok: false, reason: 'recurring', options: hits }
-  const span = Math.round(
-    (new Date(before.end_date + 'T12:00:00').getTime() - new Date(before.start_date + 'T12:00:00').getTime()) / 86_400_000,
-  )
+  let hits = n ? pool.filter((o) => norm(o.event.title) === n) : date ? pool : []
+  if (n && !hits.length) hits = pool.filter((o) => norm(o.event.title).includes(n) || n.includes(norm(o.event.title)))
+  if (!hits.length) return { ok: false, reason: 'not_found', options: date ? pool : [] }
+  if (hits.length > 1) {
+    // No day said and every hit is the same name: the soonest (pool is sorted).
+    const same = hits.every((o) => norm(o.event.title) === norm(hits[0].event.title))
+    if (date || !same) return { ok: false, reason: 'ambiguous', options: hits }
+  }
+  return { ok: true, occ: hits[0] }
+}
+
+/** Pulled from a connected Apple/Google calendar: read-only here (the next
+ *  sync would undo any change), so it has to be changed at the source. */
+export const isExternal = (ev: CalendarEvent) => !!ev.source && ev.source !== 'oneroof'
+
+export type MoveResult =
+  | { ok: true; ev: CalendarEvent; before: CalendarEvent }
+  | { ok: false; reason: 'not_found' | 'ambiguous' | 'external'; options: CalendarEvent[] }
+  | { ok: false; reason: 'recurring'; options: CalendarEvent[]; occ: Occurrence }
+
+const toMin = (t: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null)
+const fromMin = (n: number) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}:00`
+
+/** The date/time patch that moves `ev` from its occurrence on `occStart` to
+ *  `to` (and `time` when given), keeping its length. For a series this shifts
+ *  the whole series by the same number of days. */
+function movePatch(ev: CalendarEvent, occStart: string, to: string, time: string) {
+  const shift = Math.round((new Date(to + 'T12:00:00').getTime() - new Date(occStart + 'T12:00:00').getTime()) / 86_400_000)
   const patch: Partial<CalendarEvent> & { updated_at: string } = {
-    start_date: to,
-    end_date: dayShift(to, span),
+    start_date: addDays(ev.start_date, shift),
+    end_date: addDays(ev.end_date, shift),
     updated_at: new Date().toISOString(),
   }
   if (/^\d{2}:\d{2}$/.test(time)) {
     // Keep the same duration (1 h when it was all-day).
     const [h, m] = time.split(':').map(Number)
-    const toMin = (t: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null)
-    const len = before.start_time && before.end_time ? Math.max(15, (toMin(before.end_time) ?? 0) - (toMin(before.start_time) ?? 0)) : 60
-    const endMin = Math.min(23 * 60 + 59, h * 60 + m + len)
+    const len = ev.start_time && ev.end_time ? Math.max(15, (toMin(ev.end_time) ?? 0) - (toMin(ev.start_time) ?? 0)) : 60
     patch.all_day = false
     patch.start_time = `${time}:00`
-    patch.end_time = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}:00`
+    patch.end_time = fromMin(Math.min(23 * 60 + 59, h * 60 + m + len))
   }
-  const { data: updated, error } = await supabase.from('calendar_events').update(patch).eq('id', before.id).select('*').single()
-  if (error || !updated) return { ok: false, reason: 'not_found', options: onDay }
+  return patch
+}
+
+/** Move an existing event on `from` to `to` (and to `time` when given),
+ *  keeping its length. A recurring one is NOT moved here: the caller asks
+ *  whether to move the whole series (moveSeries). */
+export async function moveEvent(title: string, from: string, to: string, time: string, today = from, ref?: string): Promise<MoveResult> {
+  const r = await locateEvent(title, from, today, 92, ref)
+  if (!r.ok) return { ok: false, reason: r.reason, options: r.options.map((o) => o.event) }
+  const before = r.occ.event
+  if (isExternal(before)) return { ok: false, reason: 'external', options: [before] }
+  if (before.recurrence && before.recurrence !== 'none') return { ok: false, reason: 'recurring', options: [before], occ: r.occ }
+  return applyMove(before, r.occ.start, to, time)
+}
+
+/** Shift a whole series so the occurrence on `occStart` lands on `to`. */
+export async function moveSeries(ev: CalendarEvent, occStart: string, to: string, time: string): Promise<MoveResult> {
+  return applyMove(ev, occStart, to, time)
+}
+
+async function applyMove(before: CalendarEvent, occStart: string, to: string, time: string): Promise<MoveResult> {
+  const { data: updated, error } = await supabase
+    .from('calendar_events')
+    .update(movePatch(before, occStart, to, time))
+    .eq('id', before.id)
+    .select('*')
+    .single()
+  if (error || !updated) return { ok: false, reason: 'not_found', options: [] }
   return { ok: true, ev: updated as CalendarEvent, before }
 }
 
-/** Undo a move: put the date/time fields back. */
+/** Undo a move or an edit: put the event's fields back as they were. */
 export async function restoreEvent(before: CalendarEvent): Promise<void> {
+  // Everything but the keys (the row's id and household never change).
+  const fields: Partial<CalendarEvent> = { ...before }
+  delete fields.id
+  delete fields.household_id
   await supabase
     .from('calendar_events')
-    .update({
-      start_date: before.start_date,
-      end_date: before.end_date,
-      all_day: before.all_day,
-      start_time: before.start_time,
-      end_time: before.end_time,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ ...fields, updated_at: new Date().toISOString() })
     .eq('id', before.id)
+}
+
+export type RemoveResult =
+  | { ok: true; ev: CalendarEvent }
+  | { ok: false; reason: 'not_found' | 'ambiguous' | 'external'; options: CalendarEvent[] }
+  | { ok: false; reason: 'recurring'; options: CalendarEvent[]; occ: Occurrence }
+
+/** Delete an existing event by (loose) title — on `date` when given, else the
+ *  NEXT one. Anyone in the household may delete any event (RLS), whoever owns
+ *  it. A recurring series is left for the caller to confirm (removeSeries /
+ *  endSeries); a connected-calendar event must be deleted at its source. */
+export async function removeEvent(title: string, date: string, today: string, ref?: string): Promise<RemoveResult> {
+  const r = await locateEvent(title, date, today, 92, ref)
+  if (!r.ok) return { ok: false, reason: r.reason, options: r.options.map((o) => o.event) }
+  const ev = r.occ.event
+  if (isExternal(ev)) return { ok: false, reason: 'external', options: [ev] }
+  if (ev.recurrence && ev.recurrence !== 'none') return { ok: false, reason: 'recurring', options: [ev], occ: r.occ }
+  const { error } = await supabase.from('calendar_events').delete().eq('id', ev.id)
+  if (error) return { ok: false, reason: 'not_found', options: [] }
+  return { ok: true, ev }
+}
+
+/** Delete a whole recurring series. */
+export async function removeSeries(ev: CalendarEvent): Promise<boolean> {
+  const { error } = await supabase.from('calendar_events').delete().eq('id', ev.id)
+  return !error
+}
+
+/** Stop a series before the occurrence on `occStart` (that one and all later
+ *  ones go; earlier ones stay). On the first occurrence that's the series. */
+export async function endSeries(ev: CalendarEvent, occStart: string): Promise<boolean> {
+  if (occStart <= ev.start_date) return removeSeries(ev)
+  const { error } = await supabase
+    .from('calendar_events')
+    .update({ recurrence_until: addDays(occStart, -1), updated_at: new Date().toISOString() })
+    .eq('id', ev.id)
+  return !error
+}
+
+/** Undo a removal: put the same row (same id) back. */
+export async function unremoveEvent(ev: CalendarEvent): Promise<void> {
+  await supabase.from('calendar_events').insert({ ...ev, updated_at: new Date().toISOString() })
 }
 
 export async function deleteEvent(id: string): Promise<void> {
@@ -686,7 +1061,7 @@ export async function deleteEvent(id: string): Promise<void> {
 
 // ── doing: money ─────────────────────────────────────────────────────────────
 
-async function budgetsWithMonths(): Promise<{ budgets: Budget[]; months: Month[] }> {
+export async function budgetsWithMonths(): Promise<{ budgets: Budget[]; months: Month[] }> {
   const [b, m] = await Promise.all([
     supabase.from('budgets').select('*').order('created_at'),
     supabase.from('months').select('*').order('start_date', { ascending: false }),
@@ -697,13 +1072,12 @@ async function budgetsWithMonths(): Promise<{ budgets: Budget[]; months: Month[]
 /** The period of `budget` that holds `date`; failing that, its LATEST period
  *  (owner, 2026-11: "add it to the last month/week/day") so a request on a day
  *  whose period hasn't been opened yet still lands somewhere sensible. */
-export function periodForBudget(budget: Budget, months: Month[], date: string): Month | null {
+export function periodForBudget(budget: Budget, months: Month[], date: string, strict = false): Month | null {
   const mine = months.filter((m) => m.budget_id === budget.id)
-  return (
-    mine.find((m) => m.start_date <= date && date <= periodEndISO(budget.period, m.start_date)) ??
-    [...mine].sort((x, y) => y.start_date.localeCompare(x.start_date))[0] ??
-    null
-  )
+  const hit = mine.find((m) => m.start_date <= date && date <= periodEndISO(budget.period, m.start_date))
+  // strict: an earlier period asked about by date — no "latest one" stand-in.
+  if (hit || strict) return hit ?? null
+  return [...mine].sort((x, y) => y.start_date.localeCompare(x.start_date))[0] ?? null
 }
 
 /** Which budget a request means: the one NAMED (matched loosely), the only
@@ -780,12 +1154,12 @@ export interface MoneyLine {
 }
 
 /** This period's received / spent per budget (or the one named). */
-export async function moneySummary(budgetName: string, today: string): Promise<MoneyLine[]> {
+export async function moneySummary(budgetName: string, today: string, at?: string): Promise<MoneyLine[]> {
   const { budgets, months } = await budgetsWithMonths()
   const pick = budgetName ? budgets.filter((b) => norm(b.name) === norm(budgetName)) : budgets
   const lines: MoneyLine[] = []
   for (const b of pick.length ? pick : budgets) {
-    const month = periodForBudget(b, months, today)
+    const month = periodForBudget(b, months, at ?? today, !!at)
     let income = 0
     let spent = 0
     if (month) {
@@ -837,15 +1211,20 @@ export async function petsDue(today: string, petName = ''): Promise<PetsAnswer> 
   ])
   const pets = (petRows.data ?? []) as { id: string; name: string }[]
   const names = Object.fromEntries(pets.map((p) => [p.id, p.name]))
-  const want = petName ? pets.find((p) => norm(p.name) === norm(petName)) ?? pets.find((p) => norm(p.name).startsWith(norm(petName))) : undefined
-  const ids = want ? [want.id] : pets.map((p) => p.id)
+  // One name, or several ("Lola, Aninha"); "" = every pet.
+  const asked = petName.split(',').map((x) => x.trim()).filter(Boolean)
+  const wanted = asked
+    .map((n) => pets.find((p) => norm(p.name) === norm(n)) ?? pets.find((p) => norm(p.name).startsWith(norm(n))))
+    .filter((p): p is { id: string; name: string } => !!p)
+  const ids = wanted.length ? wanted.map((p) => p.id) : pets.map((p) => p.id)
   const tasks = (taskRows.data ?? []) as PetCareTask[]
   const done = (doneRows.data ?? []) as PetTaskDone[]
   const due = overdueCare(ids, tasks, done, (pe.data ?? []) as PetEvent[], today)
   const late: PetDue[] = due
     .filter((d) => d.dueIn < 0)
     .map((d) => ({ id: d.key, title: d.title, pet: names[d.petId] ?? '', status: 'overdue', late: -d.dueIn }))
-  const checklist = want ? dailyChecklist(tasks, done, want.id, today) : []
+  // The checklist count covers every pet asked about (one or several).
+  const checklist = wanted.flatMap((w) => dailyChecklist(tasks, done, w.id, today))
   const routine: PetDue[] = ids.flatMap((id) =>
     dailyChecklist(tasks, done, id, today)
       .filter((r) => !r.done)
@@ -856,7 +1235,7 @@ export async function petsDue(today: string, petName = ''): Promise<PetsAnswer> 
     .map((d) => ({ id: d.key, title: d.title, pet: names[d.petId] ?? '', status: 'today', late: 0 }))
   return {
     rows: [...late, ...routine, ...todayRows],
-    pet: want?.name ?? '',
+    pet: wanted.map((w) => w.name).join(', '),
     routineDone: checklist.filter((r) => r.done).length,
     routineTotal: checklist.length,
   }

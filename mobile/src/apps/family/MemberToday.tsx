@@ -38,7 +38,7 @@ const LOCALE: Record<string, string> = { en: 'en-US', es: 'es', pt: 'pt-BR' }
 const MAX_EVENTS = 4
 const MAX_ENTRIES = 3
 
-type EntryLite = Pick<Entry, 'id' | 'type' | 'label' | 'amount' | 'category' | 'entry_date' | 'created_at'>
+type EntryLite = Pick<Entry, 'id' | 'type' | 'label' | 'amount' | 'category' | 'entry_date' | 'created_at' | 'month_id'>
 interface TodayData {
   events: CalendarEvent[]
   entries: EntryLite[]
@@ -46,9 +46,11 @@ interface TodayData {
   location: MemberLocation | null
   places: Place[]
   shoppingToday: number
+  /** month_id → budget_id, so a tapped entry opens its own period. */
+  budgetOf: Record<string, string>
 }
 
-const EMPTY: TodayData = { events: [], entries: [], customCats: [], location: null, places: [], shoppingToday: 0 }
+const EMPTY: TodayData = { events: [], entries: [], customCats: [], location: null, places: [], shoppingToday: 0, budgetOf: {} }
 
 type IconT = typeof Wallet
 type GradientT = (typeof APP_GRADIENT)[keyof typeof APP_GRADIENT]
@@ -102,7 +104,7 @@ export function MemberToday({ email, firstName }: { email: string; firstName: st
       supabase.from('calendar_events').select('*').or(`owner_email.eq."${email}",owner_email.is.null`),
       supabase
         .from('entries')
-        .select('id, type, label, amount, category, entry_date, created_at')
+        .select('id, type, label, amount, category, entry_date, created_at, month_id')
         .eq('person_email', email)
         .gte('entry_date', weekStart)
         .lte('entry_date', today)
@@ -118,9 +120,14 @@ export function MemberToday({ email, firstName }: { email: string; firstName: st
         .eq('added_by', email)
         .gte('created_at', dayStart),
     ])
+    const entries = (en.data ?? []) as EntryLite[]
+    const monthIds = [...new Set(entries.map((e) => e.month_id))]
+    const mo = monthIds.length ? await supabase.from('months').select('id, budget_id').in('id', monthIds) : { data: [] }
+    const budgetOf = Object.fromEntries(((mo.data ?? []) as { id: string; budget_id: string }[]).map((m) => [m.id, m.budget_id]))
     return {
+      budgetOf,
       events: (ev.data ?? []) as CalendarEvent[],
-      entries: (en.data ?? []) as EntryLite[],
+      entries,
       customCats: (cc.data ?? []) as CustomCategory[],
       location: (loc.data as MemberLocation | null) ?? null,
       places: (pl.data ?? []) as Place[],
@@ -144,6 +151,11 @@ export function MemberToday({ email, firstName }: { email: string; firstName: st
   )
 
   const expenses = data.entries.filter((e) => e.type === 'expense')
+  /** The screen an entry was logged on — and, `open`, with its form open. */
+  const entryPath = (e: EntryLite, open: boolean) => {
+    const b = data.budgetOf[e.month_id]
+    return b ? `/budget/${b}/${e.month_id}${open ? `?entry=${e.id}` : ''}` : '/budget'
+  }
   const todayExp = expenses.filter((e) => e.entry_date === today)
   const todayTotal = todayExp.reduce((s, e) => s + Number(e.amount), 0)
   const weekTotal = expenses.reduce((s, e) => s + Number(e.amount), 0)
@@ -245,7 +257,8 @@ export function MemberToday({ email, firstName }: { email: string; firstName: st
 
       {/* Money */}
       <Pressable
-        onPress={() => router.push('/budget')}
+        // The period today's latest expense was logged in; else the money app.
+        onPress={() => router.push((todayExp[0] ? entryPath(todayExp[0], false) : '/budget') as never)}
         accessibilityRole="button"
         style={({ pressed }) => [tile, { opacity: pressed ? 0.75 : 1 }]}
       >
@@ -258,7 +271,12 @@ export function MemberToday({ email, firstName }: { email: string; firstName: st
         {todayExp.length ? (
           <View style={{ gap: 8 }}>
             {todayExp.slice(0, MAX_ENTRIES).map((e) => (
-              <View key={e.id} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <Pressable
+                key={e.id}
+                onPress={() => router.push(entryPath(e, true) as never)}
+                accessibilityRole="button"
+                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: sp.md, opacity: pressed ? 0.6 : 1 })}
+              >
                 <Txt style={{ width: 22, textAlign: 'center', fontSize: 16 }}>
                   {categoryById(e.category, data.customCats).icon}
                 </Txt>
@@ -266,7 +284,7 @@ export function MemberToday({ email, firstName }: { email: string; firstName: st
                   {e.label}
                 </Txt>
                 <Txt style={{ fontSize: 15, fontFamily: fonts.semibold }}>{formatMoney(Number(e.amount))}</Txt>
-              </View>
+              </Pressable>
             ))}
             {todayExp.length > MAX_ENTRIES ? (
               <Muted text={t('family.todayMore', { n: todayExp.length - MAX_ENTRIES })} />

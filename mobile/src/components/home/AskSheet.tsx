@@ -43,8 +43,10 @@ import {
   deleteEntry,
   deleteEvent,
   moveEvent,
+  removeEvent,
   reportGap,
   restoreEvent,
+  unremoveEvent,
   familyInfo,
   fetchStores,
   findItems,
@@ -60,7 +62,8 @@ import {
   restoreItems,
   uncheckItems,
   undoAdd,
-  understand,
+  understandWithSource,
+  recentContext,
   type FamilyField,
   type Found,
   type Intent,
@@ -76,6 +79,7 @@ import type { TKey } from '@/lib/i18n'
 import { useVoice, voiceSupported } from '@/lib/voice'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import {
+  ActionView,
   ChooseBudgetView,
   ChooseStoreView,
   DiscountView,
@@ -93,7 +97,9 @@ import {
   SummaryView,
 } from './AnswerViews'
 import { GradientBox } from './GradientBox'
-import { sendPing } from '@/lib/pings'
+import { actMore, recurrenceLabel, recurringChoice, reminderLabel, type ActEnv, type ActionAnswer } from './askActions'
+import { categoriesContext, petTasksContext } from '@/lib/assistantActions'
+import { fetchPingPresets, presetText, sendPing } from '@/lib/pings'
 import { usePlus } from '@/lib/plus'
 import { categoryById } from '@/lib/categories'
 import { formatMoney, periodLabel } from '@/lib/format'
@@ -141,9 +147,11 @@ type Answer =
   | { kind: 'marked'; mode: 'check' | 'remove'; hits: ShoppingItem[]; missing: string[]; undone: boolean }
   | { kind: 'event'; ev: CalendarEvent; who: string | null; undone: boolean }
   | { kind: 'moved'; ev: CalendarEvent; before: CalendarEvent; undone: boolean }
+  | { kind: 'removedEvent'; ev: CalendarEvent; undone: boolean }
   | { kind: 'money'; res: Extract<MoneyResult, { ok: true }>; type: 'expense' | 'income'; amount: number; title: string; undone: boolean }
   | { kind: 'summary'; lines: MoneyLine[] }
-  | { kind: 'nudge'; message: string; to: Profile | null; sent: boolean; sending: boolean }
+  | { kind: 'nudge'; message: string; to: Profile | null; sent: boolean; sending: boolean; emoji: string; urgent: boolean; pingKind: string }
+  | ActionAnswer
   | { kind: 'pets'; p: PetsAnswer }
   | { kind: 'family'; text: string }
   | { kind: 'say'; text: string }
@@ -151,6 +159,32 @@ type Answer =
   | { kind: 'discount'; amount: number; percent: number }
   | { kind: 'unknown'; text: string }
   | { kind: 'error' }
+
+/** The context the sheet loads for the model (see loadContext). */
+interface Loaded {
+  stores: ShoppingStore[]
+  open: { lines: string[]; labels: string[] }
+  budgets: string[]
+  pets: string[]
+  petTasks: string[]
+  categories: string[]
+  recent: { entries: string[]; events: string[] }
+}
+
+/** What to ask for when the server understood `about` but a detail was missing. */
+function needKey(about: string): TKey {
+  if (about === 'add_items') return 'ask.need.addItems'
+  if (['check_items', 'remove_items', 'move_items', 'uncheck_items'].includes(about)) return 'ask.need.list'
+  if (about === 'add_money') return 'ask.need.addMoney'
+  if (about === 'fix_money') return 'ask.need.fixMoney'
+  if (about === 'add_event') return 'ask.need.addEvent'
+  if (about === 'move_event') return 'ask.need.moveEvent'
+  if (about === 'edit_event') return 'ask.need.editEvent'
+  if (about === 'remove_event' || about === 'find_event') return 'ask.need.whichEvent'
+  if (about === 'send_nudge') return 'ask.need.nudge'
+  if (about.startsWith('pet_')) return 'ask.need.pet'
+  return 'ask.need.generic'
+}
 
 export function AskSheet({
   visible,
@@ -198,23 +232,55 @@ export function AskSheet({
   const canVoice = voiceSupported()
   // The household's own words, handed to the recogniser as hints.
   const [hints, setHints] = useState<string[]>([])
+  // Everything the model is shown, loaded once when the sheet opens (it
+  // remounts per open) and refreshed in the background after each answer —
+  // so asking doesn't wait on six queries first.
+  const ctxRef = useRef<Promise<Loaded> | null>(null)
+  const loadContext = useCallback(() => {
+    const firstName = (email: string | null) => profiles.find((p) => p.email === email)?.display_name.split(' ')[0] ?? ''
+    const p = (async (): Promise<Loaded> => {
+      const [stores, budgetRows, petRows, petTasks, categories, recent] = await Promise.all([
+        fetchStores(),
+        supabase.from('budgets').select('name'),
+        supabase.from('pets').select('name'),
+        petTasksContext().catch(() => []),
+        categoriesContext().catch(() => []),
+        recentContext(today, firstName).catch(() => ({ entries: [], events: [] })),
+      ])
+      const open = await openItemsContext(stores)
+      return {
+        stores,
+        open,
+        budgets: ((budgetRows.data ?? []) as { name: string }[]).map((b) => b.name),
+        pets: ((petRows.data ?? []) as { name: string }[]).map((x) => x.name),
+        petTasks,
+        categories,
+        recent,
+      }
+    })()
+    ctxRef.current = p
+    p.catch(() => {
+      if (ctxRef.current === p) ctxRef.current = null
+    })
+    return p
+  }, [profiles, today])
   useEffect(() => {
     let alive = true
-    void (async () => {
-      const [stores, pets] = await Promise.all([fetchStores(), supabase.from('pets').select('name')])
-      const { labels } = await openItemsContext(stores)
-      if (!alive) return
-      setHints([
-        ...stores.map((x) => x.name),
-        ...profiles.map((p) => p.display_name.split(' ')[0]),
-        ...((pets.data ?? []) as { name: string }[]).map((p) => p.name),
-        ...labels,
-      ])
-    })()
+    void loadContext()
+      .then((ctx) => {
+        if (!alive) return
+        setHints([
+          ...ctx.stores.map((x) => x.name),
+          ...profiles.map((p) => p.display_name.split(' ')[0]),
+          ...ctx.pets,
+          ...ctx.open.labels,
+        ])
+      })
+      .catch(() => {})
     return () => {
       alive = false
     }
-  }, [profiles])
+  }, [profiles, loadContext])
   const voice = useVoice(
     lang,
     (heard) => {
@@ -336,11 +402,20 @@ export function AskSheet({
         return undone(t('ask.sumEvent', { title: a.ev.title, when: whenLabel(a.ev) }), a.undone)
       case 'moved':
         return undone(t('ask.sumMoved', { title: a.ev.title, when: whenLabel(a.ev) }), a.undone)
+      case 'removedEvent':
+        return undone(t('ask.sumRemovedEvent', { title: a.ev.title, when: whenLabel(a.ev) }), a.undone)
       case 'money':
-        return undone(t('ask.sumMoney', { title: a.title, amount: formatMoney(a.amount) }), a.undone)
+        return undone(t(a.type === 'income' ? 'ask.sumMoneyIncome' : 'ask.sumMoney', { title: a.title, amount: formatMoney(a.amount) }), a.undone)
       case 'summary':
         return a.lines
-          .map((l) => t('ask.sumMoneyLine', { budget: l.budget.name, income: formatMoney(l.income), spent: formatMoney(l.spent) }))
+          .map((l) =>
+            t('ask.sumMoneyLine', {
+              // The period goes in the history, so "and the month before?" knows where it was.
+              budget: l.month ? `${l.budget.name} (${periodLabel(l.budget.period, l.month.start_date)})` : l.budget.name,
+              income: formatMoney(l.income),
+              spent: formatMoney(l.spent),
+            }),
+          )
           .join('; ')
       case 'nudge':
         return t('ask.sumNudge', { to: a.to?.display_name.split(' ')[0] ?? t('ask.everyoneLower'), message: a.message })
@@ -348,13 +423,15 @@ export function AskSheet({
         const { rows, pet, routineDone, routineTotal } = a.p
         const progress = pet && routineTotal ? ` ${t('ask.petProgress', { done: routineDone, total: routineTotal })}` : ''
         return rows.length
-          ? `${pet ? `${pet}: ` : ''}${list(rows.map((r) => `${r.title}${pet || !r.pet ? '' : ` (${r.pet})`}`))}.${progress}`
+          ? `${pet ? `${pet}: ` : ''}${list(rows.map((r) => `${r.title}${(pet && !pet.includes(',')) || !r.pet ? '' : ` (${r.pet})`}`))}.${progress}`
           : `${pet ? t('ask.petsNoneFor', { pet }) : t('ask.petsNone')}${progress}`
       }
       case 'split':
         return t('ask.sumSplit', { amount: formatMoney(a.amount), people: a.people })
       case 'discount':
         return t('ask.sumDiscount', { amount: formatMoney(a.amount), pct: a.percent })
+      case 'action':
+        return undone(a.summary, a.undone)
       case 'family':
       case 'say':
       case 'unknown':
@@ -391,26 +468,30 @@ export function AskSheet({
     setAnswer(null)
     setBusy(true)
     try {
-      const [stores, budgetRows, petRows] = await Promise.all([
-        fetchStores(),
-        supabase.from('budgets').select('name'),
-        supabase.from('pets').select('name'),
-      ])
-      const open = await openItemsContext(stores)
+      const ctx = await (ctxRef.current ?? loadContext()).catch(() => loadContext())
       const [y, m, d] = today.split('-').map(Number)
-      const intent = await understand(q, {
-        openItems: open.lines,
+      const { intent, source } = await understandWithSource(q, {
+        openItems: ctx.open.lines,
         today,
         weekday: new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' }),
         lang,
-        stores: stores.map((s) => s.name),
+        stores: ctx.stores.map((s) => s.name),
         members: profiles.map((p) => p.display_name),
-        budgets: ((budgetRows.data ?? []) as { name: string }[]).map((b) => b.name),
-        pets: ((petRows.data ?? []) as { name: string }[]).map((p) => p.name),
+        budgets: ctx.budgets,
+        pets: ctx.pets,
+        petTasks: ctx.petTasks,
+        categories: ctx.categories,
+        recentEntries: ctx.recent.entries,
+        events: ctx.recent.events,
         me: profile?.display_name ?? '',
         history: pastRef.current,
       })
-      setAnswer(await act(intent, stores))
+      // How often the app had to guess or ask (codes only, never the words).
+      if (intent && source === 'local') reportGap(intent.intent, 'local_guess', lang)
+      if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
+      setAnswer(await act(intent, ctx.stores))
+      // The answer may have changed what the model should see next turn.
+      void loadContext().catch(() => {})
     } catch {
       setAnswer({ kind: 'error' })
     } finally {
@@ -457,29 +538,63 @@ export function AskSheet({
         return { kind: 'agenda', a: await agendaFor(intent.date, intent.end, intent.label, intent.scope, intent.person, me, profiles, today) }
       case 'add_event': {
         const owner = (intent.person && findMember(intent.person, profiles)) || me
-        const ev = await addEvent(intent.title, intent.date, intent.time, owner)
+        const ev = await addEvent(intent.title, intent.date, intent.time, owner, intent.opts)
         invalidateCache('hub:today')
-        return { kind: 'event', ev, who: owner && owner.email !== me?.email ? owner.display_name : null, undone: false }
+        // The extras said ("toda terça", "lembrete 1h antes") show on the card.
+        const extras = [
+          owner && owner.email !== me?.email ? owner.display_name : '',
+          recurrenceLabel(t, ev.recurrence),
+          reminderLabel(t, ev.reminder_minutes),
+          ev.location ?? '',
+        ].filter(Boolean)
+        return { kind: 'event', ev, who: extras.length ? extras.join(' · ') : null, undone: false }
       }
       case 'move_event': {
-        const r = await moveEvent(intent.title, intent.date, intent.newDate, intent.time)
+        const r = await moveEvent(intent.title, intent.date, intent.newDate, intent.time, today, intent.ref)
         if (r.ok) {
           invalidateCache('hub:today')
           return { kind: 'moved', ev: r.ev, before: r.before, undone: false }
         }
+        if (r.reason === 'recurring') {
+          return recurringChoice(env, 'move', r.occ.event, r.occ.start, { to: intent.newDate, time: intent.time })
+        }
+        if (r.reason === 'external') return { kind: 'say', text: t('ask.editExternal', { title: r.options[0]?.title ?? intent.title }) }
         reportGap('move_event', r.reason, lang)
         const day = dayWords(intent.date)
         const names = r.options.slice(0, 4).map((e) => e.title).join(', ')
         return {
           kind: 'say',
           text:
-            r.reason === 'recurring'
-              ? t('ask.moveRecurring', { title: r.options[0]?.title ?? intent.title })
+            r.reason === 'ambiguous'
+              ? t('ask.moveWhich', { day, names })
+              : r.options.length
+                ? t('ask.moveNotFoundSome', { title: intent.title, day, names })
+                : t('ask.moveNotFound', { day }),
+        }
+      }
+      case 'remove_event': {
+        const r = await removeEvent(intent.title, intent.date, today, intent.ref)
+        if (r.ok) {
+          invalidateCache('hub:today')
+          return { kind: 'removedEvent', ev: r.ev, undone: false }
+        }
+        if (r.reason === 'recurring') return recurringChoice(env, 'remove', r.occ.event, r.occ.start)
+        reportGap('remove_event', r.reason, lang)
+        const day = intent.date ? dayWords(intent.date) : ''
+        const names = r.options.slice(0, 4).map((e) => (intent.date ? e.title : `${e.title} (${whenLabel(e)})`)).join(', ')
+        const title = r.options[0]?.title ?? intent.title
+        return {
+          kind: 'say',
+          text:
+            r.reason === 'external'
+              ? t('ask.removeExternal', { title })
               : r.reason === 'ambiguous'
-                ? t('ask.moveWhich', { day, names })
-                : r.options.length
-                  ? t('ask.moveNotFoundSome', { title: intent.title, day, names })
-                  : t('ask.moveNotFound', { day }),
+                  ? t('ask.removeWhich', { names })
+                  : !intent.date
+                    ? t('ask.removeNotFoundSoon', { title: intent.title })
+                    : r.options.length
+                      ? t('ask.removeNotFoundSome', { title: intent.title, day, names })
+                      : t('ask.removeNotFound', { day }),
         }
       }
       case 'add_money': {
@@ -502,10 +617,29 @@ export function AskSheet({
         return { kind: 'money', res, type: intent.type, amount: intent.amount, title: intent.title, undone: false }
       }
       case 'money_summary':
-        return { kind: 'summary', lines: await moneySummary(intent.budget, today) }
+        // Narrowed to a category or one thing: the newer per-category answer.
+        if (intent.category || intent.title || intent.person || intent.kind === 'income' || intent.range) return (await actMore(intent, env)) ?? { kind: 'error' }
+        {
+          // An earlier period asked about: only budgets that HAD that period.
+          const lines = (await moneySummary(intent.budget, today, intent.at)).filter((l) => !intent.at || l.month)
+          return lines.length ? { kind: 'summary', lines } : { kind: 'say', text: t('ask.noSuchPeriod') }
+        }
       case 'send_nudge': {
         const to = intent.person ? findMember(intent.person, profiles) : null
-        return { kind: 'nudge', message: intent.message, to, sent: false, sending: false }
+        // Said like one of the household's presets: send it with that emoji.
+        const presets = await fetchPingPresets().catch(() => [])
+        const preset = presets.find((p) => presetText(p, t).trim().toLowerCase() === intent.message.trim().toLowerCase())
+        const urgent = !!intent.urgent || !!preset?.high_priority
+        return {
+          kind: 'nudge',
+          message: intent.message,
+          to,
+          sent: false,
+          sending: false,
+          emoji: urgent ? '🆘' : (preset?.emoji ?? '📣'),
+          urgent,
+          pingKind: urgent ? 'help' : (preset?.preset_key ?? 'custom'),
+        }
       }
       case 'pets_due': {
         return { kind: 'pets', p: await petsDue(today, intent.pet) }
@@ -549,6 +683,38 @@ export function AskSheet({
         }
         return { kind: 'say', text: '' }
       }
+      case 'need_detail':
+        // Understood, but a detail was missing: say what to add, never guess.
+        return { kind: 'say', text: t(needKey(intent.about)) }
+      case 'needs_update':
+        return { kind: 'say', text: t('ask.needsUpdate') }
+      default:
+        return (intent ? await actMore(intent, env) : null) ?? { kind: 'say', text: t('ask.unknown') }
+    }
+  }
+
+  /** What the newer actions (askActions.ts) need from the sheet. */
+  const env: ActEnv = {
+    t: t as ActEnv['t'],
+    lang,
+    locale,
+    today,
+    me: profile ?? null,
+    profiles,
+    dayWords,
+    whenLabel,
+    invalidate: invalidateCache,
+    reportGap: (intent, reason) => reportGap(intent, reason, lang),
+  }
+
+  async function runChoice(run: () => Promise<ActionAnswer>) {
+    setBusy(true)
+    try {
+      setAnswer(await run())
+    } catch {
+      setAnswer({ kind: 'error' })
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -630,7 +796,7 @@ export function AskSheet({
   async function sendNudge(a: Extract<Answer, { kind: 'nudge' }>) {
     setAnswer({ ...a, sending: true })
     try {
-      await sendPing('custom', '📣', a.message, a.to ? [a.to.email] : null)
+      await sendPing(a.pingKind, a.emoji, a.message, a.to ? [a.to.email] : null, a.urgent)
       setAnswer({ ...a, sent: true, sending: false })
     } catch {
       setAnswer({ kind: 'error' })
@@ -853,6 +1019,20 @@ export function AskSheet({
                 }}
                 onOpen={() => go(`/calendar?date=${answer.undone ? answer.before.start_date : answer.ev.start_date}`)}
               />
+            ) : answer?.kind === 'removedEvent' ? (
+              <EventView
+                headline={answer.undone ? t('ask.removeUndone') : t('ask.eventRemoved')}
+                title={answer.ev.title}
+                when={whenLabel(answer.ev)}
+                who={null}
+                undone={answer.undone}
+                onUndo={async () => {
+                  await unremoveEvent(answer.ev)
+                  invalidateCache('hub:today')
+                  setAnswer({ ...answer, undone: true })
+                }}
+                onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
+              />
             ) : answer?.kind === 'money' ? (
               <MoneyView
                 type={answer.type}
@@ -875,12 +1055,45 @@ export function AskSheet({
               />
             ) : answer?.kind === 'nudge' ? (
               <NudgeView
+                emoji={answer.emoji}
+                urgent={answer.urgent}
                 message={answer.message}
                 to={answer.to?.display_name.split(' ')[0] ?? t('ask.everyoneLower')}
                 sent={answer.sent}
                 sending={answer.sending}
                 onSend={() => sendNudge(answer)}
                 onCancel={() => setAnswer(null)}
+              />
+            ) : answer?.kind === 'action' ? (
+              <ActionView
+                headline={answer.undone && answer.undo ? answer.undo.headline : answer.headline}
+                sub={answer.undone ? null : answer.sub}
+                rows={answer.undone ? [] : answer.rows}
+                quiet={
+                  answer.undo && !answer.undone
+                    ? {
+                        label: t('ask.undo'),
+                        undo: true,
+                        onPress: async () => {
+                          await answer.undo?.run()
+                          invalidateCache('hub:today')
+                          invalidateCache('hub:shopping')
+                          setAnswer({ ...answer, undone: true })
+                        },
+                      }
+                    : answer.choices?.[1]
+                      ? { label: answer.choices[1].label, onPress: () => runChoice(answer.choices![1].run) }
+                      : answer.choices?.[0] && answer.open
+                        ? { label: answer.open.label, onPress: () => go(answer.open!.path) }
+                        : null
+                }
+                main={
+                  answer.choices?.[0]
+                    ? { label: answer.choices[0].label, onPress: () => runChoice(answer.choices![0].run) }
+                    : answer.open
+                      ? { label: answer.open.label, onPress: () => go(answer.open!.path) }
+                      : null
+                }
               />
             ) : answer?.kind === 'pets' ? (
               <PetsView p={answer.p} onOpen={() => go('/pets')} onToggle={(id, done) => setDailyDone(id, today, done)} />

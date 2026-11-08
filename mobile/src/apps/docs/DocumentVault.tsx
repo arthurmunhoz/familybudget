@@ -7,13 +7,13 @@
 // Tapping a row opens the file (signed URL, in-app browser); "…" or a long
 // press opens the details sheet (rename / recategorise / REPLACE the file /
 // delete). Scanning and picking live in docPicker.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { Image } from 'expo-image'
 import { ChevronLeft, FileText, FolderLock, House, Lock, LockOpen, MoreHorizontal, Upload, Users } from 'lucide-react-native'
 
@@ -194,6 +194,19 @@ export default function DocumentVault() {
       setPicking(false)
     }
   }
+
+  // The Home assistant's "open the passport" lands here as ?open=<id> — this
+  // screen is inside VaultGate, so the vault lock (if on) has passed already.
+  const { open: openParam } = useLocalSearchParams<{ open?: string }>()
+  const openedParam = useRef(false)
+  useEffect(() => {
+    if (!openParam || openedParam.current || !docs.length) return
+    const doc = docs.find((d) => d.id === openParam)
+    if (!doc) return
+    openedParam.current = true
+    void openDoc(doc)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, docs])
 
   async function openDoc(doc: FamilyDocument) {
     if (opening) return
