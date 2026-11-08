@@ -63,6 +63,7 @@ import {
   uncheckItems,
   undoAdd,
   understandWithSource,
+  type Quota,
   recentContext,
   type FamilyField,
   type Found,
@@ -217,6 +218,9 @@ export function AskSheet({
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [answer, setAnswer] = useState<Answer | null>(null)
+  // Free plan: this member's monthly assistant allowance, as the server last
+  // reported it (absent until the first answer, and for Plus).
+  const [quota, setQuota] = useState<Quota | null>(null)
   // The conversation so far (owner, 2026-11): each finished turn stays on
   // screen as the question + a one-line account of the answer, and the same
   // lines go to Claude as context — so "o que tem no Walmart?" → "tira o
@@ -470,7 +474,7 @@ export function AskSheet({
     try {
       const ctx = await (ctxRef.current ?? loadContext()).catch(() => loadContext())
       const [y, m, d] = today.split('-').map(Number)
-      const { intent, source } = await understandWithSource(q, {
+      const { intent, source, quota: q2 } = await understandWithSource(q, {
         openItems: ctx.open.lines,
         today,
         weekday: new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' }),
@@ -486,6 +490,7 @@ export function AskSheet({
         me: profile?.display_name ?? '',
         history: pastRef.current,
       })
+      if (q2) setQuota(q2)
       // How often the app had to guess or ask (codes only, never the words).
       if (intent && source === 'local') reportGap(intent.intent, 'local_guess', lang)
       if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
@@ -688,6 +693,17 @@ export function AskSheet({
         return { kind: 'say', text: t(needKey(intent.about)) }
       case 'needs_update':
         return { kind: 'say', text: t('ask.needsUpdate') }
+      case 'limit_reached':
+        // Out of free requests this month: the way to Plus, nothing guessed.
+        return {
+          kind: 'action',
+          headline: t('ask.limitHead', { n: intent.cap }),
+          sub: t('ask.limitSub', { n: intent.cap }),
+          rows: [],
+          summary: 'Monthly free assistant limit reached.',
+          open: { label: t('settings.getPlus'), path: '/paywall' },
+          undone: false,
+        }
       default:
         return (intent ? await actMore(intent, env) : null) ?? { kind: 'say', text: t('ask.unknown') }
     }
@@ -1121,6 +1137,15 @@ export function AskSheet({
               <Headline text={t('ask.error')} />
             ) : null}
           </ScrollView>
+
+          {/* Free plan: how many of this month's requests are left. */}
+          {quota && 'cap' in quota && quota.used < quota.cap ? (
+            <Pressable onPress={() => go('/paywall')} accessibilityRole="button" style={{ paddingHorizontal: sp.lg, paddingTop: sp.xs }}>
+              <Txt style={{ color: c.textMuted, fontSize: 12.5, textAlign: 'center' }}>
+                {t('ask.quotaLeft', { n: quota.cap - quota.used, cap: quota.cap })}
+              </Txt>
+            </Pressable>
+          ) : null}
 
           {/* the input — always at the foot, ready for the next request */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingHorizontal: sp.lg, paddingTop: sp.sm }}>

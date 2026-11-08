@@ -69,6 +69,8 @@ export type Intent =
   | { intent: 'need_detail'; about: string }
   /** The server answered with something this app version can't do yet. */
   | { intent: 'needs_update'; about: string }
+  /** Free plan: this member's monthly assistant allowance is used up. */
+  | { intent: 'limit_reached'; cap: number }
   | { intent: 'send_nudge'; message: string; person: string; urgent?: boolean }
   | { intent: 'nudge_seen' }
   | { intent: 'pet_done'; pet: string; tasks: string[] }
@@ -172,8 +174,12 @@ const KNOWN_INTENTS = new Set([
 
 /** What the server said: an intent, an intent with a detail missing, an
  *  intent newer than this app, or nothing (offline / old deploy / error). */
+/** Where the member stands on the free plan's monthly allowance. */
+export type Quota = { plus: true } | { used: number; cap: number }
+
 type ServerReply =
-  | { kind: 'ok'; intent: Intent }
+  | { kind: 'ok'; intent: Intent; quota?: Quota }
+  | { kind: 'limit'; used: number; cap: number }
   | { kind: 'incomplete'; name: string }
   | { kind: 'unsupported'; name: string }
   | { kind: 'offline' }
@@ -181,37 +187,48 @@ type ServerReply =
 export type Source = 'server' | 'local' | 'asked' | 'none'
 
 /** understand() plus where the answer came from (for gap logging). */
-export async function understandWithSource(text: string, ctx: AskContext): Promise<{ intent: Intent | null; source: Source }> {
+export async function understandWithSource(
+  text: string,
+  ctx: AskContext,
+): Promise<{ intent: Intent | null; source: Source; quota?: Quota }> {
   const r = await askServer(text, ctx)
-  const remote = r.kind === 'ok' ? r.intent : null
-  const local = localParse(text, ctx.today)
-  // A server that answered a single day to "this month" (an older deploy, or a
-  // miss) loses to a period the local parser can see in the words.
-  if (remote?.intent === 'agenda' && remote.end === remote.date && local?.intent === 'agenda' && local.end > local.date) {
-    return { intent: { ...remote, date: local.date, end: local.end }, source: 'server' }
+  // Out of free requests this month: say so (with the way to Plus) — the
+  // local regexes don't stand in for the assistant.
+  if (r.kind === 'limit') return { intent: { intent: 'limit_reached', cap: r.cap }, source: 'asked', quota: { used: r.used, cap: r.cap } }
+  const quota = r.kind === 'ok' ? r.quota : undefined
+  const res = await pick()
+  return quota ? { ...res, quota } : res
+  async function pick(): Promise<{ intent: Intent | null; source: Source }> {
+    const remote = r.kind === 'ok' ? r.intent : null
+    const local = localParse(text, ctx.today)
+    // A server that answered a single day to "this month" (an older deploy, or a
+    // miss) loses to a period the local parser can see in the words.
+    if (remote?.intent === 'agenda' && remote.end === remote.date && local?.intent === 'agenda' && local.end > local.date) {
+      return { intent: { ...remote, date: local.date, end: local.end }, source: 'server' }
+    }
+    // The utilities are clear-cut phrasings; an older server that doesn't know
+    // them yet would file "divide 58,71 em 3" as an expense.
+    if ((local?.intent === 'split_bill' || local?.intent === 'discount') && remote?.intent !== local.intent) return { intent: local, source: 'local' }
+    // A pet of THIS household named next to "need / next / routine…" is a
+    // routine question, whatever an older server made of it ("what does Lola
+    // need next today?" came back as family_info / unknown — owner, 2026-11).
+    const asked = petsAsked(text, ctx.pets, ctx.members)
+    // Several pets named: all of them, whatever single one the server kept.
+    if (asked.length > 1 && (!remote || remote.intent === 'pets_due' || remote.intent === 'unknown')) {
+      return { intent: { intent: 'pets_due', pet: asked.join(', ') }, source: remote ? 'server' : 'local' }
+    }
+    const pet = asked[0] ?? ''
+    if (pet && (remote?.intent !== 'pets_due' || !remote.pet)) return { intent: { intent: 'pets_due', pet }, source: 'local' }
+    if (remote && remote.intent !== 'unknown') return { intent: remote, source: 'server' }
+    // The server UNDERSTOOD the request but a detail was missing. The local
+    // regexes are far dumber ("apaga o gasto do X" reads as a list item), so
+    // never let them guess here: ask for what's missing (owner, 2026-11).
+    if (r.kind === 'incomplete') return { intent: { intent: 'need_detail', about: r.name }, source: 'asked' }
+    if (r.kind === 'unsupported') return { intent: { intent: 'needs_update', about: r.name }, source: 'asked' }
+    // Offline, or the server said "unknown": the local parser is the fallback.
+    if (local) return { intent: local, source: 'local' }
+    return { intent: remote, source: remote ? 'server' : 'none' }
   }
-  // The utilities are clear-cut phrasings; an older server that doesn't know
-  // them yet would file "divide 58,71 em 3" as an expense.
-  if ((local?.intent === 'split_bill' || local?.intent === 'discount') && remote?.intent !== local.intent) return { intent: local, source: 'local' }
-  // A pet of THIS household named next to "need / next / routine…" is a
-  // routine question, whatever an older server made of it ("what does Lola
-  // need next today?" came back as family_info / unknown — owner, 2026-11).
-  const asked = petsAsked(text, ctx.pets, ctx.members)
-  // Several pets named: all of them, whatever single one the server kept.
-  if (asked.length > 1 && (!remote || remote.intent === 'pets_due' || remote.intent === 'unknown')) {
-    return { intent: { intent: 'pets_due', pet: asked.join(', ') }, source: remote ? 'server' : 'local' }
-  }
-  const pet = asked[0] ?? ''
-  if (pet && (remote?.intent !== 'pets_due' || !remote.pet)) return { intent: { intent: 'pets_due', pet }, source: 'local' }
-  if (remote && remote.intent !== 'unknown') return { intent: remote, source: 'server' }
-  // The server UNDERSTOOD the request but a detail was missing. The local
-  // regexes are far dumber ("apaga o gasto do X" reads as a list item), so
-  // never let them guess here: ask for what's missing (owner, 2026-11).
-  if (r.kind === 'incomplete') return { intent: { intent: 'need_detail', about: r.name }, source: 'asked' }
-  if (r.kind === 'unsupported') return { intent: { intent: 'needs_update', about: r.name }, source: 'asked' }
-  // Offline, or the server said "unknown": the local parser is the fallback.
-  if (local) return { intent: local, source: 'local' }
-  return { intent: remote, source: remote ? 'server' : 'none' }
 }
 
 export async function understand(text: string, ctx: AskContext): Promise<Intent | null> {
@@ -423,13 +440,19 @@ async function askServer(text: string, ctx: AskContext): Promise<ServerReply> {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ text, ...ctx }),
     })
+    if (res.status === 402) {
+      const j = (await res.json().catch(() => null)) as { error?: string; used?: number; cap?: number } | null
+      if (j?.error === 'assistant_limit') return { kind: 'limit', used: j.used ?? 0, cap: j.cap ?? 5 }
+    }
     if (!res.ok) return { kind: 'offline' }
     // An older deploy answers this URL as a plain nudge ({kind, emoji, message}),
     // which has no `intent` — treated like no answer.
     const j = (await res.json()) as Record<string, unknown> | null
     if (!j || typeof j.intent !== 'string') return { kind: 'offline' }
     const intent = fromServer(j, ctx.today)
-    if (intent) return { kind: 'ok', intent }
+    const q = j.quota as Quota | undefined
+    const quota = q && ('plus' in q || (typeof q.used === 'number' && typeof q.cap === 'number')) ? q : undefined
+    if (intent) return { kind: 'ok', intent, ...(quota ? { quota } : {}) }
     return KNOWN_INTENTS.has(j.intent) ? { kind: 'incomplete', name: j.intent } : { kind: 'unsupported', name: j.intent }
   } catch {
     return { kind: 'offline' }

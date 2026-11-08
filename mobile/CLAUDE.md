@@ -124,6 +124,14 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   — one occurrence can't be expressed. Events from a connected Apple/Google
   calendar are refused (the next sync would undo it). Calendar accepts
   `?date=YYYY-MM-DD`; Documents accepts `?open=<id>` (inside VaultGate).
+- **Assistant is Plus (migration 089):** free households get 5 requests per
+  MEMBER per calendar month (UTC); Plus and the signup trial are unlimited.
+  The server checks `assistant_quota` before the model call (402
+  `assistant_limit` when out — the app answers `limit_reached` with the way
+  to `/paywall`, never the local parser) and counts with `assistant_use`
+  after a parsed answer, returning `quota {used, cap}` / `{plus}`; AskSheet
+  shows "n of 5 left" above the input for free members. Fails OPEN if the
+  RPCs error. Cap = `ASSISTANT_FREE_MONTHLY` in api/suggest-ping.ts.
 - **Assistant, how a request flows (2026-11 review):** `understandWithSource`
   in `lib/assistant.ts`. The local regex parser (`localParse`) is ONLY the
   fallback when the server is unreachable or says `unknown`. When the server

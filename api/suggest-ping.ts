@@ -432,6 +432,10 @@ export function flattenGrouped(raw: any): Record<string, any> {
 }
 const HAIKU_55 = { id: 'claude-haiku-5-5', in: 0.1 / 1e6, out: 0.5 / 1e6 }
 const ASSISTANT_CAP = 300
+// Product quota (migration 089): free households get this many assistant
+// requests per MEMBER per calendar month; Plus (and the signup trial) is
+// unlimited. Separate from ASSISTANT_CAP, the per-household daily abuse ceiling.
+const ASSISTANT_FREE_MONTHLY = 5
 
 const str = (v: unknown, max = 60) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 const strList = (v: unknown, n = 30, len = 80) =>
@@ -600,9 +604,19 @@ export async function parseAssistant(
   return { out, gap: intent === 'unknown' ? str(p.gap, 160) : '', usage: response.usage }
 }
 
-async function assistant(body: any, db: any, household: string | null, res: any) {
+async function assistant(body: any, db: any, household: string | null, res: any, email: string, quota: any) {
   try {
     const { out, gap, usage } = await parseAssistant(body, process.env.ASSISTANT_SCHEMA === 'flat' ? 'flat' : 'grouped')
+    // Count it, and tell the app where the member stands (free plan only).
+    let q: { plus: true } | { used: number; cap: number } | null = null
+    if (db && quota) {
+      try {
+        const { data: n } = await db.rpc('assistant_use', { p_email: email })
+        q = quota.plus ? { plus: true } : { used: typeof n === 'number' ? n : (quota.used ?? 0) + 1, cap: ASSISTANT_FREE_MONTHLY }
+      } catch {
+        /* a counting failure must not lose a good answer */
+      }
+    }
     if (db && household) {
       const u: any = usage
       const cost =
@@ -617,7 +631,7 @@ async function assistant(body: any, db: any, household: string | null, res: any)
       // The model's anonymised rewrite only — never `text` (see migration 088).
       await recordGap(db, household, { kind: 'unknown', summary: gap, lang: str(body?.lang, 8) })
     }
-    return res.status(200).json(out)
+    return res.status(200).json(q ? { ...out, quota: q } : out)
   } catch (err: any) {
     if (err instanceof Anthropic.APIError && /credit balance|billing/i.test(err.message ?? '')) {
       return res.status(502).json({ error: 'out_of_credits' })
@@ -699,7 +713,23 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  if (isAssistant) return assistant(req.body, db, household, res)
+  if (isAssistant) {
+    // Free plan: 5 a month per member. Only an EXPLICIT "no" blocks — an RPC
+    // error (or the migration not applied yet) leaves the assistant working.
+    let quota: any = null
+    if (db && household) {
+      try {
+        const { data, error } = await db.rpc('assistant_quota', { p_household: household, p_email: email, p_cap: ASSISTANT_FREE_MONTHLY })
+        if (!error && data) quota = data
+      } catch {
+        /* fail open */
+      }
+    }
+    if (quota && quota.allowed === false && quota.reason !== 'no_household') {
+      return res.status(402).json({ error: 'assistant_limit', used: quota.used ?? ASSISTANT_FREE_MONTHLY, cap: ASSISTANT_FREE_MONTHLY })
+    }
+    return assistant(req.body, db, household, res, email, quota)
+  }
 
   try {
     const client = new Anthropic()
