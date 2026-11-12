@@ -17,10 +17,15 @@ import { Settings } from 'lucide-react-native'
 import { Txt } from './ui'
 import SafetyBanner from '../apps/location/SafetyBanner'
 import NudgesBanner from '../apps/pings/NudgesBanner'
+import GamesBanner from '../apps/games/GamesBanner'
 import TodaySection, { SectionLabel } from './TodaySection'
 import HomeBirthdays from './HomeBirthdays'
 import InviteBanner from './InviteBanner'
 import { AskSheet } from './home/AskSheet'
+import { RoofPill } from './home/RoofPill'
+import { useRoofPrefs } from '../lib/roof'
+import { useRoofWake } from '../lib/roofWake'
+import { usePlus } from '../lib/plus'
 import { APP_GRADIENT } from './home/palette'
 import { GradientBox } from './home/GradientBox'
 import { useAppPrefs } from '../hooks/useAppPrefs'
@@ -69,10 +74,32 @@ function DockSkeleton({ color }: { color: string }) {
 export default function Hub() {
   const { c } = useTheme()
   const { profile, profiles } = useAuth()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [asking, setAsking] = useState(false)
   const [askKey, setAskKey] = useState(0)
   const [askListen, setAskListen] = useState(false)
+  // "Ei Roof, …" — what came after the wake phrase, sent as soon as the sheet opens.
+  const [askSeed, setAskSeed] = useState<string | undefined>(undefined)
+  const [askVoice, setAskVoice] = useState(false)
+  // Roof listens only while the Home is the screen in front, the sheet is
+  // closed, the family turned it on and has Plus (lib/roofWake).
+  const roof = useRoofPrefs()
+  const { isPlus } = usePlus()
+  const [homeFocused, setHomeFocused] = useState(true)
+  const [roofPaused, setRoofPaused] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      setHomeFocused(true)
+      return () => setHomeFocused(false)
+    }, []),
+  )
+  const wake = useRoofWake(roof.wake && isPlus && homeFocused && !asking && !roofPaused, lang, (request) => {
+    setAskKey((k) => k + 1)
+    setAskSeed(request || undefined)
+    setAskListen(!request)
+    setAskVoice(true)
+    setAsking(true)
+  })
   // On a Face ID iPhone the dock takes the bottom button's geometry
   // (useScreenCorner); Android keeps the plain floating bar.
   const corner = useScreenCorner()
@@ -166,7 +193,9 @@ export default function Hub() {
           household={householdName ?? null}
           onAsk={(listen) => {
             setAskKey((k) => k + 1)
+            setAskSeed(undefined)
             setAskListen(!!listen)
+            setAskVoice(!!listen)
             setAsking(true)
           }}
           right={
@@ -182,6 +211,11 @@ export default function Hub() {
         />
 
         <View style={{ marginTop: sp.lg }}>
+          {/* Roof is listening for "Ei Roof" — tap to pause it. */}
+          {roof.wake && isPlus ? <RoofPill state={roofPaused ? 'paused' : wake} onToggle={() => setRoofPaused((p) => !p)} /> : null}
+          {/* An open game room — right under the ask bar, so the family sees it
+              even with game notifications off (apps/games/GamesBanner). */}
+          <GamesBanner />
           {/* Someone's birthday later this month (or today) → their Birthday page. */}
           <HomeBirthdays />
           {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
@@ -211,8 +245,13 @@ export default function Hub() {
                   <Icon size={28} color="#fff" strokeWidth={2} />
                 </GradientBox>
                 {badges[app.id] ? (
-                  <View style={[styles.badge, { borderColor: c.sheet }]}>
-                    <Txt style={{ color: '#fff', fontSize: 12, fontFamily: fonts.semibold }}>{badges[app.id]}</Txt>
+                  // A ring (page colour) with the red pill INSIDE it — not a
+                  // borderWidth: iOS paints the fill under the border's
+                  // antialiased edge, so the red bled past the dark ring.
+                  <View style={[styles.badge, { backgroundColor: c.sheet }]}>
+                    <View style={styles.badgeFill}>
+                      <Txt style={{ color: '#fff', fontSize: 12, fontFamily: fonts.semibold }}>{badges[app.id]}</Txt>
+                    </View>
                   </View>
                 ) : null}
                 <Txt numberOfLines={1} style={{ fontSize: 12.5, color: c.text, fontFamily: fonts.medium }}>
@@ -276,7 +315,7 @@ export default function Hub() {
         </View>
       </View>
 
-      <AskSheet key={askKey} visible={asking} listen={askListen} onClose={() => setAsking(false)} />
+      <AskSheet key={askKey} visible={asking} listen={askListen} autoSend={askSeed} spoken={askVoice} onClose={() => setAsking(false)} />
     </SafeAreaView>
   )
 }
@@ -295,16 +334,19 @@ const styles = StyleSheet.create({
   icon: { width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
-    top: -6,
+    top: -8.5,
     // Pinned to the icon's top-right corner, not the (wider) grid cell's.
     right: '50%',
-    marginRight: -40,
+    marginRight: -42.5,
+    padding: 2.5,
+    borderRadius: 15,
+  },
+  badgeFill: {
     minWidth: 24,
     height: 24,
     borderRadius: 12,
     paddingHorizontal: 6,
     backgroundColor: '#FF4D5E',
-    borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
   },

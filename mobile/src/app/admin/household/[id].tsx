@@ -58,18 +58,29 @@ export default function AdminHousehold() {
   } = useCachedQuery<DetailData>(`admin:household:${id}`, async () => {
     const [h, u, act, plus, ev] = await Promise.all([
       supabase.from('households').select('*').eq('id', id).single(),
+      // Memberships (migration 099): someone whose ACTIVE household is another
+      // one is still a member here.
       supabase
-        .from('allowed_users')
-        .select('email, display_name, household_id, is_admin, role')
+        .from('household_members')
+        .select('email, display_name, household_id, role')
         .eq('household_id', id)
         .order('display_name'),
       supabase.rpc('admin_user_activity', { days: 30 }),
       supabase.rpc('admin_household_is_plus', { p_household: id }),
       supabase.rpc('admin_household_events', { p_household: id, lim: 40 }),
     ])
+    const rows = (u.data ?? []) as (Omit<Profile, 'is_admin' | 'display_name'> & { display_name: string | null })[]
+    const { data: admins } = rows.length
+      ? await supabase.from('allowed_users').select('email').eq('is_admin', true).in('email', rows.map((m) => m.email))
+      : { data: [] }
+    const adminSet = new Set(((admins ?? []) as { email: string }[]).map((a) => a.email))
     return {
       household: (h.data as Household) ?? null,
-      members: (u.data ?? []) as Profile[],
+      members: rows.map((m) => ({
+        ...m,
+        display_name: m.display_name || m.email.split('@')[0],
+        is_admin: adminSet.has(m.email),
+      })),
       activity: Object.fromEntries(
         ((act.data ?? []) as UserActivity[]).map((a) => [a.user_email, a]),
       ),
@@ -150,7 +161,14 @@ export default function AdminHousehold() {
           text: t('admin.remove'),
           style: 'destructive',
           onPress: async () => {
-            const { error } = await supabase.from('allowed_users').delete().eq('email', user.email)
+            // Only from THIS household — their other households are untouched
+            // (the 099 delete trigger moves them, or ends the account if this
+            // was their last one, as the old allowed_users delete did).
+            const { error } = await supabase
+              .from('household_members')
+              .delete()
+              .eq('email', user.email)
+              .eq('household_id', id)
             if (error) {
               Alert.alert(t('admin.removeError'))
               return

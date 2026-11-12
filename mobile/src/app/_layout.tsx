@@ -34,6 +34,7 @@ import { useSyncNudgeWidget } from '@/hooks/useSyncNudgeWidget';
 import { useGeofenceSync } from '@/hooks/useGeofenceSync';
 import { useLocationSync } from '@/hooks/useLocationSync';
 import { useSyncPushToken } from '@/hooks/useSyncPushToken';
+import { usePetReminders } from '@/hooks/usePetReminders';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 import { SchemePrefProvider, useSchemePref } from '@/theme/scheme-pref';
 import { GLASS, GlassWash } from '@/theme/glass';
@@ -110,6 +111,8 @@ function Chrome() {
   useLocationSync();
   // Repair a stale/rotated Expo push token on launch (never prompts).
   useSyncPushToken();
+  // Pet routine reminders: local notifications, re-synced on login/foreground.
+  usePetReminders();
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <AnalyticsBridge />

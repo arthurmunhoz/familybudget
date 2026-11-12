@@ -15,7 +15,8 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Image } from 'expo-image'
-import { ChevronLeft, FileText, FolderLock, House, Lock, LockOpen, MoreHorizontal, Upload, Users } from 'lucide-react-native'
+import { ChevronLeft, FileText, FolderLock, GalleryHorizontalEnd, House, LayoutList, Lock, LockOpen, MoreHorizontal, Upload, Users } from 'lucide-react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { EmptyState, Loader, Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
@@ -36,10 +37,13 @@ import { supabase } from '@/lib/supabase'
 import type { DocCategory, FamilyDocument } from '@/lib/types'
 import { biometricAvailable, isVaultLockEnabled, setVaultLockEnabled } from '@/lib/vaultLock'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { CATEGORIES, CAT_COLOR, CAT_LUCIDE, formatBytes, isImageDoc, thumbPathFor } from './docUtils'
+import { CATEGORIES, CAT_COLOR, CAT_LUCIDE, formatBytes, isImageDoc, previewPathFor, thumbPathFor } from './docUtils'
+import { DocCards } from './DocCards'
 import { pickFile, scanDocument } from './docPicker'
 import UploadSheet, { type PickedFile } from './UploadSheet'
 import EditSheet from './EditSheet'
+
+const VIEW_KEY = 'docs:view'
 
 export default function DocumentVault() {
   const { c, dark } = useTheme()
@@ -55,6 +59,18 @@ export default function DocumentVault() {
   const [editing, setEditing] = useState<FamilyDocument | null>(null)
   const [picking, setPicking] = useState(false)
   const [opening, setOpening] = useState<string | null>(null)
+  // List (grouped rows) or one document at a time, large — per device.
+  const [view, setView] = useState<'list' | 'cards'>('list')
+  useEffect(() => {
+    void AsyncStorage.getItem(VIEW_KEY)
+      .then((v) => v === 'cards' && setView('cards'))
+      .catch(() => {})
+  }, [])
+  function switchView() {
+    const next = view === 'list' ? 'cards' : 'list'
+    setView(next)
+    void AsyncStorage.setItem(VIEW_KEY, next).catch(() => {})
+  }
 
   // Opt-in Face ID lock (per user + device, like the PWA). The toggle only
   // shows where a biometric is available; enabling verifies with Face ID first.
@@ -125,14 +141,17 @@ export default function DocumentVault() {
   // fallback for images uploaded before thumbnails existed (or from the PWA).
   // A path with no object simply comes back without a URL — that's how a
   // missing thumb is detected, so no `documents` column is needed.
+  // The "one at a time" view also asks for each doc's larger PREVIEW.
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
-  const thumbKey = docs.map((d) => d.id).join(',')
+  const thumbKey = docs.map((d) => d.id).join(',') + view
   useEffect(() => {
     if (!docs.length) return
     let active = true
-    const paths = docs.flatMap((d) =>
-      isImageDoc(d.mime_type, d.file_path) ? [thumbPathFor(d.file_path), d.file_path] : [thumbPathFor(d.file_path)],
-    )
+    const paths = docs.flatMap((d) => [
+      thumbPathFor(d.file_path),
+      ...(isImageDoc(d.mime_type, d.file_path) ? [d.file_path] : []),
+      ...(view === 'cards' ? [previewPathFor(d.file_path)] : []),
+    ])
     getSignedUrls(paths)
       .then((urls) => {
         if (active) setThumbs(urls)
@@ -228,7 +247,7 @@ export default function DocumentVault() {
         text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
-          await supabase.storage.from('documents').remove([doc.file_path, thumbPathFor(doc.file_path)])
+          await supabase.storage.from('documents').remove([doc.file_path, thumbPathFor(doc.file_path), previewPathFor(doc.file_path)])
           await supabase.from('documents').delete().eq('id', doc.id)
           track('doc.deleted', { title: doc.title, category: doc.category })
           setEditing(null)   // the sheet is open on the row we just removed
@@ -257,6 +276,16 @@ export default function DocumentVault() {
         >
           <ChevronLeft size={22} color={c.text} />
         </Pressable>
+        <View style={{ flexDirection: 'row', gap: sp.sm }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={view === 'list' ? t('docs.viewCards') : t('docs.viewList')}
+          onPress={switchView}
+          hitSlop={8}
+          style={[s.round, { backgroundColor: c.card, borderColor: c.border }]}
+        >
+          {view === 'list' ? <GalleryHorizontalEnd size={18} color={c.text} /> : <LayoutList size={18} color={c.text} />}
+        </Pressable>
         {canLock ? (
           <Pressable
             accessibilityRole="switch"
@@ -273,6 +302,7 @@ export default function DocumentVault() {
             {lockOn ? <Lock size={18} color={c.onAction} /> : <LockOpen size={18} color={c.textMuted} />}
           </Pressable>
         ) : null}
+        </View>
       </View>
 
       {loading ? (
@@ -356,6 +386,15 @@ export default function DocumentVault() {
 
           {visible.length === 0 ? (
             <EmptyState title={t('docs.empty')} subtitle={t('docs.emptyHint')} />
+          ) : view === 'cards' ? (
+            <DocCards
+              docs={groups.flatMap((g) => g.docs)}
+              urls={thumbs}
+              ownerName={(d) => (person === 'all' ? nameOf(d.owner_email) : null)}
+              opening={opening}
+              onOpen={(d) => void openDoc(d)}
+              onEdit={setEditing}
+            />
           ) : (
             groups.map((group) => {
               const Icon = CAT_LUCIDE[group.cat] ?? FileText

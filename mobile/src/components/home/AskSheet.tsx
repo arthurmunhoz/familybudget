@@ -78,6 +78,7 @@ import {
 } from '@/lib/assistant'
 import type { TKey } from '@/lib/i18n'
 import { useVoice, voiceSupported } from '@/lib/voice'
+import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import {
   ActionView,
@@ -192,10 +193,16 @@ export function AskSheet({
   onClose,
   seed,
   listen = false,
+  autoSend,
+  spoken = false,
 }: {
   visible: boolean
   onClose: () => void
   seed?: string
+  /** "Ei Roof, põe café na lista": the request, sent as soon as the sheet opens. */
+  autoSend?: string
+  /** Opened by voice (the Home's mic or "Ei Roof"): answers are read out. */
+  spoken?: boolean
   /** Opened from the Home's mic: start listening right away. */
   listen?: boolean
 }) {
@@ -285,9 +292,14 @@ export function AskSheet({
       alive = false
     }
   }, [profiles, loadContext])
+  // Roof reads the answer out when the question was SPOKEN (owner, 2026-11):
+  // typing never talks back. Plus only; the family can turn it off.
+  const roof = useRoofPrefs()
+  const viaVoice = useRef(spoken)
   const voice = useVoice(
     lang,
     (heard) => {
+      viaVoice.current = true
       void submitRef.current?.(heard)
     },
     hints,
@@ -298,6 +310,7 @@ export function AskSheet({
   const cancelVoice = voice.cancel
   const closeSheet = useCallback(() => {
     cancelVoice()
+    roofHush()
     onClose()
   }, [cancelVoice, onClose])
   // Drag the sheet down by its top strip to dismiss (owner, 2026-11: once a
@@ -348,6 +361,19 @@ export function AskSheet({
     const id = setTimeout(autoListen, 700)
     return () => clearTimeout(id)
   }, [listen, autoListen])
+
+  // "Ei Roof, …": send what was said once the sheet is up.
+  const autoSent = useRef(false)
+  useEffect(() => {
+    if (!autoSend || autoSent.current) return
+    const id = setTimeout(() => {
+      if (autoSent.current) return
+      autoSent.current = true
+      viaVoice.current = true
+      void submitRef.current?.(autoSend)
+    }, 450)
+    return () => clearTimeout(id)
+  }, [autoSend])
 
   const memberEmails = useMemo(() => profiles.map((p) => p.email), [profiles])
 
@@ -465,6 +491,9 @@ export function AskSheet({
   async function submit(raw?: string) {
     const q = (raw ?? text).trim()
     if (!q || busy) return
+    // Typed (no raw text passed) → answer on screen only.
+    if (raw === undefined) viaVoice.current = false
+    roofHush()
     Keyboard.dismiss()
     commitTurn()
     setQuery(q)
@@ -494,7 +523,9 @@ export function AskSheet({
       // How often the app had to guess or ask (codes only, never the words).
       if (intent && source === 'local') reportGap(intent.intent, 'local_guess', lang)
       if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
-      setAnswer(await act(intent, ctx.stores))
+      const a = await act(intent, ctx.stores)
+      setAnswer(a)
+      if (viaVoice.current && roof.speak && !isFree) void roofSay(summarize(a), lang)
       // The answer may have changed what the model should see next turn.
       void loadContext().catch(() => {})
     } catch {

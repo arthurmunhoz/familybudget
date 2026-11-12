@@ -2,7 +2,7 @@
 // a person filter, sort controls (by date / by amount), a future-entries toggle,
 // and the entry list (grouped by day when sorting by date). The bottom bar adds
 // an entry or scans a receipt photo. RN port of budget/MonthDetail.tsx.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -29,7 +29,8 @@ import type {
   Profile,
 } from '@/lib/types'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
-import EntryForm, { type EntryPrefill } from './EntryForm'
+import EntryForm, { type EntryLanding, type EntryPrefill } from './EntryForm'
+import { LandingGhost, type GhostRect } from '@/components/LandingGhost'
 import SummaryChart from './SummaryChart'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { budgetLook } from '@/components/home/palette'
@@ -40,6 +41,15 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
 type MonthWithBudget = Month & { budgets: { name: string; period: Period } | null }
 type SortBy = 'date' | 'amount'
+/** A new entry flying from the closed form into its row (LandingGhost). */
+type Landing = { entry: Entry; from: GhostRect; to: GhostRect | null | 'gone'; landed: boolean }
+
+const offset = (r: GhostRect, o: { x: number; y: number }): GhostRect => ({
+  x: r.x - o.x,
+  y: r.y - o.y,
+  width: r.width,
+  height: r.height,
+})
 
 export default function MonthDetail({
   monthId,
@@ -70,6 +80,19 @@ export default function MonthDetail({
   const [editing, setEditing] = useState<Entry | null>(null)
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
   const [scanning, setScanning] = useState(false)
+
+  // "Shrinks and lands" (see LandingGhost). The saved row is shown at once from
+  // the insert's own result, until the refetch replaces `entries` (identity
+  // check — no effect needed), so the ghost has a row to land on immediately.
+  const [landing, setLanding] = useState<Landing | null>(null)
+  const [pending, setPending] = useState<{ entry: Entry; base: Entry[] } | null>(null)
+  const hostRef = useRef<View>(null)
+  const hostOrigin = useRef({ x: 0, y: 0 })
+  const scrollRef = useRef<ScrollView>(null)
+  const scrollBoxRef = useRef<View>(null)
+  const scrollY = useRef(0)
+  const contentH = useRef(0)
+  const landingRowRef = useRef<View>(null)
 
   // Cached (stale-while-revalidate) so the period renders instantly on return.
   const {
@@ -133,9 +156,16 @@ export default function MonthDetail({
 
   const period = month?.budgets?.period ?? 'monthly'
 
+  const allEntries = useMemo(
+    () =>
+      pending && pending.base === entries && !entries.some((e) => e.id === pending.entry.id)
+        ? [...entries, pending.entry]
+        : entries,
+    [entries, pending],
+  )
   const filtered = useMemo(
-    () => (person === 'all' ? entries : entries.filter((e) => e.person_email === person)),
-    [entries, person],
+    () => (person === 'all' ? allEntries : allEntries.filter((e) => e.person_email === person)),
+    [allEntries, person],
   )
 
   // Splits entries into already-spent and still-to-come — see useToday for why
@@ -155,6 +185,67 @@ export default function MonthDetail({
       return dateAsc ? cmp : -cmp
     })
   }, [filtered, hideFuture, today, sortBy, dateAsc])
+
+  // Once the new row is rendered: bring it on screen (instantly — the ghost
+  // still covers most of the page), measure it, and let the ghost fly there.
+  // Not in the list (person filter, future entries hidden) → the ghost fades.
+  const landingId = landing && landing.to === null ? landing.entry.id : null
+  const landingVisible = landingId != null && sorted.some((e) => e.id === landingId)
+  useEffect(() => {
+    if (!landingId) return
+    const land = (to: GhostRect | 'gone') =>
+      setLanding((l) => (l && l.entry.id === landingId && l.to === null ? { ...l, to } : l))
+    let cancelled = false
+    if (!landingVisible) {
+      requestAnimationFrame(() => !cancelled && land('gone'))
+      return () => {
+        cancelled = true
+      }
+    }
+    const giveUp = setTimeout(() => land('gone'), 1200)
+    const measure = () => {
+      const row = landingRowRef.current
+      const sv = scrollRef.current
+      const box = scrollBoxRef.current
+      if (cancelled || !row || !sv || !box) return
+      row.measureInWindow((rx, ry, rw, rh) => {
+        box.measureInWindow((_sx, sy, _sw, sh) => {
+          if (cancelled) return
+          clearTimeout(giveUp)
+          if (!rw || !rh) return land('gone')
+          // Off screen: centre it. The target is COMPUTED from the scroll delta
+          // (clamped to the content) rather than re-measured — a scrollTo lands
+          // a frame or more later, and a measure taken too early reads the old
+          // spot. Checked on the simulator: computed y == the row's real y.
+          const margin = 12
+          let delta = 0
+          if (ry < sy + margin || ry + rh > sy + sh - margin) {
+            const max = Math.max(0, contentH.current - sh)
+            const y = Math.min(max, Math.max(0, scrollY.current + (ry - sy) - (sh - rh) / 2))
+            delta = y - scrollY.current
+            sv.scrollTo({ y, animated: false })
+          }
+          land(offset({ x: rx, y: ry - delta, width: rw, height: rh }, hostOrigin.current))
+        })
+      })
+    }
+    requestAnimationFrame(measure)
+    return () => {
+      cancelled = true
+      clearTimeout(giveUp)
+    }
+  }, [landingId, landingVisible])
+
+  function onEntrySaved(l?: EntryLanding) {
+    setFormOpen(false)
+    setAutoEntryClosed(true)
+    setPrefill(undefined)
+    if (l) {
+      setPending({ entry: l.entry, base: entries })
+      setLanding({ entry: l.entry, from: offset(l.rect, hostOrigin.current), to: null, landed: false })
+    }
+    load()
+  }
 
   const nameOf = useCallback(
     (email: string) => profiles.find((p) => p.email === email)?.display_name ?? email,
@@ -313,7 +404,17 @@ export default function MonthDetail({
         </View>
       )}
 
+      {/* Wrapped only so the landing can measure the visible list window. */}
+      <View ref={scrollBoxRef} style={{ flex: 1 }} collapsable={false}>
       <ScrollView
+        ref={scrollRef}
+        onScroll={(ev) => {
+          scrollY.current = ev.nativeEvent.contentOffset.y
+        }}
+        scrollEventThrottle={16}
+        onContentSizeChange={(_w, h) => {
+          contentH.current = h
+        }}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.md, gap: sp.md }}
       >
@@ -379,6 +480,8 @@ export default function MonthDetail({
                     setFormOpen(true)
                   }}
                   onLongPress={() => removeEntry(e)}
+                  rowRef={landing?.entry.id === e.id ? landingRowRef : undefined}
+                  hidden={landing?.entry.id === e.id && !landing.landed}
                 />
               ))}
             </View>
@@ -400,11 +503,14 @@ export default function MonthDetail({
                   setFormOpen(true)
                 }}
                 onLongPress={() => removeEntry(e)}
+                rowRef={landing?.entry.id === e.id ? landingRowRef : undefined}
+                hidden={landing?.entry.id === e.id && !landing.landed}
               />
             ))}
           </View>
         )}
       </ScrollView>
+      </View>
 
       {/* Bottom actions (2026-11 Money rethink): the AI receipt scan as a
           secondary pill, and New entry filled in the budget's own gradient —
@@ -490,14 +596,50 @@ export default function MonthDetail({
             setAutoEntryClosed(true)
             setPrefill(undefined)
           }}
-          onSaved={() => {
-            setFormOpen(false)
-            setAutoEntryClosed(true)
-            setPrefill(undefined)
-            load()
-          }}
+          onSaved={onEntrySaved}
         />
       )}
+
+      {/* The landing ghost's stage: covers the screen, never takes a touch. */}
+      <View
+        ref={hostRef}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        onLayout={() =>
+          hostRef.current?.measureInWindow((x, y) => {
+            hostOrigin.current = { x, y }
+          })
+        }
+      >
+        {landing ? (
+          <LandingGhost
+            key={landing.entry.id}
+            from={landing.from}
+            to={landing.to}
+            fromColor={c.sheet}
+            toColor={c.card}
+            borderColor={c.border}
+            fromRadius={28}
+            toRadius={18}
+            glow={look}
+            head={<GhostAmount entry={landing.entry} />}
+            onLanded={() => setLanding((l) => (l ? { ...l, landed: true } : l))}
+            onDone={() => setLanding(null)}
+          >
+            {/* The ghost box draws the border itself. */}
+            <View style={[rowStyles.row, { flex: 1, borderWidth: 0 }]}>
+              <EntryRowBody
+                entry={landing.entry}
+                customCats={customCats}
+                overrides={overrides}
+                showDate={sortBy !== 'date'}
+                showPerson={person === 'all'}
+                nameOf={nameOf}
+              />
+            </View>
+          </LandingGhost>
+        ) : null}
+      </View>
     </SafeAreaView>
   )
 }
@@ -520,25 +662,49 @@ function SortBtn({ active, label, onPress, tint }: { active: boolean; label: str
   )
 }
 
-function EntryRow({
-  entry: e,
-  customCats,
-  overrides,
-  showDate,
-  showPerson,
-  nameOf,
-  onPress,
-  onLongPress,
-}: {
+type RowBodyProps = {
   entry: Entry
   customCats: CustomCategory[]
   overrides: CategoryOverride[]
   showDate: boolean
   showPerson: boolean
   nameOf: (email: string) => string
+}
+
+function EntryRow({
+  onPress,
+  onLongPress,
+  rowRef,
+  hidden = false,
+  ...body
+}: RowBodyProps & {
   onPress: () => void
   onLongPress: () => void
+  /** Only the row a landing ghost is flying to — it gets measured. */
+  rowRef?: Ref<View>
+  /** Invisible while the ghost is on its way (it reveals the row on landing). */
+  hidden?: boolean
 }) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      ref={rowRef}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={({ pressed }) => [
+        rowStyles.row,
+        { backgroundColor: pressed ? c.cardActive : c.card, borderColor: c.border, opacity: hidden ? 0 : 1 },
+      ]}
+    >
+      <EntryRowBody {...body} />
+    </Pressable>
+  )
+}
+
+/** The row's content — shared by the list row and the landing ghost, so the
+ *  ghost lands looking exactly like what it reveals. */
+function EntryRowBody({ entry: e, customCats, overrides, showDate, showPerson, nameOf }: RowBodyProps) {
   const { c } = useTheme()
   const cat = categoryById(e.category, customCats, overrides)
   const isIncome = e.type === 'income'
@@ -550,22 +716,7 @@ function EntryRow({
     .filter(Boolean)
     .join(' · ')
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={350}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: pressed ? c.cardActive : c.card,
-        borderRadius: 18,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: c.border,
-        paddingHorizontal: sp.md,
-        paddingVertical: 10,
-        gap: sp.md,
-      })}
-    >
+    <>
       <View
         style={{
           width: 40,
@@ -601,9 +752,41 @@ function EntryRow({
         {isIncome ? '+' : '−'}
         {formatMoney(Number(e.amount))}
       </Txt>
-    </Pressable>
+    </>
   )
 }
+
+/** What the ghost shows while it's still form-sized: the amount, as the
+ *  form's hero had it, fading as it shrinks. */
+function GhostAmount({ entry }: { entry: Entry }) {
+  const { c } = useTheme()
+  const isIncome = entry.type === 'income'
+  return (
+    <Txt
+      style={{
+        fontSize: 48,
+        fontFamily: fonts.display,
+        fontVariant: ['tabular-nums'],
+        color: isIncome ? c.income : c.expense,
+      }}
+    >
+      {isIncome ? '+' : '−'}
+      {formatMoney(Number(entry.amount))}
+    </Txt>
+  )
+}
+
+const rowStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: sp.md,
+    paddingVertical: 10,
+    gap: sp.md,
+  },
+})
 
 /** Group an already-sorted list into day sections, preserving order. */
 function groupByDay(entries: Entry[]): { date: string; items: Entry[] }[] {

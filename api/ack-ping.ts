@@ -68,6 +68,23 @@ function pruneDeadTokens(db: any) {
   }
 }
 
+/** Is `email` a member of `householdId`? A person can belong to several
+ *  households (migration 099), so "same household" is a MEMBERSHIP question,
+ *  not a comparison of allowed_users.household_id (that's only the ACTIVE one).
+ *  Falls back to the pre-099 check when household_members doesn't exist yet.
+ *  (Same helper inline in send-ping.ts — api/ files import nothing outside api/.) */
+async function isMember(db: any, email: string, householdId: string): Promise<boolean> {
+  const { data, error } = await db
+    .from('household_members')
+    .select('email')
+    .eq('household_id', householdId)
+    .eq('email', email)
+    .maybeSingle()
+  if (!error) return !!data
+  const { data: legacy } = await db.from('allowed_users').select('household_id').eq('email', email).maybeSingle()
+  return legacy?.household_id === householdId
+}
+
 async function sendSilentExpoPush(
   messages: { to: string; data: Record<string, unknown> }[],
   /** Called with tokens Expo says are permanently unusable, so they can be
@@ -163,12 +180,9 @@ export default async function handler(req: any, res: any) {
       .select('household_id, display_name')
       .eq('email', callerEmail)
       .single()
-    const { data: tgt } = await db
-      .from('allowed_users')
-      .select('household_id')
-      .eq('email', target)
-      .single()
-    if (!me || !tgt || me.household_id !== tgt.household_id) {
+    // The watcher is looking at their ACTIVE household's map; the target only
+    // has to belong to it (their own active household may be another one).
+    if (!me || !me.household_id || !(await isMember(db, target, me.household_id))) {
       return res.status(403).json({ error: 'Forbidden' })
     }
     const { data: tokens } = await db
@@ -198,10 +212,10 @@ export default async function handler(req: any, res: any) {
   // The caller must be a member of the ping's household.
   const { data: caller } = await db
     .from('allowed_users')
-    .select('household_id, display_name')
+    .select('display_name')
     .eq('email', callerEmail)
     .single()
-  if (!caller || caller.household_id !== ping.household_id) {
+  if (!caller || !(await isMember(db, callerEmail, ping.household_id))) {
     return res.status(403).json({ error: 'Forbidden' })
   }
 

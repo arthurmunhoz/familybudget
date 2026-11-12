@@ -9,13 +9,17 @@
 // all if the app has been force-quit (an OS policy, not something to code
 // around) — the widget will simply catch up next time it's opened.
 import { router } from 'expo-router'
+import { isOnScreen } from '@/lib/onScreen'
 import * as Notifications from 'expo-notifications'
 import * as TaskManager from 'expo-task-manager'
 
 import { reloadPetCareWidget, writeAckStatus } from './widget'
 import { captureAndUpload, captureLiveFixIfSharing, fetchMyLocation, isSharingEnabled } from './location'
 import { ackPing, fetchActivePings } from './pings'
+import { notifyPetCareChange } from './petCareNotify'
+import { handlePetReminderDone, isPetReminderDone, syncPetReminders } from './petReminders'
 import { supabase } from './supabase'
+import { switchForNotification } from './households'
 import { respondToLiveWake } from './locationTask'
 import { WHEREABOUTS_ENABLED } from './features'
 
@@ -42,7 +46,10 @@ Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const data = notification.request.content.data as Record<string, unknown> | undefined
     const type = typeof data?.type === 'string' ? data.type : ''
-    const silent = SILENT_TYPES.has(type)
+    // A room invite while the Games screen (or a game) is open: it's already
+    // on screen, so no banner or sound.
+    const url = typeof data?.url === 'string' ? data.url : ''
+    const silent = SILENT_TYPES.has(type) || (url.startsWith('/games') && isOnScreen('games'))
     return {
       shouldShowBanner: !silent,
       shouldShowList: !silent,
@@ -61,14 +68,16 @@ function isLiveWake(data: unknown): boolean {
 /** Shared by both delivery paths below — the background task (app
  *  backgrounded/killed) and the foreground listener (app open), since a
  *  background task doesn't fire while the app is in the foreground. */
-function handleAckPayload(data: unknown): void {
+function handleAckPayload(data: unknown): Promise<void> | void {
   if (!data || typeof data !== 'object') return
   const d = data as Record<string, unknown>
   // Someone else marked a pet task done (api/widget petcare-done/notify): the
   // widget just needs a reload — it re-fetches the fresh state itself.
+  // Pet routine reminders follow too: one somebody just marked is cancelled
+  // here, or taken off the screen if it's already showing.
   if (d.type === 'petcare') {
     reloadPetCareWidget()
-    return
+    return syncPetReminders()
   }
   if (d.type !== 'ack') return
   const label = typeof d.label === 'string' ? d.label : ''
@@ -124,8 +133,16 @@ export function notificationTaskPayload(data: unknown): unknown {
 // why mobile/index.ts imports this module directly.
 TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => {
   if (error) return
+  // Android hands an ACTION tap (app backgrounded or killed) to this task as a
+  // NotificationResponse — that's how a pet reminder's Done works headless.
+  const maybeResponse = data as Notifications.NotificationResponse | undefined
+  if (maybeResponse && typeof maybeResponse === 'object' && 'actionIdentifier' in maybeResponse) {
+    if (isPetReminderDone(maybeResponse)) await handlePetReminderDone(maybeResponse, notifyPetCareChange)
+    return
+  }
   const payload = notificationTaskPayload(data)
-  handleAckPayload(payload)
+  // Awaited: keeps the background task alive until the reminders re-sync.
+  await handleAckPayload(payload)
   // Background wake: ramp the location task + stream a burst (not just one
   // fix) — the foreground listener below keeps the cheap single fix, since
   // there useLiveResponder picks up the streaming via Realtime.
@@ -144,6 +161,10 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
  *  tapped, and routing on one would yank the user somewhere they didn't ask
  *  to go if the OS ever did surface it. */
 function routeFromNotification(response: Notifications.NotificationResponse | null): void {
+  // An action BUTTON (a pet reminder's Done) is not a tap on the notification:
+  // it's handled where it lands (below) and must not navigate anywhere.
+  const action = response?.actionIdentifier
+  if (action && action !== Notifications.DEFAULT_ACTION_IDENTIFIER) return
   const data = response?.notification?.request?.content?.data as
     | Record<string, unknown>
     | undefined
@@ -157,13 +178,18 @@ function routeFromNotification(response: Notifications.NotificationResponse | nu
   // iPhone household member still carries '/location' — open the app as-is
   // rather than bouncing through a route that redirects home.
   if (!WHEREABOUTS_ENABLED && url.startsWith('/location')) return
+  // A push about ANOTHER of my households (migration 099; api/ puts its id in
+  // `household`) switches to it first, so the tap lands on that household's
+  // screen rather than the same screen of whichever one was active.
+  const household = typeof data.household === 'string' ? data.household : null
+  const ready = household ? switchForNotification(household) : Promise.resolve()
   // A nudge tap may be answering a "share your location" request — that one
   // is handled in a single tap instead of landing on Nudges (see below).
   if (url === '/pings') {
-    void answerLocationRequests().then((handled) => go(handled ? '/' : url))
+    void ready.then(() => answerLocationRequests()).then((handled) => go(handled ? '/' : url))
     return
   }
-  go(url)
+  void ready.then(() => go(url))
 }
 
 /** Tapping the push for a Whereabouts "your location is out of date" request
@@ -209,6 +235,23 @@ function go(url: string): void {
   }, 0)
 }
 
+// A pet reminder's Done button (opensAppToForeground: false). On iOS the OS
+// starts / wakes the app in the BACKGROUND and expo-notifications emits the
+// response as soon as the bundle runs — so this listener sits at MODULE scope
+// (mobile/index.ts imports this file), not in registerBackgroundNotifications,
+// which waits for _layout. A response delivered before any listener existed
+// waits in "last response", checked right after. Android also routes the tap
+// to the task above when the app isn't in the foreground; the duplicate is
+// absorbed by handlePetReminderDone's de-dupe and the idempotent insert.
+Notifications.addNotificationResponseReceivedListener((response) => {
+  if (isPetReminderDone(response)) void handlePetReminderDone(response, notifyPetCareChange)
+})
+Notifications.getLastNotificationResponseAsync()
+  .then((response) => {
+    if (response && isPetReminderDone(response)) void handlePetReminderDone(response, notifyPetCareChange)
+  })
+  .catch(() => {})
+
 let registered = false
 
 /** Call once at app startup (mobile/src/app/_layout.tsx). */
@@ -220,7 +263,7 @@ export function registerBackgroundNotifications(): void {
   })
   Notifications.addNotificationReceivedListener((notification) => {
     const payload = notification.request.content.data
-    handleAckPayload(payload)
+    void handleAckPayload(payload)
     if (isLiveWake(payload) && WHEREABOUTS_ENABLED) void captureLiveFixIfSharing()
   })
   Notifications.addNotificationResponseReceivedListener(routeFromNotification)

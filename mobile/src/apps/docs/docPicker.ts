@@ -12,7 +12,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 
 import type { TKey } from '@/lib/i18n'
 import { supabase } from '@/lib/supabase'
-import { THUMB_WIDTH, formatBytes, thumbPathFor } from './docUtils'
+import { PREVIEW_WIDTH, THUMB_WIDTH, formatBytes, previewPathFor, thumbPathFor } from './docUtils'
 import type { PickedFile } from './UploadSheet'
 
 type T = (key: TKey, params?: Record<string, string | number>) => string
@@ -163,18 +163,24 @@ export async function scanDocument(t: T): Promise<PickedFile | null> {
   return images.length === 1 ? fromImage(images[0], t) : fromPages(images, t)
 }
 
-/** Best-effort: a small JPEG of the document at its derived thumb path. Never
- *  throws — a missing thumbnail only means the list shows a placeholder. */
+/** Best-effort: the document's two pictures at their derived paths — the
+ *  small list thumbnail and the readable PREVIEW for the "one at a time" view
+ *  (2026-11). Never throws — a missing one only means a fallback is shown. */
 export async function uploadThumb(srcUri: string, filePath: string) {
+  await Promise.all([
+    upload(srcUri, THUMB_WIDTH, 0.6, thumbPathFor(filePath)),
+    upload(srcUri, PREVIEW_WIDTH, 0.72, previewPathFor(filePath)),
+  ])
+}
+
+async function upload(srcUri: string, width: number, compress: number, path: string) {
   try {
-    const ref = await ImageManipulator.manipulate(srcUri).resize({ width: THUMB_WIDTH }).renderAsync()
-    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.6 })
+    const ref = await ImageManipulator.manipulate(srcUri).resize({ width }).renderAsync()
+    const out = await ref.saveAsync({ format: SaveFormat.JPEG, compress })
     const bytes = new Uint8Array(await new File(out.uri).arrayBuffer())
-    await supabase.storage
-      .from('documents')
-      .upload(thumbPathFor(filePath), bytes, { contentType: 'image/jpeg', cacheControl: '604800' })
+    await supabase.storage.from('documents').upload(path, bytes, { contentType: 'image/jpeg', cacheControl: '604800' })
   } catch {
-    /* no thumbnail — the list falls back */
+    /* none — the views fall back */
   }
 }
 

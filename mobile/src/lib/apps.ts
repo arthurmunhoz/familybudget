@@ -12,6 +12,7 @@ import {
   CalendarDays,
   Users,
   Toolbox,
+  Gamepad2,
   Wrench,
 } from 'lucide-react-native'
 
@@ -34,6 +35,7 @@ const ALL_APPS: HubApp[] = [
   { id: 'pets', name: 'Pets', icon: PawPrint, route: '/pets', description: 'Vet visits, meds & due dates' },
   { id: 'docs', name: 'Documents', icon: FolderLock, route: '/docs', description: 'IDs, insurance & records' },
   { id: 'family', name: 'Family', icon: Users, route: '/family', description: 'Everyone’s info at a glance' },
+  { id: 'games', name: 'Games', icon: Gamepad2, route: '/games', description: 'Play together, each on their own phone' },
   { id: 'calc', name: 'Utilities', icon: Toolbox, route: '/calc', description: 'Split bills, deals & printable tags' },
 ]
 

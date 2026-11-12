@@ -344,6 +344,22 @@ export default async function handler(req: any, res: any) {
     db.from('user_settings').select('email, language'),
     db.from('expo_push_tokens').select('token, household_id, user_email'),
   ])
+  // Who is in which household (several per person since migration 099).
+  // Registrations are per PERSON, stamped with whichever household is active,
+  // so the digest is addressed by membership, not by the token's household_id.
+  // Before 099 is applied this falls back to allowed_users (one each).
+  const [membersRes, householdsRes] = await Promise.all([
+    db.from('household_members').select('household_id, email'),
+    db.from('households').select('id, name'),
+  ])
+  let memberships = (membersRes.data ?? []) as { household_id: string; email: string }[]
+  if (membersRes.error) {
+    const { data: legacy } = await db.from('allowed_users').select('household_id, email')
+    memberships = (legacy ?? []) as { household_id: string; email: string }[]
+  }
+  const householdNameById = new Map<string, string>(
+    ((householdsRes.data ?? []) as { id: string; name: string }[]).map((h) => [h.id, h.name]),
+  )
 
   const pets = (petsRes.data ?? []) as Pet[]
   const events = (eventsRes.data ?? []) as PetEvent[]
@@ -361,22 +377,29 @@ export default async function handler(req: any, res: any) {
 
   const petById = new Map(pets.map((p) => [p.id, p]))
 
-  // Group subscriptions by household — every member of a household gets the
-  // same shared digest (pets and dates are household-wide).
-  const subsByHousehold = new Map<string, Subscription[]>()
-  for (const s of subs) {
-    const list = subsByHousehold.get(s.household_id) ?? []
-    list.push(s)
-    subsByHousehold.set(s.household_id, list)
+  // Every member of a household gets the same shared digest (pets and dates
+  // are household-wide) on each of their devices. Someone in several
+  // households gets one digest PER household, titled with its name.
+  const membersByHousehold = new Map<string, string[]>()
+  const householdCount = new Map<string, number>()
+  for (const m of memberships) {
+    const list = membersByHousehold.get(m.household_id) ?? []
+    list.push(m.email)
+    membersByHousehold.set(m.household_id, list)
+    householdCount.set(m.email, (householdCount.get(m.email) ?? 0) + 1)
   }
-
-  // Native (Expo) push tokens grouped by household, same shape as web subs.
+  const subsByEmail = new Map<string, Subscription[]>()
+  for (const s of subs) {
+    const list = subsByEmail.get(s.user_email) ?? []
+    list.push(s)
+    subsByEmail.set(s.user_email, list)
+  }
   type ExpoTok = { token: string; household_id: string; user_email: string }
-  const expoByHousehold = new Map<string, ExpoTok[]>()
+  const expoByEmail = new Map<string, ExpoTok[]>()
   for (const t of (expoRes.data ?? []) as ExpoTok[]) {
-    const list = expoByHousehold.get(t.household_id) ?? []
+    const list = expoByEmail.get(t.user_email) ?? []
     list.push(t)
-    expoByHousehold.set(t.household_id, list)
+    expoByEmail.set(t.user_email, list)
   }
 
   // Pet reminders due today or overdue, keyed by household. Stored as data so
@@ -449,20 +472,32 @@ export default async function handler(req: any, res: any) {
     // sheet ignore the query and just open Pet Care.
     const link = petR.length ? '/pets?overdue=1' : '/calendar'
 
-    // Build the digest title/body in a given recipient's language.
+    const members = membersByHousehold.get(householdId) ?? []
+    const hhName = householdNameById.get(householdId) ?? null
+    const isMulti = (email: string) => (householdCount.get(email) ?? 0) > 1
+
+    // Build the digest title/body in a given recipient's language. For someone
+    // in several households the title names this one ("🏠 Souza · 2 reminders").
     const build = (email: string) => {
       const L = I18N[langByEmail.get(email) ?? 'en']
       const petLines = petR.map((r) => `${r.icon} ${r.name} — ${r.title} (${L.petLabel(r.days)})`)
       const dateLines = dateR.map((r) => `${r.icon} ${r.title} (${L.dateLabel(r.days)})`)
       const lines = [...petLines, ...dateLines]
-      const title = lines.length === 1 ? '🏠 One Roof' : `🏠 ${L.remindersTitle(lines.length)}`
+      const multi = isMulti(email) && !!hhName
+      const title =
+        lines.length === 1
+          ? multi ? `🏠 ${hhName}` : '🏠 One Roof'
+          : multi ? `🏠 ${hhName} · ${L.remindersTitle(lines.length)}` : `🏠 ${L.remindersTitle(lines.length)}`
       return { title, body: lines.join('\n') }
     }
 
     // Web push
-    for (const s of subsByHousehold.get(householdId) ?? []) {
+    for (const s of members.flatMap((e) => subsByEmail.get(e) ?? [])) {
       const { title, body } = build(s.user_email)
-      const payload = JSON.stringify({ title, body, url: link, tag: 'one-roof-digest' })
+      // One tag per household for multi-household people, or the second
+      // digest would REPLACE the first on the lock screen.
+      const tag = isMulti(s.user_email) ? `one-roof-digest-${householdId}` : 'one-roof-digest'
+      const payload = JSON.stringify({ title, body, url: link, tag })
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
@@ -476,13 +511,14 @@ export default async function handler(req: any, res: any) {
     }
 
     // Native (Expo) push
-    const expoMsgs: ExpoMessage[] = (expoByHousehold.get(householdId) ?? []).map((t) => {
+    const expoMsgs: ExpoMessage[] = members.flatMap((e) => expoByEmail.get(e) ?? []).map((t) => {
       const { title, body } = build(t.user_email)
       return {
         to: t.token,
         title,
         body,
-        data: { url: link },
+        // `household` lets a tap switch the app to the household it's about.
+        data: { url: link, household: householdId },
         sound: 'default' as const,
         channelId: 'household' as const,
       }

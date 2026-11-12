@@ -12,26 +12,35 @@
 // cadence as quick choices (week … year) plus a custom number of days, and
 // the icon grid as tinted tiles.
 //
+// Reminder (migration 098): an optional approximate time per routine
+// ("Morning food ~8:00"). If nobody marks it by PET_REMINDER_GRACE_MIN later,
+// the phones of members with Settings → "Pet reminders" on ask, with a Done
+// button (lib/petReminders.ts). The time is a PickerSheet in the pet's colour.
+//
 // DraggableList needs gestures INSIDE this RN Modal, so the content is wrapped
 // in its own GestureHandlerRootView (the app-root one doesn't reach a modal's
 // separate native hierarchy — see NudgeSettings.tsx, the reference for this).
 import { useMemo, useState } from 'react'
-import { Alert, Keyboard, Modal, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Alert, Keyboard, Modal, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { GripVertical, Plus, Sparkles, Trash2, X } from 'lucide-react-native'
+import { Bell, BellRing, GripVertical, Plus, Sparkles, Trash2, X } from 'lucide-react-native'
 
 import { DraggableList } from '@/components/DraggableList'
 import { GradientBox } from '@/components/home/GradientBox'
 import { shade } from '@/components/home/palette'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
+import { PickerSheet } from '@/components/PickerSheet'
 import { Pressable } from '@/components/Pressable'
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
 import { track } from '@/lib/analytics'
+import { formatTime } from '@/lib/calendar'
 import type { TKey } from '@/lib/i18n'
 import { templateTasks } from '@/lib/petCare'
+import { PET_REMINDER_GRACE_MIN, remindAtHHMM } from '@/lib/petReminderPlan'
+import { ensureReminderPermission } from '@/lib/petReminders'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetTaskIcon } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
@@ -40,6 +49,15 @@ import { TintButton } from '@/components/TintButton'
 import { CADENCE_PRESETS, everyLabel } from './careText'
 
 const ROW_H = 62
+const LOCALES: Record<string, string> = { en: 'en', es: 'es', pt: 'pt-BR' }
+const DEFAULT_REMIND = '08:00'
+
+const timeDate = (hhmm: string): Date => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return new Date(2000, 0, 1, h || 0, m || 0)
+}
+const toHHMM = (d: Date): string =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 
 /** Uppercase tracked label, like the Home's section heads. */
 function Label({ children }: { children: string }) {
@@ -64,6 +82,82 @@ function CloseBtn({ onPress }: { onPress: () => void }) {
   )
 }
 
+/** "Reminder · Approximate time  ~8:00 ×" — one card in the task editor. The
+ *  time opens a PickerSheet NESTED here (inside the editor's modal). Unset, the
+ *  chip reads "Add"; on iOS opening it starts the wheels at 8:00 (the wheels
+ *  apply live, so Done alone keeps that), on Android the system dialog only
+ *  sets a time when confirmed. */
+function ReminderCard({
+  tint,
+  soft,
+  value,
+  onChange,
+}: {
+  tint: string
+  soft: string
+  /** "HH:MM" or null (no reminder). */
+  value: string | null
+  onChange: (v: string | null) => void
+}) {
+  const { c } = useTheme()
+  const { t, lang } = useI18n()
+  const [open, setOpen] = useState(false)
+  const locale = LOCALES[lang] ?? 'en'
+  function openPicker() {
+    if (!value && Platform.OS === 'ios') onChange(DEFAULT_REMIND)
+    setOpen(true)
+  }
+  return (
+    <>
+      <Label>{t('petcare.reminder')}</Label>
+      <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, padding: sp.md }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+          <View style={[styles.rowIcon, { backgroundColor: value ? tint : soft }]}>
+            {value ? <BellRing size={18} color="#fff" /> : <Bell size={18} color={tint} />}
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('petcare.reminderTime')}</Txt>
+            <Txt style={{ fontSize: 13, lineHeight: 17, color: c.textMuted }}>
+              {value ? t('petcare.reminderHint', { n: PET_REMINDER_GRACE_MIN }) : t('petcare.reminderOff')}
+            </Txt>
+          </View>
+          <Pressable
+            onPress={openPicker}
+            accessibilityRole="button"
+            accessibilityLabel={t('petcare.reminderTime')}
+            hitSlop={4}
+            style={({ pressed }) => [styles.chip, { backgroundColor: value ? soft : tint, opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: value ? tint : '#fff' }}>
+              {value ? `~${formatTime(value, locale)}` : t('petcare.reminderAdd')}
+            </Txt>
+          </Pressable>
+          {value ? (
+            <Pressable
+              onPress={() => onChange(null)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('petcare.reminderClear')}
+              style={[styles.close, { backgroundColor: c.surface }]}
+            >
+              <X size={14} color={c.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+      <PickerSheet
+        title={t('petcare.reminderTime')}
+        tint={tint}
+        visible={open}
+        mode="time"
+        value={timeDate(value ?? DEFAULT_REMIND)}
+        onChange={(d) => onChange(toHHMM(d))}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  )
+}
+
 /** The task editor — a sheet NESTED in the routine sheet's modal (a sibling
  *  Modal fails to present on iOS). Hoisted so its inputs keep focus. */
 function TaskEditor({
@@ -76,6 +170,8 @@ function TaskEditor({
   setIcon,
   intervalDays,
   setIntervalDays,
+  remindAt,
+  setRemindAt,
   busy,
   onSave,
   onClose,
@@ -89,6 +185,8 @@ function TaskEditor({
   setIcon: (v: PetTaskIcon) => void
   intervalDays: string
   setIntervalDays: (v: string) => void
+  remindAt: string | null
+  setRemindAt: (v: string | null) => void
   busy: boolean
   onSave: () => void
   onClose: () => void
@@ -185,6 +283,9 @@ function TaskEditor({
               </>
             ) : null}
 
+            {/* reminder — optional approximate time (migration 098) */}
+            <ReminderCard tint={tint} soft={soft} value={remindAt} onChange={setRemindAt} />
+
             {/* icon — tinted tiles, the chosen one solid */}
             <Label>{t('petcare.iconLabel')}</Label>
             <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, padding: sp.md }]}>
@@ -257,7 +358,7 @@ export function RoutineSheet({
 }) {
   const { c, dark } = useTheme()
   const bottomGap = useBottomGap(sp.xs)
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [busy, setBusy] = useState(false)
 
   // Editor modal state: null = closed, 'new' = creating, else the task edited.
@@ -266,6 +367,7 @@ export function RoutineSheet({
   const [icon, setIcon] = useState<PetTaskIcon>('paw')
   const kind = section
   const [intervalDays, setIntervalDays] = useState('7')
+  const [remindAt, setRemindAt] = useState<string | null>(null)
 
   const daily = useMemo(
     () =>
@@ -286,6 +388,7 @@ export function RoutineSheet({
     setTitle('')
     setIcon(section === 'interval' ? 'bath' : 'paw')
     setIntervalDays('30')
+    setRemindAt(null)
   }
 
   function openEdit(task: PetCareTask) {
@@ -293,6 +396,7 @@ export function RoutineSheet({
     setTitle(task.title)
     setIcon(task.icon)
     setIntervalDays(String(task.interval_days ?? 7))
+    setRemindAt(remindAtHHMM(task.remind_at))
   }
 
   async function save() {
@@ -300,12 +404,16 @@ export function RoutineSheet({
     const days = Math.max(1, Math.round(Number(intervalDays) || 0))
     if (!trimmed || busy) return
     setBusy(true)
-    const fields = {
+    const fields: Record<string, unknown> = {
       title: trimmed,
       icon,
       kind,
       interval_days: kind === 'interval' ? days : null,
     }
+    // Only sent when there's something to say: a database without migration
+    // 098 has no remind_at column, and naming it would fail every save.
+    const hadReminder = editing !== 'new' && editing !== null && editing.remind_at != null
+    if (remindAt || hadReminder) fields.remind_at = remindAt
     const { error } =
       editing === 'new'
         ? await supabase.from('pet_care_tasks').insert({
@@ -321,6 +429,9 @@ export function RoutineSheet({
     }
     if (editing === 'new') track('petcare.task_added', { title: trimmed, pet: pet.name })
     setEditing(null)
+    // A time was set: this is the moment to ask for notifications (once), and
+    // BEFORE onChanged re-syncs the reminders, which never prompts.
+    if (remindAt) await ensureReminderPermission()
     onChanged()
   }
 
@@ -409,6 +520,14 @@ export function RoutineSheet({
           <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 16.5, color: c.text }} numberOfLines={1}>
             {task.title}
           </Txt>
+          {remindAtHHMM(task.remind_at) ? (
+            <View style={[styles.pill, { backgroundColor: soft, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+              <Bell size={11} color={tint} />
+              <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: tint }}>
+                {`~${formatTime(remindAtHHMM(task.remind_at) as string, LOCALES[lang] ?? 'en')}`}
+              </Txt>
+            </View>
+          ) : null}
           {task.kind === 'interval' && task.interval_days ? (
             <View style={[styles.pill, { backgroundColor: soft }]}>
               <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: tint }}>
@@ -520,6 +639,8 @@ export function RoutineSheet({
             setIcon={setIcon}
             intervalDays={intervalDays}
             setIntervalDays={setIntervalDays}
+            remindAt={remindAt}
+            setRemindAt={setRemindAt}
             busy={busy}
             onSave={save}
             onClose={() => setEditing(null)}

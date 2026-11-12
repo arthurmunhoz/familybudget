@@ -21,6 +21,7 @@
 // label→category on save.
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, StyleSheet, TextInput, View } from 'react-native'
+import { useReducedMotion } from 'react-native-reanimated'
 import { Pressable } from '@/components/Pressable'
 import {
   ArrowDown,
@@ -39,6 +40,7 @@ import {
 } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
+import type { GhostRect } from '@/components/LandingGhost'
 import { TintButton } from '@/components/TintButton'
 import type { Gradient } from '@/components/home/palette'
 import {
@@ -70,6 +72,13 @@ import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { DatePickerModal } from './shared'
 import { FormSheet } from './FormSheet'
 import ManageCategoriesSheet from './ManageCategoriesSheet'
+
+/** A NEW entry just saved, and where the form sheet was on screen (window
+ *  coordinates) — the host flies a ghost from there into the entry's row. */
+export interface EntryLanding {
+  entry: Entry
+  rect: GhostRect
+}
 
 export interface EntryPrefill {
   label?: string
@@ -571,10 +580,21 @@ export default function EntryForm({
   /** Prefilled values for a new entry (e.g. from a scanned receipt). */
   initial?: EntryPrefill
   onClose: () => void
-  onSaved: () => void
+  /** `landing` only for a new entry (edits and deletes just close). */
+  onSaved: (landing?: EntryLanding) => void
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  const reduceMotion = useReducedMotion()
+  const sheetRef = useRef<View>(null)
+  // Set once a new entry is saved: the Modal is re-rendered with no slide-out
+  // (the host's ghost takes over from the sheet's exact rect), THEN we hand off.
+  const [leaving, setLeaving] = useState<EntryLanding | null>(null)
+  useEffect(() => {
+    if (leaving) onSaved(leaving)
+    // onSaved is the host's inline closure; fire once per hand-off.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaving])
   const tint = colors?.[1] ?? c.accent
   const ri = (Icon: typeof Tag) => <RowIcon Icon={Icon} tint={tint} />
 
@@ -677,7 +697,7 @@ export default function EntryForm({
     }
     const result = entry
       ? await supabase.from('entries').update(payload).eq('id', entry.id)
-      : await supabase.from('entries').insert(payload)
+      : await supabase.from('entries').insert(payload).select('*').single()
     if (result.error) {
       setError(result.error.message)
       setSaving(false)
@@ -698,7 +718,28 @@ export default function EntryForm({
           { onConflict: 'household_id,keyword' },
         )
     }
-    onSaved()
+    const created = !entry ? (result.data as Entry | null) : null
+    const sheet = sheetRef.current
+    if (!created || !sheet) {
+      onSaved()
+      return
+    }
+    // measureInWindow answers on the next native round-trip (a frame); a
+    // missing answer must never leave the form stuck open.
+    let handed = false
+    const fallback = setTimeout(() => {
+      if (!handed) {
+        handed = true
+        onSaved()
+      }
+    }, 300)
+    sheet.measureInWindow((x, y, width, height) => {
+      if (handed) return
+      handed = true
+      clearTimeout(fallback)
+      if (!width || !height) onSaved()
+      else setLeaving({ entry: created, rect: { x, y, width, height } })
+    })
   }
 
   function remove() {
@@ -777,6 +818,8 @@ export default function EntryForm({
   return (
     <LookContext.Provider value={colors ?? null}>
     <FormSheet
+      sheetRef={sheetRef}
+      animationType={leaving ? (reduceMotion ? 'fade' : 'none') : 'slide'}
       icon={colors ? (type === 'expense' ? Receipt : Banknote) : undefined}
       colors={colors}
       kicker={kicker}

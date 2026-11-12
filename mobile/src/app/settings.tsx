@@ -2,10 +2,10 @@
 // in-app account deletion (required by Apple Guideline 5.1.1(v)). Sections are
 // separated by dividers; Plus shows a certificate badge + the included feature
 // list when active, and notifications shows a live on/off status.
+import { RoofSettings } from '@/components/RoofSettings'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   Alert,
   Animated,
   Easing,
@@ -13,13 +13,13 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   View,
   type LayoutChangeEvent,
 } from 'react-native'
 import { Toggle } from '@/components/Toggle'
-import { Pressable as SafePressable } from '@/components/Pressable'
+import { GameInvitesToggle } from '@/apps/games/GameInvitesToggle'
+import { PetRemindersToggle } from '@/apps/pets/PetRemindersToggle'
 import { router, useLocalSearchParams } from 'expo-router'
 import {
   Award,
@@ -37,12 +37,9 @@ import {
   Lock,
   MapPin,
   ReceiptText,
-  RefreshCw,
-  Share2,
   Sparkles,
   Users,
   Wallet,
-  X,
   type LucideIcon,
 } from 'lucide-react-native'
 
@@ -50,10 +47,11 @@ import { Btn, Card, Field, Screen, Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
 import { APP_GRADIENT, type Gradient } from '@/components/home/palette'
 import { DraggableList } from '@/components/DraggableList'
+import { FamilySection } from '@/components/FamilySection'
 import { useAppPrefs } from '@/hooks/useAppPrefs'
 import { APPS } from '@/lib/apps'
 import { useAuth } from '@/lib/auth'
-import { usePlus, memberLimit, MEMBER_LIMIT_PLUS } from '@/lib/plus'
+import { usePlus } from '@/lib/plus'
 import { useI18n } from '@/hooks/useI18n'
 import { LANGUAGES, platformKey, type TKey } from '@/lib/i18n'
 import { getPushEnabled, registerForPush } from '@/lib/notifications'
@@ -186,215 +184,6 @@ function PlusConfetti() {
             />
           )
         })}
-    </View>
-  )
-}
-
-// Household members + (owner-only) invite code. Fetches its own data so it can
-// refresh after a member is removed. Uses the migration-051 owner RPCs.
-function HouseholdSection({ highlight = false }: { highlight?: boolean }) {
-  const { c } = useTheme()
-  const { t } = useI18n()
-  const { profile } = useAuth()
-  const { isPlus, isFree } = usePlus()
-  const limit = memberLimit(isPlus)
-  const isOwner = profile?.role === 'owner'
-  const hid = profile?.household_id ?? null
-  const [name, setName] = useState<string | null>(null)
-  const [members, setMembers] = useState<{ email: string; display_name: string; role: string }[]>([])
-  const [code, setCode] = useState<string | null>(null)
-  const [rotating, setRotating] = useState(false)
-
-  const load = useCallback(async () => {
-    if (!hid) return
-    const [h, m] = await Promise.all([
-      supabase.from('households').select('name').eq('id', hid).maybeSingle(),
-      supabase
-        .from('allowed_users')
-        .select('email, display_name, role')
-        .eq('household_id', hid)
-        .order('display_name'),
-    ])
-    setName((h.data as { name?: string } | null)?.name ?? null)
-    setMembers((m.data as { email: string; display_name: string; role: string }[]) ?? [])
-  }, [hid])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  useEffect(() => {
-    if (!isOwner) {
-      setCode(null)
-      return
-    }
-    supabase.rpc('get_join_code').then(({ data }) => setCode(typeof data === 'string' ? data : null))
-  }, [isOwner])
-
-  async function shareCode() {
-    if (!code) return
-    try {
-      await Share.share({ message: t('household.shareMessage', { code }) })
-    } catch {
-      /* user dismissed the share sheet */
-    }
-  }
-
-  function rotate() {
-    Alert.alert(t('household.rotateTitle'), t('household.rotateConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('household.rotate'),
-        style: 'destructive',
-        onPress: async () => {
-          setRotating(true)
-          const { data, error } = await supabase.rpc('rotate_join_code')
-          setRotating(false)
-          if (error || typeof data !== 'string') {
-            Alert.alert(t('household.rotateError'))
-            return
-          }
-          setCode(data)
-        },
-      },
-    ])
-  }
-
-  function removeMember(m: { email: string; display_name: string }) {
-    Alert.alert(t('household.removeMember'), t('household.removeConfirm', { name: m.display_name }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.remove'),
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.rpc('remove_member', { p_email: m.email })
-          if (error) {
-            Alert.alert(t('household.removeError'))
-            return
-          }
-          void load()
-        },
-      },
-    ])
-  }
-
-  return (
-    <View style={{ gap: sp.sm }}>
-      <SectionLabel>{t('household.title')}</SectionLabel>
-      <Card style={{ gap: sp.md }}>
-        {name ? <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 25 }}>{name}</Txt> : null}
-        <View style={{ gap: sp.md }}>
-          {members.map((m) => (
-            <View key={m.email} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-              <Initials name={m.display_name} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Txt numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
-                    {m.display_name}
-                  </Txt>
-                  {m.role === 'owner' ? (
-                    <View style={{ backgroundColor: c.accentSoft, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                      <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 10 }}>
-                        {t('household.owner').toUpperCase()}
-                      </Txt>
-                    </View>
-                  ) : null}
-                </View>
-                <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
-                  {m.email}
-                </Txt>
-              </View>
-              {isOwner && m.role !== 'owner' ? (
-                <Pressable onPress={() => removeMember(m)} hitSlop={8} accessibilityLabel={t('household.removeMember')}>
-                  <X size={18} color={c.textFaint} />
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
-        </View>
-
-        {/* Member count + (free owners only) a nudge to Plus for more room. The
-            DB trigger is the real cap (migration 059); this is just the pitch. */}
-        <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, paddingTop: sp.md, gap: 4 }}>
-          <Txt variant="faint">{t('household.memberCount', { count: members.length, max: limit })}</Txt>
-          {isOwner && isFree ? (
-            <Pressable onPress={() => router.push('/paywall')} hitSlop={6}>
-              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
-                {t('household.upgradeForMembers', { max: MEMBER_LIMIT_PLUS })}
-              </Txt>
-            </Pressable>
-          ) : null}
-        </View>
-      </Card>
-
-      {isOwner ? (
-        <Card style={{ gap: sp.md, ...(highlight ? { borderWidth: 2, borderColor: c.accent } : {}) }}>
-          <View style={{ gap: 2 }}>
-            <Txt style={{ fontFamily: fonts.semibold }}>{t('household.inviteCode')}</Txt>
-            <Txt variant="faint">{t('household.inviteHint')}</Txt>
-          </View>
-          {/* Code and its two actions on one row (2026-11): the old layout
-              stacked a full-width code box over two full-width buttons and
-              read as empty. Share is the action; reset is a quiet icon. */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-            <View
-              style={{
-                flex: 1,
-                height: 48,
-                justifyContent: 'center',
-                paddingHorizontal: sp.md,
-                backgroundColor: c.surface,
-                borderRadius: radius.md,
-              }}
-            >
-              <Txt
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                style={{ fontSize: 20, letterSpacing: 3, fontFamily: fonts.semibold, color: c.text }}
-              >
-                {code ?? '········'}
-              </Txt>
-            </View>
-            <SafePressable
-              onPress={shareCode}
-              disabled={!code}
-              accessibilityRole="button"
-              style={({ pressed }) => ({
-                height: 48,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: sp.md,
-                borderRadius: radius.md,
-                backgroundColor: c.action,
-                opacity: !code ? 0.5 : pressed ? 0.85 : 1,
-              })}
-            >
-              <Share2 size={16} color={c.onAction} />
-              <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 15 }}>{t('household.share')}</Txt>
-            </SafePressable>
-            <SafePressable
-              onPress={rotate}
-              disabled={rotating}
-              accessibilityRole="button"
-              accessibilityLabel={t('household.rotate')}
-              style={({ pressed }) => ({
-                width: 48,
-                height: 48,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: radius.md,
-                backgroundColor: c.surface,
-                opacity: rotating ? 0.5 : pressed ? 0.7 : 1,
-              })}
-            >
-              {rotating ? <ActivityIndicator size="small" color={c.textMuted} /> : <RefreshCw size={18} color={c.textMuted} />}
-            </SafePressable>
-          </View>
-        </Card>
-      ) : (
-        <Txt variant="faint">{t('household.notOwnerHint')}</Txt>
-      )}
     </View>
   )
 }
@@ -798,8 +587,10 @@ export default function Settings() {
           ) : null}
         </View>
 
+        {/* Family: the active family, its members and invite code, your other
+            families (switch), join / leave — one card (owner, 2026-11). */}
         <View onLayout={registerSection('invite')}>
-          <HouseholdSection highlight={highlighted === 'invite'} />
+          <FamilySection highlight={highlighted === 'invite'} />
         </View>
 
 
@@ -893,6 +684,14 @@ export default function Settings() {
         </View>
 
 
+        {/* Roof — the assistant's voice: "Ei Roof" + spoken answers */}
+        <View style={{ gap: sp.sm }}>
+          <SectionLabel>{t('settings.roof')}</SectionLabel>
+          <Card>
+            <RoofSettings />
+          </Card>
+        </View>
+
         {/* Notifications */}
         <View style={{ gap: sp.sm }}>
           <SectionLabel>{t('settings.notifications')}</SectionLabel>
@@ -922,6 +721,8 @@ export default function Settings() {
               />
             )}
             {pushMsg ? <Txt variant="faint">{t(pushMsg)}</Txt> : null}
+            <GameInvitesToggle />
+            <PetRemindersToggle />
           </Card>
         </View>
 
@@ -1148,17 +949,5 @@ function AccountRow({
     </Pressable>
   ) : (
     body
-  )
-}
-
-/** Initials on a soft accent circle, for the member list. */
-function Initials({ name }: { name: string }) {
-  const { c } = useTheme()
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const ini = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
-  return (
-    <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-      <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.accent }}>{ini}</Txt>
-    </View>
   )
 }

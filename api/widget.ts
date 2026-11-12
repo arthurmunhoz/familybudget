@@ -291,6 +291,37 @@ function pruneDeadTokens(db: any) {
   }
 }
 
+// ── Several households per person (migration 099) ───────────────────────────
+// The widget token follows the user's ACTIVE household (set_active_household
+// re-stamps it), so the widgets show the active household. Push registrations
+// are per PERSON, so fan-outs resolve recipients by email through
+// household_members, never by the token's household_id. Falls back to the
+// pre-099 shape when the table isn't there. (Duplicated in send-ping.ts ON
+// PURPOSE — api/ files import nothing from outside api/.)
+
+/** Emails of a household's members. */
+async function householdMembers(db: any, householdId: string): Promise<string[]> {
+  const { data, error } = await db.from('household_members').select('email').eq('household_id', householdId)
+  if (!error) return (data ?? []).map((r: any) => r.email as string)
+  const { data: legacy } = await db.from('allowed_users').select('email').eq('household_id', householdId)
+  return (legacy ?? []).map((r: any) => r.email as string)
+}
+
+/** Of `emails`, the ones who belong to more than one household. */
+async function multiHousehold(db: any, emails: string[]): Promise<Set<string>> {
+  if (!emails.length) return new Set()
+  const { data, error } = await db.from('household_members').select('email').in('email', emails)
+  if (error) return new Set()
+  const count = new Map<string, number>()
+  for (const r of data ?? []) count.set(r.email, (count.get(r.email) ?? 0) + 1)
+  return new Set([...count].filter(([, n]) => n > 1).map(([e]) => e))
+}
+
+/** "👋 Ana" → "👋 Ana · Souza" for someone who is in several households. */
+function labelled(title: string, name: string | null, multi: boolean): string {
+  return multi && name ? `${title} · ${name}` : title
+}
+
 async function sendExpoPush(
   messages: {
     to: string
@@ -394,6 +425,10 @@ export default async function handler(req: any, res: any) {
   if (!wt) return res.status(401).json({ error: 'Invalid token' })
   const senderEmail: string = wt.user_email
   const household: string = wt.household_id
+  // The token's household must still be one of the user's (they can leave
+  // households now). One indexed lookup; this is the tenancy boundary here.
+  const householdRoster = await householdMembers(db, household)
+  if (!householdRoster.includes(senderEmail)) return res.status(401).json({ error: 'Invalid token' })
 
   // supabase-js query builders are lazy thenables — `void builder` never issues
   // the request, so this has to be awaited to actually stamp last_used_at.
@@ -573,8 +608,9 @@ export default async function handler(req: any, res: any) {
   // ── petcare ───────────────────────────────────────────────────────────────
   // The Pet Care widget: per-pet daily checklist + interval routines
   // (migration 069). `petcare` returns fresh state; `petcare-done` marks a task
-  // done for the token's user and silent-pushes every OTHER member's device so
-  // their widgets reload (backgroundNotifications.ts → reloadPetCareWidget);
+  // done for the token's user and silent-pushes every device in the household
+  // so widgets reload and the phones re-sync their pet routine reminders
+  // (backgroundNotifications.ts → reloadPetCareWidget + syncPetReminders);
   // `petcare-notify` is the fan-out alone, called by the APP after its own
   // RLS insert. Logic mirrors mobile/src/lib/petCare.ts — keep in sync.
   if (action === 'petcare' || action === 'petcare-done' || action === 'petcare-notify') {
@@ -584,8 +620,10 @@ export default async function handler(req: any, res: any) {
       const { data: tokens } = await db
         .from('expo_push_tokens')
         .select('token')
-        .eq('household_id', household)
-        .neq('user_email', senderEmail)
+        // Every member, the sender's OWN devices too (since migration 098): a
+        // task ticked on the Home-Screen widget must cancel that phone's
+        // reminder, and the sender's other devices (an iPad) need the same.
+        .in('user_email', householdRoster)
       const list = (tokens ?? []).map((t: { token: string }) => t.token)
       for (let i = 0; i < list.length; i += 100) {
         const chunk = list.slice(i, i + 100).map((to: string) => ({
@@ -650,7 +688,8 @@ export default async function handler(req: any, res: any) {
         .select('task_id, done_on, done_by, pet_care_tasks!inner(pet_id, pets!inner(household_id))')
         .eq('pet_care_tasks.pets.household_id', household)
         .gte('done_on', addDays(day, -370)),
-      db.from('allowed_users').select('email, display_name').eq('household_id', household),
+      // By email: a member whose ACTIVE household is another one still counts.
+      db.from('allowed_users').select('email, display_name').in('email', householdRoster),
     ])
     const nameOf = (email: string): string => {
       const m = (memberRows.data ?? []).find((r: { email: string }) => r.email === email)
@@ -743,13 +782,10 @@ export default async function handler(req: any, res: any) {
   // list is left as sent) if the member lookup returns nothing, so a transient
   // DB hiccup can't silently drop a legitimate nudge's recipients.
   if (targetList && targetList.length) {
-    const { data: memberRows } = await db
-      .from('allowed_users')
-      .select('email')
-      .eq('household_id', household)
-    const members = (memberRows ?? []).map((m: any) => m.email as string)
-    if (members.length) targetList = targetList.filter((r) => members.includes(r))
+    if (householdRoster.length) targetList = targetList.filter((r) => householdRoster.includes(r))
   }
+  // People who hear about it: the targets, or everyone but the sender.
+  const pushTo = (targetList ?? householdRoster).filter((e) => e !== senderEmail)
 
   const { data: ping, error: insErr } = await db
     .from('pings')
@@ -780,27 +816,30 @@ export default async function handler(req: any, res: any) {
     .maybeSingle()
   const tel = senderProfile?.phone || null
   const title = `${emoji || '📣'} ${senderName}`
+  const multi = await multiHousehold(db, pushTo)
+  let hhName: string | null = null
+  if (multi.size) {
+    const { data: hh } = await db.from('households').select('name').eq('id', household).maybeSingle()
+    hhName = (hh?.name as string | undefined) || null
+  }
 
   // Web push (best-effort; skipped if VAPID isn't configured).
-  if (vapidPublic && vapidPrivate) {
-    let query = db
+  if (vapidPublic && vapidPrivate && pushTo.length) {
+    const { data: subs } = await db
       .from('push_subscriptions')
-      .select('endpoint, p256dh, auth')
-      .eq('household_id', household)
-      .neq('user_email', senderEmail)
-    if (targetList) query = query.in('user_email', targetList)
-    const { data: subs } = await query
+      .select('endpoint, p256dh, auth, user_email')
+      .in('user_email', pushTo)
     webpush.setVapidDetails('mailto:one.roof.family.organizer@gmail.com', vapidPublic, vapidPrivate)
-    const payload = JSON.stringify({
-      title,
-      body: message,
-      url: '/pings',
-      tag: `ping-${ping.id}`,
-      tel,
-      urgent: highPriority,
-    })
     const stale: string[] = []
     for (const s of subs ?? []) {
+      const payload = JSON.stringify({
+        title: labelled(title, hhName, multi.has(s.user_email)),
+        body: message,
+        url: '/pings',
+        tag: `ping-${ping.id}`,
+        tel,
+        urgent: highPriority,
+      })
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
@@ -814,19 +853,15 @@ export default async function handler(req: any, res: any) {
   }
 
   // Native (Expo) push.
-  let expoQuery = db
-    .from('expo_push_tokens')
-    .select('token')
-    .eq('household_id', household)
-    .neq('user_email', senderEmail)
-  if (targetList) expoQuery = expoQuery.in('user_email', targetList)
-  const { data: expoTokens } = await expoQuery
+  const { data: expoTokens } = pushTo.length
+    ? await db.from('expo_push_tokens').select('token, user_email').in('user_email', pushTo)
+    : { data: [] as { token: string; user_email: string }[] }
   const expoSent = await sendExpoPush(
     (expoTokens ?? []).map((tk: any) => ({
       to: tk.token,
-      title,
+      title: labelled(title, hhName, multi.has(tk.user_email)),
       body: message,
-      data: { url: '/pings', tel },
+      data: { url: '/pings', tel, household },
       sound: 'default' as const,
       ...(highPriority ? { priority: 'high' as const } : {}),
     })),

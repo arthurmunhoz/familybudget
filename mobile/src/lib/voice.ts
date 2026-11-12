@@ -18,6 +18,7 @@ interface SpeechModule {
     lang: string
     interimResults: boolean
     continuous: boolean
+    maxAlternatives?: number
     addsPunctuation?: boolean
     contextualStrings?: string[]
     volumeChangeEventOptions?: { enabled: boolean; intervalMillis?: number }
@@ -111,6 +112,16 @@ function whenActive(maxMs = 2500): Promise<void> {
 }
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
+/** The native recogniser (or null on a build without it) — for Roof's wake
+ *  listener (lib/roofWake), which shares the module with useVoice. */
+export function speechModule() {
+  return speech()
+}
+/** The listen chimes, for the wake listener's "I heard you". */
+export function playChime(which: 'start' | 'stop') {
+  chime(which)
+}
+
 export function voiceSupported(): boolean {
   return speech() !== null
 }
@@ -140,7 +151,35 @@ const LOCALE: Record<string, string> = { en: 'en-US', pt: 'pt-BR', es: 'es-ES' }
 export type VoiceState = 'idle' | 'starting' | 'listening' | 'denied' | 'error'
 
 /** Listen once: `transcript` updates live; `onFinal` gets the last result. */
-export function useVoice(lang: string, onFinal: (text: string) => void, hints: string[] = []) {
+/** Short answers (the quiz): keep listening through silence (`continuous`),
+ *  take each result as-is instead of stitching sentence fragments, and fold
+ *  a word the recogniser repeated ("borboleta borboleta" → "borboleta"). */
+export interface VoiceOptions {
+  short?: boolean
+}
+
+/** "borboleta borboleta" / "Paris. Paris" → "borboleta" / "Paris": the same
+ *  word or phrase said (or reported) twice in a row, once. */
+export function foldRepeats(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  const key = (w: string) => w.toLowerCase().replace(/[.,!?;:]+$/g, '')
+  for (let n = 1; n <= words.length / 2; n++) {
+    if (words.length % n) continue
+    const unit = words.slice(0, n).map(key).join(' ')
+    let same = true
+    for (let i = n; i < words.length; i += n) if (words.slice(i, i + n).map(key).join(' ') !== unit) same = false
+    if (same) return words.slice(0, n).join(' ').replace(/[.,!?;:]+$/g, '')
+  }
+  return text.trim()
+}
+
+export function useVoice(
+  lang: string,
+  onFinal: (text: string, alternatives: string[]) => void,
+  hints: string[] = [],
+  opts: VoiceOptions = {},
+) {
+  const short = !!opts.short
   const hintsRef = useRef(hints)
   useEffect(() => {
     hintsRef.current = hints
@@ -148,6 +187,10 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
   const [state, setState] = useState<VoiceState>('idle')
   const [transcript, setTranscript] = useState('')
   const latest = useRef('')
+  // Every other guess the recogniser offered during this listen (short mode):
+  // an accent turns "two" into "true" as the BEST guess while "two" is still
+  // among the alternatives — the quiz checks them all (owner, 2026-11).
+  const alts = useRef<string[]>([])
   // iOS 18's recogniser RESETS its transcript after a short pause mid-sentence
   // and from then on reports only the new stretch — "what is on… my shopping
   // list" arrived as "my shopping list" (owner, 2026-11). We keep the stretches
@@ -196,14 +239,21 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
         if (!live.current) goLive()
       }),
       m.addListener('result', (e: { results?: { transcript: string }[]; isFinal?: boolean }) => {
-        const text = stitch(segments.current, e.results?.[0]?.transcript ?? '')
+        const raw = e.results?.[0]?.transcript ?? ''
+        const text = short ? foldRepeats(raw) : stitch(segments.current, raw)
+        if (short) {
+          for (const r of e.results ?? []) {
+            const a = foldRepeats(r.transcript ?? '').trim()
+            if (a && !alts.current.includes(a)) alts.current = [...alts.current, a].slice(-12)
+          }
+        }
         latest.current = text
         setTranscript(text)
         if (e.isFinal && text.trim() && listening.current) {
           listening.current = false
           chime('stop')
           setState('idle')
-          finalRef.current(text.trim())
+          finalRef.current(text.trim(), alts.current.filter((a) => a !== text.trim()))
         }
       }),
       m.addListener('error', (e: { error?: string }) => {
@@ -236,7 +286,8 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
         listening.current = false
         if (live.current) chime('stop')
         setState('idle')
-        if (latest.current.trim()) finalRef.current(latest.current.trim())
+        const said = latest.current.trim()
+        if (said) finalRef.current(said, alts.current.filter((a) => a !== said))
       }),
     ]
     return () => {
@@ -247,7 +298,7 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
       listening.current = false
       m.abort()
     }
-  }, [goLive])
+  }, [goLive, short])
 
   const start = useCallback(async () => {
     const m = speech()
@@ -270,6 +321,7 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
       await sleep(350)
     }
     latest.current = ''
+    alts.current = []
     segments.current = { done: '', current: '' }
     setTranscript('')
     listening.current = true
@@ -283,7 +335,11 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
     begin.current = () => m.start({
       lang: LOCALE[lang] ?? 'en-US',
       interimResults: true,
-      continuous: false,
+      // Short answers keep the mic open through a pause to think; the caller
+      // decides when the answer is complete (see the quiz's AnswerPanel).
+      continuous: short,
+      // Several guesses per result (see `alts`); one is plenty otherwise.
+      maxAlternatives: short ? 5 : 1,
       addsPunctuation: true,
       // The household's own words (stores, items, names, pets) — iOS biases
       // recognition toward them; "Publix" or "Thor" stop coming out as
@@ -301,7 +357,7 @@ export function useVoice(lang: string, onFinal: (text: string) => void, hints: s
       },
     })
     begin.current()
-  }, [lang])
+  }, [lang, short])
 
   /** Stop listening; whatever was heard so far is sent. */
   const stop = useCallback(() => {

@@ -10,7 +10,7 @@ import {
   ShieldCheck,
 } from 'lucide-react-native'
 
-import type { DocCategory } from '@/lib/types'
+import type { DocCategory, FamilyDocument } from '@/lib/types'
 
 /** The document categories, in display order, each with an emoji + an outline
  *  icon (used for the per-document type glyph in the list). */
@@ -82,4 +82,26 @@ export function isImageDoc(mime: string | null | undefined, filePath: string): b
   if (mime?.startsWith('image/')) return true
   const ext = (filePath.split('.').pop() ?? '').toLowerCase()
   return ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif'].includes(ext)
+}
+
+// A larger picture of the document for the "one at a time" view (2026-11):
+// `<household>/previews/<uuid>.jpg`, PREVIEW_WIDTH wide — enough to read a
+// page on a phone. Written at upload next to the thumb; older documents have
+// none and fall back (image files to themselves, PDFs to the thumb).
+export const PREVIEW_WIDTH = 1240
+
+export function previewPathFor(filePath: string): string {
+  const [household] = filePath.split('/')
+  const base = (filePath.split('/').pop() ?? '').replace(/\.[^.]+$/, '')
+  return `${household}/previews/${base}.jpg`
+}
+
+/** Best picture we have for a document (see the file header). */
+export function docPicture(doc: FamilyDocument, urls: Record<string, string>): { uri: string; cacheKey: string; sharp: boolean } | null {
+  const preview = previewPathFor(doc.file_path)
+  if (urls[preview]) return { uri: urls[preview], cacheKey: preview, sharp: true }
+  if (isImageDoc(doc.mime_type, doc.file_path) && urls[doc.file_path]) return { uri: urls[doc.file_path], cacheKey: doc.file_path, sharp: true }
+  const thumb = thumbPathFor(doc.file_path)
+  if (urls[thumb]) return { uri: urls[thumb], cacheKey: thumb, sharp: false }
+  return null
 }

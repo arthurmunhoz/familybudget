@@ -180,6 +180,59 @@ function pruneDeadTokens(db: any) {
   }
 }
 
+// ── Several households per person (migration 099) ───────────────────────────
+// Push registrations belong to a PERSON and are stamped with whichever
+// household is ACTIVE, so recipients are resolved by EMAIL through
+// household_members — never by the token's household_id, which would drop
+// everyone currently looking at another of their households. Someone in more
+// than one household sees the household's name on its pushes, and `household`
+// rides in the data so a tap can switch to it. Each helper falls back to the
+// pre-099 shape (allowed_users.household_id) when the table isn't there, so
+// deploying this before the migration changes nothing.
+// (Duplicated in send-digest.ts, widget.ts and ack-ping.ts ON PURPOSE — a file
+// in api/ must import nothing from outside its own folder; see CLAUDE.md.)
+
+/** Emails of a household's members. */
+async function householdMembers(db: any, householdId: string): Promise<string[]> {
+  const { data, error } = await db.from('household_members').select('email').eq('household_id', householdId)
+  if (!error) return (data ?? []).map((r: any) => r.email as string)
+  const { data: legacy } = await db.from('allowed_users').select('email').eq('household_id', householdId)
+  return (legacy ?? []).map((r: any) => r.email as string)
+}
+
+/** Is `email` a member of `householdId`? */
+async function isMember(db: any, email: string, householdId: string): Promise<boolean> {
+  const { data, error } = await db
+    .from('household_members')
+    .select('email')
+    .eq('household_id', householdId)
+    .eq('email', email)
+    .maybeSingle()
+  if (!error) return !!data
+  const { data: legacy } = await db.from('allowed_users').select('household_id').eq('email', email).maybeSingle()
+  return legacy?.household_id === householdId
+}
+
+/** Of `emails`, the ones who belong to more than one household. */
+async function multiHousehold(db: any, emails: string[]): Promise<Set<string>> {
+  if (!emails.length) return new Set()
+  const { data, error } = await db.from('household_members').select('email').in('email', emails)
+  if (error) return new Set()
+  const count = new Map<string, number>()
+  for (const r of data ?? []) count.set(r.email, (count.get(r.email) ?? 0) + 1)
+  return new Set([...count].filter(([, n]) => n > 1).map(([e]) => e))
+}
+
+async function householdName(db: any, householdId: string): Promise<string | null> {
+  const { data } = await db.from('households').select('name').eq('id', householdId).maybeSingle()
+  return (data?.name as string | undefined) || null
+}
+
+/** "👋 Ana" → "👋 Ana · Souza" for someone who is in several households. */
+function labelled(title: string, name: string | null, multi: boolean): string {
+  return multi && name ? `${title} · ${name}` : title
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -230,6 +283,146 @@ export default async function handler(req: any, res: any) {
 
   const db = createClient(url, serviceKey, { auth: { persistSession: false } })
 
+  // ── Game invite: "Arthur opened a Hangman room" (migration 091). The room row
+  //    is inserted by game_create(); its AFTER INSERT trigger asks for this.
+  //    Goes to every OTHER member of the household who hasn't switched game
+  //    notifications off (user_settings.notify_games), in each one's language.
+  if ((req.body?.action ?? '') === 'game-invite') {
+    const sessionId = req.body?.game_session_id
+    if (!sessionId) return res.status(400).json({ error: 'Missing game_session_id' })
+    const { data: room } = await db
+      .from('game_sessions')
+      .select('id, household_id, host_email, game, mode, status, state, pushed_at')
+      .eq('id', sessionId)
+      .single()
+    if (!room) return res.status(404).json({ error: 'Room not found' })
+    if (!internal && room.host_email !== callerEmail) return res.status(403).json({ error: 'Forbidden' })
+    // A live room is announced while it's still a lobby; a SENT hangman (mode
+    // 'async', migration 092) goes straight into play and is announced then.
+    const announceable = room.mode === 'async' ? room.status === 'playing' : room.status === 'lobby'
+    if (room.pushed_at || !announceable) return res.status(200).json({ ok: true, skipped: 'already_pushed' })
+    const { data: roomClaimed } = await db
+      .from('game_sessions')
+      .update({ pushed_at: new Date().toISOString() })
+      .eq('id', room.id)
+      .is('pushed_at', null)
+      .select('id')
+      .maybeSingle()
+    if (!roomClaimed) return res.status(200).json({ ok: true, skipped: 'already_pushed' })
+
+    // Members by membership (migration 099): someone looking at another of
+    // their households still hears about this one.
+    const memberEmails = await householdMembers(db, room.household_id)
+    const { data: members } = await db.from('allowed_users').select('email, display_name').in('email', memberEmails)
+    // Live room: everyone else. Sent hangman: only the person it was sent to.
+    const others = memberEmails
+      .filter((e: string) => e !== room.host_email)
+      .filter((e: string) => room.mode !== 'async' || e === (room.state as any)?.guesser)
+    if (!others.length) return res.status(200).json({ ok: true, skipped: true })
+    const { data: prefs } = await db.from('user_settings').select('email, notify_games, language').in('email', others)
+    const pref = new Map((prefs ?? []).map((p: any) => [p.email as string, p]))
+    const recipients = others.filter((e: string) => pref.get(e)?.notify_games !== false)
+    if (!recipients.length) return res.status(200).json({ ok: true, skipped: true })
+
+    const host = (members ?? []).find((m: any) => m.email === room.host_email)
+    const hostName = (host?.display_name || room.host_email.split('@')[0]).split(' ')[0]
+    const GAME: Record<string, Record<string, string>> = {
+      pt: { hangman: 'Forca', battleship: 'Batalha naval', quiz: 'Quiz com campainha' },
+      en: { hangman: 'Hangman', battleship: 'Battleship', quiz: 'Buzzer quiz' },
+      es: { hangman: 'Ahorcado', battleship: 'Batalla naval', quiz: 'Quiz con timbre' },
+    }
+    const copy = (lang: string) => {
+      const l = lang === 'pt' || lang === 'es' ? lang : 'en'
+      const game = GAME[l][room.game] ?? room.game
+      if (room.mode === 'async') {
+        if (l === 'pt') return { title: `🎮 ${game}`, body: `${hostName} te mandou uma forca! Consegue adivinhar?` }
+        if (l === 'es') return { title: `🎮 ${game}`, body: `¡${hostName} te mandó un ahorcado! ¿Lo adivinas?` }
+        return { title: `🎮 ${game}`, body: `${hostName} sent you a hangman! Can you guess it?` }
+      }
+      if (l === 'pt') return { title: `🎮 ${game}`, body: `${hostName} abriu uma sala. Bora jogar?` }
+      if (l === 'es') return { title: `🎮 ${game}`, body: `${hostName} abrió una sala. ¿Jugamos?` }
+      return { title: `🎮 ${game}`, body: `${hostName} opened a room. Want to play?` }
+    }
+
+    const { data: gameTokens } = await db
+      .from('expo_push_tokens')
+      .select('token, user_email')
+      .in('user_email', recipients)
+    const gameExpo = await sendExpoPush(
+      (gameTokens ?? []).map((t: any) => {
+        const { title, body } = copy(pref.get(t.user_email)?.language ?? 'en')
+        return {
+          to: t.token,
+          title,
+          body,
+          data: { url: `/games/${room.id}` },
+          sound: 'default' as const,
+          priority: 'high' as const,
+          channelId: 'household' as const,
+        }
+      }),
+      pruneDeadTokens(db),
+    )
+    return res.status(200).json({ ok: true, expoSent: gameExpo.sent, expoFailed: gameExpo.failed })
+  }
+
+  // ── Game result: a SENT hangman was played (migration 092). Tells the sender
+  //    how it went. Asked for by hangman_finish_round; one-shot on
+  //    result_pushed_at. Sent regardless of notify_games: it answers something
+  //    the sender did themselves, like a nudge's "seen by".
+  if ((req.body?.action ?? '') === 'game-result') {
+    const sessionId = req.body?.game_session_id
+    if (!sessionId) return res.status(400).json({ error: 'Missing game_session_id' })
+    if (!internal) return res.status(403).json({ error: 'Forbidden' })
+    const { data: g } = await db
+      .from('game_sessions')
+      .select('id, household_id, host_email, mode, status, state, result_pushed_at')
+      .eq('id', sessionId)
+      .single()
+    if (!g) return res.status(404).json({ error: 'Game not found' })
+    if (g.mode !== 'async' || g.status !== 'done' || g.result_pushed_at) {
+      return res.status(200).json({ ok: true, skipped: true })
+    }
+    const { data: resClaimed } = await db
+      .from('game_sessions')
+      .update({ result_pushed_at: new Date().toISOString() })
+      .eq('id', g.id)
+      .is('result_pushed_at', null)
+      .select('id')
+      .maybeSingle()
+    if (!resClaimed) return res.status(200).json({ ok: true, skipped: 'already_pushed' })
+    const st = (g.state ?? {}) as { guesser?: string; solved?: boolean; word?: string }
+    const { data: who } = await db.from('allowed_users').select('display_name').eq('email', st.guesser ?? '').maybeSingle()
+    const guesserName = (who?.display_name || (st.guesser ?? '').split('@')[0]).split(' ')[0]
+    const { data: hostPref } = await db.from('user_settings').select('language').eq('email', g.host_email).maybeSingle()
+    const l = hostPref?.language === 'pt' || hostPref?.language === 'es' ? hostPref.language : 'en'
+    const word = (st.word ?? '').toUpperCase()
+    const body =
+      l === 'pt'
+        ? st.solved ? `${guesserName} acertou sua forca: ${word} 🎉` : `${guesserName} não acertou ${word}. A casa ficou pronta! 🏠`
+        : l === 'es'
+          ? st.solved ? `${guesserName} adivinó tu ahorcado: ${word} 🎉` : `${guesserName} no adivinó ${word}. ¡La casa quedó terminada! 🏠`
+          : st.solved ? `${guesserName} guessed your hangman: ${word} 🎉` : `${guesserName} missed ${word}. The house got finished! 🏠`
+    const title = l === 'pt' ? '🎮 Forca' : l === 'es' ? '🎮 Ahorcado' : '🎮 Hangman'
+    const { data: hostTokens } = await db
+      .from('expo_push_tokens')
+      .select('token')
+      .eq('user_email', g.host_email)
+    const resultExpo = await sendExpoPush(
+      (hostTokens ?? []).map((t: any) => ({
+        to: t.token,
+        title,
+        body,
+        data: { url: `/games/${g.id}` },
+        sound: 'default' as const,
+        priority: 'high' as const,
+        channelId: 'household' as const,
+      })),
+      pruneDeadTokens(db),
+    )
+    return res.status(200).json({ ok: true, expoSent: resultExpo.sent })
+  }
+
   // ── Place event: "Emma arrived at School". The event row is already inserted
   //    by the crossing member's own device (RLS); this fans the push out to the
   //    rest of the household.
@@ -279,8 +472,10 @@ export default async function handler(req: any, res: any) {
       .from('place_watchers')
       .select('user_email, watched, notify_arrivals, notify_departures')
       .eq('place_id', ev.place_id)
+    const placeMembers = new Set(await householdMembers(db, ev.household_id))
     const recipients = (watchers ?? [])
       .filter((w: any) => w.user_email !== ev.user_email)
+      .filter((w: any) => placeMembers.has(w.user_email))
       .filter((w: any) => (ev.type === 'arrive' ? w.notify_arrivals : w.notify_departures))
       .filter(
         (w: any) =>
@@ -298,17 +493,24 @@ export default async function handler(req: any, res: any) {
     const title = `${place.icon || '📍'} ${place.name}`
     const body = ev.type === 'arrive' ? `${moverName} arrived` : `${moverName} left`
 
+    // By person, not by the registration's household (see householdMembers).
+    const placeMulti = await multiHousehold(db, recipients)
+    const placeHhName = placeMulti.size ? await householdName(db, ev.household_id) : null
     const { data: subs } = await db
       .from('push_subscriptions')
-      .select('endpoint, p256dh, auth')
-      .eq('household_id', ev.household_id)
+      .select('endpoint, p256dh, auth, user_email')
       .in('user_email', recipients)
 
     webpush.setVapidDetails('mailto:one.roof.family.organizer@gmail.com', vapidPublic, vapidPrivate)
-    const placePayload = JSON.stringify({ title, body, url: '/location', tag: `place-${ev.id}` })
     let placeSent = 0
     const placeStale: string[] = []
     for (const s of subs ?? []) {
+      const placePayload = JSON.stringify({
+        title: labelled(title, placeHhName, placeMulti.has(s.user_email)),
+        body,
+        url: '/location',
+        tag: `place-${ev.id}`,
+      })
       try {
         await webpush.sendNotification(
           { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
@@ -323,15 +525,14 @@ export default async function handler(req: any, res: any) {
 
     const { data: placeTokens } = await db
       .from('expo_push_tokens')
-      .select('token')
-      .eq('household_id', ev.household_id)
+      .select('token, user_email')
       .in('user_email', recipients)
     const placeExpoSent = await sendExpoPush(
       (placeTokens ?? []).map((t: any) => ({
         to: t.token,
-        title,
+        title: labelled(title, placeHhName, placeMulti.has(t.user_email)),
         body,
-        data: { url: '/location' },
+        data: { url: '/location', household: ev.household_id },
         sound: 'default' as const,
         // FCM transport priority, NOT the channel's importance. Without it the
         // message is normal-priority, and Android parks normal-priority FCM in
@@ -375,15 +576,10 @@ export default async function handler(req: any, res: any) {
   }
 
   // The caller must be a member of the ping's household.
-  if (!internal) {
-    const { data: caller } = await db
-      .from('allowed_users')
-      .select('household_id')
-      .eq('email', callerEmail)
-      .single()
-    if (!caller || caller.household_id !== ping.household_id) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
+  // (A membership, not the caller's ACTIVE household — they may have switched
+  // since sending.)
+  if (!internal && !(await isMember(db, callerEmail, ping.household_id))) {
+    return res.status(403).json({ error: 'Forbidden' })
   }
 
   // An expired nudge is already gone from every banner — never push it.
@@ -421,32 +617,39 @@ export default async function handler(req: any, res: any) {
   const tel = senderProfile?.phone || null
 
   // Recipients: targeted list if set, otherwise the whole household — always
-  // excluding the sender's own devices.
-  let query = db
+  // excluding the sender's own devices. Resolved as PEOPLE (members of the
+  // ping's household), so a member currently looking at another of their
+  // households still gets it.
+  const members = (await householdMembers(db, ping.household_id)).filter((e) => e !== ping.sender_email)
+  const targets =
+    Array.isArray(ping.recipients) && ping.recipients.length > 0
+      ? members.filter((e) => (ping.recipients as string[]).includes(e))
+      : members
+  if (!targets.length) return res.status(200).json({ ok: true, sent: 0, expoSent: 0, expoFailed: 0 })
+  const multi = await multiHousehold(db, targets)
+  const hhName = multi.size ? await householdName(db, ping.household_id) : null
+  const pingTitle = `${ping.emoji} ${senderName}`
+
+  const { data: subs } = await db
     .from('push_subscriptions')
-    .select('endpoint, p256dh, auth')
-    .eq('household_id', ping.household_id)
-    .neq('user_email', ping.sender_email)
-  if (Array.isArray(ping.recipients) && ping.recipients.length > 0) {
-    query = query.in('user_email', ping.recipients)
-  }
-  const { data: subs } = await query
+    .select('endpoint, p256dh, auth, user_email')
+    .in('user_email', targets)
 
   webpush.setVapidDetails('mailto:one.roof.family.organizer@gmail.com', vapidPublic, vapidPrivate)
-  const payload = JSON.stringify({
-    title: `${ping.emoji} ${senderName}`,
-    body: ping.message,
-    url: '/pings',
-    tag: `ping-${ping.id}`,
-    tel,
-    // High-priority nudges are urgent: sound + persistent + vibrate (where
-    // supported). Generalizes the old "Need help"-only behavior.
-    urgent: ping.high_priority === true,
-  })
 
   let sent = 0
   const stale: string[] = []
   for (const s of subs ?? []) {
+    const payload = JSON.stringify({
+      title: labelled(pingTitle, hhName, multi.has(s.user_email)),
+      body: ping.message,
+      url: '/pings',
+      tag: `ping-${ping.id}`,
+      tel,
+      // High-priority nudges are urgent: sound + persistent + vibrate (where
+      // supported). Generalizes the old "Need help"-only behavior.
+      urgent: ping.high_priority === true,
+    })
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
@@ -460,21 +663,16 @@ export default async function handler(req: any, res: any) {
   if (stale.length) await db.from('push_subscriptions').delete().in('endpoint', stale)
 
   // Native (Expo) devices for the same recipients — best-effort, alongside web push.
-  let expoQuery = db
+  const { data: expoTokens } = await db
     .from('expo_push_tokens')
-    .select('token')
-    .eq('household_id', ping.household_id)
-    .neq('user_email', ping.sender_email)
-  if (Array.isArray(ping.recipients) && ping.recipients.length > 0) {
-    expoQuery = expoQuery.in('user_email', ping.recipients)
-  }
-  const { data: expoTokens } = await expoQuery
+    .select('token, user_email')
+    .in('user_email', targets)
   const expoSent = await sendExpoPush(
     (expoTokens ?? []).map((t: any) => ({
       to: t.token,
-      title: `${ping.emoji} ${senderName}`,
+      title: labelled(pingTitle, hhName, multi.has(t.user_email)),
       body: ping.message,
-      data: { url: '/pings', tel },
+      data: { url: '/pings', tel, household: ping.household_id },
       sound: 'default' as const,
       // priority is the FCM transport (beats Doze); channelId is how Android
       // presents it. Both nudges are high-priority to SEND — a nudge nobody

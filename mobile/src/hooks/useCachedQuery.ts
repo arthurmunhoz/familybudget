@@ -84,6 +84,14 @@ export function writeCache<T>(key: string, value: T): void {
 export function clearCache(): void {
   cache.clear()
 }
+/** Refetch EVERYTHING that is mounted: every `useCachedQuery` and every
+ *  `useRevalidateOnForeground` screen (they share the foreground set). Used when
+ *  the active household changes (migration 099) — RLS now answers for another
+ *  household, so every screen in the stack, not just the visible one, must
+ *  reload. Pair it with `clearCache()` so a remount can't show the old one. */
+export function revalidateAll(): void {
+  for (const fn of [...foregroundSubs]) fn()
+}
 /** Drop every cached key starting with `prefix`. For a mutation on one screen
  *  that invalidates another's data (deleting a household from its detail screen
  *  invalidates the admin list). The other screen still refetches on focus — this

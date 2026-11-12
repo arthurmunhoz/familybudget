@@ -155,6 +155,11 @@ export interface PetCareTask {
   interval_days: number | null
   sort_order: number
   created_at: string
+  /** Approximate time of day ("08:00:00" from Postgres `time`), migration 098.
+   *  NULL = no reminder; absent on a database without that migration. Each
+   *  phone reminds remind_at + PET_REMINDER_GRACE_MIN later if nobody has
+   *  marked it (lib/petReminders.ts). */
+  remind_at?: string | null
 }
 
 /** A completion of a task on a day; unique per (task, day). */

@@ -21,7 +21,7 @@ import { supabase } from '@/lib/supabase'
 import type { DocCategory, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, sp, useTheme } from '@/theme/theme'
-import { CATEGORIES, formatBytes, randomUUID, thumbPathFor } from './docUtils'
+import { CATEGORIES, formatBytes, previewPathFor, randomUUID, thumbPathFor } from './docUtils'
 import { uploadThumb } from './docPicker'
 
 export interface PickedFile {
@@ -97,7 +97,7 @@ export default function UploadSheet({
     setUploading(false)
     if (dbError) {
       // Roll back the orphaned object if the row couldn't be written.
-      await supabase.storage.from('documents').remove([path, thumbPathFor(path)])
+      await supabase.storage.from('documents').remove([path, thumbPathFor(path), previewPathFor(path)])
       Alert.alert(t('docs.saveFailed'))
       return
     }

@@ -221,10 +221,37 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   up only for the people/households on screen. All from migration 087; the
   Overview says "apply 087" if it's missing.
 - **Calendar (2026-11):** round back + Google/Apple round buttons, big
-  title with "n things this week" faded, Month/Upcoming segmented, the month
-  grid in one card (selected day = Calendar-red gradient circle, today a soft
-  red), the day's events as rows of ONE card with a time tile in the owner's
-  colour; Upcoming rows carry a month/day "tear-off" tile + countdown pill.
+  title with "n things this week" faded, then a **Day · Week · Month**
+  segmented (the old "Upcoming" list is GONE — owner's call, 2026-11-11).
+  One anchor date (`selected`) drives all three; swiping sideways
+  (`SwipePager`: follows the finger damped, slides out/in with timing curves,
+  no springs; Reduce Motion = fade) or the chevrons move one day/week/month.
+  - **Month**: the grid in one card (selected = Calendar-red gradient circle,
+    today soft red) + the selected day's events in detail (time range or
+    multi-day span, "turns N", who with their colour dot, place, first line of
+    notes). Paging months lands on today if it's in that month, else the 1st.
+  - **Week / Day** share `TimeGrid`: hour gutter, all-day bars on top
+    (`allDayRows`, multi-day bars span columns, max 3 rows then "+n"), timed
+    blocks at their times in the OWNER's colour (opaque `c.sheet` under a
+    tint — the grid is on a translucent card), a Calendar-red "now" line +
+    time pill on today (refreshed every 30 s). Overlaps sit side by side:
+    `calendarLayout.ts` `layoutColumns` (clusters → first free column → stretch
+    right over free columns; tested in `__tests__/calendarLayout.test.ts`).
+    Recurrence comes from `occurrencesByDay` as everywhere. Tap a block → the
+    editor (read-only Google/Apple rows don't open); tap an empty slot → New
+    event at that half hour (1 h long); tap the all-day strip → an all-day
+    event. Week: a day header opens that Day. Day: a week strip above.
+  - **Phone week = 7 narrow columns** (titles only, 10 pt, no times), not
+    horizontal scroll or a 3-day window: the whole week stays at a glance,
+    horizontal scrolling would fight the swipe-to-change-week gesture, and a
+    tap on the day header zooms into Day for detail. Columns go "compact"
+    only when narrower than 84 pt, so iPad portrait already gets full blocks.
+  - **Wide (≥ 760 pt — iPad either way, the iPad app on a Mac):** title and
+    segmented share a row, Month puts the day list BESIDE the grid (its own
+    scroller), hour rows are 60 pt. Sizes come from `useWindowDimensions`, so
+    split view / Stage Manager resizes re-layout live.
+  - The pan only activates on a clearly horizontal drag and fails on vertical
+    movement, so the hour grid's vertical ScrollView inside still scrolls.
   `EventForm`: the title typed large in the header, kind as emoji chips,
   When grouped, Who as round colour chips (`WhoPicker`), Save docked in the
   Calendar red. Google / Apple sync screens share `apps/calendar/SyncScreen`.
@@ -238,6 +265,38 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   shared FormSheet): the name typed in place beside a Money-green tile, the
   grouping as three equal tiles (month / week / day), the Plus-only private
   switch as one row, and "Create budget" docked in the Money gradient.
+- **A new Money entry "shrinks and lands" (2026-11, `components/LandingGhost`).**
+  On saving a NEW entry, `EntryForm` inserts with `.select('*').single()`,
+  measures its sheet (`FormSheet sheetRef`, window coords) and re-renders the
+  Modal with `animationType` 'none' ('fade' under Reduce Motion) BEFORE handing
+  off (`onSaved(landing)` from an effect), so the sheet vanishes without its
+  slide-out. `MonthDetail` puts a ghost card at the sheet's exact rect on a
+  full-screen `pointerEvents="none"` stage, shows the returned row at once
+  (`pending`, dropped as soon as the refetch replaces `entries` — an identity
+  check, no effect), keeps that row at opacity 0, measures it, scrolls it into
+  view INSTANTLY if it's off screen (the ghost still covers the page) and
+  COMPUTES the landing spot from the clamped scroll delta — re-measuring right
+  after `scrollTo` can read the pre-scroll position — and the ghost flies
+  there (520 ms, `Easing.bezier(0.2,0,0,1)`, no spring):
+  the amount fades out early, the row's own content (`EntryRowBody`, shared
+  with the real row) fades in late, then a glow in `budgetLook` + fade reveals
+  the real row. Reduce Motion (`useReducedMotion`): no flight, just the glow on
+  the row and a fade. A row the list doesn't show (person filter, future
+  hidden) or a measure that never answers (1.2 s) → the ghost just fades.
+  Saving itself is never delayed — the ghost starts after the insert, like the
+  old close. Edits, deletes, the receipt scan (it only prefills the form) and
+  the assistant's `add_money` (never opens the form) keep the plain path.
+  **Reanimated skips animations under Reduce Motion by default**
+  (`ReduceMotion.System`: a `withTiming` jumps to its end value), so the glow
+  and fade pass `reduceMotion: ReduceMotion.Never` — without it the reduced
+  path showed nothing at all. Any animation that IS the reduced-motion
+  fallback needs the same. Shared values are written with `.set()` (compiler
+  lint). Simulator-verified 2026-11-11 (iPhone 17 Pro, both paths); Android
+  not checked (a Modal there is its own window — the start rect may sit a
+  status bar off). Shopping was NOT
+  given this: its add capsule stays open, adds can be several items at once,
+  rows swap a `tmp-` id for the server's (remount mid-flight) and the
+  SectionList virtualises — it keeps its scroll-to + pulse confirmation.
 - **Nudge banners on the Hub (`apps/pings/NudgesBanner`, 2026-11):** a
   RECEIVED nudge is a gradient card in the Nudges colour (red when urgent),
   "From Sam · 4m ago", the message large, Got it / Call as pills inside. A
@@ -255,6 +314,44 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   a 4 s failsafe hide. Changing the splash image/colour needs a prebuild.
   App icon = the "glass" house (assets/images/icon.png + the three Android
   adaptive layers + splash-icon.png, rendered from one SVG).
+- **Several families per account (migration 099, 2026-11)** — model in the
+  root `CLAUDE.md` (multi-tenancy rules). App side:
+  - `lib/households.ts`: `fetchMyHouseholds` (`my_households`, [] on a server
+    without 099), `setActiveHousehold`, `joinHousehold`, `leaveHousehold`,
+    `householdError`, `switchForNotification`. Every change notifies
+    `onHouseholdChange` listeners; `AuthProvider` re-reads profile + members,
+    and when `profile.household_id` MOVES it calls `clearCache()` +
+    `revalidateAll()` (useCachedQuery: runs every mounted query and every
+    `useRevalidateOnForeground` screen) — the Hub stays mounted under Settings,
+    so refreshing only the visible screen is not enough. Anything that holds
+    household data outside those two mechanisms must key on
+    `profile.household_id` (Plus, the Hub's household name and Settings'
+    invite code do). `AuthProvider` also re-checks the active household on
+    every foreground (it's per ACCOUNT; another device may have switched).
+  - `profiles` comes from `household_members` (falls back to allowed_users):
+    a member whose active household is another one would vanish from an
+    `allowed_users.eq('household_id')` query. Do the same in any new members
+    list (Settings' `HouseholdSection` and Admin › household already do).
+  - Settings › Family is ONE card (`components/FamilySection.tsx`, 2026-11 —
+    the old "My families" card + Household section repeated each other): the
+    active family (tile, name, "n of max members · Owner"), its members (owner
+    removes), the invite code (owner shares / resets; members see who to ask),
+    then `FamilySwitcher` from `MyHouseholds.tsx` inside the same card: your
+    OTHER families (tap to switch) and Join / Leave. The rows and sheets below
+    still live in `MyHouseholds.tsx`:
+    each family as a row with its own gradient tile (`budgetLook(id)`)
+    + initial, members · Owner, and a Family-purple check that springs in on
+    the active one; tap another to switch. "Join another family" opens a sheet
+    (invite-code capsule that shakes on a bad code, `TintButton` in the Family
+    gradient); "Leave this family" (only with 2+ families) leaves the ACTIVE
+    one: a confirm, or — for the only owner of a family with members — the
+    hand-over sheet to pick the new owner; alone in it, a destructive confirm
+    (the family is deleted). Hidden entirely when `my_households` is missing.
+  - Pushes from the api carry `data.household`; `routeFromNotification` switches
+    to it (`switchForNotification`) before routing, so a tap opens the right
+    family's screen. Titles carry the family name for people in several.
+  - Widgets follow the active household: the widget token is re-stamped on
+    switch, and `useSyncNudgeWidget` resyncs from the new `profiles`.
 - **Settings (2026-11):** round back + big title + your name faded; Plus as
   a purple gradient card (features, one action inside); apps listed with
   their Home gradient tiles; tinted gradient icon tiles on every card;
@@ -265,6 +362,24 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   clears any choice an older build saved. Pickers opened from an app take
   that app's colour (`PickerSheet tint`, via `DateTimeRow` / `DayRow`). Note the apps list
   is a DraggableList: a scroll gesture that STARTS on a row can pick it up.
+- **Roof — the assistant's voice (2026-11, Plus).** Two per-device prefs in
+  `lib/roof.ts` (`wake` off by default, `speak` on), set in Settings ›
+  Assistente Roof (`components/RoofSettings`). With both off the assistant
+  works only from the mic button and answers on screen — keep that path.
+  - **Wake word** (`lib/roofWake.ts`): no engine — the phone's own recogniser
+    runs continuously ON-DEVICE (`requiresOnDeviceRecognition`; no on-device
+    model = "unsupported", never a server fallback) while the app is open on
+    the Home, and `afterWake()` matches "ei/hey/oye roof" spellings (tested in
+    `__tests__/roofWake.test.ts`). Words after the call are sent at once
+    (`AskSheet autoSend`); a bare call opens the sheet listening. Restarts
+    every 60 s, backs off on errors, stops off-Home and in background.
+    `RoofPill` on the Home shows it and pauses it.
+  - **Spoken reply** (`roofSay`): only for a SPOKEN request, Plus, `speak` on.
+    Azure TTS (`pt-BR-ThalitaMultilingualNeural`; en Ava, es Dalia) via
+    `/api/suggest-ping?action=speak` (Vercel env `AZURE_SPEECH_KEY` +
+    `AZURE_SPEECH_REGION`), Plus-gated and metered with `ai_light_*` kind
+    `voice`. MP3s cached by text hash in `Paths.cache/roof-voice/`.
+    Not device-verified yet (2026-11-12).
 - **The ask bar (`components/home/AskSheet` + `lib/assistant`).** The server
   only UNDERSTANDS (`/api/suggest-ping?action=assistant` → `{intent, items,
   store, scope, person, date, reply}`, Claude Haiku, structured output); the
@@ -481,8 +596,9 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   banner. `shouldShowAlert` is DEPRECATED in expo-notifications 56; use
   `shouldShowBanner` (heads-up) + `shouldShowList` (Notification Centre).
 - **Auth** `@/lib/auth`: `useAuth()` → `{ session, profile, profiles, loading,
-  signInWithApple, signInWithGoogle, devSignIn, signOut }`. `profiles` = household
-  members.
+  signInWithApple, signInWithGoogle, devSignIn, signOut }`. `profiles` = members
+  of the ACTIVE household (from `household_members`, migration 099);
+  `profile.household_id` = the active household.
   - **`oneroof://auth-callback` must stay a real route** (`app/auth-callback.tsx`).
     Google sign-in and the Google Calendar connect both redirect there, and the
     platforms deliver that redirect DIFFERENTLY: iOS's
@@ -685,6 +801,49 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   series and left the first reminder overdue forever). The digest must fetch
   ALL events, not just those with a `next_due` — a final dose logged with no
   next date is what ends a series. `__tests__/petCare.test.ts` pins this.
+- **Pet routine reminders are LOCAL notifications** (migration 098, 2026-11;
+  `lib/petReminders.ts` + the pure `lib/petReminderPlan.ts`, pinned by
+  `__tests__/petReminders.test.ts`). A routine (`pet_care_tasks`, either kind)
+  can carry `remind_at time` ("Morning food ~8:00", set in RoutineSheet's task
+  editor via `ReminderCard` → `PickerSheet`). Each phone schedules DATE
+  triggers at day + remind_at + `PET_REMINDER_GRACE_MIN` (45) in ITS OWN local
+  time, for today + 2 days (`PET_REMINDER_DAYS`), max 40 (iOS drops anything
+  past 64 pending), id `petrem:<task>:<day>`; interval routines only on due
+  days. Skipped when a `pet_task_done` row exists for (task, day) or the time
+  has passed — never fires late. No server cron: Vercel Hobby is daily-only.
+  - `syncPetReminders()` recomputes everything and is the ONLY scheduler. It
+    runs on login/foreground (`usePetReminders` in `_layout`), from
+    `notifyPetCareChange()` (every mark/edit on this phone), on the silent
+    `petcare` push (background task awaits it; foreground listener too), after
+    the Settings toggle and after a Done. It also DISMISSES reminders already
+    on screen whose task got marked — that's how the notification leaves the
+    other phones. `api/widget.ts`'s petcare fan-out therefore now includes the
+    SENDER's own devices (a tick on the iOS widget must cancel that phone's
+    reminder). Silent pushes are best-effort on iOS (throttled, none after a
+    force-quit): the next foreground is the backstop. Offline, or on a DB
+    without 098, a sync leaves the schedule alone; signed out / toggle off /
+    no permission clears it.
+  - **Done button** = category `pet-reminder`, action `pet-done`,
+    `opensAppToForeground: false`. It writes `pet_task_done` (upsert, ignore
+    duplicates) with the member's own session — the Keychain session is
+    AFTER_FIRST_UNLOCK, so it works from the lock screen. iOS delivers the tap
+    as a response to a background-launched JS context, so the listener sits at
+    MODULE scope in `backgroundNotifications.ts` (+ a "last response" check);
+    Android hands it to the background notification task as a
+    `NotificationResponse` (`'actionIdentifier' in data`). The tap is queued in
+    AsyncStorage BEFORE the request and flushed by the next sync, in case the
+    OS suspends the app mid-write. `routeFromNotification` ignores any
+    non-default action so Done never navigates; a plain tap opens `/pets`.
+  - Opt-in per member: `user_settings.notify_pets` (default true), Settings →
+    Notifications → `PetRemindersToggle`. Permission is asked only from a
+    gesture (`ensureReminderPermission`: a time saved, the toggle turned on),
+    channels first; Android local notifications go to `ANDROID_CHANNEL.DEFAULT`.
+  - Text is built at schedule time in the phone's saved language
+    (`oneroof-lang`), so a language change shows on the next sync. Members in
+    different time zones each get it at THEIR local ~8:45 — `remind_at` is a
+    zone-less wall-clock time on purpose. The Done category is a runtime API
+    (no new native module / config), but the response handling is only
+    exercised on a real build — not verified on a device yet.
 - **Pure logic copied from the PWA** lives in `@/lib/` (types, format, calendar,
   categories, petCare, stores, signedUrls, pings) — keep them in sync with the PWA
   or, post-cutover, treat these as the source of truth.
@@ -762,6 +921,104 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   flip mounts a fresh native view; `Btn` already uses it.
   `__tests__/pressable.test.tsx` fails if a file with a disabled Pressable
   imports react-native's.
+- **Games (`/games`, hub app, migration 090, 2026-11).** Live family games,
+  each player on their own phone. **The server runs the game**: clients only
+  READ `game_sessions` (public state JSON) + `game_players` over Realtime, and
+  every move is a security-definer RPC (`lib/games.ts` wraps them) that checks
+  household, player and whose turn it is. Anything the other team must not see
+  (the hangman word; later the battleship fleets and quiz answers) lives in
+  `game_secrets`, which no client role can read — never put a secret in
+  `state`. Shapes are documented at the top of the migration and in
+  `lib/games.ts`. Shared live base: a room (`game_create` → host on team A,
+  `game_join` balances teams), teams A/B ("Coral"/"Indigo", `apps/games/look`),
+  "I'm ready", host starts when everyone else is ready and both teams have a
+  player; turns rotate inside each team (`order`/`idx` in state); the host can
+  skip someone away from the phone; leaving mid-game reseats the turn, an
+  empty team ends the game. Rooms older than 3 h drop off the list.
+  - **Hangman** (`apps/games/hangman/`): the setter picks a category (the hint)
+    and a word — tapped suggestion, random, or typed (`words.ts`, pt/en/es;
+    `validWord` mirrors the server rule). Accents fold on the server
+    (`game_norm`). The drawing is the One Roof house going up, one piece per
+    wrong guess (`art/HouseBuild`, 7 pieces = `HOUSE_PIECES` = server
+    `max_wrong`). Solved → point to the guessers; house finished → point to the
+    setters. Teams swap every round; rounds are even.
+  - **Polish is part of the feature** (owner, 2026-11): original SVG art +
+    Reanimated motion (`art/`), synthesised sounds (`scripts/make-game-sounds.py`
+    → `assets/sounds/games/`), haptics via expo-haptics. `feedback.ts` loads
+    expo-audio/expo-haptics lazily (guarded) and keeps a per-device mute.
+    Feedback is driven by what CHANGED in shared state, so every phone reacts
+    to every move. Layout adapts at ≥760 pt (board left, controls right) for
+    iPad/Mac. Battleship and the buzzer quiz show as "coming soon" cards.
+  - **Finding a room** (migration 091): an open room shows on the Home right
+    under the ask bar (`apps/games/GamesBanner`, live via `useOpenGames`) for
+    everyone, and creating one pushes "X opened a room" (DB trigger →
+    `api/send-ping` action `game-invite`, one-shot on `game_sessions.pushed_at`,
+    copy in the recipient's `user_settings.language`) to members whose
+    `user_settings.notify_games` is on — the opt-out lives in Settings →
+    Notifications (`GameInvitesToggle`). Turning it off never hides the Home card.
+  - **Send a hangman** (migration 092, `hangman/SendHangman`, route
+    `/games/send?to=`): pick people + word → one ONE-ROUND async session per
+    recipient (mode 'async'), recipient notified (same insert trigger), sender
+    told the result (`game-result`, sent even with notify_games off — it answers
+    the sender's own action). The Hangman screen renders async sessions without
+    teams/scores (sender ↔ guesser header) and its result offers "send one
+    back". Listed in the Games hub ("Sent hangmans") and, when waiting for you,
+    on the Home (`GamesBanner`). `useChallenges` loads the last 7 days.
+  - **Battleship** (`apps/games/battleship/`, migration 093): same lobby and
+    teams; phase `placing` (tap a ship in the tray, tap the sea; tap a placed
+    ship to rotate/remove/move; Shuffle = `randomFleet`; teammates see changes
+    via `state.rev` → refetch `battleship_my_fleet`), then `battle` (aim with a
+    tap, then "Fire!" — two steps so a slip doesn't waste a shot; hit fires
+    again). The enemy fleet NEVER reaches the phone; sunk ships are revealed in
+    `state.sunk`. Phone shows one sea at a time (follows the turn, switchable);
+    ≥760 pt shows both. `Board.tsx` draws the sea, ships (SVG hulls), hit/miss
+    marks and the last shot's ripple/burst. Never use jsonb `@>` to match board
+    cells: containment ignores order inside arrays, so [0,2] "contains" [2,0]
+    (this bit the first version of the SQL).
+  - **Buzzer quiz** (`apps/games/quiz/`, migrations 094–095): question on
+    every phone, big `Buzzer` (team-coloured dome), first press the SERVER
+    receives answers by voice (`useVoice`, same recogniser as the ask bar) or
+    typing; wrong/slow → locked out of that question, reopened for the rest;
+    reveal → +1 and auto-next. The server owns every clock: phones correct
+    drift with `state.now` and call `quiz_tick` when their countdown ends (the
+    server re-checks the deadline). Answers are matched tolerantly in SQL
+    (`quiz_matches`). The bank is generated by `scripts/quiz-bank.py` (+ one
+    file per category in `scripts/quiz_extra/`) → 095, ~1,400 questions
+    (pt 511, en/es ~440), de-duplicated per language; add questions THERE
+    (short answers, all fair variants, timeless facts, answer never inside the
+    question). A household never sees a question twice until the bank runs
+    out (`quiz_seen`, keyed by `qkey` = md5(lang|question), migration 097).
+  - **Team identity is loud on purpose** (owner, 2026-11): teams are Orange (A)
+    and Purple (B); every game screen shows "You're on Team X"
+    (`MyTeamBanner`), a wash of your colour (`TeamWash`), your score tile marked
+    YOU and the other team's faded. Round results are from YOUR side: your
+    colours + confetti when your team scores, a grey card with a rain cloud
+    when it doesn't; a "+1" flies into the scoring team's tile. The hangman
+    house is the word team's: they see it BUILD, the guessers see it CRUMBLE
+    (`HouseBuild` mode) — same `wrong` count. Motion is calm (timed fades, no
+    wobbly springs) by request. The lobby's rules are the illustrated
+    `HowToPlay`, not a paragraph.
+  - **Rooms (migration 096):** ONE live room per host — `game_create` raises
+    `has_room`, the app asks "close the other and open this?" and retries with
+    `p_replace`. A live room idle 15 min closes (`state.ended = 'expired'`):
+    `game_sweep()` runs when the room list loads and every minute inside a
+    room (no cron); lobby moves bump `updated_at` via a `game_players` trigger.
+    Leaving is the themed `LeaveSheet` (also on Android back), never an Alert.
+  - **Buttons:** game actions use `GameBtn` (`GAME_ACTION`, cyan → blue) —
+    never a team colour (orange/purple) and not the app's clay `action`.
+  - **Pushes you're already looking at:** `lib/onScreen` — the Games screens
+    mark `'games'` while focused and the foreground handler drops `/games`
+    pushes then.
+  - **Sounds:** quick UI sounds play from a small pool of players, each paused
+    + rewound when it finishes. Pause FIRST: on Android a finished player is
+    still "playing", so a bare seekTo(0) restarted it — an endless chime.
+  - **Quiz UI:** `QuestionCard` (category header with its icon, question in
+    large type — never `adjustsFontSizeToFit`, iOS shrank it unreadable), the
+    mic opens by itself when you hold the buzzer (`AnswerPanel`), and every
+    attempt flashes big on all phones (`AttemptFlash`).
+  - Test the SQL before applying: the RPCs were exercised on PGlite
+    (`@electric-sql/pglite` ≥0.5 — 0.3 crashes on RAISE) with stubbed
+    `auth.jwt()`/`current_household()`.
 - **Utilities (`/calc`, hub tile renamed from Calculator — slug, route and
   `app.calc.*` keys unchanged)** is a grid of tools, each its OWN route under
   `app/calc/` (native back gesture, real stack entry). Implementation in
@@ -794,6 +1051,47 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     a "please update" alert instead of a crash. No expo-media-library on
     purpose: its Android READ_MEDIA_* permissions draw Play policy review.
     New card = template + card component + route + hub tile.
+  - **Photo frame** (`apps/calc/frame/`, 2026-11; routes `/calc/frame` =
+    set-up, `/calc/frame-show` = the frame). Two sources, chosen PER DEVICE
+    (`frameStore` settings in AsyncStorage, with the slideshow/night options):
+    **this device's photos** (picked, resized and copied into
+    `Paths.document/frame-device/` — never uploaded) and the **family album**
+    (`frame_photos`, migration 100; bytes in `documents` at
+    `<household>/frame/<uuid>.jpg`, resized to a 1600 px long side / JPEG 0.8
+    before upload; delete own, owners any — the RLS decides, the app deletes
+    the ROW first and only then the object). Limits: a BEFORE INSERT trigger
+    on `household_is_plus` — free 30, Plus 500; `free_plan_frame_limit` → the
+    app offers `/paywall`, `frame_photo_limit` = Plus is full;
+    `frame_photo_quota()` feeds "12 of 30" (constants in `frameLogic` are UI
+    only). **Egress rule: the slideshow plays ONLY local files.** Each album
+    photo is downloaded once into `Paths.document/frame-cache/<id>.jpg`
+    (`syncCache`, two at a time, half files deleted, pruned when a photo is
+    gone); the uploader's own copy goes straight into its cache. The list
+    refreshes from Realtime on `frame_photos` + foreground (`useFrameAlbum`);
+    offline it falls back to the last list this device saw (manifest per
+    household). The set-up grid uses the cached file, else a signed URL with
+    expo-image `cacheKey: path` (a new token must not mean a new download).
+    The frame: keep-awake via a GUARDED require (`keepAwake.ts`;
+    expo-keep-awake comes with `expo`, now also declared), two layers — the
+    incoming one revealed only on `onLoad` (4 s fallback), crossfade 1.8 s,
+    Ken Burns per photo (`kenBurns(id)`), `fitFor` shows a photo whose shape
+    fights the screen whole over a blurred copy; clock/date, "Added by Ana",
+    next calendar event, pet care still due (`petsDue`), birthday pill; on a
+    member's birthday their TAGGED photos lead and alternate (`buildDeck`).
+    Night mode pauses the show and dims (clock stays) or blacks out between
+    two hours — the screen stays lit (no brightness API in the binary). The
+    app is portrait-locked on phones, so "Turn sideways" (`rotated`) draws the
+    whole stage rotated 90°; iPad/Mac rotate natively and the layout follows
+    `useWindowDimensions`. Pure maths in `frameLogic.ts`
+    (`__tests__/frame.test.ts`).
+- **Documents: List or One at a time (2026-11, per device, `docs:view`).** The
+  round button left of the lock flips it. `apps/docs/DocCards` pages through the
+  same filtered/sorted docs, the page drawn large on white: the PREVIEW
+  (`previewPathFor` → `<household>/previews/<uuid>.jpg`, 1240 px, written by
+  `uploadThumb` with the thumb since 2026-11), else an image doc's own file,
+  else the 320 px thumb with "open to read it all". Older PDFs have no
+  preview (no PDF renderer on device). Deleting/replacing a doc removes all
+  three objects.
 - **Date/time pickers open in their own sheet, never inline in a form.**
   `@/components/PickerSheet` (iOS bottom sheet + Done; Android's native dialog)
   for times and one-off dates; Money's `DatePickerModal` and Pet Care's

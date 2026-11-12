@@ -179,11 +179,72 @@ one.
   directly (admin-only RLS is unchanged). Both clients now have the UI: on the
   web it's `src/pages/Onboarding.tsx` (gated in `App.tsx`) +
   `src/components/HouseholdSection.tsx` in the Drawer.
+- **Several households per account (migration 099, 2026-11).** One person can
+  be in the family with their spouse AND the one with their parents:
+  - `household_members (household_id, email, role, display_name, joined_at)` is
+    the SOURCE OF TRUTH for who belongs where (RLS: the active household's
+    roster + your own rows; writes only via definer RPCs / admin).
+  - `allowed_users` stays ONE ROW PER PERSON (a dozen FKs point at its email),
+    and its `household_id`/`role` now mean the **ACTIVE** household and your
+    role in it — that column is the active pointer, so every legacy reader
+    ("which household is this user in?") gets the active one unchanged. A
+    trigger keeps a membership for whatever it points at (admin inserts still
+    work) and mirrors `display_name` to every membership.
+  - `current_household()` = the active household if still a membership, else
+    the first membership (by `joined_at`), else null. All RLS goes through it,
+    so a switch is one UPDATE. **The active household is per ACCOUNT, not per
+    device**: switching on the phone switches a tablet on the same account too
+    (the app re-checks on foreground).
+  - RPCs: `my_households()`, `set_active_household(id)`, `join_household(code)`
+    (ADDS a membership and switches; `already a member` if you're in it),
+    `create_household(name)` (an existing user may create another ONLY as the
+    OWNER of an active household with a PAID Plus — the signup trial doesn't
+    count: `plus_required` / `plus_owner_required`; migration 104),
+    `leave_household(id, new_owner)` (an only owner with members left must name
+    a successor — `last_owner`; your only household can't be left —
+    `last_household`, use account deletion; leaving one you're alone in WIPES
+    it). `remove_member`, `get_join_code`, `rotate_join_code` act on the
+    caller's ACTIVE household. Internal (revoked): `activate_household_for`,
+    `wipe_household`.
+  - Switching re-stamps the person's `expo_push_tokens`, `push_subscriptions`
+    and `widget_tokens` with the active household. Losing a membership (leave,
+    removal, admin) deletes their Whereabouts rows and Google connection for
+    THAT household, moves them to their next household (or deletes the account
+    row if none is left — back to onboarding, as removal always did), and moves
+    `member_profiles` (one per person) to a household they're still in.
+  - An account is in at most 3 households (`max_households_per_account()`,
+    migration 104): `join_household` and `create_household` raise
+    `household_limit` past it.
+  - **Plus link (migration 104).** A family created that way gets no trial and
+    no subscription row: `households.plus_from` (the paying family) +
+    `plus_by` (the payer). `household_is_plus()` reads a family's OWN
+    `household_subscriptions` row when it has one, else follows the link while
+    the paying family has a PAID Plus and the payer still owns both. The payer
+    can't hand the linked family over while that holds (`leave_household` →
+    `plus_owner`); after the plan lapses a hand-over is allowed and clears the
+    link. Never read `household_subscriptions` directly for "is this Plus?" —
+    go through `household_is_plus()`.
+  - The member cap trigger now lives on `household_members` (an existing
+    membership never counts against itself, so switching into a full household
+    works).
+  - **Service-role code must ask "is X a member of H?" through
+    `household_members`, never `allowed_users.household_id = H`** (that's only
+    the active one). Pushes resolve recipients as PEOPLE (members' emails) and
+    send to all their tokens — never `.eq('household_id', …)` on tokens — and a
+    recipient in several households gets the household's name on the title and
+    `household` in the push data (the app switches to it on tap). The api/
+    helpers fall back to the pre-099 query when the table is missing.
+  - Known gaps: `member_profiles` avatars live under the first household's
+    storage prefix, so they don't sign from another household; Whereabouts
+    sharing stays with the household where it was turned on;
+    the frozen web client lists members via `allowed_users` (active ones only).
 
 **Auth/profile**: `useAuth()` gives `profile` (self), `profiles` (members
 of OWN household only — already filtered; admins can query `allowed_users`
 directly for cross-household needs, see `Admin.tsx`), `profileLoaded`, and
-`refreshProfile()`.
+`refreshProfile()`. Since migration 099 `profile.household_id` is the ACTIVE
+household, and the native app reads `profiles` from `household_members` (see
+`mobile/CLAUDE.md`).
 - `profile.role` is the household-scoped `'owner' | 'member'` — gate invite/
   remove-member affordances on it, NEVER on `is_admin`.
 - **A signed-in user with `profileLoaded && !profile` has no household yet** →

@@ -7,7 +7,7 @@
 // `overlay` renders nested modals (date picker, category picker…) INSIDE this
 // Modal's tree — a Modal rendered as a sibling of an open one silently fails
 // to present on iOS.
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { Keyboard, Modal, StyleSheet, View } from 'react-native'
 import { X, type LucideIcon } from 'lucide-react-native'
 
@@ -30,6 +30,8 @@ export function FormSheet({
   footer,
   overlay,
   maxShare = 0.94,
+  sheetRef,
+  animationType = 'slide',
   icon,
   colors,
   kicker,
@@ -53,6 +55,10 @@ export function FormSheet({
   overlay?: ReactNode
   /** Tallest the sheet may get, as a share of the room above the keyboard. */
   maxShare?: number
+  /** The sheet panel — a host measures it to fly a "landing" ghost from it. */
+  sheetRef?: Ref<View>
+  /** Flip to 'none' (or 'fade') just before unmounting to skip the slide-out. */
+  animationType?: 'slide' | 'fade' | 'none'
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -61,7 +67,7 @@ export function FormSheet({
   const edgePad = clearOfBars ? sp.md : bottomGap
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType={animationType} transparent onRequestClose={onClose}>
       <View style={styles.backdrop} onLayout={onRootLayout}>
         <Pressable
           style={StyleSheet.absoluteFill}
@@ -69,6 +75,7 @@ export function FormSheet({
           accessible={false}
         />
         <View
+          ref={sheetRef}
           style={[
             styles.sheet,
             { backgroundColor: c.sheet, maxHeight: room * maxShare, marginBottom: lift },

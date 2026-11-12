@@ -7,6 +7,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -21,8 +22,36 @@ import { supabase } from './supabase'
 import { completeOAuthRedirect } from './oauthRedirect'
 import { disablePush } from './notifications'
 import { clearWidgetData } from './widget'
-import { clearCache } from '@/hooks/useCachedQuery'
+import { clearCache, revalidateAll } from '@/hooks/useCachedQuery'
+import { onHouseholdChange } from './households'
 import type { Profile } from './types'
+
+const PROFILE_COLS = 'email, display_name, household_id, is_admin, role'
+
+/** The members of a household. Read from household_members (migration 099):
+ *  a member whose ACTIVE household is another one has allowed_users pointing
+ *  elsewhere and would vanish from an allowed_users-by-household query. Falls
+ *  back to that query against a server without 099. */
+async function loadMembers(householdId: string): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from('household_members')
+    .select('email, display_name, household_id, role')
+    .eq('household_id', householdId)
+    .order('joined_at')
+  if (!error) {
+    return ((data ?? []) as { email: string; display_name: string | null; household_id: string; role: 'owner' | 'member' }[]).map(
+      (m) => ({
+        email: m.email,
+        display_name: m.display_name || m.email.split('@')[0],
+        household_id: m.household_id,
+        role: m.role,
+        is_admin: false,
+      }),
+    )
+  }
+  const { data: legacy } = await supabase.from('allowed_users').select(PROFILE_COLS).eq('household_id', householdId)
+  return (legacy as Profile[]) ?? []
+}
 
 /** Where signInWithApple parks the name Apple gives us exactly once, for
  *  Onboarding to prefill. See the comment in signInWithApple. */
@@ -141,20 +170,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data } = await supabase
       .from('allowed_users')
-      .select('email, display_name, household_id, is_admin, role')
+      .select(PROFILE_COLS)
       .eq('email', email)
       .maybeSingle()
     const next = (data as Profile) ?? null
     setProfile(next)
     setProfileLoaded(true)
-    if (next?.household_id) {
-      const { data: members } = await supabase
-        .from('allowed_users')
-        .select('email, display_name, household_id, is_admin, role')
-        .eq('household_id', next.household_id)
-      setProfiles((members as Profile[]) ?? [])
-    }
+    if (next?.household_id) setProfiles(await loadMembers(next.household_id))
   }, [email])
+
+  // Switching / joining / leaving a household (lib/households) → re-read who
+  // and where we are. The effect below then reloads every screen.
+  useEffect(() => onHouseholdChange(refreshProfile), [refreshProfile])
+
+  // The active household is per ACCOUNT: another device may have switched it.
+  // Re-check on every return to the foreground (one row, by primary key).
+  const activeRef = useRef<string | null>(null)
+  const activeHousehold = profile?.household_id ?? null
+  useEffect(() => {
+    activeRef.current = activeHousehold
+  }, [activeHousehold])
+  useEffect(() => {
+    if (!email) return
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !activeRef.current) return
+      void supabase
+        .from('allowed_users')
+        .select('household_id')
+        .eq('email', email)
+        .maybeSingle()
+        .then(({ data }) => {
+          const hh = (data as { household_id?: string } | null)?.household_id ?? null
+          if (hh !== activeRef.current) void refreshProfile()
+        })
+    })
+    return () => sub.remove()
+  }, [email, refreshProfile])
 
   useEffect(() => {
     setProfileLoaded(false)
@@ -176,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data, error } = await supabase
           .from('allowed_users')
-          .select('email, display_name, household_id, is_admin, role')
+          .select(PROFILE_COLS)
           .eq('email', email)
           .maybeSingle()
         if (!active) return
@@ -217,16 +268,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     let active = true
-    supabase
-      .from('allowed_users')
-      .select('email, display_name, household_id, is_admin, role')
-      .eq('household_id', householdId)
-      .then(({ data }) => {
-        if (active) setProfiles((data as Profile[]) ?? [])
-      })
+    void loadMembers(householdId).then((members) => {
+      if (active) setProfiles(members)
+    })
     return () => {
       active = false
     }
+  }, [householdId])
+
+  // The ACTIVE household moved (a switch here, a join, a leave, or another
+  // device): every cached answer belongs to the old one. Drop them and refetch
+  // every mounted screen — not just the visible one; the Hub sits mounted under
+  // Settings. Runs after the commit that carries the new profile, so fetchers
+  // that read `profile.household_id` already see the new id.
+  const prevHousehold = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevHousehold.current
+    prevHousehold.current = householdId
+    if (!prev || !householdId || prev === householdId) return
+    clearCache()
+    revalidateAll()
   }, [householdId])
 
   const signInWithApple = useCallback(async () => {

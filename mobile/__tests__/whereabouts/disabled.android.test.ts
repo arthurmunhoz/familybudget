@@ -146,7 +146,9 @@ describe('G2 — nothing of the feature is visible', () => {
     const { router } = require('expo-router')
     const push = jest.spyOn(router, 'push').mockImplementation(() => {})
     require('@/lib/backgroundNotifications').registerBackgroundNotifications()
-    const onTap = Notifications.addNotificationResponseReceivedListener.mock.calls[0][0]
+    // The LAST listener: the one registerBackgroundNotifications adds. (The
+    // module itself first adds a pet-reminder Done listener at load.)
+    const onTap = Notifications.addNotificationResponseReceivedListener.mock.calls.at(-1)[0]
     onTap({ notification: { request: { content: { data: { url: '/location' } } } } })
     onTap({ notification: { request: { content: { data: { url: '/pings' } } } } })
     await new Promise((r) => setTimeout(r, 5))

@@ -640,6 +640,76 @@ async function assistant(body: any, db: any, household: string | null, res: any,
   }
 }
 
+// ── Roof's voice ─────────────────────────────────────────────────────────────
+// Chosen by ear in a blind test (owner, 2026-11-12): Thalita Multilingual —
+// standard-tier price, and being multilingual it says "Roof" properly.
+const ROOF_VOICES: Record<string, string> = {
+  pt: 'pt-BR-ThalitaMultilingualNeural',
+  en: 'en-US-AvaMultilingualNeural',
+  es: 'es-MX-DaliaMultilingualNeural',
+}
+const XML_LANG: Record<string, string> = { pt: 'pt-BR', en: 'en-US', es: 'es-MX' }
+const SPEAK_MAX = 400 // characters per reply — Roof keeps it short
+const VOICE_DAILY_CAP = 400 // per household per day, abuse ceiling
+const VOICE_USD_PER_CHAR = 16 / 1e6 // Azure neural, pay-as-you-go estimate
+
+function speakable(raw: string): string {
+  return raw
+    .replace(/[\p{Extended_Pictographic}️‍]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, SPEAK_MAX)
+}
+const xmlEscape = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+
+async function speak(body: any, supabaseUrl: string, email: string, res: any) {
+  const key = process.env.AZURE_SPEECH_KEY
+  const region = process.env.AZURE_SPEECH_REGION || 'eastus'
+  if (!key) return res.status(503).json({ error: 'voice_off' })
+  const text = speakable(typeof body?.text === 'string' ? body.text : '')
+  if (!text) return res.status(400).json({ error: 'Missing text' })
+  const lang = ROOF_VOICES[body?.lang] ? body.lang : 'pt'
+
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) return res.status(503).json({ error: 'voice_off' })
+  const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const { data: caller } = await db.from('allowed_users').select('household_id').eq('email', email).maybeSingle()
+  const household: string | null = caller?.household_id ?? null
+  if (!household) return res.status(403).json({ error: 'no_household' })
+  // Plus gate: an explicit "no" blocks; spoken replies cost real money per call.
+  const { data: plus, error: plusErr } = await db.rpc('household_is_plus', { p_household: household })
+  if (!plusErr && plus === false) return res.status(402).json({ error: 'plus_required' })
+  const { data: gate, error: gateErr } = await db.rpc('ai_light_allowed', { p_household: household, p_kind: 'voice', p_cap: VOICE_DAILY_CAP })
+  if (!gateErr && gate && gate.allowed === false) return res.status(429).json({ error: 'paused' })
+
+  const ssml =
+    `<speak version='1.0' xml:lang='${XML_LANG[lang]}' xmlns='http://www.w3.org/2001/10/synthesis'>` +
+    `<voice name='${ROOF_VOICES[lang]}'><lang xml:lang='${XML_LANG[lang]}'>${xmlEscape(text)}</lang></voice></speak>`
+  try {
+    const r = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': key,
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': 'audio-24khz-48kbitrate-mono-mp3',
+        'User-Agent': 'oneroof',
+      },
+      body: ssml,
+    })
+    if (!r.ok) return res.status(502).json({ error: 'voice_failed' })
+    const audio = Buffer.from(await r.arrayBuffer()).toString('base64')
+    try {
+      await db.rpc('ai_light_record', { p_household: household, p_kind: 'voice', p_cost: text.length * VOICE_USD_PER_CHAR })
+    } catch {
+      /* metering never breaks a good reply */
+    }
+    return res.status(200).json({ audio, format: 'mp3' })
+  } catch {
+    return res.status(502).json({ error: 'voice_failed' })
+  }
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -674,6 +744,11 @@ export default async function handler(req: any, res: any) {
     await recordGap(dbGap, hh, { kind: 'failed', intent: code(req.body?.intent), reason: code(req.body?.reason), lang: code(req.body?.lang) })
     return res.status(200).json({ ok: true })
   }
+
+  // Roof's spoken replies (owner, 2026-11): text → Azure neural voice (MP3,
+  // base64). Plus only (the signup trial counts). Lives here because the
+  // Vercel plan is at its function cap. Metered as kind 'voice'.
+  if (req.query?.action === 'speak') return speak(req.body, supabaseUrl, email, res)
 
   const { text } = req.body ?? {}
   if (!text || typeof text !== 'string' || !text.trim()) {

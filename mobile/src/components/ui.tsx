@@ -232,6 +232,28 @@ export function Card({
   return <View style={[base, style]}>{children}</View>
 }
 
+/** Mix a #rrggbb colour toward white (amt 0…1). Non-hex input is returned
+ *  unchanged — the gradient then just reads as flat. */
+function lighten(hex: string, amt: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return hex
+  const n = parseInt(m[1], 16)
+  const ch = (v: number) => Math.round(v + (255 - v) * amt)
+  const r = ch((n >> 16) & 255)
+  const g = ch((n >> 8) & 255)
+  const b = ch(n & 255)
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`
+}
+
+/**
+ * The app's button (2026-11 refresh, owner: the old flat 12pt rectangle looked
+ * dated next to the redesigned screens). Taller (54pt), rounder (18pt), the
+ * filled variants are a soft diagonal gradient of their colour with a tinted
+ * shadow, and a press shrinks it a touch instead of only fading. `secondary`
+ * is a card-coloured button with a hairline border. Pass `colors` to fill a
+ * primary button with a specific gradient (a team, an app), `icon` for a
+ * leading glyph.
+ */
 export function Btn({
   title,
   onPress,
@@ -240,6 +262,8 @@ export function Btn({
   loading,
   style,
   curveBottom = false,
+  colors,
+  icon,
 }: {
   title: string
   onPress: () => void
@@ -253,51 +277,73 @@ export function Btn({
   disabled?: boolean
   loading?: boolean
   style?: ViewStyle
-  /** Screen-curve rounded bottom corners (top stays radius.md) — for a button
+  /** Screen-curve rounded bottom corners (top stays rounded) — for a button
    *  docked to the bottom of a sheet/screen, matching NewItemButton. */
   curveBottom?: boolean
+  /** Primary only: fill with this gradient instead of the theme's action colour. */
+  colors?: readonly [string, string]
+  icon?: React.ReactNode
 }) {
   const { c } = useTheme()
-  const bg =
-    variant === 'primary'
-      ? c.action
-      : variant === 'danger'
-        ? c.expense
-        : variant === 'secondary'
-          ? c.surface
-          : 'transparent'
-  const fg =
-    variant === 'primary' ? c.onAction : variant === 'danger' ? pickOn(c.expense) : c.text
+  const filled = variant === 'primary' || variant === 'danger'
+  const base = variant === 'danger' ? c.expense : c.action
+  const fill: readonly [string, string] | null = filled ? (variant === 'primary' && colors ? colors : [lighten(base, 0.16), base]) : null
+  const fg = variant === 'primary' ? (colors ? '#fff' : c.onAction) : variant === 'danger' ? pickOn(c.expense) : c.text
+  const R = 18
   const corners = curveBottom
     ? {
-        borderTopLeftRadius: radius.md,
-        borderTopRightRadius: radius.md,
-        borderBottomLeftRadius: CURVE_RADIUS,
-        borderBottomRightRadius: CURVE_RADIUS,
+        borderTopLeftRadius: R,
+        borderTopRightRadius: R,
+        borderBottomLeftRadius: Math.max(CURVE_RADIUS, R),
+        borderBottomRightRadius: Math.max(CURVE_RADIUS, R),
       }
-    : { borderRadius: radius.md }
+    : { borderRadius: R }
+  const off = disabled || loading
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      disabled={disabled || loading}
+      disabled={off}
       style={({ pressed }) => [
         {
-          backgroundColor: bg,
           ...corners,
-          paddingVertical: 14,
+          minHeight: 54,
+          paddingVertical: 15,
           paddingHorizontal: sp.lg,
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+          flexDirection: 'row' as const,
+          gap: 8,
+          alignItems: 'center' as const,
+          justifyContent: 'center' as const,
+          backgroundColor: filled ? fill![1] : variant === 'secondary' ? c.card : 'transparent',
+          borderWidth: variant === 'secondary' ? StyleSheet.hairlineWidth : 0,
+          borderColor: c.border,
+          opacity: disabled ? 0.45 : pressed ? 0.92 : 1,
+          transform: [{ scale: pressed && !off ? 0.98 : 1 }],
         },
+        filled && !disabled
+          ? {
+              shadowColor: fill![1],
+              shadowOpacity: 0.28,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 3,
+            }
+          : null,
         style,
       ]}
     >
+      {fill ? (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, corners, { overflow: 'hidden' }]}>
+          <GradientBox colors={fill} radius={0} style={StyleSheet.absoluteFill} />
+        </View>
+      ) : null}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
-        <Text style={{ color: fg, fontSize: 16, fontFamily: fonts.semibold }}>{title}</Text>
+        <>
+          {icon}
+          <Text style={{ color: fg, fontSize: 16.5, fontFamily: fonts.semibold }}>{title}</Text>
+        </>
       )}
     </Pressable>
   )

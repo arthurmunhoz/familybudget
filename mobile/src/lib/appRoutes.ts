@@ -10,6 +10,7 @@ import {
   CalendarDays,
   CalendarHeart,
   FolderLock,
+  Gamepad2,
   Home,
   LayoutGrid,
   MapPin,
@@ -34,6 +35,7 @@ export const APP_META: Record<string, { name: string; icon: LucideIcon }> = {
   dates: { name: 'Dates', icon: CalendarHeart },
   family: { name: 'Family', icon: Users },
   calc: { name: 'Calculator', icon: Calculator },
+  games: { name: 'Games', icon: Gamepad2 },
   admin: { name: 'Admin', icon: Wrench },
 }
 

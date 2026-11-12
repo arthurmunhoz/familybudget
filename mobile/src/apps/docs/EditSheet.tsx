@@ -23,7 +23,7 @@ import { supabase } from '@/lib/supabase'
 import type { FamilyDocument, DocCategory, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { fonts, sp, useTheme } from '@/theme/theme'
-import { CATEGORIES, formatBytes, randomUUID, thumbPathFor } from './docUtils'
+import { CATEGORIES, formatBytes, previewPathFor, randomUUID, thumbPathFor } from './docUtils'
 import { pickFile, scanDocument, uploadThumb } from './docPicker'
 import type { PickedFile } from './UploadSheet'
 import { track } from '@/lib/analytics'
@@ -106,14 +106,14 @@ export default function EditSheet({
       .eq('id', doc.id)
     if (error) {
       // Don't leave the new upload orphaned if the row couldn't point at it.
-      if (fileFields) await supabase.storage.from('documents').remove([fileFields.file_path, thumbPathFor(fileFields.file_path)])
+      if (fileFields) await supabase.storage.from('documents').remove([fileFields.file_path, thumbPathFor(fileFields.file_path), previewPathFor(fileFields.file_path)])
       setSaving(false)
       Alert.alert(t('docs.editSaveFailed'))
       return
     }
     if (fileFields) {
       // The row now points at the new file; the old one goes.
-      await supabase.storage.from('documents').remove([doc.file_path, thumbPathFor(doc.file_path)])
+      await supabase.storage.from('documents').remove([doc.file_path, thumbPathFor(doc.file_path), previewPathFor(doc.file_path)])
       track('doc.replaced', { title: title.trim(), category })
     }
     setSaving(false)
