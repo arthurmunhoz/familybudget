@@ -5,14 +5,27 @@
 // gets the green "better deal" tag. The product follows the unit: a bottle
 // and a jug for L / mL, a jar and a sack for weights, a pack and a crate for
 // "each".
-import { useEffect, useRef } from 'react'
-import { Animated, StyleSheet, View } from 'react-native'
-import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg'
+//
+// 2026-11 restyle (the photo frame's language): the containers wear the
+// tool's teal, and the verdict PLAYS on the shelf — the winner rises a little
+// on a glow of its colour with a gradient "best deal" ribbon dropping onto
+// it, the other one steps back (dims, its label band goes grey). Timed
+// curves only; Reduce Motion lands on the end state.
+import { useEffect } from 'react'
+import { StyleSheet, View } from 'react-native'
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated'
+import Svg, { Circle, Defs, Ellipse, G, Path, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg'
 import { Check } from 'lucide-react-native'
 
+import { GradientBox } from '@/components/home/GradientBox'
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
-import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
+
+import { TOOL_LOOK } from './look'
+
+const LOOK = TOOL_LOOK.deal
+const EASE = Easing.bezier(0.2, 0, 0, 1)
 
 type ProductKind = 'liquid' | 'weight' | 'count'
 
@@ -25,11 +38,10 @@ function productKind(unit: string): ProductKind {
 const ART = 110 // drawn size of a full-scale container
 
 /** One container, drawn in a 100×120 box standing on its base. */
-function Container({ kind, big, label }: { kind: ProductKind; big: boolean; label: string }) {
-  const { c, dark } = useTheme()
-  const body = dark ? '#F3E3D3' : '#FFF8F0'
-  const shade = dark ? '#E2CDB8' : '#F1E2D2'
-  const band = c.accent
+function Container({ kind, big, label, band }: { kind: ProductKind; big: boolean; label: string; band: string }) {
+  const { dark } = useTheme()
+  const body = dark ? '#EEF3F2' : '#FFFFFF'
+  const shade = dark ? '#CFDAD8' : '#DCE6E4'
   const ink = '#FFFFFF'
   if (kind === 'liquid') {
     return big ? (
@@ -112,68 +124,89 @@ function Txtish({ label, color, y = 80 }: { label: string; color: string; y?: nu
   )
 }
 
-/** One shelf slot: the container (animated size), its winner tag, and the
- *  per-unit price under it. */
+/** One shelf slot: the container (its size follows the amount), the
+ *  winner's glow + ribbon, and the per-unit price under it. */
 function Slot({
   side,
   kind,
   big,
   scale,
-  winner,
+  state,
   perUnit,
 }: {
   side: 'A' | 'B'
   kind: ProductKind
   big: boolean
   scale: number
-  winner: boolean
+  /** 'win' / 'lose' once both are known, else 'idle'. */
+  state: 'win' | 'lose' | 'idle'
   perUnit: string | null
 }) {
-  const { c } = useTheme()
+  const { c, dark } = useTheme()
   const { t } = useI18n()
-  const s = useRef(new Animated.Value(scale)).current
-  const lift = useRef(new Animated.Value(winner ? 1 : 0)).current
+  const reduce = useReducedMotion()
+  const s = useSharedValue(scale)
+  const win = useSharedValue(state === 'win' ? 1 : 0)
+  const lose = useSharedValue(state === 'lose' ? 1 : 0)
   useEffect(() => {
-    Animated.spring(s, { toValue: scale, useNativeDriver: true, friction: 6, tension: 80 }).start()
-  }, [scale, s])
+    s.set(reduce ? scale : withTiming(scale, { duration: 520, easing: EASE }))
+  }, [scale, reduce, s])
   useEffect(() => {
-    Animated.spring(lift, { toValue: winner ? 1 : 0, useNativeDriver: true, friction: 5 }).start()
-  }, [winner, lift])
+    const to = (v: number, d: number) => (reduce ? v : withTiming(v, { duration: d, easing: EASE }))
+    win.set(to(state === 'win' ? 1 : 0, 560))
+    lose.set(to(state === 'lose' ? 1 : 0, 420))
+  }, [state, reduce, win, lose])
+
+  // Scale from the BOTTOM so containers stay standing on the shelf; the
+  // winner also rises 8pt off it.
+  const art = useAnimatedStyle(() => ({
+    opacity: 1 - lose.get() * 0.5,
+    transform: [
+      { translateY: (1 - s.get()) * (ART / 2) - win.get() * 8 },
+      { scale: s.get() * (1 - lose.get() * 0.04) },
+    ],
+  }))
+  const glow = useAnimatedStyle(() => ({ opacity: win.get(), transform: [{ scaleX: 0.6 + win.get() * 0.4 }] }))
+  const ribbon = useAnimatedStyle(() => ({
+    opacity: win.get(),
+    transform: [{ translateY: (1 - win.get()) * -14 }, { scale: 0.7 + win.get() * 0.3 }],
+  }))
+  const band = state === 'lose' ? (dark ? '#7D8785' : '#B4BEBC') : LOOK.tint
+
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <View style={{ height: 22, justifyContent: 'center' }}>
-        <Animated.View
-          style={[
-            styles.tag,
-            {
-              backgroundColor: c.income,
-              opacity: lift,
-              transform: [{ scale: lift.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
-            },
-          ]}
-        >
-          <Check size={11} color="#fff" strokeWidth={3} />
-          <Txt style={{ color: '#fff', fontSize: 11, fontFamily: fonts.semibold }}>{t('calc.betterDeal')}</Txt>
+      <View style={{ height: 32, justifyContent: 'flex-start', zIndex: 2 }}>
+        <Animated.View style={ribbon}>
+          <GradientBox colors={LOOK.colors} radius={999} style={styles.tag}>
+            <Check size={12} color="#fff" strokeWidth={3} />
+            <Txt style={{ color: '#fff', fontSize: 11.5, fontFamily: fonts.semibold }}>{t('calc.betterDeal')}</Txt>
+          </GradientBox>
         </Animated.View>
       </View>
       <View style={{ width: ART, height: ART, justifyContent: 'flex-end', alignItems: 'center' }}>
-        <Animated.View
-          style={{
-            width: ART,
-            height: ART,
-            // Scale from the BOTTOM so containers stay standing on the shelf.
-            transform: [{ translateY: Animated.multiply(Animated.subtract(1, s), ART / 2) }, { scale: s }],
-          }}
-        >
-          <Container kind={kind} big={big} label={side} />
+        {/* the winner's spotlight on the shelf */}
+        <Animated.View pointerEvents="none" style={[styles.glow, glow]}>
+          <Svg width={ART + 20} height={40}>
+            <Defs>
+              <RadialGradient id={`dealGlow${side}`} cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor={LOOK.colors[0]} stopOpacity={0.55} />
+                <Stop offset="1" stopColor={LOOK.colors[0]} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Ellipse cx={(ART + 20) / 2} cy={20} rx={(ART + 20) / 2} ry={18} fill={`url(#dealGlow${side})`} />
+          </Svg>
+        </Animated.View>
+        <Animated.View style={[{ width: ART, height: ART }, art]}>
+          <Container kind={kind} big={big} label={side} band={band} />
         </Animated.View>
       </View>
       <Txt
         style={{
-          marginTop: 6,
+          marginTop: 8,
           fontSize: 13,
           fontFamily: fonts.semibold,
-          color: winner ? c.income : perUnit ? c.textMuted : c.textFaint,
+          color: state === 'win' ? LOOK.tint : perUnit ? c.textMuted : c.textFaint,
+          fontVariant: ['tabular-nums'],
         }}
         numberOfLines={1}
       >
@@ -191,7 +224,6 @@ export function ProductShelf({
   winner,
   perUnitA,
   perUnitB,
-  verdict,
 }: {
   unit: string
   qtyA: number
@@ -199,14 +231,14 @@ export function ProductShelf({
   winner: 'A' | 'B' | 'tie' | null
   perUnitA: string | null
   perUnitB: string | null
-  /** "Option A is 20% cheaper" — the shelf's footer once both are filled. */
-  verdict: string | null
 }) {
   const { c } = useTheme()
   const kind = productKind(unit)
   // Who's the big container: the larger amount. Until both are typed, A small
   // and B big — the picture explains the tool before any input.
   const known = qtyA > 0 && qtyB > 0
+  const stateOf = (side: 'A' | 'B') =>
+    winner === 'A' || winner === 'B' ? (winner === side ? 'win' : 'lose') : 'idle'
   const aBig = known ? qtyA >= qtyB : false
   const bBig = known ? qtyB >= qtyA : true
   // Size by how much more: area ∝ amount, so scale ∝ √ratio, kept readable.
@@ -218,29 +250,16 @@ export function ProductShelf({
       {/* the shelf, behind the containers' bases */}
       <View style={[styles.shelf, { backgroundColor: c.border }]} pointerEvents="none" />
       <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-        <Slot side="A" kind={kind} big={aBig} scale={scaleOf(qtyA, 0.72)} winner={winner === 'A'} perUnit={perUnitA} />
-        <Slot side="B" kind={kind} big={bBig} scale={scaleOf(qtyB, 1)} winner={winner === 'B'} perUnit={perUnitB} />
+        <Slot side="A" kind={kind} big={aBig} scale={scaleOf(qtyA, 0.72)} state={stateOf('A')} perUnit={perUnitA} />
+        <Slot side="B" kind={kind} big={bBig} scale={scaleOf(qtyB, 1)} state={stateOf('B')} perUnit={perUnitB} />
       </View>
-      {verdict ? (
-        <Txt
-          style={{
-            marginTop: sp.sm,
-            textAlign: 'center',
-            fontFamily: fonts.semibold,
-            fontSize: 14,
-            color: winner === 'tie' ? c.textMuted : c.income,
-          }}
-        >
-          {verdict}
-        </Txt>
-      ) : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   stage: {
-    borderRadius: radius.lg,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     paddingTop: sp.sm,
     paddingBottom: sp.md,
@@ -253,16 +272,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: sp.lg,
     right: sp.lg,
-    top: sp.sm + 22 + ART - 3,
+    top: sp.sm + 32 + ART - 3,
     height: 3,
     borderRadius: 2,
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
+  glow: { position: 'absolute', bottom: -18, left: -10 },
 })

@@ -86,9 +86,11 @@ const INTENTS = [
   'open_app',
   'split_bill',
   'discount',
+  'app_help',
   'unknown',
 ] as const
-const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'settings', '']
+const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'games', 'settings', '']
+const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'plus', 'families', 'roof', 'other', '']
 const RECURRENCES = ['none', 'daily', 'weekly', 'monthly', 'yearly']
 const EVENT_KINDS = ['event', 'birthday', 'anniversary', 'renewal', 'other']
 const PET_EVENT_TYPES = ['vet', 'vaccine', 'medication', 'grooming', 'other', '']
@@ -137,6 +139,7 @@ const ASSISTANT_SCHEMA = {
         'open_app = asks to open a part of the app.',
         'split_bill = split a bill / restaurant check / total among people ("divide 58,71 em 3", "split the check").',
         'discount = the price after a percentage off ("quanto fica 80 com 30% de desconto").',
+        'app_help = asks about One Roof ITSELF: what it can do, what a part or feature is, which games there are, how a game or feature works ("quais jogos tem no app?", "como funciona a forca?", "explica a batalha naval", "o que o Plus dá?", "o que você sabe fazer?"). Answered from the APP GUIDE.',
         'unknown = anything else.',
       ].join(' '),
     },
@@ -306,7 +309,13 @@ const ASSISTANT_SCHEMA = {
         'pets_due naming several pets ("a rotina da Lola e da Chloe"): all of them, comma-separated ("Lola, Chloe").',
     },
     field: { type: 'string', enum: FIELDS, description: 'family_info / family_update: which detail. "" otherwise.' },
-    app: { type: 'string', enum: APPS, description: 'open_app: which part (budget = money). "" otherwise.' },
+    app: { type: 'string', enum: APPS, description: 'open_app: which part (budget = money, calc = utilities). "" otherwise.' },
+    topic: {
+      type: 'string',
+      enum: TOPICS,
+      description:
+        'app_help: what it is about — games (which games / games in general), hangman (forca), battleship (batalha naval), quiz (buzzer quiz / perguntas), plus, families (several families per account), roof (the voice assistant), other. "" otherwise.',
+    },
     gap: {
       type: 'string',
       description:
@@ -320,7 +329,8 @@ const ASSISTANT_SCHEMA = {
         'agenda over a period: a short phrase naming it in the user language ("este mês", "this week", "nas próximas 3 semanas"). ' +
         'find_items: one short sentence in the user language answering the question, naming the store each match is on ' +
         '("Sim — Agua de coco está na lista do Costco.", "No, there is no coconut water on the list."). ' +
-        'unknown: one short, friendly sentence in the user language saying what you can do (shopping lists, calendar, money, nudges, pets, family details, where someone is, weather, documents, splitting a bill, discounts). "" otherwise.',
+        'app_help: 1–3 short sentences in the user language answering from the APP GUIDE only (never invent a feature). Asked which games there are: name them and offer to explain the rules ("Quer que eu explique as regras de algum?"). Asked how ONE game works: one sentence on the idea — the app shows the full rules under it. ' +
+        'unknown: one short, friendly sentence in the user language saying what you can do (shopping lists, calendar, money, nudges, pets, family details, where someone is, weather, documents, splitting a bill, discounts, and questions about the app and its games). "" otherwise.',
     },
   },
   required: [
@@ -358,6 +368,7 @@ const ASSISTANT_SCHEMA = {
     'pet',
     'field',
     'app',
+    'topic',
     'gap',
     'reply',
     'ref',
@@ -393,6 +404,7 @@ const GROUPS: Record<string, { keys: string[]; for: string; note?: string }> = {
   family: { keys: ['field', 'value'], for: 'family_info, family_update' },
   nudge: { keys: ['urgent'], for: 'send_nudge' },
   open: { keys: ['app'], for: 'open_app' },
+  help: { keys: ['topic'], for: 'app_help' },
 }
 const flatProps = ASSISTANT_SCHEMA.properties as Record<string, unknown>
 const pick = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, flatProps[k]]))
@@ -490,6 +502,23 @@ function buildContext(body: any, today: string): string {
   ].join('\n')
 }
 
+// What the assistant may say about the app itself (app_help). Keep it TRUE:
+// the model answers from this and nothing else.
+const APP_GUIDE =
+  'APP GUIDE (One Roof — answer app_help from this only): ' +
+  'Home: today\'s agenda and the assistant (typed, the mic, or "Ei Roof"/"Hey Roof" by voice, a Plus feature). ' +
+  'Apps: Calendar (events, birthdays, reminders; Google/Apple Calendar sync on Plus), Money (budgets, expenses and income, AI receipt scan), ' +
+  'Shopping (lists by store, shared live), Pets (daily routines, vet visits, vaccines, reminders), Documents (family vault; Face ID lock on Plus), ' +
+  'Family (each member\'s profile: birthday, phone, sizes, allergies), Utilities (split a bill evenly or by item, better deal per unit, discount, printable cards, photo frame), ' +
+  'Nudges (one-tap messages to the family, urgent ones too), Location (family map, places with arrival alerts, safety radius; iPhone only), Games. ' +
+  'GAMES — played live, each person on their own phone, in two teams (Orange and Purple); someone opens a room in Games, the others join and tap ready, the host starts: ' +
+  '1) Hangman (Forca): one team picks a word from a category (the hint), the other team guesses letters, one person per turn; each wrong letter adds a piece of the house; ' +
+  'guessing the word scores for the guessers, a finished house scores for the word team; teams swap every round. You can also SEND a hangman to one person to solve on their own. ' +
+  '2) Battleship (Batalha naval): each team hides its fleet on its own sea; on your turn aim at the other team\'s sea and Fire; a hit shoots again, a miss passes the turn; sink the whole fleet to win. ' +
+  '3) Buzzer quiz (Quiz de campainha): the same question shows on every phone; first to press the buzzer answers by voice or typing; a wrong answer is out for that question and the others can try; each right answer is a point for the team. ' +
+  'PLUS (One Roof Plus): unlimited AI scans, calendar sync, split by item, several and private budgets, up to 12 members (free: 4), Face ID on documents, the Roof voice, the assistant without a monthly limit, creating another family. ' +
+  'FAMILIES: one account can be in up to 3 families (join with an invite code, free; create another needs a paid Plus).'
+
 const SYSTEM =
   'You turn one request (typed, or spoken and transcribed — expect transcription slips) into a structured intent ' +
   'for a family organiser app. The household speaks Portuguese, English or Spanish, often mixing them. ' +
@@ -498,7 +527,8 @@ const SYSTEM =
   '"and tomorrow?", "e para a Lola?" against the conversation, keeping whatever the user did not change ' +
   '(same store, same pet, same person, same period). Read the request in context: a word that makes no sense for ' +
   'the domain is usually a slip ("pagar o gasto" = "apagar o gasto"), and a follow-up about something just logged, ' +
-  'scheduled or added stays in that same feature (an expense just logged is fixed/removed as money, never as a list item).'
+  'scheduled or added stays in that same feature (an expense just logged is fixed/removed as money, never as a list item).\n\n' +
+  APP_GUIDE
 
 export type SchemaVariant = 'flat' | 'grouped'
 
@@ -598,7 +628,8 @@ export async function parseAssistant(
     pet: str(p.pet, 40),
     field: FIELDS.includes(p.field) ? p.field : '',
     app: APPS.includes(p.app) ? p.app : '',
-    reply: str(p.reply, 240),
+    topic: TOPICS.includes(p.topic) ? p.topic : '',
+    reply: str(p.reply, intent === 'app_help' ? 420 : 240),
     ref: typeof p.ref === 'string' && /^[ev]\d{1,2}$/.test(p.ref) ? p.ref : '',
   }
   return { out, gap: intent === 'unknown' ? str(p.gap, 160) : '', usage: response.usage }

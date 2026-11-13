@@ -5,8 +5,12 @@
 // and text-only quick picks.
 // (2026-11 redesign: the old screen was an input, a row of chips and a
 // separate "You pay" card, which read as a form rather than a price.)
+// Restyled after the photo frame (2026-11): hero head + art, the tag in the
+// tool's own pink gradient (it was the scheme's clay), the controls on a card
+// with the tool's tint for what's selected.
 import { useEffect, useRef, useState } from 'react'
-import { Animated, StyleSheet, TextInput, View, type LayoutChangeEvent } from 'react-native'
+import { StyleSheet, TextInput, View, type LayoutChangeEvent } from 'react-native'
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated'
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg'
 import { Check, Minus, Pencil, Plus, Tag } from 'lucide-react-native'
 
@@ -16,7 +20,12 @@ import { useI18n } from '@/hooks/useI18n'
 import { formatMoney } from '@/lib/format'
 import { fonts, sp, useTheme } from '@/theme/theme'
 
+import { TOOL_LOOK } from './look'
 import { num } from './shared'
+import { SectionLabel, ToolHero } from './ToolHead'
+
+const LOOK = TOOL_LOOK.discount
+const EASE = Easing.bezier(0.2, 0, 0, 1)
 
 const CHIPS = [10, 15, 20, 30, 50]
 const TAG_H = 214
@@ -29,7 +38,7 @@ const NOTCH = 34 // width of the tag's pointed end
  *  the LOOP gutter left of the tip, so the SVG is wider than the tag. */
 const LOOP = 34
 
-function TagShape({ width, fill }: { width: number; fill: string }) {
+function TagShape({ width }: { width: number }) {
   const w = width
   const h = TAG_H
   const x0 = LOOP // the tip
@@ -42,13 +51,17 @@ function TagShape({ width, fill }: { width: number; fill: string }) {
   return (
     <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
       <Defs>
+        <LinearGradient id="tagFill" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor={LOOK.colors[0]} />
+          <Stop offset="1" stopColor={LOOK.colors[1]} />
+        </LinearGradient>
         <LinearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.16} />
           <Stop offset="0.55" stopColor="#FFFFFF" stopOpacity={0} />
           <Stop offset="1" stopColor="#000000" stopOpacity={0.12} />
         </LinearGradient>
       </Defs>
-      <Path d={body(0)} fill={fill} />
+      <Path d={body(0)} fill="url(#tagFill)" />
       <Path d={body(0)} fill="url(#sheen)" />
       {/* stitching */}
       <Path
@@ -80,6 +93,7 @@ function TagShape({ width, fill }: { width: number; fill: string }) {
 export function Discount() {
   const { c, dark } = useTheme()
   const { t } = useI18n()
+  const reduce = useReducedMotion()
   const [price, setPrice] = useState('')
   const [pct, setPct] = useState(20)
   const [custom, setCustom] = useState('')
@@ -100,16 +114,27 @@ export function Discount() {
   const priceRef = useRef<TextInput>(null)
   const [editing, setEditing] = useState(false)
   const struck = hasDeal && !editing
-  const strike = useRef(new Animated.Value(0)).current
+  const strike = useSharedValue(0)
   useEffect(() => {
-    Animated.timing(strike, { toValue: struck ? 1 : 0, duration: 260, useNativeDriver: true }).start()
-  }, [struck, strike])
+    strike.set(reduce ? (struck ? 1 : 0) : withTiming(struck ? 1 : 0, { duration: 300, easing: EASE }))
+  }, [struck, strike, reduce])
 
-  // 0 → 1 as the deal appears: draws the strike line, fades the sale price in.
-  const deal = useRef(new Animated.Value(0)).current
+  // 0 → 1 as the deal appears: pops the sticker, rises the sale price in.
+  const deal = useSharedValue(0)
   useEffect(() => {
-    Animated.timing(deal, { toValue: hasDeal ? 1 : 0, duration: 320, useNativeDriver: true }).start()
-  }, [hasDeal, deal])
+    deal.set(reduce ? (hasDeal ? 1 : 0) : withTiming(hasDeal ? 1 : 0, { duration: 380, easing: EASE }))
+  }, [hasDeal, deal, reduce])
+
+  const lineW = priceW + 8
+  const strikeStyle = useAnimatedStyle(() => ({
+    // scaleX from the LEFT: shift by half the width as it grows.
+    transform: [{ translateX: -(lineW / 2) * (1 - strike.get()) }, { scaleX: strike.get() }, { rotate: '-4deg' }],
+  }))
+  const stickerStyle = useAnimatedStyle(() => ({
+    opacity: deal.get(),
+    transform: [{ rotate: `${12 + (1 - deal.get()) * 30}deg` }, { scale: 0.4 + deal.get() * 0.6 }],
+  }))
+  const saleStyle = useAnimatedStyle(() => ({ opacity: deal.get(), transform: [{ translateY: (1 - deal.get()) * 10 }] }))
 
   function pickChip(v: number) {
     setPct(v)
@@ -124,14 +149,15 @@ export function Discount() {
     setPct((cur) => Math.min(100, Math.max(0, Math.round(cur) + delta)))
   }
 
-  // On the tag (an ACTION-coloured card): white text, a cream strike and a
-  // cream sticker — red-on-red or the app's green would vanish here.
-  const onTag = c.onAction
+  // On the tag (the tool's pink gradient): white text, a cream strike and a
+  // cream sticker — red-on-pink or the app's green would vanish here.
+  const onTag = '#FFFFFF'
   const cream = '#FFE3A3'
   const ink = '#3A2416'
 
   return (
     <View style={{ gap: sp.lg }}>
+      <ToolHero kind="discount" title={t('calc.tool.discount')} subtitle={t('calc.tool.discountSub')} />
       {/* ── The price tag ── */}
       <View
         onLayout={(e: LayoutChangeEvent) => setTagW(e.nativeEvent.layout.width)}
@@ -139,28 +165,17 @@ export function Discount() {
         style={{
           height: TAG_H,
           transform: [{ rotate: '-1.5deg' }],
-          marginTop: sp.xl,
-          shadowColor: '#5A2E14',
+          marginTop: sp.sm,
+          shadowColor: LOOK.colors[1],
           shadowOpacity: dark ? 0.4 : 0.14,
           shadowRadius: 14,
           shadowOffset: { width: 0, height: 8 },
         }}
       >
-        {tagW ? (
-          <TagShape width={tagW} fill={c.action} />
-        ) : null}
+        {tagW ? <TagShape width={tagW} /> : null}
 
         {/* the % sticker, slapped on the corner */}
-        <Animated.View
-          style={[
-            styles.sticker,
-            {
-              backgroundColor: cream,
-              opacity: deal,
-              transform: [{ rotate: '12deg' }, { scale: deal.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
-            },
-          ]}
-        >
+        <Animated.View style={[styles.sticker, { backgroundColor: cream }, stickerStyle]}>
           <Txt style={{ color: ink, fontFamily: fonts.display, fontSize: 18 }}>−{pct}%</Txt>
         </Animated.View>
 
@@ -219,7 +234,7 @@ export function Discount() {
                   accessibilityLabel={t('common.done')}
                   style={styles.confirm}
                 >
-                  <Check size={18} color={c.action} strokeWidth={3} />
+                  <Check size={18} color={LOOK.tint} strokeWidth={3} />
                 </Pressable>
               )}
             </View>
@@ -239,34 +254,17 @@ export function Discount() {
             </Txt>
             <Animated.View
               pointerEvents="none"
-              style={{
-                position: 'absolute',
-                left: -4,
-                top: '50%',
-                width: priceW + 8,
-                height: 3,
-                borderRadius: 2,
-                backgroundColor: cream,
-                // scaleX from the LEFT: shift by half the width as it grows.
-                transform: [
-                  { translateX: strike.interpolate({ inputRange: [0, 1], outputRange: [-(priceW + 8) / 2, 0] }) },
-                  { scaleX: strike },
-                  { rotate: '-4deg' },
-                ],
-              }}
+              style={[
+                { position: 'absolute', left: -4, top: '50%', width: lineW, height: 3, borderRadius: 2, backgroundColor: cream },
+                strikeStyle,
+              ]}
             />
           </View>
 
           {/* the sale price — mounted only with a deal, so an empty tag keeps
               the original price centred instead of a reserved blank band */}
           {hasDeal ? (
-          <Animated.View
-            style={{
-              opacity: deal,
-              transform: [{ translateY: deal.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
-              gap: 6,
-            }}
-          >
+          <Animated.View style={[{ gap: 6 }, saleStyle]}>
             <View>
               {/* named like the original above it (owner, 2026-11) */}
               <Txt variant="label" style={{ color: onTag, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11 }}>
@@ -290,10 +288,11 @@ export function Discount() {
       {/* ── Discount: deliberately quiet — the tag is the show. A − / + with
           the % in the middle (type it to set any value), then text-only quick
           picks; the active one gets a soft tint, not a filled block. ── */}
-      <View style={{ alignItems: 'center', gap: sp.md, marginTop: sp.lg }}>
+      <SectionLabel style={{ marginTop: sp.md, marginBottom: -sp.xs }}>{t('calc.tool.discount')}</SectionLabel>
+      <View style={[styles.controls, { backgroundColor: c.card, borderColor: c.border }]}>
         <View style={styles.stepper}>
-          <Pressable onPress={() => adjust(-1)} accessibilityLabel="−1%" hitSlop={8} style={[styles.stepBtn, { backgroundColor: c.sheet, borderColor: c.border }]}>
-            <Minus size={18} color={c.textMuted} />
+          <Pressable onPress={() => adjust(-1)} accessibilityLabel="−1%" hitSlop={8} style={[styles.stepBtn, { backgroundColor: LOOK.tint + '1A' }]}>
+            <Minus size={18} color={LOOK.tint} />
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', minWidth: 110, justifyContent: 'center' }}>
             <TextInput
@@ -304,28 +303,34 @@ export function Discount() {
               keyboardType="decimal-pad"
               selectTextOnFocus
               maxLength={4}
-              style={{ fontFamily: fonts.display, fontSize: 34, color: c.text, textAlign: 'right', paddingVertical: 0, minWidth: 30 }}
+              style={{ fontFamily: fonts.display, fontSize: 40, color: LOOK.tint, textAlign: 'right', paddingVertical: 0, minWidth: 30 }}
             />
-            <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: c.text }}>%</Txt>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 24, color: LOOK.tint }}>%</Txt>
             <Txt style={{ fontSize: 13, color: c.textMuted, marginLeft: 6, letterSpacing: 1 }}>{t('calc.off')}</Txt>
           </View>
-          <Pressable onPress={() => adjust(1)} accessibilityLabel="+1%" hitSlop={8} style={[styles.stepBtn, { backgroundColor: c.sheet, borderColor: c.border }]}>
-            <Plus size={18} color={c.textMuted} />
+          <Pressable onPress={() => adjust(1)} accessibilityLabel="+1%" hitSlop={8} style={[styles.stepBtn, { backgroundColor: LOOK.tint + '1A' }]}>
+            <Plus size={18} color={LOOK.tint} />
           </Pressable>
         </View>
 
-        {/* On a light track of its own: bare text straight on the wash had
-            too little contrast (the wash is a saturated peach). */}
-        <View style={[styles.track, { backgroundColor: c.card, borderColor: c.border }]}>
+        {/* quick picks: the active one in the frame's "selected" look */}
+        <View style={styles.track}>
           {CHIPS.map((v) => {
             const active = pct === v
             return (
               <Pressable
                 key={v}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
                 onPress={() => pickChip(v)}
-                style={[styles.chip, active && [styles.chipOn, { backgroundColor: c.sheet }]]}
+                style={[
+                  styles.chip,
+                  active
+                    ? { backgroundColor: LOOK.tint + '1F', borderColor: LOOK.tint, borderWidth: 1.5 }
+                    : { backgroundColor: c.surface2, borderColor: 'transparent', borderWidth: 1.5 },
+                ]}
               >
-                <Txt style={{ fontFamily: active ? fonts.semibold : fonts.medium, fontSize: 14, color: active ? c.accent : c.text }}>
+                <Txt style={{ fontFamily: active ? fonts.semibold : fonts.medium, fontSize: 14, color: active ? LOOK.tint : c.text }}>
                   {v}%
                 </Txt>
               </Pressable>
@@ -379,34 +384,29 @@ const styles = StyleSheet.create({
     gap: sp.lg,
   },
   stepBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: StyleSheet.hairlineWidth,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#5A2E14',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+  },
+  controls: {
+    alignItems: 'center',
+    gap: sp.lg,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: sp.lg,
+    paddingHorizontal: sp.md,
   },
   track: {
     flexDirection: 'row',
-    padding: 3,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: sp.sm,
   },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 999,
-  },
-  chipOn: {
-    shadowColor: '#5A2E14',
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
   },
 })

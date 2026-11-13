@@ -281,7 +281,8 @@ export default function Settings() {
   const orderedApps = useMemo(() => {
     const pos = new Map(appOrder.map((id, i) => [id, i]))
     const rank = (id: string) => pos.get(id) ?? appOrder.length + APPS.findIndex((x) => x.id === id)
-    return [...APPS].sort((a, b) => rank(a.id) - rank(b.id))
+    // Family has no Home tile (the family strip opens it), so nothing to hide or order.
+    return APPS.filter((a) => a.id !== 'family').sort((a, b) => rank(a.id) - rank(b.id))
   }, [appOrder])
   const { profile, signOut } = useAuth()
   const { isPlus, restore, isTrial, trialDaysLeft, trialExpired, managementUrl } = usePlus()
@@ -685,9 +686,9 @@ export default function Settings() {
 
 
         {/* Roof — the assistant's voice: "Ei Roof" + spoken answers */}
-        <View style={{ gap: sp.sm }}>
+        <View style={{ gap: sp.sm }} onLayout={registerSection('roof')}>
           <SectionLabel>{t('settings.roof')}</SectionLabel>
-          <Card>
+          <Card style={highlighted === 'roof' ? { borderWidth: 2, borderColor: c.accent } : undefined}>
             <RoofSettings />
           </Card>
         </View>

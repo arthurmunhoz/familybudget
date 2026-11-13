@@ -21,15 +21,19 @@ import {
   ChevronUp,
   Images,
   ReceiptText,
-  ScanLine,
+  Share2,
   Sparkles,
   Sun,
   TriangleAlert,
   UserPlus,
+  UsersRound,
+  HandCoins,
   X,
 } from 'lucide-react-native'
 import { ActivityIndicator } from 'react-native'
 
+import { RowIcon } from '@/components/form'
+import { GradientBox } from '@/components/home/GradientBox'
 import { Pressable } from '@/components/Pressable'
 import { Card, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
@@ -39,15 +43,19 @@ import { usePlus } from '@/lib/plus'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 import { pickBillPhoto, scanBill, ScanError, type ScannedBill } from './billScan'
+import { TOOL_LOOK, toolCard } from './look'
+import { ChoiceChip, SectionLabel, ToolHeroArt } from './ToolHead'
 import { Avatar, colorFor, firstName } from './shared'
 import { itemSplit, type PersonShare, type SplitItem, type Tip } from './splitMath'
-import { EditRow, TipGrid } from './steps'
+import { EditRow, HeroLine, ResultHero, TipGrid } from './steps'
 import { StepTitle, WizardScreen } from './wizard'
 
 type Stage = 'intro' | 'scan' | 'people' | 'assign' | 'extras' | 'summary'
 const ORDER: Stage[] = ['intro', 'scan', 'people', 'assign', 'extras', 'summary']
 const STEPS = 5
 const progressIndex = (s: Stage) => Math.max(0, ORDER.indexOf(s) - 1)
+const LOOK = TOOL_LOOK.items
+const TINT = LOOK.tint
 
 type ScanState =
   | { phase: 'working'; uri: string }
@@ -55,6 +63,7 @@ type ScanState =
   | { phase: 'error'; uri: string; reason: ScanError['reason']; message?: string }
 
 export function ItemSplitWizard() {
+  const { c } = useTheme()
   const { t } = useI18n()
   const { isFree } = usePlus()
   const { profiles } = useAuth()
@@ -187,19 +196,21 @@ export function ItemSplitWizard() {
   const removeItem = (id: string) => setItems((its) => its.filter((it) => it.id !== id))
 
   const result = itemSplit(items, people, tax, tip)
-  const title = t('calc.tool.byItem')
 
   // ── Plus gate (deep links land here too) ───────────────────────────────
   if (isFree) {
     return (
       <WizardScreen
-        title={title}
+        kind="items"
         steps={STEPS}
         index={0}
         onBack={exit}
         hideProgress
         primary={{ label: t('settings.getPlus'), onPress: () => router.push('/paywall') }}
       >
+        <View style={{ alignSelf: 'center', marginTop: sp.sm }}>
+          <ToolHeroArt kind="items" size={128} />
+        </View>
         <StepTitle title={t('calc.plusByItem')} hint={t('calc.plusByItemHint')} />
       </WizardScreen>
     )
@@ -208,13 +219,13 @@ export function ItemSplitWizard() {
   if (stage === 'intro') {
     return (
       <WizardScreen
-        title={title}
+        kind="items"
         steps={STEPS}
         index={0}
         direction={dir}
         onBack={onBack}
-        primary={{ label: t('bill.openCamera'), onPress: () => void capture(true) }}
-        secondary={{ label: t('bill.scanLibrary'), onPress: () => void capture(false) }}
+        primary={{ label: t('bill.openCamera'), onPress: () => void capture(true), icon: <Camera size={18} color="#fff" /> }}
+        secondary={{ label: t('bill.scanLibrary'), onPress: () => void capture(false), icon: <Images size={17} color={TINT} /> }}
       >
         <IntroStep />
       </WizardScreen>
@@ -226,7 +237,7 @@ export function ItemSplitWizard() {
     const capped = failed && scan.reason === 'monthly_cap'
     return (
       <WizardScreen
-        title={title}
+        kind="items"
         steps={STEPS}
         index={0}
         direction={dir}
@@ -240,7 +251,8 @@ export function ItemSplitWizard() {
         }
         secondary={failed && !capped ? { label: t('bill.scanLibrary'), onPress: () => void capture(false) } : undefined}
       >
-        <ScanningStep scan={scan} />
+        {/* keyed by the photo: a re-scan starts its paced stages over */}
+        <ScanningStep key={scan.uri} scan={scan} />
       </WizardScreen>
     )
   }
@@ -249,7 +261,7 @@ export function ItemSplitWizard() {
     const pending = nameInput.trim()
     return (
       <WizardScreen
-        title={title}
+        kind="items"
         steps={STEPS}
         index={progressIndex('people')}
         direction={dir}
@@ -283,7 +295,7 @@ export function ItemSplitWizard() {
     const proceed = () => next('extras')
     return (
       <WizardScreen
-        title={title}
+        kind="items"
         steps={STEPS}
         index={progressIndex('assign')}
         direction={dir}
@@ -312,9 +324,7 @@ export function ItemSplitWizard() {
         }}
       >
         <StepTitle step={3} steps={STEPS} title={t('bill.q.assign')} hint={t('bill.q.assignHint')} />
-        <Txt variant="label" style={{ marginBottom: sp.sm }}>
-          {t('bill.assignedCount', { done, total: items.length })}
-        </Txt>
+        <SectionLabel>{t('bill.assignedCount', { done, total: items.length })}</SectionLabel>
         <AssignStep
           items={items}
           people={people}
@@ -329,7 +339,7 @@ export function ItemSplitWizard() {
   if (stage === 'extras') {
     return (
       <WizardScreen
-        title={title}
+        kind="items"
         steps={STEPS}
         index={progressIndex('extras')}
         direction={dir}
@@ -337,13 +347,11 @@ export function ItemSplitWizard() {
         primary={{ label: cta, onPress: () => next('summary') }}
       >
         <StepTitle step={4} steps={STEPS} title={t('bill.q.extras')} hint={t('bill.q.extrasHint')} />
-        <Card style={{ marginBottom: sp.xl }}>
+        <View style={[toolCard(c), { marginBottom: sp.xl, padding: sp.md, gap: 4 }]}>
           <Line label={t('bill.subtotal')} value={formatMoney(result.subtotal)} />
           <Line label={t('bill.taxFromPhoto')} value={formatMoney(tax)} />
-        </Card>
-        <Txt variant="label" style={{ marginBottom: sp.sm }}>
-          {t('bill.tip')}
-        </Txt>
+        </View>
+        <SectionLabel>{t('bill.tip')}</SectionLabel>
         <TipGrid base={result.subtotal} value={tip} onChange={setTip} fromBill={billTip} />
       </WizardScreen>
     )
@@ -381,29 +389,31 @@ export function ItemSplitWizard() {
 
   return (
     <WizardScreen
-      title={title}
+      kind="items"
       steps={STEPS}
       index={progressIndex('summary')}
       direction={dir}
       onBack={onBack}
       swipeBack
-      primary={{ label: t('calc.share'), onPress: share }}
+      primary={{ label: t('calc.share'), onPress: share, icon: <Share2 size={18} color="#fff" /> }}
       secondary={{ label: t('common.done'), onPress: exit }}
     >
       <StepTitle step={5} steps={STEPS} title={t('calc.q.summary')} hint={t('bill.summaryHint')} />
       <SummaryStep result={result} />
       <View style={{ height: sp.lg }} />
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <EditRow first label={t('bill.peopleShort')} value={String(people.length)} onPress={() => edit('people')} />
+      <View style={[toolCard(c), { overflow: 'hidden' }]}>
+        <EditRow first icon={UsersRound} label={t('bill.peopleShort')} value={String(people.length)} onPress={() => edit('people')} />
         <EditRow
+          icon={ReceiptText}
           label={t('bill.items')}
           value={t('bill.assignedShort', { done: items.length - result.unassigned.length, total: items.length })}
           onPress={() => edit('assign')}
         />
-        <EditRow label={t('bill.tip')} value={tipLabel} onPress={() => edit('extras')} />
-      </Card>
-      <Pressable onPress={newPhoto} style={{ alignSelf: 'center', padding: sp.md, marginTop: sp.sm }}>
-        <Txt variant="label">{t('bill.newPhoto')}</Txt>
+        <EditRow icon={HandCoins} label={t('bill.tip')} value={tipLabel} onPress={() => edit('extras')} />
+      </View>
+      <Pressable onPress={newPhoto} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', padding: sp.md, marginTop: sp.sm }}>
+        <Camera size={16} color={TINT} />
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: TINT }}>{t('bill.newPhoto')}</Txt>
       </Pressable>
     </WizardScreen>
   )
@@ -421,20 +431,21 @@ function IntroStep() {
   ]
   return (
     <View>
-      <View style={[styles.introArt, { backgroundColor: c.accentSoft }]}>
-        <ScanLine size={56} color={c.accent} strokeWidth={1.6} />
+      <View style={{ alignSelf: 'center', marginTop: sp.sm }}>
+        <ToolHeroArt kind="items" size={128} />
       </View>
       <StepTitle step={1} steps={STEPS} title={t('bill.intro.title')} hint={t('bill.intro.body')} />
-      <Card style={{ gap: sp.lg }}>
-        {tips.map(({ icon: Icon, text }) => (
-          <View key={text} style={{ flexDirection: 'row', gap: sp.md, alignItems: 'center' }}>
-            <View style={[styles.tipIcon, { backgroundColor: c.surface }]}>
-              <Icon size={20} color={c.accent} />
-            </View>
-            <Txt style={{ flex: 1 }}>{text}</Txt>
+      <View style={[toolCard(c), { overflow: 'hidden' }]}>
+        {tips.map(({ icon: Icon, text }, i) => (
+          <View
+            key={text}
+            style={[styles.tipRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}
+          >
+            <RowIcon Icon={Icon} tint={TINT} />
+            <Txt style={{ flex: 1, fontSize: 15, color: c.text }}>{text}</Txt>
           </View>
         ))}
-      </Card>
+      </View>
     </View>
   )
 }
@@ -451,7 +462,6 @@ function ScanningStep({ scan }: { scan: ScanState }) {
 
   useEffect(() => {
     if (!working) return
-    setTick(0)
     const a = setTimeout(() => setTick(1), 1200)
     const b = setTimeout(() => setTick(2), 4500)
     return () => {
@@ -461,11 +471,11 @@ function ScanningStep({ scan }: { scan: ScanState }) {
   }, [working, scan.uri])
 
   useEffect(() => {
-    sweep.value = 0
-    sweep.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }), -1, true)
+    sweep.set(0)
+    sweep.set(withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }), -1, true))
   }, [sweep])
 
-  const lineStyle = useAnimatedStyle(() => ({ top: `${sweep.value * 100}%` }))
+  const lineStyle = useAnimatedStyle(() => ({ top: `${sweep.get() * 100}%` }))
 
   const stages = [t('bill.stage.upload'), t('bill.stage.items'), t('bill.stage.totals')]
   const doneUpTo = scan.phase === 'done' ? stages.length : scan.phase === 'error' ? -1 : tick
@@ -475,12 +485,12 @@ function ScanningStep({ scan }: { scan: ScanState }) {
       <View style={[styles.photo, { borderColor: c.border, backgroundColor: c.surface }]}>
         <Image source={{ uri: scan.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         {working ? (
-          <Animated.View style={[styles.scanLine, { backgroundColor: c.action, shadowColor: c.action }, lineStyle]} />
+          <Animated.View style={[styles.scanLine, { backgroundColor: TINT, shadowColor: TINT }, lineStyle]} />
         ) : null}
         {scan.phase === 'done' ? (
-          <View style={[styles.photoBadge, { backgroundColor: c.income }]}>
+          <GradientBox colors={LOOK.colors} radius={28} style={styles.photoBadge}>
             <Check size={28} color="#ffffff" strokeWidth={3} />
-          </View>
+          </GradientBox>
         ) : null}
       </View>
 
@@ -496,7 +506,7 @@ function ScanningStep({ scan }: { scan: ScanState }) {
         </View>
       ) : (
         <View style={{ alignSelf: 'stretch', marginTop: sp.xl, gap: sp.md }}>
-          <Txt variant="h2" style={{ textAlign: 'center', marginBottom: sp.xs }}>
+          <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 32, textAlign: 'center', marginBottom: sp.xs }}>
             {scan.phase === 'done' ? t('bill.foundItems', { count: scan.count }) : t('bill.scanning')}
           </Txt>
           {stages.map((label, i) => {
@@ -506,9 +516,9 @@ function ScanningStep({ scan }: { scan: ScanState }) {
               <View key={label} style={styles.stageRow}>
                 <View style={styles.stageIcon}>
                   {done ? (
-                    <Check size={18} color={c.income} strokeWidth={3} />
+                    <Check size={18} color={TINT} strokeWidth={3} />
                   ) : active ? (
-                    <ActivityIndicator size="small" color={c.accent} />
+                    <ActivityIndicator size="small" color={TINT} />
                   ) : (
                     <View style={[styles.stageDot, { backgroundColor: c.surface2 }]} />
                   )}
@@ -527,8 +537,8 @@ function FoundBanner({ count, subtotal }: { count: number; subtotal: number }) {
   const { c } = useTheme()
   const { t } = useI18n()
   return (
-    <View style={[styles.found, { backgroundColor: c.accentSoft }]}>
-      <ReceiptText size={18} color={c.accent} />
+    <View style={[styles.found, { backgroundColor: TINT + '14', borderColor: TINT + '55' }]}>
+      <ReceiptText size={18} color={TINT} />
       <Txt style={{ flex: 1, color: c.text }}>
         {t('bill.foundSummary', { count, amount: formatMoney(subtotal) })}
       </Txt>
@@ -557,19 +567,17 @@ function PeopleStep({
     <View style={{ gap: sp.lg }}>
       {suggestions.length > 0 ? (
         <View>
-          <Txt variant="label" style={{ marginBottom: sp.sm }}>
-            {t('bill.fromHousehold')}
-          </Txt>
+          <SectionLabel>{t('bill.fromHousehold')}</SectionLabel>
           <View style={styles.wrap}>
             {suggestions.map((n) => (
               <Pressable
                 key={n}
                 onPress={() => onAdd(n)}
-                style={[styles.suggest, { backgroundColor: c.card, borderColor: c.border }]}
+                style={({ pressed }) => [styles.suggest, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
               >
                 <Avatar name={n} sm />
                 <Txt style={{ fontFamily: fonts.semibold, color: c.text }}>{firstName(n)}</Txt>
-                <UserPlus size={15} color={c.accent} />
+                <UserPlus size={15} color={TINT} />
               </Pressable>
             ))}
           </View>
@@ -593,17 +601,17 @@ function PeopleStep({
           accessibilityLabel={t('common.add')}
           onPress={() => onAdd(nameInput)}
           disabled={!nameInput.trim()}
-          style={[styles.addBtn, { backgroundColor: nameInput.trim() ? c.action : c.surface }]}
+          style={{ opacity: nameInput.trim() ? 1 : 0.4 }}
         >
-          <UserPlus size={20} color={nameInput.trim() ? c.onAction : c.textFaint} />
+          <GradientBox colors={LOOK.colors} radius={16} style={styles.addBtn}>
+            <UserPlus size={20} color="#fff" />
+          </GradientBox>
         </Pressable>
       </View>
 
       {people.length > 0 ? (
         <View>
-          <Txt variant="label" style={{ marginBottom: sp.sm }}>
-            {t('bill.splittingCount', { count: people.length })}
-          </Txt>
+          <SectionLabel>{t('bill.splittingCount', { count: people.length })}</SectionLabel>
           <View style={styles.wrap}>
             {people.map((p) => (
               <Pressable
@@ -648,7 +656,7 @@ function AssignStep({
             key={it.id}
             style={[
               styles.itemCard,
-              { backgroundColor: c.card, borderColor: none ? c.action : c.border, borderWidth: none ? 1 : StyleSheet.hairlineWidth },
+              { backgroundColor: c.card, borderColor: none ? TINT : c.border, borderWidth: none ? 1.5 : StyleSheet.hairlineWidth },
             ]}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
@@ -668,14 +676,7 @@ function AssignStep({
             </View>
             <View style={[styles.wrap, { marginTop: sp.sm }]}>
               {people.length > 1 ? (
-                <Pressable
-                  onPress={() => onAll(it.id)}
-                  style={[styles.chip, { backgroundColor: all ? c.text : c.surface }]}
-                >
-                  <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: all ? c.sheet : c.textMuted }}>
-                    {t('common.everyone')}
-                  </Txt>
-                </Pressable>
+                <ChoiceChip label={t('common.everyone')} on={all} tint={TINT} onPress={() => onAll(it.id)} />
               ) : null}
               {people.map((p) => {
                 const on = it.people.includes(p)
@@ -709,27 +710,21 @@ function SummaryStep({ result }: { result: ReturnType<typeof itemSplit> }) {
   const { t } = useI18n()
   return (
     <View style={{ gap: sp.sm }}>
-      <Card style={{ alignItems: 'center', paddingVertical: sp.lg, gap: 2 }}>
-        <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.6, color: c.textFaint }}>
-          {t('bill.billTotal')}
-        </Txt>
-        <Txt style={{ fontSize: 40, fontFamily: fonts.display, color: c.text, fontVariant: ['tabular-nums'] }}>
-          {formatMoney(result.total)}
-        </Txt>
-        <Txt variant="faint">
+      <ResultHero kicker={t('bill.billTotal')} amount={formatMoney(result.total)}>
+        <HeroLine faint>
           {t('bill.totalBreakdown', {
             subtotal: formatMoney(result.subtotal),
             tax: formatMoney(result.tax),
             tip: formatMoney(result.tip),
           })}
-        </Txt>
-      </Card>
+        </HeroLine>
+      </ResultHero>
       {result.people.map((p) => (
         <PersonCard key={p.name} share={p} />
       ))}
       {result.unassigned.length > 0 ? (
-        <View style={[styles.found, { backgroundColor: c.accentSoft }]}>
-          <TriangleAlert size={18} color={c.accent} />
+        <View style={[styles.found, { backgroundColor: TINT + '14', borderColor: TINT + '55' }]}>
+          <TriangleAlert size={18} color={TINT} />
           <Txt style={{ flex: 1, color: c.text }}>
             {t('bill.leftOut', {
               count: result.unassigned.length,
@@ -748,7 +743,7 @@ function PersonCard({ share }: { share: PersonShare }) {
   const [open, setOpen] = useState(false)
   const Chevron = open ? ChevronUp : ChevronDown
   return (
-    <Card onPress={() => setOpen((o) => !o)} style={{ paddingVertical: sp.md }}>
+    <Card onPress={() => setOpen((o) => !o)} style={{ paddingVertical: sp.md, borderRadius: 20 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
         <Avatar name={share.name} />
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -801,20 +796,11 @@ function Line({ label, value, small }: { label: string; value: string; small?: b
 }
 
 const styles = StyleSheet.create({
-  introArt: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginTop: sp.lg,
-  },
-  tipIcon: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  tipRow: { flexDirection: 'row', gap: sp.md, alignItems: 'center', paddingHorizontal: sp.md, paddingVertical: 14 },
   photo: {
     width: 200,
     height: 260,
-    borderRadius: radius.lg,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
     marginTop: sp.xl,
@@ -846,7 +832,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: sp.sm,
-    borderRadius: radius.md,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: sp.md,
     marginBottom: sp.lg,
   },
@@ -871,14 +858,14 @@ const styles = StyleSheet.create({
   },
   nameInput: {
     flex: 1,
-    borderRadius: radius.md,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: sp.md,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontSize: 16,
   },
-  addBtn: { width: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  itemCard: { borderRadius: radius.lg, padding: sp.md },
+  addBtn: { width: 50, flex: 1, alignItems: 'center', justifyContent: 'center' },
+  itemCard: { borderRadius: 20, padding: sp.md },
   chip: { borderRadius: radius.pill, paddingHorizontal: sp.md, paddingVertical: 6 },
   line: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingVertical: 2 },
 })

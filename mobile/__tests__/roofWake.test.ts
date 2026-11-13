@@ -32,3 +32,26 @@ describe('speakable / voiceKey', () => {
     expect(voiceKey('pt', 'Pronto')).not.toBe(voiceKey('en', 'Pronto'))
   })
 })
+
+describe('afterWake: an American "roof" inside Portuguese', () => {
+  it('takes the spellings pt-BR gives it', () => {
+    expect(afterWake('ei rough põe café na lista')).toBe('põe café na lista')
+    expect(afterWake('Ei, rof. O que tem hoje?')).toBe('O que tem hoje?')
+    expect(afterWake('hey ru')).toBe('')
+  })
+  it('still ignores ordinary words that start the same', () => {
+    expect(afterWake('ei rua da escola')).toBe(null)
+    expect(afterWake('a roupa está no varal')).toBe(null)
+  })
+})
+
+describe('afterWake: Brazilian R and a bare English call', () => {
+  it('takes the h-sound spellings', () => {
+    expect(afterWake('ei hufe põe leite')).toBe('põe leite')
+    expect(afterWake('Ei, Rute')).toBe('')
+  })
+  it('a transcript that starts with "roof" is a call', () => {
+    expect(afterWake('roof what is on today')).toBe('what is on today')
+    expect(afterWake('o roof da casa')).toBe(null)
+  })
+})

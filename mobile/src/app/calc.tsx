@@ -23,10 +23,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, type Href } from 'expo-router'
 import { Sparkles } from 'lucide-react-native'
 
+import Animated, { Easing, FadeInDown } from 'react-native-reanimated'
+
 import { Pressable } from '@/components/Pressable'
 import { Txt } from '@/components/ui'
 import type { Gradient } from '@/components/home/palette'
-import { FRAME_LOOK } from '@/apps/calc/frame/look'
+import { TOOL_LOOK } from '@/apps/calc/look'
 import { ToolArt, type ToolArtKind } from '@/apps/calc/ToolArt'
 import { ToolTopBar } from '@/apps/calc/wizard'
 import { useBottomGap } from '@/hooks/useBottomGap'
@@ -45,22 +47,25 @@ interface Tool {
   plus?: boolean
   /** Powered by AI — gets a "✨ AI" badge on the tile. */
   ai?: boolean
+  /** Entrance order (the tiles rise in one after another). */
+  order: number
 }
 
-const EVEN: Tool = { id: 'even', route: '/calc/even', colors: ['#5B86F5', '#3F57D6'], title: 'calc.tool.even', sub: 'calc.tool.evenSub' }
+const EVEN: Tool = { id: 'even', route: '/calc/even', colors: TOOL_LOOK.even.colors, title: 'calc.tool.even', sub: 'calc.tool.evenSub', order: 2 }
 const ITEMS: Tool = {
   id: 'items',
   route: '/calc/items',
-  colors: ['#A77CF2', '#6E3FD3'],
+  colors: TOOL_LOOK.items.colors,
+  order: 3,
   title: 'calc.tool.byItem',
   sub: 'calc.tool.byItemSub',
   plus: true,
   ai: true,
 }
-const DEAL: Tool = { id: 'deal', route: '/calc/deal', colors: ['#2CC2B4', '#11807F'], title: 'calc.tool.unit', sub: 'calc.tool.unitSub' }
-const DISCOUNT: Tool = { id: 'discount', route: '/calc/discount', colors: ['#F2687B', '#C8355F'], title: 'calc.tool.discount', sub: 'calc.tool.discountSub' }
-const TAG: Tool = { id: 'tag', route: '/calc/tag', colors: ['#FFB547', '#D9741C'], title: 'calc.tool.tag', sub: 'calc.tool.tagSub' }
-const FRAME: Tool = { id: 'frame', route: '/calc/frame', colors: FRAME_LOOK.colors, title: 'calc.tool.frame', sub: 'calc.tool.frameSub' }
+const DEAL: Tool = { id: 'deal', route: '/calc/deal', colors: TOOL_LOOK.deal.colors, title: 'calc.tool.unit', sub: 'calc.tool.unitSub', order: 4 }
+const DISCOUNT: Tool = { id: 'discount', route: '/calc/discount', colors: TOOL_LOOK.discount.colors, title: 'calc.tool.discount', sub: 'calc.tool.discountSub', order: 5 }
+const TAG: Tool = { id: 'tag', route: '/calc/tag', colors: TOOL_LOOK.tag.colors, title: 'calc.tool.tag', sub: 'calc.tool.tagSub', order: 1 }
+const FRAME: Tool = { id: 'frame', route: '/calc/frame', colors: TOOL_LOOK.frame.colors, title: 'calc.tool.frame', sub: 'calc.tool.frameSub', order: 0 }
 const TOOL_COUNT = 6
 
 export default function UtilitiesScreen() {
@@ -135,11 +140,18 @@ function ToolTile({ tool, locked, onPress }: { tool: Tool; locked: boolean; onPr
   const { c, dark } = useTheme()
   const { t } = useI18n()
   return (
+    <Animated.View style={{ flex: 1 }} entering={FadeInDown.delay(60 * tool.order).duration(380).easing(Easing.bezier(0.2, 0, 0, 1))}>
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.tile, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.75 : 1 }]}
+      style={({ pressed }) => [
+        styles.tile,
+        { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
+      ]}
     >
+      {/* the tool's colour as a soft glow in the corner, behind its art —
+          the frame's tiles carry their colour; a full fill was too loud */}
+      <View pointerEvents="none" style={[styles.glow, { backgroundColor: tool.colors[0] + (dark ? '2A' : '1E') }]} />
       <View style={styles.tileTop}>
         <ToolArt kind={tool.id} colors={tool.colors} dark={dark} size={50} />
         {tool.ai ? (
@@ -160,12 +172,13 @@ function ToolTile({ tool, locked, onPress }: { tool: Tool; locked: boolean; onPr
         </Txt>
       </View>
     </Pressable>
+    </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
-  bigTitle: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, letterSpacing: -0.8 },
-  count: { fontFamily: fonts.display, fontSize: 18, lineHeight: 23 },
+  bigTitle: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8 },
+  count: { fontFamily: fonts.display, fontSize: 22, lineHeight: 28, letterSpacing: -0.4, marginTop: 2 },
   tip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -183,6 +196,7 @@ const styles = StyleSheet.create({
   grid: { flex: 1, marginTop: sp.lg, gap: sp.md },
   row: { flex: 1, flexDirection: 'row', gap: sp.md, minHeight: 124, maxHeight: 190 },
   col: { flex: 1 },
-  tile: { flex: 1, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, padding: 14, justifyContent: 'space-between' },
+  tile: { flex: 1, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: 14, justifyContent: 'space-between', overflow: 'hidden' },
+  glow: { position: 'absolute', top: -38, left: -38, width: 130, height: 130, borderRadius: 65 },
   tileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
 })

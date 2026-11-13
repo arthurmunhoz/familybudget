@@ -13,7 +13,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Directory, File, Paths } from 'expo-file-system'
 import { requireOptionalNativeModule } from 'expo-modules-core'
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 
 import { supabase } from '@/lib/supabase'
 
@@ -36,7 +36,9 @@ export function loadRoofPrefs(): Promise<RoofPrefs> {
     loaded = AsyncStorage.getItem(KEY)
       .then((raw) => {
         const j = raw ? (JSON.parse(raw) as Partial<RoofPrefs>) : {}
-        current = { ...DEFAULTS, ...j }
+        // A switch flipped before the disk answered wins over what was stored.
+        current = { ...DEFAULTS, ...j, ...touched }
+        subs.forEach((f) => f(current))
         return current
       })
       .catch(() => current)
@@ -44,25 +46,33 @@ export function loadRoofPrefs(): Promise<RoofPrefs> {
   return loaded
 }
 
+// Prefs changed this session (see loadRoofPrefs).
+let touched: Partial<RoofPrefs> = {}
+
 export function setRoofPref<K extends keyof RoofPrefs>(k: K, v: RoofPrefs[K]) {
+  touched = { ...touched, [k]: v }
   current = { ...current, [k]: v }
   subs.forEach((f) => f(current))
   void AsyncStorage.setItem(KEY, JSON.stringify(current)).catch(() => {})
 }
 
+/** The live prefs: one store shared by every screen (Settings and the Home
+ *  both read it), so a switch flipped in one shows in the other at once. The
+ *  hook used to copy the launch-time value into local state and could hand a
+ *  newly mounted screen the old one (2026-11-12). */
 export function useRoofPrefs(): RoofPrefs {
-  const [p, setP] = useState(current)
   useEffect(() => {
-    let alive = true
-    void loadRoofPrefs().then((v) => alive && setP(v))
-    subs.add(setP)
-    return () => {
-      alive = false
-      subs.delete(setP)
-    }
+    void loadRoofPrefs()
   }, [])
-  return p
+  return useSyncExternalStore(subscribe, snapshot)
 }
+const subscribe = (f: () => void) => {
+  subs.add(f)
+  return () => {
+    subs.delete(f)
+  }
+}
+const snapshot = () => current
 
 // ── speaking ─────────────────────────────────────────────────────────────────
 

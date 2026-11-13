@@ -10,24 +10,50 @@ import { Alert, StyleSheet, useWindowDimensions, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Localization from 'expo-localization'
 import { router } from 'expo-router'
-import { Check } from 'lucide-react-native'
+import {
+  BedDouble,
+  Check,
+  House,
+  ImageDown,
+  Mail,
+  PenLine,
+  Phone,
+  Plane,
+  Printer,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react-native'
 
+import { FormSection, NoteRow, RowIcon, TextRow } from '@/components/form'
 import { Pressable } from '@/components/Pressable'
-import { Field, Txt } from '@/components/ui'
+import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
 import { DICTS, type TKey } from '@/lib/i18n'
 import { formatPhone } from '@/lib/phone'
 import { fetchMemberPhones } from '@/lib/pings'
 import { pickOn } from '@/theme/contrast'
-import { fonts, radius, sp, useTheme } from '@/theme/theme'
+import { sp, useTheme } from '@/theme/theme'
 
+import { TOOL_LOOK, toolCard } from '../look'
 import { Avatar, firstName } from '../shared'
+import { ChoiceChip, SectionLabel, ToolHero } from '../ToolHead'
 import { WizardScreen } from '../wizard'
 import { NeedsUpdateError, printCard, shareCard } from './printing'
 import { CARD_COLORS, type PrintableTemplate, type PrintValues } from './templates'
 
 const draftKey = (id: string) => `oneroof-printable:${id}`
+const LOOK = TOOL_LOOK.tag
+
+/** Each field's row tile, by key (a new template's unknown key gets a pen). */
+const FIELD_ICON: Record<string, LucideIcon> = {
+  name: UserRound,
+  phone: Phone,
+  email: Mail,
+  address: House,
+  destination: BedDouble,
+  flight: Plane,
+}
 
 interface Draft {
   values: PrintValues
@@ -145,19 +171,30 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
 
   return (
     <WizardScreen
-      title={t(template.title)}
+      kind="tag"
       steps={1}
       index={0}
       onBack={exit}
       hideProgress
-      primary={{ label: t('printable.print'), onPress: () => void run('print'), loading: busy === 'print', disabled: !!busy }}
-      secondary={{ label: t('printable.saveImage'), onPress: () => void run('share'), disabled: !!busy }}
+      primary={{
+        label: t('printable.print'),
+        onPress: () => void run('print'),
+        loading: busy === 'print',
+        disabled: !!busy,
+        icon: <Printer size={18} color="#fff" />,
+      }}
+      secondary={{
+        label: t('printable.saveImage'),
+        onPress: () => void run('share'),
+        disabled: !!busy,
+        icon: <ImageDown size={17} color={LOOK.tint} />,
+      }}
     >
-      {/* The screen header already names the tool, so no second title — just
-          what it's for, in a readable size (user feedback 2026-11). */}
-      <Txt style={{ fontSize: 17, lineHeight: 24, color: c.textMuted, marginBottom: sp.md }}>{t(template.intro)}</Txt>
+      {/* The frame's head: the tool's name large, what it does faded under
+          it, its art on the right. */}
+      <ToolHero kind="tag" title={t(template.title)} subtitle={t('calc.tool.tagSub')} />
 
-      <View style={[styles.stage, { backgroundColor: c.surface }]}>
+      <View style={[styles.stage, toolCard(c)]}>
         {/* The shadow lives on an OUTER view so the snapshot (taken of the
             inner one) is just the card, with clean transparent corners. */}
         <View style={styles.shadow}>
@@ -165,8 +202,12 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
             <Card values={values} color={color} width={previewW} label={printLabel} />
           </View>
         </View>
+        <Txt variant="faint" style={styles.note}>
+          {t(template.intro)}
+        </Txt>
       </View>
 
+      <SectionLabel>{t('printable.color')}</SectionLabel>
       <View style={styles.swatches}>
         {CARD_COLORS.map((col) => {
           const on = col === color
@@ -177,44 +218,41 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
               accessibilityState={{ selected: on }}
               accessibilityLabel={t('printable.color')}
               onPress={() => setColor(col)}
-              style={[styles.swatch, { backgroundColor: col, borderColor: on ? c.text : 'transparent' }]}
+              style={[styles.ring, { borderColor: on ? LOOK.tint : 'transparent' }]}
             >
-              {on ? <Check size={16} color={pickOn(col)} strokeWidth={3} /> : null}
+              <View style={[styles.swatch, { backgroundColor: col }]}>
+                {on ? <Check size={16} color={pickOn(col)} strokeWidth={3} /> : null}
+              </View>
             </Pressable>
           )
         })}
       </View>
 
       {members.length > 0 ? (
-        <View style={{ marginBottom: sp.lg }}>
-          <Txt variant="label" style={{ marginBottom: sp.sm }}>
-            {t('printable.fillFrom')}
-          </Txt>
+        <View style={{ marginBottom: sp.xl }}>
+          <SectionLabel>{t('printable.fillFrom')}</SectionLabel>
           <View style={styles.wrap}>
-            {members.map((m) => {
-              const on = (values.name ?? '') === m.name
-              return (
-                <Pressable
-                  key={m.email}
-                  onPress={() => fillFrom(m.email, m.name)}
-                  style={[
-                    styles.member,
-                    { backgroundColor: on ? c.accentSoft : c.card, borderColor: on ? c.action : c.border },
-                  ]}
-                >
-                  <Avatar name={m.name} sm />
-                  <Txt style={{ fontFamily: fonts.semibold, color: c.text }}>{firstName(m.name)}</Txt>
-                </Pressable>
-              )
-            })}
+            {members.map((m) => (
+              <ChoiceChip
+                key={m.email}
+                label={firstName(m.name)}
+                on={(values.name ?? '') === m.name}
+                tint={LOOK.tint}
+                left={<Avatar name={m.name} sm />}
+                onPress={() => fillFrom(m.email, m.name)}
+              />
+            ))}
           </View>
         </View>
       ) : null}
 
-      <View style={{ gap: sp.md }}>
-        {template.fields.map((f) => (
-          <Field
+      <FormSection>
+        {template.fields.map((f) => {
+          const Row = f.multiline ? NoteRow : TextRow
+          return (
+          <Row
             key={f.key}
+            icon={<RowIcon Icon={FIELD_ICON[f.key] ?? PenLine} tint={LOOK.tint} />}
             label={template.required.includes(f.key) ? `${t(f.label)} *` : t(f.label)}
             value={values[f.key] ?? ''}
             onChangeText={(s) => set(f.key, s)}
@@ -231,11 +269,11 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
             autoCapitalize={f.autoCapitalize}
             textContentType={f.textContentType}
             autoComplete={f.autoComplete}
-            style={f.multiline ? { minHeight: 72, textAlignVertical: 'top' } : undefined}
           />
-        ))}
-      </View>
-      <Txt variant="faint" style={{ marginTop: sp.md }}>
+          )
+        })}
+      </FormSection>
+      <Txt variant="faint" style={styles.note}>
         {t('printable.privacy')}
       </Txt>
     </WizardScreen>
@@ -244,11 +282,13 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
 
 const styles = StyleSheet.create({
   stage: {
-    borderRadius: radius.lg,
-    paddingVertical: sp.xl,
+    paddingTop: sp.xl,
+    paddingBottom: sp.md,
+    paddingHorizontal: sp.md,
     alignItems: 'center',
-    marginBottom: sp.lg,
+    marginBottom: sp.xl,
   },
+  note: { fontSize: 12.5, lineHeight: 17, marginTop: sp.md, textAlign: 'center' },
   shadow: {
     shadowColor: '#000',
     shadowOpacity: 0.18,
@@ -257,24 +297,14 @@ const styles = StyleSheet.create({
     elevation: 6,
     borderRadius: 18,
   },
-  swatches: { flexDirection: 'row', justifyContent: 'center', gap: sp.md, marginBottom: sp.xl },
+  swatches: { flexDirection: 'row', gap: sp.sm, marginBottom: sp.xl },
+  ring: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   swatch: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm },
-  member: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingLeft: 4,
-    paddingRight: sp.md,
-    paddingVertical: 4,
-  },
 })

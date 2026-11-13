@@ -92,6 +92,8 @@ export type Intent =
   | { intent: 'open_app'; app: string }
   | { intent: 'split_bill'; amount: number; people: number; mode: 'even' | 'items' | ''; tip: number }
   | { intent: 'discount'; amount: number; percent: number }
+  /** About One Roof itself (what it does, the games and their rules). */
+  | { intent: 'app_help'; topic: string; reply: string }
   | { intent: 'unknown'; reply: string }
 
 /** add_event's extras beyond title/day/time (all optional). */
@@ -169,7 +171,7 @@ const KNOWN_INTENTS = new Set([
   'agenda', 'add_event', 'edit_event', 'find_event', 'move_event', 'remove_event', 'birthdays', 'day_summary',
   'add_money', 'money_summary', 'list_money', 'fix_money', 'remove_money', 'split_bill', 'discount', 'better_deal',
   'send_nudge', 'nudge_seen', 'pets_due', 'pet_done', 'pet_log', 'pet_next', 'pet_weight',
-  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'unknown',
+  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'app_help', 'unknown',
 ])
 
 /** What the server said: an intent, an intent with a detail missing, an
@@ -422,6 +424,8 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
       const percent = typeof j.percent === 'number' ? j.percent : 0
       return amount > 0 && percent > 0 ? { intent: 'discount', amount, percent } : null
     }
+    case 'app_help':
+      return { intent: 'app_help', topic: str('topic'), reply: str('reply') }
     case 'unknown':
       return { intent: 'unknown', reply: str('reply') }
     default:

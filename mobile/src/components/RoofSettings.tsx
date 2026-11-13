@@ -2,6 +2,7 @@
 // hear the answer out loud — or turn both off and use only the mic button,
 // answers on screen. Per device (lib/roof). Plus features: on the free plan
 // the rows show the Plus tag and open the paywall.
+import { useSyncExternalStore } from 'react'
 import { Alert, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { AudioLines, Sparkles, Volume2 } from 'lucide-react-native'
@@ -14,8 +15,7 @@ import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { usePlus } from '@/lib/plus'
 import { setRoofPref, useRoofPrefs, type RoofPrefs } from '@/lib/roof'
-import { onDeviceOk } from '@/lib/roofWake'
-import { speechModule } from '@/lib/voice'
+import { onRoofHeard, roofLastHeard, turnOnRoofWake } from '@/lib/roofWake'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 const ROOF_GRADIENT: [string, string] = ['#E58A63', '#B9532F']
@@ -26,6 +26,7 @@ export function RoofSettings() {
   const { t } = useI18n()
   const { isPlus } = usePlus()
   const prefs = useRoofPrefs()
+  const heard = useSyncExternalStore(onRoofHeard, roofLastHeard)
 
   async function set(k: keyof RoofPrefs, v: boolean) {
     if (!isPlus) {
@@ -33,14 +34,9 @@ export function RoofSettings() {
       return
     }
     if (k === 'wake' && v) {
-      const m = speechModule()
-      if (!m || !onDeviceOk()) {
-        Alert.alert(t('settings.roofWake'), t('settings.roofNoDevice'))
-        return
-      }
-      // Ask for the mic here, where the user just chose it — never from the Home.
-      const perm = await m.requestPermissionsAsync().catch(() => ({ granted: false }))
-      if (!perm.granted) return
+      // Asks for the mic here, where the user just chose it.
+      if ((await turnOnRoofWake()) === 'unsupported') Alert.alert(t('settings.roofWake'), t('settings.roofNoDevice'))
+      return
     }
     setRoofPref(k, v)
   }
@@ -80,6 +76,13 @@ export function RoofSettings() {
       <Txt variant="faint" style={{ marginTop: sp.xs }}>
         {isPlus ? t('settings.roofOffHint') : t('settings.roofPlus')}
       </Txt>
+      {/* What the phone wrote last time it heard you (memory only) — so a
+          call it misses can be taught (owner, 2026-11). */}
+      {isPlus && prefs.wake && heard ? (
+        <Txt variant="faint" style={{ fontSize: 12.5 }}>
+          {t('settings.roofLastHeard', { text: heard })}
+        </Txt>
+      ) : null}
     </View>
   )
 }

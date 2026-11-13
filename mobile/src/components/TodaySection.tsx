@@ -13,10 +13,7 @@ import { router, useFocusEffect } from 'expo-router'
 import {
   Cake,
   CalendarDays,
-  ChevronRight,
   PawPrint,
-  Sparkles,
-  Mic,
   CloudLightning,
   CloudRain,
   CloudSnow,
@@ -27,7 +24,6 @@ import {
 } from 'lucide-react-native'
 
 import { Txt } from './ui'
-import { voiceSupported } from '../lib/voice'
 import { CARD_GRADIENT } from './home/palette'
 import { GradientBox } from './home/GradientBox'
 import { Skeleton } from './Skeleton'
@@ -90,14 +86,15 @@ function WeatherSkeleton() {
 export default function TodaySection({
   name,
   household,
-  onAsk,
+  below,
   right,
 }: {
   /** First name for the greeting. */
   name: string
   household: string | null
   /** Open the ask sheet; `listen` = straight into voice (the mic). */
-  onAsk: (listen?: boolean) => void
+  /** Under the greeting: the family strip. */
+  below?: ReactNode
   /** Header slot on the right (the Settings button). */
   right?: ReactNode
 }) {
@@ -326,53 +323,8 @@ export default function TodaySection({
             : t('home.thingsMany', { n: totalItems })}
       </Txt>
 
-      {/* ask anything */}
-      <Pressable
-        onPress={() => onAsk(false)}
-        accessibilityRole="button"
-        accessibilityLabel={t('ask.title')}
-        style={({ pressed }) => ({
-          marginTop: sp.lg,
-          height: 58,
-          borderRadius: 20,
-          backgroundColor: c.card,
-          borderWidth: 1,
-          borderColor: c.border,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: sp.md,
-          paddingLeft: sp.lg,
-          paddingRight: 8,
-          opacity: pressed ? 0.75 : 1,
-        })}
-      >
-        <Sparkles size={20} color={c.accent} />
-        <Txt style={{ flex: 1, fontSize: 15, color: c.textFaint }} numberOfLines={1}>
-          {t('ask.placeholder')}
-        </Txt>
-        {/* The mic: straight into listening. Without the voice module (an
-            older build) it's the plain "open" chevron. */}
-        <Pressable
-          onPress={() => onAsk(voiceSupported())}
-          accessibilityRole="button"
-          accessibilityLabel={voiceSupported() ? t('ask.speak') : t('ask.title')}
-          hitSlop={6}
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 14,
-            backgroundColor: c.action,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {voiceSupported() ? (
-            <Mic size={21} color={c.onAction} strokeWidth={2.3} />
-          ) : (
-            <ChevronRight size={22} color={c.onAction} strokeWidth={2.4} />
-          )}
-        </Pressable>
-      </Pressable>
+      {/* the family (the assistant moved to the bottom dock, by the thumb) */}
+      {below}
 
       {/* today's agenda as cards */}
       {totalItems > 0 ? (

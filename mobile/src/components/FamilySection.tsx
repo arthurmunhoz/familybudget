@@ -1,12 +1,14 @@
 // Settings › Family — ONE card for everything about your family (owner,
 // 2026-11: "My families" and the old members/code section repeated each
 // other). Top to bottom:
-//   · the active family: its name (no tile — the screen has enough colour), "3 of 6 members · you're the owner"
-//   · its members (owners can remove), with the Plus nudge for free owners
-//   · the invite code (owners: share / new code; members: who to ask)
+//   · the active family: its name (no tile — the screen has enough colour) + "2 of 12 members"
+//   · its members, one row each: "You" after your name, an Owner tag or (for
+//     owners) a remove button on the right; the Plus nudge for free owners
+//   · the invite code as a dashed "ticket", a full-width Share and a quiet
+//     "New code" (members see who to ask instead)
 //   · other families you belong to — tap to switch
-//   · a centred "Add a family" divider, then join another / leave this one
-//     as plain centred text buttons (owner, 2026-11: no more coloured squares)
+//   · "Add another family" → /families (join / create and the rules live
+//     there — owner, 2026-11: too much for Settings), then Leave this one
 // Switching re-renders the whole card for the new family (AuthProvider moves
 // profile.household_id first, see lib/households.ts).
 import { useCallback, useEffect, useState } from 'react'
@@ -119,98 +121,109 @@ export function FamilySection({ highlight = false }: { highlight?: boolean }) {
   }
 
   const title = name ?? t('household.title')
-  const meta = [t('household.memberCount', { count: members.length, max: limit }), isOwner ? t('households.owner') : null].filter(Boolean).join(' · ')
+  const meta = t('household.memberCount', { count: members.length, max: limit })
+  const me = profile?.email
 
   return (
     <View style={{ gap: sp.sm }}>
       <Txt style={[s.label, { color: c.textMuted }]}>{t('household.title')}</Txt>
       <Card style={{ padding: 0, overflow: 'hidden', ...(highlight ? { borderWidth: 2, borderColor: c.accent } : {}) }}>
-        {/* the active family */}
+        {/* the active family: name big, how full it is under it */}
         <View style={s.head}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Txt numberOfLines={1} style={{ fontFamily: fonts.display, fontSize: 21, lineHeight: 26, color: c.text, flexShrink: 1 }}>
-                {title}
-              </Txt>
-              {isOwner ? <Crown size={15} color={c.accent} /> : null}
-            </View>
-            <Txt variant="faint" numberOfLines={1} style={{ fontSize: 13 }}>
-              {meta}
-            </Txt>
-          </View>
+          <Txt numberOfLines={1} style={{ fontFamily: fonts.display, fontSize: 24, lineHeight: 30, color: c.text }}>
+            {title}
+          </Txt>
+          <Txt variant="faint" numberOfLines={1} style={{ fontSize: 13.5 }}>
+            {meta}
+          </Txt>
         </View>
 
-        {/* members */}
-        <View style={{ paddingHorizontal: sp.md, paddingBottom: sp.md, gap: sp.md }}>
-          {members.map((m) => (
-            <View key={m.email} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+        {/* members — one row each, role / remove on the right */}
+        <View style={{ paddingHorizontal: sp.md, paddingBottom: sp.sm }}>
+          {members.map((m, i) => (
+            <View key={m.email} style={[s.member, i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border } : null]}>
               <Initials name={m.display_name} />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Txt numberOfLines={1} style={{ fontFamily: fonts.semibold, flexShrink: 1 }}>
-                    {m.display_name}
-                  </Txt>
-                  {m.role === 'owner' ? (
-                    <View style={{ backgroundColor: c.accentSoft, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                      <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 10 }}>{t('household.owner').toUpperCase()}</Txt>
-                    </View>
-                  ) : null}
-                </View>
-                <Txt variant="faint" style={{ fontSize: 11 }} numberOfLines={1}>
+                <Txt numberOfLines={1} style={{ fontFamily: fonts.semibold, color: c.text }}>
+                  {m.display_name}
+                  {m.email === me ? <Txt style={{ fontFamily: fonts.body, color: c.textFaint }}>{'  ' + t('household.you')}</Txt> : null}
+                </Txt>
+                <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={1}>
                   {m.email}
                 </Txt>
               </View>
-              {isOwner && m.role !== 'owner' ? (
-                <Pressable onPress={() => removeMember(m)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('household.removeMember')}>
-                  <X size={18} color={c.textFaint} />
+              {m.role === 'owner' ? (
+                <View style={[s.ownerTag, { backgroundColor: c.accentSoft }]}>
+                  <Crown size={12} color={c.accent} />
+                  <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 11.5 }}>{t('household.owner')}</Txt>
+                </View>
+              ) : isOwner ? (
+                <Pressable
+                  onPress={() => removeMember(m)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('household.removeMember')}
+                  style={({ pressed }) => [s.remove, { backgroundColor: c.surface2, opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <X size={15} color={c.textMuted} />
                 </Pressable>
               ) : null}
             </View>
           ))}
           {/* The DB trigger is the real cap (migration 059); this is the pitch. */}
           {isOwner && isFree ? (
-            <Pressable onPress={() => router.push('/paywall')} hitSlop={6}>
-              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13 }}>{t('household.upgradeForMembers', { max: MEMBER_LIMIT_PLUS })}</Txt>
+            <Pressable onPress={() => router.push('/paywall')} hitSlop={6} style={{ paddingTop: sp.xs, paddingBottom: sp.xs }}>
+              <Txt style={{ color: c.accent, fontFamily: fonts.semibold, fontSize: 13.5 }}>{t('household.upgradeForMembers', { max: MEMBER_LIMIT_PLUS })}</Txt>
             </Pressable>
           ) : null}
         </View>
 
-        {/* invite code */}
+        {/* invite code: a ticket you hand out */}
         <View style={[s.block, { borderTopColor: c.border }]}>
-          <View style={{ gap: 2 }}>
-            <Txt style={{ fontFamily: fonts.semibold }}>{t('household.inviteCode')}</Txt>
-            <Txt variant="faint">{isOwner ? t('household.inviteHint') : t('household.notOwnerHint')}</Txt>
-          </View>
+          <Txt style={[s.label, { color: c.textMuted }]}>{t('household.inviteCode')}</Txt>
           {isOwner ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-              <View style={[s.code, { backgroundColor: c.surface }]}>
-                <Txt numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, letterSpacing: 3, fontFamily: fonts.semibold, color: c.text }}>
-                  {shownCode ?? '········'}
+            <>
+              <View style={[s.ticket, { borderColor: c.accent + '66', backgroundColor: c.accentSoft }]}>
+                <Txt
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  selectable
+                  style={{ fontSize: 28, letterSpacing: 6, fontFamily: fonts.semibold, color: c.text, textAlign: 'center' }}
+                >
+                  {shownCode ?? '· · · · · · · ·'}
                 </Txt>
               </View>
+              <Txt variant="faint" style={{ fontSize: 13.5, textAlign: 'center' }}>
+                {t('household.inviteHintNamed', { name: title })}
+              </Txt>
               <Pressable
                 onPress={shareCode}
                 disabled={!shownCode}
                 accessibilityRole="button"
                 style={({ pressed }) => [s.share, { backgroundColor: c.action, opacity: !shownCode ? 0.5 : pressed ? 0.85 : 1 }]}
               >
-                <Share2 size={16} color={c.onAction} />
-                <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 15 }}>{t('household.share')}</Txt>
+                <Share2 size={17} color={c.onAction} />
+                <Txt style={{ color: c.onAction, fontFamily: fonts.semibold, fontSize: 15.5 }}>{t('household.shareCode')}</Txt>
               </Pressable>
               <Pressable
                 onPress={rotate}
                 disabled={rotating}
                 accessibilityRole="button"
-                accessibilityLabel={t('household.rotate')}
-                style={({ pressed }) => [s.rotate, { backgroundColor: c.surface, opacity: rotating ? 0.5 : pressed ? 0.7 : 1 }]}
+                hitSlop={6}
+                style={({ pressed }) => [s.rotate, { opacity: rotating ? 0.5 : pressed ? 0.55 : 1 }]}
               >
-                {rotating ? <ActivityIndicator size="small" color={c.textMuted} /> : <RefreshCw size={18} color={c.textMuted} />}
+                {rotating ? <ActivityIndicator size="small" color={c.textMuted} /> : <RefreshCw size={14} color={c.textMuted} />}
+                <Txt style={{ color: c.textMuted, fontFamily: fonts.semibold, fontSize: 13.5 }}>{t('household.newCode')}</Txt>
               </Pressable>
-            </View>
-          ) : null}
+            </>
+          ) : (
+            <Txt variant="faint" style={{ fontSize: 14 }}>
+              {t('household.notOwnerHint')}
+            </Txt>
+          )}
         </View>
 
-        {/* other families + join / leave */}
+        {/* other families (switch), "Add another family", leave */}
         <FamilySwitcher />
       </Card>
     </View>
@@ -223,7 +236,7 @@ function Initials({ name }: { name: string }) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   const ini = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?'
   return (
-    <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
       <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.accent }}>{ini}</Txt>
     </View>
   )
@@ -231,9 +244,12 @@ function Initials({ name }: { name: string }) {
 
 const s = StyleSheet.create({
   label: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', paddingHorizontal: 2 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.md },
-  block: { borderTopWidth: StyleSheet.hairlineWidth, padding: sp.md, gap: sp.md },
-  code: { flex: 1, height: 48, justifyContent: 'center', paddingHorizontal: sp.md, borderRadius: radius.md },
-  share: { height: 48, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: sp.md, borderRadius: radius.md },
-  rotate: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md },
+  head: { paddingHorizontal: sp.md, paddingTop: sp.lg, paddingBottom: sp.sm, gap: 2 },
+  member: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 12 },
+  ownerTag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.pill },
+  remove: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  block: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: sp.md, paddingTop: sp.md + 2, paddingBottom: sp.sm, gap: sp.md },
+  ticket: { height: 68, justifyContent: 'center', paddingHorizontal: sp.lg, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed' },
+  share: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.pill },
+  rotate: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4, alignSelf: 'center' },
 })

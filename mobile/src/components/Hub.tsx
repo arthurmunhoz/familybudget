@@ -9,7 +9,7 @@
 // Light is the default appearance; every surface here reads from the theme,
 // only the app icons and agenda cards carry their own fixed colours.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import { Settings } from 'lucide-react-native'
@@ -22,9 +22,11 @@ import TodaySection, { SectionLabel } from './TodaySection'
 import HomeBirthdays from './HomeBirthdays'
 import InviteBanner from './InviteBanner'
 import { AskSheet } from './home/AskSheet'
-import { RoofPill } from './home/RoofPill'
+import { RoofDock, ROOF_DOCK_H } from './home/RoofDock'
+import { FamilyStrip } from './home/FamilyStrip'
 import { useRoofPrefs } from '../lib/roof'
-import { useRoofWake } from '../lib/roofWake'
+import { turnOnRoofWake, useRoofWake } from '../lib/roofWake'
+import { voiceSupported } from '../lib/voice'
 import { usePlus } from '../lib/plus'
 import { APP_GRADIENT } from './home/palette'
 import { GradientBox } from './home/GradientBox'
@@ -34,42 +36,12 @@ import { useScreenCorner } from '../hooks/useScreenCorner'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { WHEREABOUTS_ENABLED } from '../lib/features'
 import { useAuth } from '../lib/auth'
-import { memberColor } from '../lib/calendar'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
 import type { TKey } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
 import { channelName } from '@/lib/realtime'
 import { fonts, sp, useTheme } from '../theme/theme'
-
-const DOCK_H = 72
-
-/** The dock while the household's members load: a household always has at
- *  least you, so an empty list means "not here yet" — it used to render an
- *  empty bar with just "Family" in it (owner, 2026-11). Two soft circles the
- *  size of the avatars breathe until the real ones arrive. */
-function DockSkeleton({ color }: { color: string }) {
-  // Faint ink breathing between 12% and 26%: visible on the dock's opaque
-  // fill in either theme without reading as real (coloured) avatars.
-  const [pulse] = useState(() => new Animated.Value(0.12))
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.26, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.12, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]),
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [pulse])
-  return (
-    <>
-      {[0, 1].map((i) => (
-        <Animated.View key={i} style={[styles.avatar, { backgroundColor: color, opacity: pulse }]} />
-      ))}
-    </>
-  )
-}
 
 export default function Hub() {
   const { c } = useTheme()
@@ -81,6 +53,8 @@ export default function Hub() {
   // "Ei Roof, …" — what came after the wake phrase, sent as soon as the sheet opens.
   const [askSeed, setAskSeed] = useState<string | undefined>(undefined)
   const [askVoice, setAskVoice] = useState(false)
+  // Opened from the dock's arrow: talk or type (keyboard up too).
+  const [askType, setAskType] = useState(false)
   // Roof listens only while the Home is the screen in front, the sheet is
   // closed, the family turned it on and has Plus (lib/roofWake).
   const roof = useRoofPrefs()
@@ -93,21 +67,46 @@ export default function Hub() {
       return () => setHomeFocused(false)
     }, []),
   )
-  const wake = useRoofWake(roof.wake && isPlus && homeFocused && !asking && !roofPaused, lang, (request) => {
-    setAskKey((k) => k + 1)
-    setAskSeed(request || undefined)
-    setAskListen(!request)
-    setAskVoice(true)
-    setAsking(true)
-  })
+  // A wake opens the sheet at once, already "listening": the wake recogniser
+  // keeps capturing (one chime) and streams what it hears into the sheet.
+  const [wakeCapture, setWakeCapture] = useState(false)
+  const [wakeHeard, setWakeHeard] = useState('')
+  const [wakeEpoch, setWakeEpoch] = useState(0)
+  const [askContinue, setAskContinue] = useState(0)
+  const wakeHandlers = useMemo(
+    () => ({
+      onWake: () => {
+        setAskKey((k) => k + 1)
+        setAskSeed(undefined)
+        setAskListen(false)
+        setAskVoice(true)
+        setAskType(false)
+        setWakeHeard('')
+        setWakeCapture(true)
+        setAsking(true)
+      },
+      onHeard: setWakeHeard,
+      onDone: (request: string, handOff: boolean) => {
+        setWakeCapture(false)
+        if (request) setAskSeed(request)
+        // Just "Ei Roof" and the recogniser stopped at the pause: the sheet
+        // keeps listening with its own mic, no second chime.
+        else if (handOff) setAskContinue((n) => n + 1)
+      },
+    }),
+    [],
+  )
+  const wake = useRoofWake(
+    roof.wake && isPlus && homeFocused && !roofPaused && (!asking || wakeCapture),
+    lang,
+    wakeHandlers,
+    wakeEpoch,
+  )
   // On a Face ID iPhone the dock takes the bottom button's geometry
   // (useScreenCorner); Android keeps the plain floating bar.
   const corner = useScreenCorner()
   const bottomGap = useBottomGap(sp.md)
   const dockGap = corner ? corner.bottom : bottomGap
-  // Room for the dock vs its own width: equal means it filled the row.
-  const [dockRoom, setDockRoom] = useState(0)
-  const [dockWidth, setDockWidth] = useState(0)
 
   const { hiddenApps, appOrder } = useAppPrefs()
   // Hidden apps drop out; ordered ids come first (registry order for the rest);
@@ -115,7 +114,8 @@ export default function Hub() {
   const apps: HubApp[] = useMemo(() => {
     const pos = new Map(appOrder.map((id, i) => [id, i]))
     const rank = (a: HubApp) => pos.get(a.id) ?? appOrder.length + APPS.findIndex((x) => x.id === a.id)
-    const visible = APPS.filter((a) => !hiddenApps.includes(a.id)).sort((a, b) => rank(a) - rank(b))
+    // Family isn't a tile: the strip under the greeting is its way in (owner, 2026-11).
+    const visible = APPS.filter((a) => a.id !== 'family' && !hiddenApps.includes(a.id)).sort((a, b) => rank(a) - rank(b))
     return profile?.is_admin ? [...visible, ADMIN_APP] : visible
   }, [profile?.is_admin, hiddenApps, appOrder])
 
@@ -170,6 +170,14 @@ export default function Hub() {
   )
 
   const insets = useSafeAreaInsets()
+  const openAsk = (listen: boolean, type = false) => {
+    setAskKey((k) => k + 1)
+    setAskSeed(undefined)
+    setAskListen(listen)
+    setAskVoice(listen)
+    setAskType(type)
+    setAsking(true)
+  }
   const badges: Record<string, number> = { shopping: shoppingCount }
   const firstName = (profile?.display_name ?? '').split(' ')[0] || 'One Roof'
   const memberEmails = useMemo(() => profiles.map((p) => p.email), [profiles])
@@ -185,19 +193,13 @@ export default function Hub() {
     // bar; the inset is padding inside the scroll instead.
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right']}>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: insets.top, paddingBottom: DOCK_H + dockGap + sp.xl }}
+        contentContainerStyle={{ paddingHorizontal: sp.lg, paddingTop: insets.top, paddingBottom: ROOF_DOCK_H + dockGap + sp.xl }}
         keyboardShouldPersistTaps="handled"
       >
         <TodaySection
           name={firstName}
           household={householdName ?? null}
-          onAsk={(listen) => {
-            setAskKey((k) => k + 1)
-            setAskSeed(undefined)
-            setAskListen(!!listen)
-            setAskVoice(!!listen)
-            setAsking(true)
-          }}
+          below={<FamilyStrip members={members} emails={memberEmails} me={profile?.email} />}
           right={
             <Pressable
               accessibilityLabel="Settings"
@@ -211,8 +213,6 @@ export default function Hub() {
         />
 
         <View style={{ marginTop: sp.lg }}>
-          {/* Roof is listening for "Ei Roof" — tap to pause it. */}
-          {roof.wake && isPlus ? <RoofPill state={roofPaused ? 'paused' : wake} onToggle={() => setRoofPaused((p) => !p)} /> : null}
           {/* An open game room — right under the ask bar, so the family sees it
               even with game notifications off (apps/games/GamesBanner). */}
           <GamesBanner />
@@ -263,59 +263,50 @@ export default function Hub() {
         </View>
       </ScrollView>
 
-      {/* the household, always within reach. The dock hugs its members and
-          sits centred; only a household too big to fit stretches it edge to
-          edge (and scrolls) — that's when it takes the screen's curve. A
-          one-person household used to get a full-width bar with the avatar
-          on one side and "Family" on the other (owner, 2026-11). */}
+      {/* Roof, by the thumb (owner, 2026-11): tap to type, the big button to
+          talk; with "Ei Roof" on, a breathing dot and a pause button. The
+          family moved up under the greeting (FamilyStrip). */}
       <View
         pointerEvents="box-none"
-        onLayout={(e) => setDockRoom(e.nativeEvent.layout.width)}
         style={[styles.dockWrap, { bottom: dockGap }, corner ? { left: corner.side, right: corner.side } : null]}
       >
-        <View
-          onLayout={(e) => setDockWidth(e.nativeEvent.layout.width)}
-          style={[
-            styles.dock,
-            { backgroundColor: c.sheet, borderColor: c.border },
-            corner && dockWidth >= dockRoom - 1
-              ? {
-                  borderTopLeftRadius: 24,
-                  borderTopRightRadius: 24,
-                  borderBottomLeftRadius: corner.radius,
-                  borderBottomRightRadius: corner.radius,
-                  paddingRight: 14,
-                }
-              : null,
-          ]}
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dockScroll} contentContainerStyle={styles.dockRow}>
-            {members.length === 0 ? <DockSkeleton color={c.textFaint} /> : null}
-            {members.map((p) => {
-              const tint = memberColor(p.email, memberEmails)
-              const initial = (p.display_name || p.email).trim().charAt(0).toUpperCase()
-              return (
-                <Pressable
-                  key={p.email}
-                  accessibilityLabel={p.display_name}
-                  onPress={() => router.push(`/family?email=${encodeURIComponent(p.email)}`)}
-                  style={[styles.avatar, { backgroundColor: tint + '2E' }]}
-                >
-                  <Txt style={{ fontFamily: fonts.display, fontSize: 17, color: tint }}>{initial}</Txt>
-                </Pressable>
-              )
-            })}
-          </ScrollView>
-          <Pressable
-            onPress={() => router.push('/family')}
-            style={[styles.familyBtn, { backgroundColor: c.surface }]}
-          >
-            <Txt style={{ fontFamily: fonts.semibold, fontSize: 14 }}>{t('home.family')}</Txt>
-          </Pressable>
-        </View>
+        <RoofDock
+          wake={!isPlus ? 'needsPlus' : !roof.wake ? 'off' : roofPaused ? 'paused' : wake}
+          onOpen={() => openAsk(voiceSupported(), true)}
+          onWakeTap={() => {
+            if (roof.wake) {
+              setRoofPaused((p) => !p)
+              return
+            }
+            void turnOnRoofWake().then((r) => {
+              if (r === 'unsupported') Alert.alert(t('settings.roofWake'), t('settings.roofNoDevice'))
+              else if (r === 'ok') setRoofPaused(false)
+            })
+          }}
+          shape={corner ? { radius: corner.radius } : null}
+        />
       </View>
 
-      <AskSheet key={askKey} visible={asking} listen={askListen} autoSend={askSeed} spoken={askVoice} onClose={() => setAsking(false)} />
+      <AskSheet
+        key={askKey}
+        visible={asking}
+        listen={askListen}
+        autoSend={askSeed}
+        spoken={askVoice}
+        typeToo={askType}
+        continueListening={askContinue}
+        wakeHeard={wakeCapture ? wakeHeard : undefined}
+        onWakeStop={() => {
+          // Stop tapped while the wake capture runs: send what was heard.
+          setWakeCapture(false)
+          if (wakeHeard.trim()) setAskSeed(wakeHeard.trim())
+        }}
+        onClose={() => {
+          setAsking(false)
+          setWakeCapture(false)
+          setWakeEpoch((e) => e + 1)
+        }}
+      />
     </SafeAreaView>
   )
 }
@@ -350,23 +341,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dockWrap: { position: 'absolute', left: sp.lg, right: sp.lg, alignItems: 'center' },
-  dock: {
-    maxWidth: '100%',
-    height: DOCK_H,
-    borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  dockScroll: { flexGrow: 0, flexShrink: 1 },
-  dockRow: { alignItems: 'center', gap: 10, paddingHorizontal: 12 },
-  avatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  familyBtn: { height: 44, borderRadius: 22, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  dockWrap: { position: 'absolute', left: sp.lg, right: sp.lg },
 })

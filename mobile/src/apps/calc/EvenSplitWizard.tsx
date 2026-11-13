@@ -5,15 +5,16 @@
 import { useCallback, useState } from 'react'
 import { Share, View } from 'react-native'
 import { router } from 'expo-router'
+import { HandCoins, ReceiptText, Share2, UsersRound } from 'lucide-react-native'
 
-import { Card, Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { formatMoney } from '@/lib/format'
-import { fonts, sp, useTheme } from '@/theme/theme'
+import { sp, useTheme } from '@/theme/theme'
 
 import { num } from './shared'
 import { evenSplit, type Tip } from './splitMath'
-import { EditRow, MoneyHero, PeopleCount, TipGrid } from './steps'
+import { EditRow, HeroLine, MoneyHero, PeopleCount, ResultHero, TipGrid } from './steps'
+import { toolCard } from './look'
 import { StepTitle, WizardScreen } from './wizard'
 
 type Step = 0 | 1 | 2 | 3
@@ -87,12 +88,11 @@ export function EvenSplitWizard({
     void Share.share({ message: lines.join('\n') })
   }
 
-  const title = t('calc.tool.even')
 
   if (step === 0) {
     return (
       <WizardScreen
-        title={title}
+        kind="even"
         steps={STEPS}
         index={0}
         direction={dir}
@@ -108,7 +108,7 @@ export function EvenSplitWizard({
   if (step === 1) {
     return (
       <WizardScreen
-        title={title}
+        kind="even"
         steps={STEPS}
         index={1}
         direction={dir}
@@ -124,7 +124,7 @@ export function EvenSplitWizard({
   if (step === 2) {
     return (
       <WizardScreen
-        title={title}
+        kind="even"
         steps={STEPS}
         index={2}
         direction={dir}
@@ -144,36 +144,28 @@ export function EvenSplitWizard({
 
   return (
     <WizardScreen
-      title={title}
+      kind="even"
       steps={STEPS}
       index={3}
       direction={dir}
       onBack={onBack}
       swipeBack
-      primary={{ label: t('calc.share'), onPress: share }}
+      primary={{ label: t('calc.share'), onPress: share, icon: <Share2 size={18} color="#fff" /> }}
       secondary={{ label: t('common.done'), onPress: exit }}
     >
       <StepTitle step={4} steps={STEPS} title={t('calc.q.summary')} hint={t('calc.q.summaryHint')} />
-      <Card style={{ alignItems: 'center', paddingVertical: sp.xl, gap: 4 }}>
-        <Txt variant="label" style={{ textTransform: 'uppercase', letterSpacing: 0.6, color: c.textFaint }}>
-          {t('calc.eachPays')}
-        </Txt>
-        <Txt style={{ fontSize: 52, fontFamily: fonts.display, color: c.text, fontVariant: ['tabular-nums'] }}>
-          {formatMoney(r.per)}
-        </Txt>
-        <Txt variant="muted">{t('calc.totalFor', { total: formatMoney(r.total), count: people })}</Txt>
+      <ResultHero kicker={t('calc.eachPays')} amount={formatMoney(r.per)}>
+        <HeroLine>{t('calc.totalFor', { total: formatMoney(r.total), count: people })}</HeroLine>
         {r.extraCentCount > 0 ? (
-          <Txt variant="faint" style={{ textAlign: 'center', marginTop: sp.xs }}>
-            {t('calc.extraCent', { count: r.extraCentCount, amount: formatMoney(r.per + 0.01) })}
-          </Txt>
+          <HeroLine faint>{t('calc.extraCent', { count: r.extraCentCount, amount: formatMoney(r.per + 0.01) })}</HeroLine>
         ) : null}
-      </Card>
+      </ResultHero>
       <View style={{ height: sp.lg }} />
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <EditRow first label={t('calc.bill')} value={formatMoney(b)} onPress={() => edit(0)} />
-        <EditRow label={t('calc.split')} value={t('calc.people', { count: people })} onPress={() => edit(1)} />
-        <EditRow label={t('calc.tipPct')} value={tipLabel} onPress={() => edit(2)} />
-      </Card>
+      <View style={[toolCard(c), { overflow: 'hidden' }]}>
+        <EditRow first icon={ReceiptText} label={t('calc.bill')} value={formatMoney(b)} onPress={() => edit(0)} />
+        <EditRow icon={UsersRound} label={t('calc.split')} value={t('calc.people', { count: people })} onPress={() => edit(1)} />
+        <EditRow icon={HandCoins} label={t('calc.tipPct')} value={tipLabel} onPress={() => edit(2)} />
+      </View>
     </WizardScreen>
   )
 }

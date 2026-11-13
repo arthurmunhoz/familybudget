@@ -10,7 +10,7 @@
 // without migration 099 `my_households` doesn't exist and the list is empty.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Alert, Animated, Easing, Modal, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { Check, Crown, House, KeyRound, LogOut, Plus, UserPlus, X } from 'lucide-react-native'
+import { Check, ChevronRight, Crown, House, KeyRound, LogOut, Plus, UserPlus, X } from 'lucide-react-native'
 import { router } from 'expo-router'
 
 // Rows flip `disabled` (active / switching) — the Android-safe wrapper.
@@ -24,7 +24,6 @@ import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useSheetLift } from '@/hooks/useSheetLift'
 import { useAuth } from '@/lib/auth'
-import { usePlus } from '@/lib/plus'
 import {
   createHousehold,
   fetchMyHouseholds,
@@ -36,6 +35,7 @@ import {
 } from '@/lib/households'
 import type { TKey } from '@/lib/i18n'
 import type { Profile } from '@/lib/types'
+import { MAX_FAMILIES } from '@/lib/families'
 import { fonts, sp, useTheme } from '@/theme/theme'
 
 const FAMILY = APP_GRADIENT.family
@@ -51,8 +51,6 @@ const JOIN_ERROR: Record<string, TKey> = {
   plusOwnerRequired: 'households.plusOwnerBody',
 }
 
-/** Mirrors the server's cap (migration 104 `max_households_per_account`). */
-export const MAX_FAMILIES = 3
 
 /** The bottom of Settings' Family card (`FamilySection`): your OTHER
  *  families (tap to switch), then Join another / Leave this one. Rendered
@@ -63,9 +61,6 @@ export function FamilySwitcher() {
   const { profile, profiles } = useAuth()
   const { data: list = [], revalidate } = useCachedQuery<MyHousehold[]>('settings:households', fetchMyHouseholds)
   const [switching, setSwitching] = useState<string | null>(null)
-  const [joining, setJoining] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const { isPlus, isTrial } = usePlus()
   const [handOver, setHandOver] = useState<MyHousehold | null>(null)
 
   // The account row is the truth for which one is active (it moves first).
@@ -121,25 +116,6 @@ export function FamilySwitcher() {
     ])
   }
 
-  // Creating ANOTHER family needs a PAID Plus on the active one — the server
-  // refuses the signup trial (migration 104), so this copy has to match it —
-// and only its OWNER may spend it (the new family rides on that Plus).
-  function startCreate() {
-    if (profile?.role !== 'owner') {
-      Alert.alert(t('households.plusTitle'), t('households.plusOwnerBody'))
-      return
-    }
-    if (isPlus && !isTrial) {
-      setCreating(true)
-      return
-    }
-    Alert.alert(t('households.plusTitle'), t(isTrial ? 'households.plusTrialBody' : 'households.plusBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('households.seePlus'), onPress: () => router.push('/paywall') },
-    ])
-  }
-
-  const full = list.length >= MAX_FAMILIES
   const rest = list.filter((h) => h.household_id !== activeId)
   return (
     <>
@@ -158,45 +134,38 @@ export function FamilySwitcher() {
           onPress={() => void switchTo(h)}
         />
       ))}
-      {/* "from here down you can add another family" */}
-      <View style={s.divider} accessibilityRole="header">
-        <View style={[s.rule, { backgroundColor: c.border }]} />
-        <Txt style={[s.label, { color: c.textMuted }]}>{t('households.addSection')}</Txt>
-        <View style={[s.rule, { backgroundColor: c.border }]} />
-      </View>
-      {full ? (
-        <Txt variant="faint" style={s.fullNote}>
-          {t('households.limitReached')}
-        </Txt>
-      ) : (
-        <>
-          <TextAction icon={<UserPlus size={16} color={c.accent} />} label={t('households.join')} color={c.accent} onPress={() => setJoining(true)} />
-          <TextAction icon={<Plus size={16} color={c.accent} />} label={t('households.create')} color={c.accent} onPress={startCreate} />
-        </>
-      )}
+      {/* "Add another family" — its own screen (/families), which explains the rules. */}
+      <Pressable
+        onPress={() => router.push('/families')}
+        accessibilityRole="button"
+        style={({ pressed }) => [s.addRow, { borderTopColor: c.border, opacity: pressed ? 0.6 : 1 }]}
+      >
+        <GradientBox colors={FAMILY} radius={12} style={s.addTile}>
+          <Plus size={20} color="#fff" strokeWidth={2.5} />
+        </GradientBox>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Txt style={{ fontFamily: fonts.semibold, color: c.text }} numberOfLines={1}>
+            {t('household.addFamily')}
+          </Txt>
+          <Txt variant="faint" style={{ fontSize: 12.5 }} numberOfLines={1}>
+            {t('household.addFamilySub', { count: Math.max(list.length, 1), max: MAX_FAMILIES })}
+          </Txt>
+        </View>
+        <ChevronRight size={18} color={c.textFaint} />
+      </Pressable>
       {list.length > 1 && active ? (
-        <TextAction icon={<LogOut size={15} color={c.expense} />} label={t('households.leave')} color={c.expense} small onPress={leave} />
+        <Pressable
+          onPress={leave}
+          accessibilityRole="button"
+          style={({ pressed }) => [s.leaveRow, { borderTopColor: c.border, opacity: pressed ? 0.55 : 1 }]}
+        >
+          <LogOut size={15} color={c.expense} />
+          <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.expense }} numberOfLines={1}>
+            {t('households.leave')}
+          </Txt>
+        </Pressable>
       ) : null}
-      <View style={{ height: sp.sm }} />
 
-      {joining ? (
-        <JoinHouseholdSheet
-          onClose={() => setJoining(false)}
-          onJoined={() => {
-            setJoining(false)
-            void revalidate()
-          }}
-        />
-      ) : null}
-      {creating ? (
-        <CreateHouseholdSheet
-          onClose={() => setCreating(false)}
-          onCreated={() => {
-            setCreating(false)
-            void revalidate()
-          }}
-        />
-      ) : null}
       {handOver ? (
         <HandOverSheet
           household={handOver}
@@ -267,36 +236,6 @@ function HouseholdRow({
           </Animated.View>
         </View>
       )}
-    </Pressable>
-  )
-}
-
-/** A centred text button (icon + label), no tile — the actions under the
- *  "Add a family" divider. */
-function TextAction({
-  icon,
-  label,
-  color,
-  small = false,
-  onPress,
-}: {
-  icon: ReactNode
-  label: string
-  color: string
-  small?: boolean
-  onPress: () => void
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      hitSlop={4}
-      style={({ pressed }) => [s.textAction, { opacity: pressed ? 0.55 : 1 }]}
-    >
-      {icon}
-      <Txt style={{ fontSize: small ? 14 : 15.5, fontFamily: fonts.semibold, color }} numberOfLines={1}>
-        {label}
-      </Txt>
     </Pressable>
   )
 }
@@ -374,7 +313,7 @@ function Sheet({
   )
 }
 
-function JoinHouseholdSheet({ onClose, onJoined }: { onClose: () => void; onJoined: () => void }) {
+export function JoinHouseholdSheet({ onClose, onJoined }: { onClose: () => void; onJoined: () => void }) {
   const { t } = useI18n()
   const { c } = useTheme()
   const inputRef = useRef<TextInput>(null)
@@ -447,7 +386,7 @@ function JoinHouseholdSheet({ onClose, onJoined }: { onClose: () => void; onJoin
   )
 }
 
-function CreateHouseholdSheet({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+export function CreateHouseholdSheet({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { t } = useI18n()
   const { c } = useTheme()
   const inputRef = useRef<TextInput>(null)
@@ -600,10 +539,9 @@ const s = StyleSheet.create({
   othersHead: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: sp.md, paddingTop: sp.md, paddingBottom: 2 },
   label: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', paddingHorizontal: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.md, paddingVertical: 12 },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingHorizontal: sp.md, paddingTop: sp.lg, paddingBottom: sp.xs },
-  rule: { flex: 1, height: StyleSheet.hairlineWidth },
-  fullNote: { textAlign: 'center', fontSize: 13.5, paddingHorizontal: sp.lg, paddingVertical: 11 },
-  textAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, paddingHorizontal: sp.md },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.md, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  addTile: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  leaveRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
   radio: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   check: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   head: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.md, paddingHorizontal: sp.lg },

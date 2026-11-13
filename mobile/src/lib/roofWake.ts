@@ -1,16 +1,20 @@
 // "Ei Roof" — hands-free wake while the app is open on the Home (owner,
 // 2026-11-12). No wake-word engine: the phone's OWN recogniser runs ON-DEVICE
 // (requiresOnDeviceRecognition — nothing leaves the phone while it waits) and
-// we watch its words for "ei/hey roof". Whatever was said after it in the same
-// breath ("Ei Roof, põe café na lista") is the request; a bare "Ei Roof" opens
-// the ask sheet listening.
+// we watch its words for "ei/hey roof". The moment the call is heard: ONE
+// chime and `onWake` (the Home opens the ask sheet already showing
+// "listening"), and this same recogniser keeps going — no second start, no
+// second chime (owner, 2026-11: two chimes left people unsure when to talk).
+// What follows streams to `onHeard`; a pause after words (or ~7 s of nothing)
+// ends it with `onDone(request)`.
 //
 // Never runs in the background (iOS/Android forbid the mic there) and never
 // where on-device recognition isn't available — then the switch says so.
 import { useEffect, useRef, useState } from 'react'
 import { AppState, Platform } from 'react-native'
 
-import { playChime, speechModule } from '@/lib/voice'
+import { setRoofPref } from '@/lib/roof'
+import { playChime, speechModule, stitch } from '@/lib/voice'
 
 const LOCALE: Record<string, string> = { en: 'en-US', pt: 'pt-BR', es: 'es-ES' }
 
@@ -24,9 +28,11 @@ const fold = (s: string) =>
     .trim()
 
 // How recognisers spell "Roof" in pt/en/es, and the greeting before it.
-const CALL = '(?:ei|hey|hei|ey|ai|oi|e|a|hay|oye)'
-const NAME = '(?:roof|roofs|ruf|ruff|rufe|rufi|rufo|rufy|ruffy|rufus|ruth|roofy|roofie|rouf|hoof)'
-const WAKE = new RegExp(`(?:^|\\s)${CALL}\\s+${NAME}(?:\\s|$)`)
+const CALL = '(?:ei|hey|hei|ey|ai|oi|e|a|hay|oye|rei|eai)'
+// An American "roof" said inside Portuguese often comes back as rough/rof/ru…
+const NAME =
+  '(?:roof|roofs|roofe|ruf|ruff|ruffe|rufe|rufi|rufo|rufu|rufy|ruffy|rufus|ruth|rute|roofy|roofie|rouf|rof|rofe|rough|ruv|ru|rou|hoof|hoofe|huf|hufe|hufi|hufo|houf|uf|ufe|ufi)'
+const WAKE = new RegExp(`(?:^|\\s)${CALL}\\s+${NAME}(?:\\s|$)|^roof(?:\\s|$)`)
 
 /** The wake phrase in `heard`? Returns what came AFTER it (maybe ''), or null.
  *  Works on the ORIGINAL text so the request keeps its accents. */
@@ -62,16 +68,60 @@ export function onDeviceOk(): boolean {
   }
 }
 
+/** Turn "Ei Roof" on (Settings and the Home's dock share this): needs
+ *  on-device recognition and the microphone — asked here, from the tap. */
+export async function turnOnRoofWake(): Promise<'ok' | 'unsupported' | 'denied'> {
+  const m = speechModule()
+  if (!m || !onDeviceOk()) return 'unsupported'
+  const perm = await m.requestPermissionsAsync().catch(() => ({ granted: false }))
+  if (!perm.granted) return 'denied'
+  setRoofPref('wake', true)
+  return 'ok'
+}
+
 export type WakeState = 'off' | 'waiting' | 'unsupported'
 
-/** Listens for "Ei Roof" while `enabled`. `onWake(request)` gets what followed
- *  the wake phrase ('' = just the call). */
-export function useRoofWake(enabled: boolean, lang: string, onWake: (request: string) => void): WakeState {
+// The last thing the wake listener heard — so the owner can see how the phone
+// writes "Ei Roof" in their voice and we can teach it (2026-11). MEMORY ONLY:
+// never stored or sent; gone when the app closes. Shown in Settings › Roof.
+let lastHeard = ''
+const heardSubs = new Set<() => void>()
+export function roofLastHeard() {
+  return lastHeard
+}
+export function onRoofHeard(f: () => void) {
+  heardSubs.add(f)
+  return () => {
+    heardSubs.delete(f)
+  }
+}
+function noteHeard(text: string) {
+  const v = text.trim().slice(0, 80)
+  if (!v || v === lastHeard) return
+  lastHeard = v
+  heardSubs.forEach((f) => f())
+}
+
+export interface WakeHandlers {
+  /** The call was heard (the chime already played): open the sheet listening. */
+  onWake: () => void
+  /** What has been said after the call so far. */
+  onHeard: (text: string) => void
+  /** Finished: the request ('' = nothing came after the call). `handOff`:
+   *  the recogniser stopped on its own right after a bare call (iOS ends a
+   *  session at the pause after "Ei Roof") — the sheet should keep listening
+   *  with its own mic, quietly. */
+  onDone: (request: string, handOff: boolean) => void
+}
+
+/** Listens for "Ei Roof" while `enabled`. Bump `epoch` to re-arm it after a
+ *  wake was handed off while `enabled` stayed true. */
+export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandlers, epoch = 0): WakeState {
   const [state, setState] = useState<WakeState>('off')
-  const wakeRef = useRef(onWake)
+  const handRef = useRef(handlers)
   useEffect(() => {
-    wakeRef.current = onWake
-  }, [onWake])
+    handRef.current = handlers
+  }, [handlers])
 
   useEffect(() => {
     const m = speechModule()
@@ -79,10 +129,9 @@ export function useRoofWake(enabled: boolean, lang: string, onWake: (request: st
     let alive = true
     let running = false
     let fails = 0
-    // Woke and handed off: the caller takes the mic (the ask sheet) and turns
-    // this off; never restart in between.
+    // Woke and finished: the caller turns this off; never restart in between.
     let held = false
-    let woke: { at: number; req: string } | null = null
+    let woke: { req: string; seg: { done: string; current: string } } | null = null
     let settle: ReturnType<typeof setTimeout> | null = null
     let restart: ReturnType<typeof setTimeout> | null = null
     let refresh: ReturnType<typeof setTimeout> | null = null
@@ -91,7 +140,7 @@ export function useRoofWake(enabled: boolean, lang: string, onWake: (request: st
       for (const t of [settle, restart, refresh]) if (t) clearTimeout(t)
       settle = restart = refresh = null
     }
-    const fire = () => {
+    const fire = (handOff = false) => {
       if (!woke) return
       const req = woke.req
       woke = null
@@ -103,9 +152,8 @@ export function useRoofWake(enabled: boolean, lang: string, onWake: (request: st
       } catch {
         /* already stopped */
       }
-      wakeRef.current(req)
+      handRef.current.onDone(req, handOff && !req)
     }
-
     const begin = async () => {
       if (!alive || held || running || AppState.currentState !== 'active') return
       const perm = await m.getPermissionsAsync?.().catch(() => null)
@@ -163,22 +211,31 @@ export function useRoofWake(enabled: boolean, lang: string, onWake: (request: st
         if (!running) return
         fails = 0
         const heard = e.results?.[0]?.transcript ?? ''
-        const after = afterWake(heard)
-        if (after === null) return
+        noteHeard(heard)
         if (!woke) {
-          woke = { at: Date.now(), req: after }
+          const after = afterWake(heard)
+          if (after === null) return
+          woke = { req: after, seg: { done: '', current: heard } }
           playChime('start')
-        } else woke.req = after
+          handRef.current.onWake()
+        } else {
+          // iOS restarts its transcript after a pause: join the stretches,
+          // and a stretch without the call in it is all request.
+          const full = stitch(woke.seg, heard)
+          woke.req = afterWake(full) ?? full.trim()
+        }
+        handRef.current.onHeard(woke.req)
         if (settle) clearTimeout(settle)
-        // Wait for the sentence to finish: a pause after words = done; just
-        // "Ei Roof" with nothing more for a moment = open the sheet listening.
-        if (e.isFinal) return fire()
-        settle = setTimeout(fire, after ? 1300 : 1800)
+        if (e.isFinal && woke.req) return fire()
+        // A pause after words = done. Just the call: keep this session (no gap,
+        // no lost words) and wait a while; if iOS ends it at the pause, 'end'
+        // hands the listening over to the sheet instead (fire(true)).
+        settle = setTimeout(() => fire(false), woke.req ? 1300 : 7000)
       }),
       m.addListener('error', (e: { error?: string }) => {
         if (!running) return
         running = false
-        if (woke) return fire()
+        if (woke) return fire(true)
         if (e.error === 'not-allowed') {
           setState('off')
           return
@@ -193,7 +250,7 @@ export function useRoofWake(enabled: boolean, lang: string, onWake: (request: st
           return
         }
         running = false
-        if (woke) return fire()
+        if (woke) return fire(true)
         schedule()
       }),
     ]
@@ -227,7 +284,7 @@ export function useRoofWake(enabled: boolean, lang: string, onWake: (request: st
       }
       setState('off')
     }
-  }, [enabled, lang])
+  }, [enabled, lang, epoch])
 
   if (!enabled || !speechModule()) return 'off'
   if (!onDeviceOk()) return 'unsupported'

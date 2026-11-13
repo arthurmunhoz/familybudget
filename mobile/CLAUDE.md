@@ -379,7 +379,40 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `/api/suggest-ping?action=speak` (Vercel env `AZURE_SPEECH_KEY` +
     `AZURE_SPEECH_REGION`), Plus-gated and metered with `ai_light_*` kind
     `voice`. MP3s cached by text hash in `Paths.cache/roof-voice/`.
-    Not device-verified yet (2026-11-12).
+  - **One chime** (owner, 2026-11-12): on the call the wake recogniser chimes,
+    calls `onWake` (the Hub opens AskSheet at once with `wakeHeard`, shown as
+    "listening") and KEEPS capturing — no second recogniser, no second chime.
+    `onHeard` streams the text; a pause after words (or ~7 s of nothing) ends
+    it with `onDone(request)` → `autoSend`. The Hub keeps the hook enabled
+    while `wakeCapture` and bumps `wakeEpoch` on close to re-arm it.
+  - **Bare "Ei Roof"**: iOS often ENDS the session at the pause after the
+    call. Then `onDone('', handOff=true)` → Hub bumps `continueListening` →
+    AskSheet starts its own mic with `start({ quiet: true })` (no second
+    chime, shown as "listening" at once). While listening the sheet's button
+    shows `ListeningBars` (tap still stops). Settings › Roof shows the last
+    thing the wake listener heard (memory only, never stored) to tune spellings.
+  - **Keeps listening**: after an answer to a SPOKEN request (and after Roof
+    finished saying it), AskSheet starts its own mic again; the answer stays
+    on screen with a small "listening" strip under it (`follow`). Silence ends it.
+  - The Home's bottom dock IS Roof (`home/RoofDock`, compact by the owner's
+    call): orb with a status dot (green breathing = listening, grey = not), a
+    mute button (pause / resume, or turns "Ei Roof" on via `turnOnRoofWake`)
+    and an UP ARROW that opens the sheet listening AND with the keyboard up
+    (`typeToo`; typing cancels the mic). No hint text. The family avatars moved
+    up under the greeting (`home/FamilyStrip`); the old ask bar, `RoofPill` and
+    the Family TILE are gone from the Home (Settings no longer lists Family).
+  - Prefs are ONE external store (`useSyncExternalStore` in lib/roof.ts): the
+    old hook copied the launch-time value and Settings / Home drifted apart.
+- **Assistant knows the app** (`app_help`, 2026-11-12): `APP_GUIDE` in
+  api/suggest-ping.ts is the only source it may answer from (keep it TRUE when
+  features change); `topic` picks what the app shows under the reply —
+  `home/HelpView`: the games with their REAL rules from i18n (`games.how.*`,
+  `games.bs.how*`, `games.quiz.how*`) and "Open Games"; Plus / families / Roof
+  get a button to their screen.
+- **Settings › Casa → "Add another family" → `/families`** (2026-11-12): join
+  by code / create, with the rules spelled out (3 per account, create needs a
+  paid Plus as owner, the new family rides on it, what happens when Plus ends).
+  `useFamilies()` / `MAX_FAMILIES` live in `lib/families.ts`.
 - **The ask bar (`components/home/AskSheet` + `lib/assistant`).** The server
   only UNDERSTANDS (`/api/suggest-ping?action=assistant` → `{intent, items,
   store, scope, person, date, reply}`, Claude Haiku, structured output); the
@@ -1084,6 +1117,20 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     whole stage rotated 90°; iPad/Mac rotate natively and the layout follows
     `useWindowDimensions`. Pure maths in `frameLogic.ts`
     (`__tests__/frame.test.ts`).
+  - **Every tool speaks the frame's language (2026-11-12).** One gradient +
+    tint per tool in `apps/calc/look.ts` (`TOOL_LOOK`; the hub tiles read it
+    too). `ToolHead.tsx`: `ToolHero` (36pt title, faded 22pt display subtitle,
+    breathing `ToolHeroArt`), `SectionLabel`, `ChoiceChip` (selected = soft
+    wash + 1.5 outline in the tint). `WizardScreen` takes `kind` (no `title`):
+    round back + progress in the tool's tint + its mini art in one row, the
+    docked primary is a `TintButton` in the tool's gradient, the secondary a
+    tinted text button; the steps' controls read the look from
+    `ToolLookContext`. Results are a gradient `ResultHero` (steps.tsx).
+    Better deal: unit is a `SelectRow`; the shelf plays the verdict (winner
+    rises on a glow with a gradient ribbon, the other dims/greys) and
+    `DealVerdict` shows who wins with per-unit bars (shorter = cheaper),
+    a stamp-landing headline and one sheen per NEW winner. All motion is
+    Reanimated timing curves; Reduce Motion lands on the end state.
 - **Documents: List or One at a time (2026-11, per device, `docs:view`).** The
   round button left of the lock flips it. `apps/docs/DocCards` pages through the
   same filtered/sorted docs, the page drawn large on white: the PREVIEW

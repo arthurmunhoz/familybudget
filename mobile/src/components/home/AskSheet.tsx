@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native'
 import { router } from 'expo-router'
-import { ArrowUp, CalendarDays, ChevronRight, Mic, PawPrint, RotateCcw, Sparkles, Square } from 'lucide-react-native'
+import { ArrowUp, CalendarDays, ChevronRight, Mic, PawPrint, RotateCcw, Sparkles } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Txt } from '@/components/ui'
@@ -99,6 +99,8 @@ import {
   SummaryView,
 } from './AnswerViews'
 import { GradientBox } from './GradientBox'
+import { HelpView } from './HelpView'
+import { ListeningBars } from './ListeningBars'
 import { actMore, recurrenceLabel, recurringChoice, reminderLabel, type ActEnv, type ActionAnswer } from './askActions'
 import { categoriesContext, petTasksContext } from '@/lib/assistantActions'
 import { fetchPingPresets, presetText, sendPing } from '@/lib/pings'
@@ -130,6 +132,7 @@ const APP_ROUTE: Record<string, string> = {
   family: '/family',
   docs: '/docs',
   calc: '/calc',
+  games: '/games',
   settings: '/settings',
 }
 
@@ -159,6 +162,7 @@ type Answer =
   | { kind: 'say'; text: string }
   | { kind: 'split'; amount: number; people: number; tip: number; mode: 'choose' | 'even' }
   | { kind: 'discount'; amount: number; percent: number }
+  | { kind: 'help'; topic: string; text: string }
   | { kind: 'unknown'; text: string }
   | { kind: 'error' }
 
@@ -195,6 +199,10 @@ export function AskSheet({
   listen = false,
   autoSend,
   spoken = false,
+  wakeHeard,
+  onWakeStop,
+  typeToo = false,
+  continueListening = 0,
 }: {
   visible: boolean
   onClose: () => void
@@ -205,6 +213,17 @@ export function AskSheet({
   spoken?: boolean
   /** Opened from the Home's mic: start listening right away. */
   listen?: boolean
+  /** "Ei Roof" is still capturing (the Home's wake recogniser): what it has
+   *  heard so far. The sheet shows "listening" without starting its own mic. */
+  wakeHeard?: string
+  /** Stop tapped during that capture. */
+  onWakeStop?: () => void
+  /** Opened from the dock's arrow: listening AND the keyboard up — typing
+   *  stops the mic. */
+  typeToo?: boolean
+  /** Bumped when "Ei Roof" handed the listening over: start the mic quietly
+   *  (the wake chime already said "talk now"). */
+  continueListening?: number
 }) {
   const { c } = useTheme()
   const { t, lang } = useI18n()
@@ -222,6 +241,19 @@ export function AskSheet({
 
   // Fresh state per open: the Hub remounts this sheet (new key) each time.
   const [text, setText] = useState(seed ?? '')
+  // For the listen-again after a spoken answer (see submit).
+  const textRef = useRef(text)
+  useEffect(() => {
+    textRef.current = text
+  }, [text])
+  const turnSeq = useRef(0)
+  const openRef = useRef(true)
+  useEffect(() => {
+    openRef.current = visible
+    return () => {
+      openRef.current = false
+    }
+  }, [visible])
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [answer, setAnswer] = useState<Answer | null>(null)
@@ -309,6 +341,8 @@ export function AskSheet({
   // and plays the stop chime instead of cutting off silently.
   const cancelVoice = voice.cancel
   const closeSheet = useCallback(() => {
+    turnSeq.current++
+    openRef.current = false
     cancelVoice()
     roofHush()
     onClose()
@@ -342,8 +376,19 @@ export function AskSheet({
   )
   // `starting` counts as hearing for the layout (stop button, no answer), but
   // the label says "one moment" until the mic is live and the chime plays.
-  const hearing = voice.state === 'listening' || voice.state === 'starting'
-  const warming = voice.state === 'starting'
+  // Listening carried on from "Ei Roof" (see continueListening below).
+  const [quiet, setQuiet] = useState(false)
+  const wakeLive = wakeHeard !== undefined
+  const voiceOn = voice.state === 'listening' || voice.state === 'starting'
+  const hearing = voiceOn || wakeLive
+  const warming = voice.state === 'starting' && !wakeLive && !quiet
+  const heardText = wakeLive ? wakeHeard : voice.transcript
+  // A conversation by voice keeps listening after each answer (owner,
+  // 2026-11): the answer stays on screen and a small "listening" strip sits
+  // under it, instead of the full listening view replacing it.
+  const [follow, setFollow] = useState(false)
+  const followUp = follow && voiceOn
+  const fullHearing = hearing && !followUp
   // Opened from the Home's mic: listen straight away — but only once the sheet
   // has finished presenting (Modal onShow). Starting the recogniser during the
   // slide-in lost the audio-session activation on device, so the owner had to
@@ -361,6 +406,18 @@ export function AskSheet({
     const id = setTimeout(autoListen, 700)
     return () => clearTimeout(id)
   }, [listen, autoListen])
+
+  // A bare "Ei Roof" whose recogniser stopped at the pause: keep listening
+  // here, without a second chime, and show it as listening from the start.
+  const lastContinue = useRef(continueListening)
+  useEffect(() => {
+    if (!continueListening || continueListening === lastContinue.current) return
+    lastContinue.current = continueListening
+    viaVoice.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the Home's hand-off
+    setQuiet(true)
+    void startVoice({ quiet: true })
+  }, [continueListening, startVoice])
 
   // "Ei Roof, …": send what was said once the sheet is up.
   const autoSent = useRef(false)
@@ -462,6 +519,8 @@ export function AskSheet({
         return t('ask.sumDiscount', { amount: formatMoney(a.amount), pct: a.percent })
       case 'action':
         return undone(a.summary, a.undone)
+      case 'help':
+        return a.text || t('ask.openGames')
       case 'family':
       case 'say':
       case 'unknown':
@@ -491,6 +550,9 @@ export function AskSheet({
   async function submit(raw?: string) {
     const q = (raw ?? text).trim()
     if (!q || busy) return
+    turnSeq.current++
+    setFollow(false)
+    setQuiet(false)
     // Typed (no raw text passed) → answer on screen only.
     if (raw === undefined) viaVoice.current = false
     roofHush()
@@ -525,7 +587,19 @@ export function AskSheet({
       if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
       const a = await act(intent, ctx.stores)
       setAnswer(a)
-      if (viaVoice.current && roof.speak && !isFree) void roofSay(summarize(a), lang)
+      if (viaVoice.current) {
+        const turn = ++turnSeq.current
+        const said = roof.speak && !isFree ? roofSay(summarize(a), lang) : Promise.resolve()
+        // Then listen for the next thing — unless the sheet closed, something
+        // newer started, or the person is typing.
+        void said.then(() => {
+          setTimeout(() => {
+            if (!openRef.current || turn !== turnSeq.current || textRef.current.trim()) return
+            setFollow(true)
+            void voice.start()
+          }, 250)
+        })
+      }
       // The answer may have changed what the model should see next turn.
       void loadContext().catch(() => {})
     } catch {
@@ -711,6 +785,8 @@ export function AskSheet({
       }
       case 'discount':
         return { kind: 'discount', amount: intent.amount, percent: intent.percent }
+      case 'app_help':
+        return { kind: 'help', topic: intent.topic, text: intent.reply }
       case 'open_app': {
         const route = APP_ROUTE[intent.app]
         if (route) {
@@ -933,7 +1009,7 @@ export function AskSheet({
               </>
             ) : null}
 
-            {hearing ? (
+            {fullHearing ? (
               <View style={{ paddingVertical: sp.lg, gap: sp.md }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
                   <Orb />
@@ -941,8 +1017,8 @@ export function AskSheet({
                     {warming ? t('ask.getReady') : t('ask.listening')}
                   </Txt>
                 </View>
-                <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 33, color: voice.transcript ? c.text : c.textFaint }}>
-                  {voice.transcript || t('ask.ex1')}
+                <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 33, color: heardText ? c.text : c.textFaint }}>
+                  {heardText || t('ask.ex1')}
                 </Txt>
               </View>
             ) : query ? (
@@ -979,7 +1055,7 @@ export function AskSheet({
               </View>
             ) : null}
 
-            {hearing ? null : busy ? (
+            {fullHearing ? null : busy ? (
               <View style={s.answerRow}>
                 <Orb />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingTop: 4 }}>
@@ -1162,10 +1238,25 @@ export function AskSheet({
               />
             ) : answer?.kind === 'discount' ? (
               <DiscountView amount={answer.amount} percent={answer.percent} onOpen={() => go('/calc/discount')} />
+            ) : answer?.kind === 'help' ? (
+              <HelpView topic={answer.topic} text={answer.text} onOpen={(r) => go(r)} />
             ) : answer?.kind === 'say' ? (
               answer.text ? <Headline text={answer.text} /> : null
             ) : answer ? (
               <Headline text={t('ask.error')} />
+            ) : null}
+            {followUp ? (
+              <View style={[s.followStrip, { backgroundColor: c.accentSoft }]}>
+                <Orb size={22} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1, color: warming ? c.textMuted : c.accent, textTransform: 'uppercase' }}>
+                    {warming ? t('ask.getReady') : t('ask.listening')}
+                  </Txt>
+                  <Txt numberOfLines={2} style={{ fontSize: 15.5, lineHeight: 21, color: voice.transcript ? c.text : c.textFaint }}>
+                    {voice.transcript || t('ask.followHint')}
+                  </Txt>
+                </View>
+              </View>
             ) : null}
           </ScrollView>
 
@@ -1185,10 +1276,16 @@ export function AskSheet({
               <TextInput
                 ref={inputRef}
                 value={text}
-                onChangeText={setText}
+                onChangeText={(v) => {
+                  // Typing while the mic is open: the keyboard wins.
+                  if (v && voiceOn) cancelVoice()
+                  setText(v)
+                }}
                 placeholder={t('ask.inputPlaceholder')}
                 placeholderTextColor={c.textFaint}
-                autoFocus={!seed && !listen}
+                // Keyboard up only from a TAP (the dock's arrow, typeToo); a call by
+                // voice ("Ei Roof") opens listening, keyboard down (owner, 2026-11).
+                autoFocus={!seed && (typeToo || (!listen && !spoken))}
                 returnKeyType="send"
                 onSubmitEditing={() => submit()}
                 style={{ flex: 1, fontSize: 16, fontFamily: fonts.body, color: c.text, paddingVertical: 0 }}
@@ -1199,10 +1296,10 @@ export function AskSheet({
             {hearing ? (
               <Pressable
                 accessibilityLabel={t('ask.stop')}
-                onPress={voice.stop}
-                style={[s.send, { backgroundColor: c.expense, borderBottomRightRadius: innerCurve }]}
+                onPress={wakeLive ? onWakeStop : voice.stop}
+                style={[s.send, { backgroundColor: c.action, borderBottomRightRadius: innerCurve }]}
               >
-                <Square size={18} color="#fff" fill="#fff" />
+                <ListeningBars color={c.onAction} />
               </Pressable>
             ) : !text.trim() && canVoice ? (
               <Pressable
@@ -1213,6 +1310,8 @@ export function AskSheet({
                   // Talking again continues the conversation: the last answer
                   // moves up as context instead of vanishing under "listening".
                   commitTurn()
+                  setFollow(false)
+                  setQuiet(false)
                   void voice.start()
                 }}
                 style={[s.send, { backgroundColor: c.action, borderBottomRightRadius: innerCurve }]}
@@ -1607,6 +1706,7 @@ const s = StyleSheet.create({
     paddingVertical: 11,
   },
   answerRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginTop: sp.lg },
+  followStrip: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: sp.lg, padding: sp.md, borderRadius: 18 },
   answerText: { flex: 1, fontFamily: fonts.displaySemi, fontSize: 18, lineHeight: 24, paddingTop: 2 },
   panel: { marginTop: sp.md, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: sp.md, paddingVertical: 4 },
   storeHead: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: sp.md, borderBottomWidth: StyleSheet.hairlineWidth },

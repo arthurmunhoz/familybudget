@@ -595,6 +595,48 @@
       "expect": {
         "intent": "unknown"
       }
+    },
+    {
+      "text": "quais jogos tem no app?",
+      "expect": {
+        "intent": "app_help",
+        "topic": "games"
+      }
+    },
+    {
+      "text": "como funciona a forca?",
+      "expect": {
+        "intent": "app_help",
+        "topic": "hangman"
+      }
+    },
+    {
+      "text": "me explica as regras da batalha naval",
+      "expect": {
+        "intent": "app_help",
+        "topic": "battleship"
+      }
+    },
+    {
+      "text": "how does the buzzer quiz work?",
+      "expect": {
+        "intent": "app_help",
+        "topic": "quiz"
+      }
+    },
+    {
+      "text": "o que o Plus dá?",
+      "expect": {
+        "intent": "app_help",
+        "topic": "plus"
+      }
+    },
+    {
+      "text": "abre os jogos",
+      "expect": {
+        "intent": "open_app",
+        "app": "games"
+      }
     }
   ]
 }

@@ -212,12 +212,15 @@ export function useVoice(
   /** Starts the native recogniser with the current options (set by start). */
   const begin = useRef<(() => void) | null>(null)
   const fallback = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const quietStart = useRef(false)
   const goLive = useCallback(() => {
     if (fallback.current) clearTimeout(fallback.current)
     fallback.current = null
     if (!listening.current || live.current) return
     live.current = true
-    chime('start')
+    // A quiet start continues a listen the user already heard begin (the
+    // "Ei Roof" chime): no second chime.
+    if (!quietStart.current) chime('start')
     setState('listening')
   }, [])
 
@@ -300,9 +303,10 @@ export function useVoice(
     }
   }, [goLive, short])
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (opts?: { quiet?: boolean }) => {
     const m = speech()
     if (!m) return
+    quietStart.current = opts?.quiet === true
     // Was this the first time? Then the OS just showed its permission alerts,
     // and the app is still coming back from them — wait for it to be active
     // (plus a beat for the audio session) before opening the microphone. Doing
