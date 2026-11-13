@@ -72,7 +72,7 @@ export default function Hub() {
   const [wakeCapture, setWakeCapture] = useState(false)
   const [wakeHeard, setWakeHeard] = useState('')
   const [wakeEpoch, setWakeEpoch] = useState(0)
-  const [askContinue, setAskContinue] = useState(0)
+  const [askContinue, setAskContinue] = useState({ n: 0, quiet: true })
   const wakeHandlers = useMemo(
     () => ({
       onWake: () => {
@@ -86,12 +86,13 @@ export default function Hub() {
         setAsking(true)
       },
       onHeard: setWakeHeard,
-      onDone: (request: string, handOff: boolean) => {
+      onDone: (request: string, handOff: false | 'quiet' | 'chime') => {
         setWakeCapture(false)
         if (request) setAskSeed(request)
         // Just "Ei Roof" and the recogniser stopped at the pause: the sheet
-        // keeps listening with its own mic, no second chime.
-        else if (handOff) setAskContinue((n) => n + 1)
+        // keeps listening with its own mic — quietly, unless the wake chime
+        // may have been cut off (then the sheet's mic chimes as it goes live).
+        else if (handOff) setAskContinue((x) => ({ n: x.n + 1, quiet: handOff === 'quiet' }))
       },
     }),
     [],
@@ -294,7 +295,8 @@ export default function Hub() {
         autoSend={askSeed}
         spoken={askVoice}
         typeToo={askType}
-        continueListening={askContinue}
+        continueListening={askContinue.n}
+        continueQuiet={askContinue.quiet}
         wakeHeard={wakeCapture ? wakeHeard : undefined}
         onWakeStop={() => {
           // Stop tapped while the wake capture runs: send what was heard.

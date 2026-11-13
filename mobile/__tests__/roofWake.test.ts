@@ -55,3 +55,17 @@ describe('afterWake: Brazilian R and a bare English call', () => {
     expect(afterWake('o roof da casa')).toBe(null)
   })
 })
+
+describe('afterWake: a Brazilian "Rúfi"', () => {
+  it('takes what sounds like Roof after a clear greeting', () => {
+    expect(afterWake('Ei, Rúfi, o que tem hoje?')).toBe('o que tem hoje?')
+    expect(afterWake('ei rubi')).toBe('')
+    expect(afterWake('hey rufie põe pão')).toBe('põe pão')
+    expect(afterWake('ei hufi')).toBe('')
+  })
+  it('but not after a bare "e"/"a", nor ordinary words', () => {
+    expect(afterWake('e rouba a cena')).toBe(null)
+    expect(afterWake('ei rua da escola')).toBe(null)
+    expect(afterWake('ei ovo')).toBe(null)
+  })
+})

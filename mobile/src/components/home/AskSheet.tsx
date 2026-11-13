@@ -203,6 +203,7 @@ export function AskSheet({
   onWakeStop,
   typeToo = false,
   continueListening = 0,
+  continueQuiet = true,
 }: {
   visible: boolean
   onClose: () => void
@@ -224,6 +225,8 @@ export function AskSheet({
   /** Bumped when "Ei Roof" handed the listening over: start the mic quietly
    *  (the wake chime already said "talk now"). */
   continueListening?: number
+  /** false = the wake chime may have been cut off: chime when going live. */
+  continueQuiet?: boolean
 }) {
   const { c } = useTheme()
   const { t, lang } = useI18n()
@@ -427,8 +430,8 @@ export function AskSheet({
     viaVoice.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the Home's hand-off
     setQuiet(true)
-    void startVoice({ quiet: true })
-  }, [continueListening, startVoice])
+    void startVoice({ quiet: continueQuiet })
+  }, [continueListening, continueQuiet, startVoice])
 
   // "Ei Roof, …": send what was said once the sheet is up.
   const autoSent = useRef(false)

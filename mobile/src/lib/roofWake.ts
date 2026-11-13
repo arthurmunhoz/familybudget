@@ -16,6 +16,9 @@ import { AppState, Platform } from 'react-native'
 import { setRoofPref } from '@/lib/roof'
 import { playChime, speechModule, stitch } from '@/lib/voice'
 
+/** The start chime's length (assets/sounds/listen-start.wav, 0.24 s) + a beat. */
+const CHIME_MS = 300
+
 const LOCALE: Record<string, string> = { en: 'en-US', pt: 'pt-BR', es: 'es-ES' }
 
 const fold = (s: string) =>
@@ -28,11 +31,19 @@ const fold = (s: string) =>
     .trim()
 
 // How recognisers spell "Roof" in pt/en/es, and the greeting before it.
-const CALL = '(?:ei|hey|hei|ey|ai|oi|e|a|hay|oye|rei|eai)'
-// An American "roof" said inside Portuguese often comes back as rough/rof/ru…
+// Strong greetings (ei, hey, oye…) take any word that SOUNDS like Roof: an
+// r/h start (Brazilian RR is an h), u/o, then f/v/b, then any short ending —
+// "rufi", "hufe", "rúfi", "rubi", "roofy" (owner, 2026-11: a Brazilian
+// "Rúfi" wasn't caught). The bare "e"/"a" — ordinary words — only take the
+// exact spellings below, so "e rouba…" doesn't wake it.
+const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay)'
+const CALL_WEAK = '(?:e|a)'
+const SOUNDS_LIKE = '(?:r|rr|h)(?:u|o|ou|oo)(?:f|ff|ph|v|b)(?:e|i|y|o|u|a|ie|io|ia|ey)?s?'
 const NAME =
   '(?:roof|roofs|roofe|ruf|ruff|ruffe|rufe|rufi|rufo|rufu|rufy|ruffy|rufus|ruth|rute|roofy|roofie|rouf|rof|rofe|rough|ruv|ru|rou|hoof|hoofe|huf|hufe|hufi|hufo|houf|uf|ufe|ufi)'
-const WAKE = new RegExp(`(?:^|\\s)${CALL}\\s+${NAME}(?:\\s|$)|^roof(?:\\s|$)`)
+const WAKE = new RegExp(
+  `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^roof(?:\\s|$)`,
+)
 
 /** The wake phrase in `heard`? Returns what came AFTER it (maybe ''), or null.
  *  Works on the ORIGINAL text so the request keeps its accents. */
@@ -110,8 +121,11 @@ export interface WakeHandlers {
   /** Finished: the request ('' = nothing came after the call). `handOff`:
    *  the recogniser stopped on its own right after a bare call (iOS ends a
    *  session at the pause after "Ei Roof") — the sheet should keep listening
-   *  with its own mic, quietly. */
-  onDone: (request: string, handOff: boolean) => void
+   *  with its own mic — 'quiet' when the wake chime surely played, 'chime'
+   *  when the session ended so soon after it that iOS may have cut it off
+   *  (then the sheet's mic chimes as it goes live, so the user always hears
+   *  exactly one "talk now"). */
+  onDone: (request: string, handOff: false | 'quiet' | 'chime') => void
 }
 
 /** Listens for "Ei Roof" while `enabled`. Bump `epoch` to re-arm it after a
@@ -140,6 +154,10 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
       for (const t of [settle, restart, refresh]) if (t) clearTimeout(t)
       settle = restart = refresh = null
     }
+    // When the "I heard you" chime played: a session torn down while it's
+    // still sounding cuts it off (iOS reconfigures the audio), which is why
+    // the call was sometimes silent and only the closing chime was heard.
+    let chimeAt = 0
     const fire = (handOff = false) => {
       if (!woke) return
       const req = woke.req
@@ -147,12 +165,18 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
       running = false
       held = true
       clear()
-      try {
-        m.abort()
-      } catch {
-        /* already stopped */
+      const left = CHIME_MS - (Date.now() - chimeAt)
+      const abort = () => {
+        try {
+          m.abort()
+        } catch {
+          /* already stopped */
+        }
       }
-      handRef.current.onDone(req, handOff && !req)
+      // Let the chime finish before tearing the session down.
+      if (left > 0 && !handOff) setTimeout(abort, left)
+      else abort()
+      handRef.current.onDone(req, handOff && !req ? (left > -150 ? 'chime' : 'quiet') : false)
     }
     const begin = async () => {
       if (!alive || held || running || AppState.currentState !== 'active') return
@@ -171,7 +195,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
           continuous: true,
           requiresOnDeviceRecognition: true,
           addsPunctuation: false,
-          contextualStrings: ['Roof', 'Ei Roof', 'Hey Roof', 'One Roof'],
+          contextualStrings: ['Roof', 'Ei Roof', 'Hey Roof', 'One Roof', 'Rufi', 'Ei Rufi'],
           // Music playing on the phone keeps playing (mixWithOthers).
           iosCategory: { category: 'playAndRecord', categoryOptions: ['defaultToSpeaker', 'allowBluetooth', 'mixWithOthers'], mode: 'default' },
           ...(Platform.OS === 'android'
@@ -217,6 +241,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
           if (after === null) return
           woke = { req: after, seg: { done: '', current: heard } }
           playChime('start')
+          chimeAt = Date.now()
           handRef.current.onWake()
         } else {
           // iOS restarts its transcript after a pause: join the stretches,
@@ -274,6 +299,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
       clear()
       app.remove()
       subs.forEach((s) => s.remove())
+      // A delayed abort (letting the chime finish) is left to run on its own.
       if (running) {
         running = false
         try {
