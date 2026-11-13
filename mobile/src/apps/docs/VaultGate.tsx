@@ -43,14 +43,14 @@ import { useBottomGap } from '@/hooks/useBottomGap'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
 import { biometricAvailable, isVaultLockEnabled } from '@/lib/vaultLock'
-import { fonts, sp } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
 
 import { VaultDoor } from './VaultDoor'
 import { haptic, preloadVault, vaultSound } from './vaultFeedback'
 
 type Status = 'checking' | 'locked' | 'opening' | 'unlocked'
 
-const BRASS: [string, string] = ['#E3BC66', '#A87628']
+const STEEL: [string, string] = ['#5D6776', '#2B313A']
 const NEVER = { reduceMotion: ReduceMotion.Never }
 
 export default function VaultGate({ children }: { children: ReactNode }) {
@@ -60,6 +60,10 @@ export default function VaultGate({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets()
   const bottomGap = useBottomGap(sp.lg)
   const reduced = useReducedMotion()
+  const { dark } = useTheme()
+  const ink = dark
+    ? { text: '#F2F4F7', muted: 'rgba(230,234,240,0.62)', error: '#FF9A8F', chip: 'rgba(255,255,255,0.08)', chipLine: 'rgba(255,255,255,0.14)' }
+    : { text: '#1D2127', muted: 'rgba(29,33,39,0.58)', error: '#C2372B', chip: 'rgba(255,255,255,0.6)', chipLine: 'rgba(0,0,0,0.08)' }
   const [status, setStatus] = useState<Status>('checking')
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -103,21 +107,21 @@ export default function VaultGate({ children }: { children: ReactNode }) {
     }
     haptic('light')
     vaultSound('dial')
-    wheel.set(withTiming(-330, { duration: 760, easing: Easing.bezier(0.45, 0, 0.2, 1) }))
-    later(760, () => {
+    wheel.set(withTiming(-540, { duration: 1050, easing: Easing.bezier(0.5, 0, 0.15, 1) }))
+    later(1050, () => {
       vaultSound('clunk')
       haptic('medium')
-      bolts.set(withTiming(1, { duration: 220, easing: Easing.in(Easing.quad) }))
+      bolts.set(withTiming(1, { duration: 260, easing: Easing.bezier(0.6, 0, 0.3, 1) }))
     })
-    later(1010, () => {
+    later(1360, () => {
       vaultSound('open')
-      door.set(withTiming(1, { duration: 950, easing: Easing.bezier(0.3, 0, 0.1, 1) }))
+      door.set(withTiming(1, { duration: 1050, easing: Easing.bezier(0.35, 0, 0.1, 1) }))
     })
-    later(1500, () => {
+    later(1900, () => {
       haptic('success')
       leave.set(withTiming(1, { duration: 520, easing: Easing.bezier(0.4, 0, 0.6, 1) }))
     })
-    later(2040, () => setStatus('unlocked'))
+    later(2440, () => setStatus('unlocked'))
   }, [reduced, wheel, bolts, door, lamp, leave])
 
   const authenticate = useCallback(async () => {
@@ -210,7 +214,8 @@ export default function VaultGate({ children }: { children: ReactNode }) {
     )
   }
 
-  const doorSize = Math.min(width - 84, height * 0.4, 340)
+  // The drawing is ~1.6× the door wide (frame, hinge housing, shadow room).
+  const doorSize = Math.min((width - 24) / 1.6, height * 0.36, 300)
   const BioIcon = Platform.OS === 'android' ? Fingerprint : ScanFace
 
   return (
@@ -219,12 +224,12 @@ export default function VaultGate({ children }: { children: ReactNode }) {
       {status === 'opening' ? <View style={StyleSheet.absoluteFill}>{children}</View> : null}
 
       <Animated.View style={[StyleSheet.absoluteFill, sceneStyle]} pointerEvents={status === 'opening' ? 'none' : 'auto'}>
-        <StatusBar style="light" />
-        <Backdrop width={width} height={height} />
+        <StatusBar style={dark ? 'light' : 'dark'} />
+        <Backdrop width={width} height={height} dark={dark} />
 
         <View style={{ paddingTop: insets.top + sp.sm, paddingHorizontal: sp.lg }}>
-          <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('common.back')} style={st.round}>
-            <ChevronLeft size={22} color="#E8ECF2" />
+          <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('common.back')} style={[st.round, { backgroundColor: ink.chip, borderColor: ink.chipLine }]}>
+            <ChevronLeft size={22} color={ink.text} />
           </Pressable>
         </View>
 
@@ -235,16 +240,16 @@ export default function VaultGate({ children }: { children: ReactNode }) {
         </View>
 
         <Animated.View style={[{ paddingHorizontal: sp.xl, alignItems: 'center', gap: 6 }, textFade]}>
-          <Txt style={st.kicker}>{t('docs.title')}</Txt>
-          <Txt style={st.title}>{status === 'opening' ? t('vault.opening') : t('vault.title')}</Txt>
-          <Txt style={[st.sub, failed ? { color: '#FF9A8F' } : null]}>{failed ? t('vault.failed') : t('vault.locked')}</Txt>
+          <Txt style={[st.kicker, { color: ink.muted }]}>{t('docs.title')}</Txt>
+          <Txt style={[st.title, { color: ink.text }]}>{status === 'opening' ? t('vault.opening') : t('vault.title')}</Txt>
+          <Txt style={[st.sub, { color: failed ? ink.error : ink.muted }]}>{failed ? t('vault.failed') : t('vault.locked')}</Txt>
         </Animated.View>
 
         <Animated.View style={[{ paddingHorizontal: sp.lg, paddingTop: sp.xl, paddingBottom: bottomGap + sp.sm }, textFade]}>
           <TintButton
             inline
-            tint={BRASS[1]}
-            colors={BRASS}
+            tint={STEEL[1]}
+            colors={STEEL}
             disabled={busy || status === 'opening'}
             title={busy ? t('vault.unlocking') : t('vault.unlock')}
             icon={<BioIcon size={20} color="#fff" />}
@@ -256,15 +261,16 @@ export default function VaultGate({ children }: { children: ReactNode }) {
   )
 }
 
-/** Deep steel night with a soft pool of light where the door hangs. */
-function Backdrop({ width, height }: { width: number; height: number }) {
+/** A studio wall: a soft key light from the upper left falling off to the
+ *  edges — pale grey in light mode, graphite in dark. */
+function Backdrop({ width, height, dark }: { width: number; height: number; dark: boolean }) {
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
       <Defs>
-        <RadialGradient id="vbg" cx="50%" cy="42%" r="75%">
-          <Stop offset="0" stopColor="#2B3445" />
-          <Stop offset="0.55" stopColor="#141922" />
-          <Stop offset="1" stopColor="#07090D" />
+        <RadialGradient id="vbg" cx="42%" cy="36%" r="80%">
+          <Stop offset="0" stopColor={dark ? '#4A505A' : '#F7F8FA'} />
+          <Stop offset="0.55" stopColor={dark ? '#24282E' : '#D9DCE1'} />
+          <Stop offset="1" stopColor={dark ? '#0E1013' : '#A9AEB6'} />
         </RadialGradient>
       </Defs>
       <Rect width={width} height={height} fill="url(#vbg)" />
@@ -279,11 +285,9 @@ const st = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
   },
-  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 2.2, textTransform: 'uppercase', color: '#E3BC66' },
-  title: { fontFamily: fonts.display, fontSize: 28, lineHeight: 34, color: '#F4F6FA', textAlign: 'center' },
-  sub: { fontSize: 15.5, lineHeight: 21, color: 'rgba(232,236,242,0.62)', textAlign: 'center', maxWidth: 300 },
+  kicker: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 2.2, textTransform: 'uppercase' },
+  title: { fontFamily: fonts.display, fontSize: 28, lineHeight: 34, textAlign: 'center' },
+  sub: { fontSize: 15.5, lineHeight: 21, textAlign: 'center', maxWidth: 300 },
 })
