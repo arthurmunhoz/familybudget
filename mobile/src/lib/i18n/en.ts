@@ -1706,7 +1706,7 @@ export const en = {
   'ask.youSave': "You save {amount}.",
   'ask.openDiscount': "Open Discount",
   'calc.toolsCount': "{n} tools for the house.",
-  'calc.askTip': "Tip: just ask on the Home — “divide 58,71 em 3”.",
+  'calc.askTip': "Tip: just ask Roof — “split 58.71 between 3”.",
   'petcare.doneOf': "{done} of {total} done",
   'petcare.doneShort': "Done",
   'petcare.swipeHint': "Swipe left on an entry to delete it.",

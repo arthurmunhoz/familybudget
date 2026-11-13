@@ -1696,7 +1696,7 @@ export const pt: Record<keyof typeof en, string> = {
   'ask.youSave': "Você economiza {amount}.",
   'ask.openDiscount': "Abrir Desconto",
   'calc.toolsCount': "{n} ferramentas para a casa.",
-  'calc.askTip': "Dica: é só pedir na Home — “divide 58,71 em 3”.",
+  'calc.askTip': "Dica: é só pedir ao Roof — “divide 58,71 em 3”.",
   'petcare.doneOf': "{done} de {total} feitas",
   'petcare.doneShort': "Feito",
   'petcare.swipeHint': "Deslize um registro para a esquerda para apagar.",
