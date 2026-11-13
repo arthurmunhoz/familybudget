@@ -2124,6 +2124,7 @@ export const es: Record<keyof typeof en, string> = {
   'games.soundOn': "Activar el sonido",
   'games.soundOff': "Desactivar el sonido",
   'games.leave': "Salir",
+  'games.exitShort': "Salir",
   'games.exitRoom': "Salir de la sala",
   'games.closeRoom': "Cerrar la sala",
   'games.stay': "Quedarme aquí",

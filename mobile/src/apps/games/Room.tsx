@@ -109,7 +109,7 @@ export function Room({ id }: { id: string }) {
           <GameTopBar
             title={session ? t(TITLE[session.game]) : ''}
             onBack={leave}
-            exitLabel={session && session.mode === 'live' && (session.status === 'lobby' || session.status === 'playing') ? t('games.exitRoom') : undefined}
+            exitLabel={session && session.mode === 'live' && (session.status === 'lobby' || session.status === 'playing') ? t('games.exitShort') : undefined}
           />
         </View>
         {session?.status === 'playing' && session.mode === 'live' && online ? (

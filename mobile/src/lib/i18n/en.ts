@@ -2134,6 +2134,7 @@ export const en = {
   'games.soundOn': "Turn sound on",
   'games.soundOff': "Turn sound off",
   'games.leave': "Leave",
+  'games.exitShort': "Leave",
   'games.exitRoom': "Leave room",
   'games.closeRoom': "Close the room",
   'games.stay': "Stay here",

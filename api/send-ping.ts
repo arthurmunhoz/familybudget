@@ -327,7 +327,7 @@ export default async function handler(req: any, res: any) {
     const host = (members ?? []).find((m: any) => m.email === room.host_email)
     const hostName = (host?.display_name || room.host_email.split('@')[0]).split(' ')[0]
     const GAME: Record<string, Record<string, string>> = {
-      pt: { hangman: 'Forca', battleship: 'Batalha naval', quiz: 'Quiz com campainha' },
+      pt: { hangman: 'Forca', battleship: 'Batalha naval', quiz: 'Perguntas & Tortadas' },
       en: { hangman: 'Hangman', battleship: 'Battleship', quiz: 'Buzzer quiz' },
       es: { hangman: 'Ahorcado', battleship: 'Batalla naval', quiz: 'Quiz con timbre' },
     }
