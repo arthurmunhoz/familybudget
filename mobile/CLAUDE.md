@@ -362,6 +362,10 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   clears any choice an older build saved. Pickers opened from an app take
   that app's colour (`PickerSheet tint`, via `DateTimeRow` / `DayRow`). Note the apps list
   is a DraggableList: a scroll gesture that STARTS on a row can pick it up.
+- **Wake phrase per language (2026-11-13):** pt "Oi Casa", es "Oye Casa", en
+  "Hey Roof" — "Roof" with a Brazilian/Spanish R kept being missed. `CASA_CALL`
+  in `lib/roofWake.ts` and `src/casa/wake.ts` (greeting + "casa" only; "casa"
+  alone is an everyday word). The old "Ei Roof" spellings still work.
 - **Roof — the assistant's voice (2026-11, Plus).** Two per-device prefs in
   `lib/roof.ts` (`wake` off by default, `speak` on), set in Settings ›
   Assistente Roof (`components/RoofSettings`). With both off the assistant
