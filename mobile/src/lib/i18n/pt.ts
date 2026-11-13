@@ -2103,7 +2103,7 @@ export const pt: Record<keyof typeof en, string> = {
   'games.hangmanSub': "Time contra time. Adivinhe a palavra antes da casa ficar pronta.",
   'games.battleship': "Batalha naval",
   'games.battleshipSub': "Esconda sua frota e afunde a deles. Acertou, joga de novo.",
-  'games.quiz': "Tortada",
+  'games.quiz': "Perguntas & Tortadas",
   'games.quizSub': "Aperte primeiro e responda. Errou, torta na cara — acertou, a torta vai pro outro time.",
   'games.soon': "Em breve",
   'games.soonBody': "Estamos fazendo este. Ele chega numa próxima atualização.",

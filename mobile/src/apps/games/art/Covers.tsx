@@ -111,7 +111,7 @@ export function BattleshipCover() {
 }
 
 /** Quiz: a big round buzzer with question bubbles popping around it. */
-/** The quiz in pt is "Tortada" (owner, 2026-11-13): a cream pie flying at a
+/** The quiz in pt is "Perguntas & Tortadas" (owner, 2026-11-13): a cream pie flying at a
  *  splat, strawberry on top. Original art. */
 export function QuizCover() {
   const bob = useBob(1500, 4)
