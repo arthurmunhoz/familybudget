@@ -39,8 +39,9 @@ export function preloadVault() {
     players = {}
     for (const k of Object.keys(FILES) as VaultSound[]) {
       const p = audio.createAudioPlayer(FILES[k]) as Player
-      // Quiet on purpose (owner, 2026-11-13): it's a flourish, not an alarm.
-      p.volume = k === 'open' ? 0.4 : 0.45
+      // Very quiet on purpose (owner, 2026-11-13, twice): a small touch
+      // under the phone's volume, never something that draws attention.
+      p.volume = k === 'open' ? 0.14 : 0.15
       players[k] = p
     }
   } catch {
