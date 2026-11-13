@@ -162,7 +162,10 @@ export default function PingComposer({
       const next = new Set(prev)
       if (next.has(email)) next.delete(email)
       else next.add(email)
-      return next
+      // Everyone picked one by one IS "Everyone": store it as that (an empty
+      // set), or the chips showed Everyone while the next tap on a person
+      // un-picked them and left the OTHER one selected (owner, 2026-11-13).
+      return next.size >= members.length ? new Set<string>() : next
     })
   }
 
