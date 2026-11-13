@@ -675,6 +675,55 @@
       "expect": {
         "intent": "open_document"
       }
+    },
+    {
+      "text": "inicia uma partida de perguntas e tortadas",
+      "expect": {
+        "intent": "start_game",
+        "game": "quiz"
+      }
+    },
+    {
+      "text": "começar um jogo de forca",
+      "expect": {
+        "intent": "start_game",
+        "game": "hangman"
+      }
+    },
+    {
+      "text": "abre uma sala de batalha naval",
+      "expect": {
+        "intent": "start_game",
+        "game": "battleship"
+      }
+    },
+    {
+      "text": "bora jogar o jogo da torta",
+      "expect": {
+        "intent": "start_game",
+        "game": "quiz"
+      }
+    },
+    {
+      "text": "let's play hangman",
+      "expect": {
+        "intent": "start_game",
+        "game": "hangman"
+      }
+    },
+    {
+      "text": "vamos a jugar batalla naval",
+      "expect": {
+        "intent": "start_game",
+        "game": "battleship"
+      }
+    },
+    {
+      "text": "como funciona perguntas e tortadas?",
+      "expect": {
+        "intent": "app_help",
+        "topic": "quiz"
+      }
     }
   ]
 }

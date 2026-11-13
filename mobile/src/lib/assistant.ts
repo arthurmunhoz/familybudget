@@ -90,6 +90,7 @@ export type Intent =
   | { intent: 'pets_due'; pet: string }
   | { intent: 'family_info'; person: string; field: FamilyField | '' }
   | { intent: 'open_app'; app: string }
+  | { intent: 'start_game'; game: string }
   | { intent: 'split_bill'; amount: number; people: number; mode: 'even' | 'items' | ''; tip: number }
   | { intent: 'discount'; amount: number; percent: number }
   /** About One Roof itself (what it does, the games and their rules). */
@@ -173,7 +174,7 @@ const KNOWN_INTENTS = new Set([
   'agenda', 'add_event', 'edit_event', 'find_event', 'move_event', 'remove_event', 'birthdays', 'day_summary',
   'add_money', 'money_summary', 'list_money', 'fix_money', 'remove_money', 'split_bill', 'discount', 'better_deal',
   'send_nudge', 'nudge_seen', 'pets_due', 'pet_done', 'pet_log', 'pet_next', 'pet_weight',
-  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'app_help', 'unknown',
+  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'start_game', 'app_help', 'unknown',
 ])
 
 /** What the server said: an intent, an intent with a detail missing, an
@@ -410,6 +411,8 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
       return { intent: 'family_info', person: str('person'), field: str('field') as FamilyField | '' }
     case 'open_app':
       return str('app') ? { intent: 'open_app', app: str('app') } : null
+    case 'start_game':
+      return { intent: 'start_game', game: str('game') }
     case 'split_bill': {
       const num = (k: string) => (typeof j[k] === 'number' ? (j[k] as number) : 0)
       const mode = str('split_mode')

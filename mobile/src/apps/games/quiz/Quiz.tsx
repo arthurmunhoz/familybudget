@@ -235,21 +235,25 @@ function AnswerPanel({ sessionId, lang, team, left, total }: { sessionId: string
   const { t } = useI18n()
   const [text, setText] = useState('')
   const [sent, setSent] = useState(false)
+  // A ref too: two paths can hand the same answer over in one tick.
+  const sentRef = useRef(false)
   const canTalk = voiceSupported()
   const submit = useCallback(
     async (answer: string, alts: string[] = []) => {
       const a = answer.trim()
-      if (!a || sent) return
+      if (!a || sentRef.current) return
+      sentRef.current = true
       setSent(true)
       try {
         // The recogniser's other guesses ride along — the server accepts the
         // answer if any of them is right ("true" heard, "two" meant).
         await games.quiz.answer(sessionId, a, alts)
       } catch {
+        sentRef.current = false
         setSent(false)
       }
     },
-    [sessionId, sent],
+    [sessionId],
   )
   // Short-answer mode: the mic stays open through a pause to think (owner,
   // 2026-11: it closed after a few seconds of silence and cost a re-tap), and
@@ -264,6 +268,15 @@ function AnswerPanel({ sessionId, lang, team, left, total }: { sessionId: string
     const id = setTimeout(() => stop(), SPOKEN_DONE_MS)
     return () => clearTimeout(id)
   }, [voice.transcript, voice.state, sent, stop])
+  // Safety net: the listen ended (any way at all) with words on screen and
+  // nothing sent — send what's shown. What you see is what gets answered.
+  const lastState = useRef(voice.state)
+  useEffect(() => {
+    const was = lastState.current
+    lastState.current = voice.state
+    const ended = (was === 'listening' || was === 'starting') && (voice.state === 'idle' || voice.state === 'error')
+    if (ended && voice.transcript.trim() && !sentRef.current) void submit(voice.transcript)
+  }, [voice.state, voice.transcript, submit])
   // Some recognisers still end on a long silence (older Android): reopen
   // quietly while there's time, unless they're typing instead.
   const leftRef = useRef(left)

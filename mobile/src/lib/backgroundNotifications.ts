@@ -160,11 +160,23 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
  *  Silent types are skipped: they are never presented, so they can't be
  *  tapped, and routing on one would yank the user somewhere they didn't ask
  *  to go if the OS ever did surface it. */
+/** Taps already routed (by notification id) — see routeFromNotification. */
+const routedTaps = new Set<string>()
+
 function routeFromNotification(response: Notifications.NotificationResponse | null): void {
   // An action BUTTON (a pet reminder's Done) is not a tap on the notification:
   // it's handled where it lands (below) and must not navigate anywhere.
   const action = response?.actionIdentifier
   if (action && action !== Notifications.DEFAULT_ACTION_IDENTIFIER) return
+  // ONE tap, ONE screen (owner, 2026-11-13: two Games screens stacked after a
+  // tap). The same tap can arrive twice — the live listener AND
+  // getLastNotificationResponseAsync (Android hands the warm-start tap to
+  // both) — and each pushed the route.
+  const tapId = response?.notification?.request?.identifier
+  if (tapId) {
+    if (routedTaps.has(tapId)) return
+    routedTaps.add(tapId)
+  }
   const data = response?.notification?.request?.content?.data as
     | Record<string, unknown>
     | undefined
@@ -221,7 +233,14 @@ async function answerLocationRequests(): Promise<boolean> {
   }
 }
 
+let lastGo = { url: '', at: 0 }
+
 function go(url: string): void {
+  // Belt and braces for the double-tap above: the same route twice within a
+  // few seconds is one intent, not two screens.
+  const now = Date.now()
+  if (url === lastGo.url && now - lastGo.at < 4000) return
+  lastGo = { url, at: now }
   // A cold start routes before the first screen has mounted, so let the
   // navigator settle rather than pushing into nothing.
   setTimeout(() => {

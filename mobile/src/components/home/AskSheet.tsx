@@ -865,6 +865,14 @@ export function AskSheet({
         // About Roof itself → the capabilities screen, not a paragraph.
         if (intent.topic === 'roof') return { kind: 'capabilities' }
         return { kind: 'help', topic: intent.topic, text: intent.reply }
+      case 'start_game': {
+        // Straight to Games with that game's start sheet open (owner,
+        // 2026-11-13: "start a Perguntas & Tortadas match").
+        closeSheet()
+        const g = ['hangman', 'battleship', 'quiz'].includes(intent.game) ? intent.game : ''
+        router.push((g ? `/games?start=${g}` : '/games') as never)
+        return { kind: 'say', text: '' }
+      }
       case 'open_app': {
         const route = APP_ROUTE[intent.app]
         if (route) {

@@ -83,6 +83,7 @@ const INTENTS = [
   'send_nudge',
   'pets_due',
   'family_info',
+  'start_game',
   'open_app',
   'split_bill',
   'discount',
@@ -90,6 +91,7 @@ const INTENTS = [
   'unknown',
 ] as const
 const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'frame', 'games', 'settings', '']
+const GAMES = ['hangman', 'battleship', 'quiz', '']
 const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'plus', 'families', 'roof', 'casa', 'other', '']
 const RECURRENCES = ['none', 'daily', 'weekly', 'monthly', 'yearly']
 const EVENT_KINDS = ['event', 'birthday', 'anniversary', 'renewal', 'other']
@@ -136,6 +138,7 @@ const ASSISTANT_SCHEMA = {
         'better_deal = compare package prices to see which is cheaper per unit ("2 L por 8 ou 3 L por 11, qual compensa?").',
         'open_document = open a stored family document ("abre o passaporte do Léo", "mostra o seguro do carro").',
         'day_summary = asks for an overview of the day ("resumo do meu dia", "o que tenho hoje no geral?"). A plain "what is on the calendar" is agenda.',
+        'start_game = wants to PLAY / start / open a room / create a match of a game — any phrasing: "começar um jogo de forca", "abre uma sala de batalha naval", "cria uma partida de perguntas e tortadas", "inicia uma partida de", "bora jogar", "vamos jogar", "quero jogar", "joga comigo", "uma rodada de", "let\'s play hangman", "start a battleship game", "open a quiz room", "empezar una partida de ahorcado", "abre una sala de", "vamos a jugar". The game may be named loosely ("o jogo da torta", "o da casinha", "o dos barcos"). With no game named, game "". Questions ABOUT a game (rules, which games exist) are app_help.',
         'open_app = asks to open a part of the app.',
         'split_bill = split a bill / restaurant check / total among people ("divide 58,71 em 3", "split the check").',
         'discount = the price after a percentage off ("quanto fica 80 com 30% de desconto").',
@@ -310,11 +313,16 @@ const ASSISTANT_SCHEMA = {
     },
     field: { type: 'string', enum: FIELDS, description: 'family_info / family_update: which detail. "" otherwise.' },
     app: { type: 'string', enum: APPS, description: 'open_app: which part (budget = money, calc = utilities, frame = the photo frame / porta-retrato / slideshow, shopping = lists). "" otherwise.' },
+    game: {
+      type: 'string',
+      enum: GAMES,
+      description: 'start_game: which game — hangman (forca), battleship (batalha naval), quiz (Perguntas & Tortadas / buzzer quiz / perguntas / quiz / torta). "" otherwise.',
+    },
     topic: {
       type: 'string',
       enum: TOPICS,
       description:
-        'app_help: what it is about — games (which games / games in general), hangman (forca), battleship (batalha naval), quiz (buzzer quiz / perguntas), plus, families (several families per account), roof (the voice assistant), casa (Modo Casa / home mode / using the app on a tablet or screen at home), other. "" otherwise.',
+        'app_help: what it is about — games (which games / games in general), hangman (forca), battleship (batalha naval), quiz (Perguntas & Tortadas / buzzer quiz / perguntas / torta), plus, families (several families per account), roof (the voice assistant), casa (Modo Casa / home mode / using the app on a tablet or screen at home), other. "" otherwise.',
     },
     gap: {
       type: 'string',
@@ -404,6 +412,7 @@ const GROUPS: Record<string, { keys: string[]; for: string; note?: string }> = {
   family: { keys: ['field', 'value'], for: 'family_info, family_update' },
   nudge: { keys: ['urgent'], for: 'send_nudge' },
   open: { keys: ['app'], for: 'open_app' },
+  game: { keys: ['game'], for: 'start_game' },
   help: { keys: ['topic'], for: 'app_help' },
 }
 const flatProps = ASSISTANT_SCHEMA.properties as Record<string, unknown>
@@ -519,7 +528,7 @@ const APP_GUIDE =
   '1) Hangman (Forca): one team picks a word from a category (the hint), the other team guesses letters, one person per turn; each wrong letter adds a piece of the house; ' +
   'guessing the word scores for the guessers, a finished house scores for the word team; teams swap every round. You can also SEND a hangman to one person to solve on their own. ' +
   '2) Battleship (Batalha naval): each team hides its fleet on its own sea; on your turn aim at the other team\'s sea and Fire; a hit shoots again, a miss passes the turn; sink the whole fleet to win. ' +
-  '3) Buzzer quiz (Quiz de campainha): the same question shows on every phone; first to press the buzzer answers by voice or typing; a wrong answer is out for that question and the others can try; each right answer is a point for the team. ' +
+  '3) Perguntas & Tortadas (in Portuguese; "Buzzer quiz" in English): the same question shows on every phone; first to press the buzzer answers by voice or typing; a wrong answer is out for that question and the others can try; each right answer is a point for the team — and the losing side takes a cream pie in the face on screen (the one who got it wrong, or the other team when someone gets it right). ' +
   'PLUS (One Roof Plus): unlimited AI scans, calendar sync, split by item, several and private budgets, up to 12 members (free: 4), Face ID on documents, the Roof voice, the assistant without a monthly limit, creating another family. ' +
   'MODO CASA (Home Mode): a spare device at home (an old phone, a tablet, a screen) becomes the family hub — the day, lists, pets, the money behind a PIN, and Roof by voice. Open one-roof-app.vercel.app on it and pair it from the phone: Settings › Modo Casa › Pair a device (type the code it shows or scan its QR). 30 days of everything free from the first device; then, without Plus, it only shows the day; Plus unlocks Roof, actions, the budget and more devices. ' +
   'FAMILIES: one account can be in up to 3 families (join with an invite code, free; create another needs a paid Plus).'

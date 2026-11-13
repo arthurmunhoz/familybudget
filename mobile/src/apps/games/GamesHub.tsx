@@ -5,10 +5,10 @@
 //
 // Hangman is live in this release; Battleship and the buzzer Quiz are shown as
 // "coming soon" so the family sees what's next.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { ChevronRight, Send, Users } from 'lucide-react-native'
 
@@ -58,6 +58,11 @@ export function GamesHub() {
   const me = session?.user.email
   const { forMe, sent, played } = useChallenges(me)
   const [creating, setCreating] = useState<GameKind | null>(null)
+  // `?start=quiz` (from Roof: "start a match of …") opens that game's sheet.
+  const { start } = useLocalSearchParams<{ start?: string }>()
+  useEffect(() => {
+    if (start === 'hangman' || start === 'battleship' || start === 'quiz') setCreating(start as GameKind)
+  }, [start])
   // Phones: one card per row. Tablets/Mac: two or three.
   const cols = width >= 1100 ? 3 : width >= 700 ? 2 : 1
 

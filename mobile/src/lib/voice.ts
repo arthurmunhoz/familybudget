@@ -305,6 +305,18 @@ export function useVoice(
           }, 400)
           return
         }
+        // Something WAS heard: an error on the way out must not drop it —
+        // Android reports 'no-speech' / 'client' when a continuous listen is
+        // stopped, and the quiz lost a perfectly heard "deserto do Saara"
+        // to that (owner, 2026-11-13). Hand it over like a final result.
+        const said = latest.current.trim()
+        if (listening.current && said && e.error !== 'not-allowed' && e.error !== 'aborted') {
+          if (live.current && !untilCancel.current) chime('stop')
+          listening.current = false
+          setState('idle')
+          finalRef.current(said, alts.current.filter((a) => a !== said))
+          return
+        }
         // Silence in a conversation: listen again (see untilCancel).
         if (untilCancel.current && listening.current && live.current && (e.error === 'no-speech' || e.error === 'speech-timeout') && keepGoing()) return
         if (listening.current && live.current) chime('stop')
