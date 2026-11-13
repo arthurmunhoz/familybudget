@@ -90,7 +90,7 @@ const INTENTS = [
   'unknown',
 ] as const
 const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'games', 'settings', '']
-const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'plus', 'families', 'roof', 'other', '']
+const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'plus', 'families', 'roof', 'casa', 'other', '']
 const RECURRENCES = ['none', 'daily', 'weekly', 'monthly', 'yearly']
 const EVENT_KINDS = ['event', 'birthday', 'anniversary', 'renewal', 'other']
 const PET_EVENT_TYPES = ['vet', 'vaccine', 'medication', 'grooming', 'other', '']
@@ -314,7 +314,7 @@ const ASSISTANT_SCHEMA = {
       type: 'string',
       enum: TOPICS,
       description:
-        'app_help: what it is about — games (which games / games in general), hangman (forca), battleship (batalha naval), quiz (buzzer quiz / perguntas), plus, families (several families per account), roof (the voice assistant), other. "" otherwise.',
+        'app_help: what it is about — games (which games / games in general), hangman (forca), battleship (batalha naval), quiz (buzzer quiz / perguntas), plus, families (several families per account), roof (the voice assistant), casa (Modo Casa / home mode / using the app on a tablet or screen at home), other. "" otherwise.',
     },
     gap: {
       type: 'string',
@@ -521,6 +521,7 @@ const APP_GUIDE =
   '2) Battleship (Batalha naval): each team hides its fleet on its own sea; on your turn aim at the other team\'s sea and Fire; a hit shoots again, a miss passes the turn; sink the whole fleet to win. ' +
   '3) Buzzer quiz (Quiz de campainha): the same question shows on every phone; first to press the buzzer answers by voice or typing; a wrong answer is out for that question and the others can try; each right answer is a point for the team. ' +
   'PLUS (One Roof Plus): unlimited AI scans, calendar sync, split by item, several and private budgets, up to 12 members (free: 4), Face ID on documents, the Roof voice, the assistant without a monthly limit, creating another family. ' +
+  'MODO CASA (Home Mode): a spare device at home (an old phone, a tablet, a screen) becomes the family hub — the day, lists, pets, the money behind a PIN, and Roof by voice. Open one-roof-app.vercel.app on it and pair it from the phone: Settings › Modo Casa › Pair a device (type the code it shows or scan its QR). 30 days of everything free from the first device; then, without Plus, it only shows the day; Plus unlocks Roof, actions, the budget and more devices. ' +
   'FAMILIES: one account can be in up to 3 families (join with an invite code, free; create another needs a paid Plus).'
 
 const SYSTEM =

@@ -399,6 +399,110 @@ function tr(lang: string, key: string, vars?: Record<string, string | number>): 
   return s
 }
 
+// ── Modo Casa pairing (migration 105) ────────────────────────────────────────
+// casa-start  (tablet, no auth)      → a short code (shown as a QR) + a secret
+//                                      only the tablet knows.
+// casa-claim  (phone, member's JWT)  → checks the member and the device limit,
+//                                      records the tablet, mints it a
+//                                      magic-link token for that member.
+// casa-poll   (tablet, code+secret)  → hands the token over ONCE; the tablet
+//                                      exchanges it (verifyOtp) for its own
+//                                      session.
+const CASA_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no 0/O, 1/I/L
+const CASA_DEVICES_FREE = 1
+const CASA_DEVICES_PLUS = 5
+function casaCode(): string {
+  let s = ''
+  for (let i = 0; i < 6; i++) s += CASA_ALPHABET[Math.floor(Math.random() * CASA_ALPHABET.length)]
+  return s
+}
+function casaSecret(): string {
+  return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
+}
+
+async function casaPair(action: string, req: any, res: any, url: string, serviceKey: string) {
+  const db = createClient(url, serviceKey, { auth: { persistSession: false } })
+  const body = req.body ?? {}
+
+  if (action === 'casa-start') {
+    for (let tries = 0; tries < 5; tries++) {
+      const code = casaCode()
+      const secret = casaSecret()
+      const { error } = await db.from('home_pair_codes').insert({ code, secret })
+      if (!error) return res.status(200).json({ code, secret })
+    }
+    return res.status(500).json({ error: 'no_code' })
+  }
+
+  if (action === 'casa-poll') {
+    const code = String(body.code ?? '').toUpperCase()
+    const { data: row } = await db.from('home_pair_codes').select('*').eq('code', code).maybeSingle()
+    if (!row || row.secret !== body.secret) return res.status(404).json({ error: 'unknown' })
+    if (row.collected_at) return res.status(410).json({ error: 'used' })
+    if (!row.token_hash) {
+      if (new Date(row.expires_at).getTime() < Date.now()) return res.status(410).json({ error: 'expired' })
+      return res.status(200).json({ pending: true })
+    }
+    await db.from('home_pair_codes').update({ collected_at: new Date().toISOString() }).eq('code', code)
+    return res.status(200).json({ token_hash: row.token_hash, device_id: row.device_id, household_id: row.household_id })
+  }
+
+  if (action === 'casa-claim') {
+    const anon = process.env.VITE_SUPABASE_ANON_KEY
+    const jwt = String(req.headers?.authorization ?? '').replace(/^Bearer /, '')
+    if (!anon || !jwt) return res.status(401).json({ error: 'auth' })
+    const who = await fetch(`${url}/auth/v1/user`, { headers: { apikey: anon, Authorization: `Bearer ${jwt}` } })
+    const email: string | undefined = who.ok ? (await who.json())?.email : undefined
+    if (!email) return res.status(401).json({ error: 'auth' })
+
+    const code = String(body.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const { data: row } = await db.from('home_pair_codes').select('*').eq('code', code).maybeSingle()
+    if (!row || new Date(row.expires_at).getTime() < Date.now()) return res.status(404).json({ error: 'invalid_code' })
+    if (row.claimed_at) return res.status(409).json({ error: 'already_claimed' })
+
+    // The caller's ACTIVE household, and they must still belong to it.
+    const { data: me } = await db.from('allowed_users').select('household_id').eq('email', email).maybeSingle()
+    const household: string | undefined = me?.household_id
+    if (!household) return res.status(403).json({ error: 'no_household' })
+    const roster = await householdMembers(db, household)
+    if (!roster.includes(email)) return res.status(403).json({ error: 'no_household' })
+
+    // Device limit: 1 tablet without Plus (trial included), more with Plus.
+    const { data: plus } = await db.rpc('household_is_plus', { p_household: household })
+    const { count } = await db
+      .from('home_devices')
+      .select('id', { count: 'exact', head: true })
+      .eq('household_id', household)
+      .is('revoked_at', null)
+    const limit = plus === true ? CASA_DEVICES_PLUS : CASA_DEVICES_FREE
+    if ((count ?? 0) >= limit) return res.status(402).json({ error: plus === true ? 'device_limit' : 'plus_required' })
+
+    const name = String(body.name ?? '').trim().slice(0, 40) || 'Dispositivo'
+    const { data: dev, error: devErr } = await db
+      .from('home_devices')
+      .insert({ household_id: household, paired_by: email, name })
+      .select('id')
+      .single()
+    if (devErr || !dev) return res.status(500).json({ error: 'device' })
+
+    // The tablet's own session for this member (a fresh one — the phone's
+    // session is untouched). generateLink sends no email.
+    const { data: link, error: linkErr } = await (db.auth as any).admin.generateLink({ type: 'magiclink', email })
+    const tokenHash: string | undefined = link?.properties?.hashed_token
+    if (linkErr || !tokenHash) {
+      await db.from('home_devices').delete().eq('id', dev.id)
+      return res.status(500).json({ error: 'session' })
+    }
+    await db
+      .from('home_pair_codes')
+      .update({ household_id: household, device_id: dev.id, claimed_by: email, claimed_at: new Date().toISOString(), token_hash: tokenHash })
+      .eq('code', code)
+    return res.status(200).json({ ok: true, device_id: dev.id })
+  }
+
+  return res.status(400).json({ error: 'unknown_action' })
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -409,6 +513,9 @@ export default async function handler(req: any, res: any) {
   // Defaults to 'nudge': that's the only legacy caller (the shipped widget),
   // and it posts no action of its own.
   const action = String(req.query?.action ?? req.body?.action ?? 'nudge')
+
+  // Modo Casa pairing (migration 105) — no widget token; see casaPair().
+  if (action.startsWith('casa-')) return casaPair(action, req, res, url, serviceKey)
 
   const { token } = req.body ?? {}
   if (!token || typeof token !== 'string') return res.status(400).json({ error: 'Missing token' })

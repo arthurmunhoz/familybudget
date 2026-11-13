@@ -45,6 +45,7 @@ const LINK: Record<string, { label: TKey; route: string }> = {
   plus: { label: 'ask.helpSeePlus', route: '/paywall' },
   families: { label: 'ask.helpFamilies', route: '/families' },
   roof: { label: 'ask.helpRoof', route: '/settings' },
+  casa: { label: 'ask.helpCasa', route: '/settings?highlight=casa' },
 }
 
 export function HelpView({ topic, text, onOpen }: { topic: string; text: string; onOpen: (route: string) => void }) {

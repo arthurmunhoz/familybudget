@@ -3,6 +3,7 @@
 // separated by dividers; Plus shows a certificate badge + the included feature
 // list when active, and notifications shows a live on/off status.
 import { RoofSettings } from '@/components/RoofSettings'
+import { CasaSettings } from '@/components/CasaSettings'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AccessibilityInfo,
@@ -301,7 +302,7 @@ export default function Settings() {
   // Deep-link to a section and briefly outline it — from the Hub's "Set city"
   // button (?highlight=weather) and its invite banner (?highlight=invite).
   // Each target registers its own y via onLayout under the same key.
-  const params = useLocalSearchParams<{ highlight?: string }>()
+  const params = useLocalSearchParams<{ highlight?: string; pair?: string }>()
   const scrollRef = useRef<ScrollView>(null)
   const [sectionY, setSectionY] = useState<Record<string, number>>({})
   const [highlighted, setHighlighted] = useState<string | null>(null)
@@ -684,6 +685,14 @@ export default function Settings() {
           <Txt variant="faint">{t('settings.appsHint')}</Txt>
         </View>
 
+
+        {/* Modo Casa — a spare device at home as the family hub */}
+        <View style={{ gap: sp.sm }} onLayout={registerSection('casa')}>
+          <SectionLabel>{t('settings.casa')}</SectionLabel>
+          <Card style={highlighted === 'casa' ? { borderWidth: 2, borderColor: c.accent } : undefined}>
+            <CasaSettings pairCode={params.pair} />
+          </Card>
+        </View>
 
         {/* Roof — the assistant's voice: "Ei Roof" + spoken answers */}
         <View style={{ gap: sp.sm }} onLayout={registerSection('roof')}>
