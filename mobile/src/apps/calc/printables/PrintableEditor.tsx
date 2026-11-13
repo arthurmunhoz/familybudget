@@ -176,6 +176,7 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
       index={0}
       onBack={exit}
       hideProgress
+      sideBySide
       primary={{
         label: t('printable.print'),
         onPress: () => void run('print'),

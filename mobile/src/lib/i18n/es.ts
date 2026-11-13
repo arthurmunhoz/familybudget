@@ -404,7 +404,7 @@ export const es: Record<keyof typeof en, string> = {
   'bill.newPhotoTitle': '¿Leer una cuenta nueva?',
   'bill.newPhotoBody': 'Esto borra los artículos actuales. Las personas se quedan.',
   'printable.print': 'Imprimir',
-  'printable.saveImage': 'Guardar imagen o compartir',
+  'printable.saveImage': 'Guardar',
   'printable.color': 'Color',
   'printable.fillFrom': 'Rellenar para',
   'printable.cutHint': 'Recorta por la línea discontinua. Ponle cinta o plastifícala para que dure.',

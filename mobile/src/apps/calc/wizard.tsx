@@ -32,6 +32,7 @@ import { ChevronLeft } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { TintButton } from '@/components/TintButton'
+import { GradientBox } from '@/components/home/GradientBox'
 import { DismissKeyboard, Txt } from '@/components/ui'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useI18n } from '@/hooks/useI18n'
@@ -62,6 +63,7 @@ export function WizardScreen({
   secondary,
   hideProgress,
   swipeBack,
+  sideBySide = false,
 }: {
   /** Which tool — its colour runs through the whole flow (look.ts). */
   kind: ToolArtKind
@@ -76,6 +78,9 @@ export function WizardScreen({
   primary?: WizardAction
   secondary?: WizardAction
   hideProgress?: boolean
+  /** Primary and secondary as two equal buttons in one row (the luggage tag's
+   *  Print / Save — owner, 2026-11), a little shorter than the docked one. */
+  sideBySide?: boolean
   /** Allow the iOS edge swipe to leave the wizard. Defaults to the first step
    *  only; result screens (whose back arrow exits) turn it on too. */
   swipeBack?: boolean
@@ -124,7 +129,37 @@ export function WizardScreen({
               {children}
             </Animated.View>
           </ScrollView>
-          {primary || secondary ? (
+          {sideBySide && primary && secondary ? (
+            <View style={[styles.column, styles.footer, styles.pairRow, { paddingBottom: bottom }]}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={primary.onPress}
+                disabled={primary.disabled || primary.loading}
+                style={({ pressed }) => [{ flex: 1, opacity: primary.disabled ? 0.45 : pressed ? 0.85 : 1 }]}
+              >
+                <GradientBox colors={look.colors} radius={radius.pill} style={styles.pairBtn}>
+                  {primary.loading ? <ActivityIndicator color="#fff" /> : primary.icon}
+                  <Txt numberOfLines={1} style={{ fontFamily: fonts.semibold, fontSize: 15.5, color: '#fff' }}>
+                    {primary.label}
+                  </Txt>
+                </GradientBox>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={secondary.onPress}
+                disabled={secondary.disabled}
+                style={({ pressed }) => [
+                  styles.pairBtn,
+                  { flex: 1, borderRadius: radius.pill, borderWidth: 1.5, borderColor: look.tint, opacity: secondary.disabled ? 0.45 : pressed ? 0.6 : 1 },
+                ]}
+              >
+                {secondary.icon}
+                <Txt numberOfLines={1} style={{ fontFamily: fonts.semibold, fontSize: 15.5, color: look.tint }}>
+                  {secondary.label}
+                </Txt>
+              </Pressable>
+            </View>
+          ) : primary || secondary ? (
             <View style={[styles.column, styles.footer, { paddingBottom: bottom }]}>
               {primary ? (
                 <TintButton
@@ -256,5 +291,7 @@ const styles = StyleSheet.create({
   question: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, letterSpacing: -0.8 },
   hint: { fontFamily: fonts.display, fontSize: 19, lineHeight: 25, letterSpacing: -0.3, marginTop: 2 },
   footer: { paddingTop: sp.sm, gap: 2 },
+  pairRow: { flexDirection: 'row', gap: sp.sm },
+  pairBtn: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: sp.sm },
   secondary: { height: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
 })
