@@ -480,9 +480,12 @@ async function recordGap(
 }
 
 /** The request's context block (what the model may match against). */
+const LANG_NAME: Record<string, string> = { pt: 'Portuguese (Brazil)', en: 'English', es: 'Spanish' }
+
 function buildContext(body: any, today: string): string {
   return [
     `TODAY: ${today} (${str(body?.weekday, 20)})`,
+    `APP LANGUAGE: ${LANG_NAME[str(body?.lang, 8)] ?? 'Portuguese (Brazil)'}`,
     `KNOWN STORES: ${strList(body?.stores).join(', ') || '(none yet)'}`,
     `MEMBERS: ${strList(body?.members, 15).join(', ') || '(unknown)'}`,
     `KNOWN BUDGETS: ${strList(body?.budgets, 15).join(', ') || '(none)'}`,
@@ -527,7 +530,10 @@ const SYSTEM =
   '"and tomorrow?", "e para a Lola?" against the conversation, keeping whatever the user did not change ' +
   '(same store, same pet, same person, same period). Read the request in context: a word that makes no sense for ' +
   'the domain is usually a slip ("pagar o gasto" = "apagar o gasto"), and a follow-up about something just logged, ' +
-  'scheduled or added stays in that same feature (an expense just logged is fixed/removed as money, never as a list item).\n\n' +
+  'scheduled or added stays in that same feature (an expense just logged is fixed/removed as money, never as a list item). ' +
+  '"The user language" means the language the REQUEST is clearly written in; when the request is a word or two, a filler, ' +
+  'a fragment, or could be either language, it means the APP LANGUAGE — and every reply is then in the APP LANGUAGE ' +
+  '(the answer is read aloud in that language\'s voice).\n\n' +
   APP_GUIDE
 
 export type SchemaVariant = 'flat' | 'grouped'

@@ -79,6 +79,7 @@ import {
 import type { TKey } from '@/lib/i18n'
 import { useVoice, voiceSupported } from '@/lib/voice'
 import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
+import { meaningfulRequest } from '@/lib/roofWake'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import {
   ActionView,
@@ -334,8 +335,11 @@ export function AskSheet({
   const voice = useVoice(
     lang,
     (heard) => {
-      // A listen that finished after the sheet closed is dropped, never sent.
+      // A listen that finished after the sheet closed is dropped, never sent;
+      // so is a bare hesitation ("er", "é…") — that's not a request.
       if (!openRef.current) return
+      heard = meaningfulRequest(heard)
+      if (!heard) return
       viaVoice.current = true
       void submitRef.current?.(heard)
     },
@@ -430,7 +434,12 @@ export function AskSheet({
     viaVoice.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the Home's hand-off
     setQuiet(true)
-    void startVoice({ quiet: continueQuiet })
+    // Let the wake chime (0.24 s) finish before the mic restarts — a restart
+    // mid-chime cut it off. One chime, always (the wake's).
+    const id = setTimeout(() => {
+      if (openRef.current) void startVoice({ quiet: continueQuiet })
+    }, 260)
+    return () => clearTimeout(id)
   }, [continueListening, continueQuiet, startVoice])
 
   // "Ei Roof, …": send what was said once the sheet is up.

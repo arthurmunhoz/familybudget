@@ -45,6 +45,17 @@ const WAKE = new RegExp(
   `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^roof(?:\\s|$)`,
 )
 
+// Sounds, not requests: a hesitation the recogniser wrote down ("er", "uh",
+// "é…") must never be sent — "ER" once went to the assistant and came back
+// answered in English (owner, 2026-11).
+const FILLERS = new Set(['er', 'err', 'erm', 'uh', 'uhh', 'um', 'umm', 'hum', 'hm', 'hmm', 'ah', 'ahn', 'eh', 'e', 'a', 'o', 'oh', 'ai', 'ei', 'hey', 'ok', 'okay', 'roof', 'ne', 'tipo', 'entao', 'bom'])
+
+/** `text` with only filler words → '' (nothing to send); else `text`. */
+export function meaningfulRequest(text: string): string {
+  const words = fold(text).split(' ').filter(Boolean)
+  return words.some((w) => !FILLERS.has(w)) ? text.trim() : ''
+}
+
 /** The wake phrase in `heard`? Returns what came AFTER it (maybe ''), or null.
  *  Works on the ORIGINAL text so the request keeps its accents. */
 export function afterWake(heard: string): string | null {
@@ -62,11 +73,13 @@ export function afterWake(heard: string): string | null {
     if (fold(words[i])) seen++
     i++
   }
-  return words
-    .slice(i)
-    .join(' ')
-    .replace(/^[\s,.;:!?-]+/, '')
-    .trim()
+  return meaningfulRequest(
+    words
+      .slice(i)
+      .join(' ')
+      .replace(/^[\s,.;:!?-]+/, '')
+      .trim(),
+  )
 }
 
 /** Can this phone recognise speech without the network? Required: the wait
@@ -176,7 +189,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
       // Let the chime finish before tearing the session down.
       if (left > 0 && !handOff) setTimeout(abort, left)
       else abort()
-      handRef.current.onDone(req, handOff && !req ? (left > -150 ? 'chime' : 'quiet') : false)
+      handRef.current.onDone(req, handOff && !req ? 'quiet' : false)
     }
     const begin = async () => {
       if (!alive || held || running || AppState.currentState !== 'active') return
@@ -247,7 +260,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
           // iOS restarts its transcript after a pause: join the stretches,
           // and a stretch without the call in it is all request.
           const full = stitch(woke.seg, heard)
-          woke.req = afterWake(full) ?? full.trim()
+          woke.req = afterWake(full) ?? meaningfulRequest(full)
         }
         handRef.current.onHeard(woke.req)
         if (settle) clearTimeout(settle)

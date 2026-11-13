@@ -1,4 +1,4 @@
-import { afterWake } from '../src/lib/roofWake'
+import { afterWake, meaningfulRequest } from '../src/lib/roofWake'
 import { speakable, voiceKey } from '../src/lib/roof'
 
 describe('afterWake ("Ei Roof")', () => {
@@ -67,5 +67,19 @@ describe('afterWake: a Brazilian "Rúfi"', () => {
     expect(afterWake('e rouba a cena')).toBe(null)
     expect(afterWake('ei rua da escola')).toBe(null)
     expect(afterWake('ei ovo')).toBe(null)
+  })
+})
+
+describe('fillers are not requests', () => {
+  it('a call followed by a hesitation is a bare call', () => {
+    expect(afterWake('hey roof er')).toBe('')
+    expect(afterWake('Ei Roof, é…')).toBe('')
+    expect(afterWake('ei roof uh hum')).toBe('')
+  })
+  it('real words still go through', () => {
+    expect(afterWake('ei roof é dia de lixo?')).toBe('é dia de lixo?')
+    expect(meaningfulRequest('er')).toBe('')
+    expect(meaningfulRequest('ER')).toBe('')
+    expect(meaningfulRequest('o que tem hoje')).toBe('o que tem hoje')
   })
 })
