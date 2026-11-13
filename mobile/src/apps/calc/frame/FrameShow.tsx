@@ -423,15 +423,12 @@ export function FrameShow() {
 
         {controls ? (
           <Animated.View style={[styles.controls, { opacity: controlsFade, top: pad.top, left: pad.left, right: pad.right }]}>
+            {/* All the controls together, top-left (owner, 2026-11): the
+                top-right is where the frame's notices (next event, pets due)
+                sit, and the buttons used to land on top of them. */}
             <RoundBtn label={t('frame.close')} onPress={exit}>
               <X size={22} color="#fff" />
             </RoundBtn>
-            <View style={{ flex: 1 }} />
-            {!awake ? (
-              <Txt style={styles.warn} numberOfLines={2}>
-                {t('frame.awakeMissing')}
-              </Txt>
-            ) : null}
             {win.height > win.width || rotated ? (
               <RoundBtn label={t('frame.rotate')} onPress={toggleRotate}>
                 <RotateCw size={20} color="#fff" />
@@ -440,6 +437,11 @@ export function FrameShow() {
             <RoundBtn label={t('frame.settings')} onPress={exit}>
               <Settings2 size={20} color="#fff" />
             </RoundBtn>
+            {!awake ? (
+              <Txt style={styles.warn} numberOfLines={2}>
+                {t('frame.awakeMissing')}
+              </Txt>
+            ) : null}
           </Animated.View>
         ) : null}
       </Pressable>
@@ -583,5 +585,5 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  warn: { color: '#fff', fontSize: 12, maxWidth: 220, textAlign: 'right', ...shadow },
+  warn: { color: '#fff', fontSize: 12, maxWidth: 220, textAlign: 'left', ...shadow },
 })
