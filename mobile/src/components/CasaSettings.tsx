@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Alert, Modal, StyleSheet, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronRight, House, KeyRound, MonitorSmartphone, Plus, X } from 'lucide-react-native'
+import { ChevronRight, KeyRound, MonitorSmartphone, Plus, X } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { TintButton } from '@/components/TintButton'
@@ -102,15 +102,11 @@ export function CasaSettings({ pairCode }: { pairCode?: string }) {
 
   return (
     <View style={{ gap: sp.md }}>
-      <View style={s.headRow}>
-        <GradientBox colors={CASA} radius={12} style={s.tile}>
-          <House size={20} color="#fff" />
-        </GradientBox>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt style={{ fontFamily: fonts.semibold }}>{t('casa.title')}</Txt>
-          <Txt variant="faint">{t('casa.what')}</Txt>
-        </View>
-      </View>
+      {/* What it is — plain text, not a row: the rows below are the actions
+          (owner, 2026-11: a tile here read as one more item). */}
+      <Txt variant="muted" style={{ fontSize: 14.5, lineHeight: 20 }}>
+        {t('casa.what')}
+      </Txt>
 
       {devices.map((d) => (
         <View key={d.id} style={[s.row, { borderTopColor: c.border }]}>
@@ -354,7 +350,6 @@ function PinSheet({ household, onClose, onSaved }: { household: string; onClose:
 }
 
 const s = StyleSheet.create({
-  headRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingTop: sp.md, borderTopWidth: StyleSheet.hairlineWidth },
   tile: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   devIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
