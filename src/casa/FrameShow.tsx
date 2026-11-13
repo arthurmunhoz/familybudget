@@ -90,18 +90,20 @@ function AddedBy({ photo, members, light }: { photo: FramePhoto; members: Member
 function EmptyAlbum({ big }: { big?: boolean }) {
   const { t } = useI18n()
   return (
-    <div className="casa-fade flex h-full flex-col items-center justify-center px-8 text-center">
+    <div className="casa-scroll h-full">
+    <div className="casa-fade flex min-h-full flex-col items-center justify-center px-6 py-4 text-center">
       <span
-        className="casa-breathe-slow inline-flex items-center justify-center rounded-[30%]"
-        style={{ width: big ? 120 : 84, height: big ? 120 : 84, background: grad(GRAD.frame), boxShadow: `0 24px 60px -24px ${GRAD.frame[1]}` }}
+        className="casa-breathe-slow inline-flex shrink-0 items-center justify-center rounded-[30%]"
+        style={{ width: big ? 'clamp(4.5rem, 16dvh, 7.5rem)' : 'clamp(3.5rem, 11dvh, 5.25rem)', height: big ? 'clamp(4.5rem, 16dvh, 7.5rem)' : 'clamp(3.5rem, 11dvh, 5.25rem)', background: grad(GRAD.frame), boxShadow: `0 24px 60px -24px ${GRAD.frame[1]}` }}
       >
-        <Images size={big ? 58 : 40} color="#fff" strokeWidth={1.9} aria-hidden />
+        <Images className="h-1/2 w-1/2" color="#fff" strokeWidth={1.9} aria-hidden />
       </span>
-      <p className={`font-display mt-6 leading-tight ${big ? 'text-[2.6rem]' : 'text-[1.7rem]'}`}>{t('casa.frame.emptyTitle')}</p>
+      <p className={`font-display mt-[clamp(10px,3dvh,24px)] leading-tight ${big ? 'text-[clamp(1.8rem,min(6vw,6dvh),2.6rem)]' : 'text-[clamp(1.35rem,4dvh,1.7rem)]'}`}>{t('casa.frame.emptyTitle')}</p>
       <p className={`mt-3 flex max-w-[42ch] items-start gap-2 text-left text-(--text-muted) ${big ? 'text-[1.2rem]' : 'text-[1rem]'}`}>
         <Smartphone size={big ? 24 : 20} className="mt-0.5 shrink-0" aria-hidden />
         {t('casa.frame.emptyBody')}
       </p>
+    </div>
     </div>
   )
 }

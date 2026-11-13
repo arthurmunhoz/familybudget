@@ -9,6 +9,7 @@ import { addDays, KIND_EMOJI, type Occurrence } from '../lib/calendar'
 import { dailyChecklist, overdueEvents, routineStatus } from '../lib/petCare'
 import type { PetTaskDone, ShoppingItem } from '../lib/types'
 import { CARE_ICONS } from '../apps/pets/careIcons'
+import StoreLogo from '../apps/shopping/StoreLogo'
 import { agenda, minutesOf, petTaskDone, setChecked, type HubData, type Member } from './data'
 import { tick } from './sound'
 import { Avatar, IconChip, PlusTag } from './ui'
@@ -42,7 +43,7 @@ export function PreviewCard({
 }) {
   return (
     <section
-      className={`${plain ? '' : 'casa-card casa-rise rounded-[26px]'} flex min-h-0 flex-col overflow-hidden ${className}`}
+      className={`${plain ? '' : 'casa-liquid casa-rise rounded-[28px]'} flex min-h-0 flex-col overflow-hidden ${className}`}
       style={{ ['--i' as string]: i }}
     >
       <button onClick={(e) => onOpen(e.currentTarget)} className="casa-press flex shrink-0 items-center gap-3 px-4 pt-4 pb-2.5 text-left">
@@ -192,12 +193,12 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
   useEffect(() => setGone(new Set()), [data.open])
   const open = data.open.filter((i) => !gone.has(i.id))
   const valid = new Set(data.stores.map((s) => s.id))
-  const groups: { id: string; name: string; items: ShoppingItem[] }[] = []
+  const groups: { id: string; name: string; slug: string | null; items: ShoppingItem[] }[] = []
   const general = open.filter((i) => !i.store_id || !valid.has(i.store_id))
-  if (general.length) groups.push({ id: 'general', name: t('casa.list.general'), items: general })
+  if (general.length) groups.push({ id: 'general', name: t('casa.list.general'), slug: null, items: general })
   for (const s of data.stores) {
     const items = open.filter((i) => i.store_id === s.id)
-    if (items.length) groups.push({ id: s.id, name: s.name, items })
+    if (items.length) groups.push({ id: s.id, name: s.name, slug: s.slug, items })
   }
   const per = big ? 6 : groups.length > 2 ? 2 : 3
 
@@ -224,9 +225,10 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
     <div className={big ? 'grid gap-x-3 landscape:grid-cols-2' : ''}>
       {groups.slice(0, big ? 12 : 3).map((g) => (
         <div key={g.id} className="mb-1">
-          <p className="flex items-baseline gap-2 px-3 pt-2 pb-0.5">
-            <span className="truncate text-[0.8rem] font-semibold uppercase tracking-[0.14em] text-(--text-faint)">{g.name}</span>
-            <span className="text-[0.8rem] font-semibold text-(--text-faint)">{g.items.length}</span>
+          <p className="flex items-center gap-2 px-3 pt-2 pb-0.5">
+            <StoreLogo slug={g.slug} name={g.name} size={22} />
+            <span className="min-w-0 truncate text-[0.82rem] font-semibold uppercase tracking-[0.12em] text-(--text-muted)">{g.name}</span>
+            <span className="shrink-0 rounded-full bg-(--surface) px-1.5 text-[0.78rem] font-semibold text-(--text-muted)">{g.items.length}</span>
           </p>
           <ul>
             {g.items.slice(0, per).map((it) => {
@@ -259,50 +261,151 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
 }
 
 // ── pets ─────────────────────────────────────────────────────────────────────
+// Grouped BY PET, in the phone's Pet Care order: what's overdue first (vet /
+// vaccine reminders, late routines), then the daily routine in its own order,
+// then the routines due today. The layout follows the number of pets:
+// 1 → the full list; 2–3 → a section per pet (columns in the big widget);
+// 4+ → a compact card per pet (progress + the next thing to do), tap to open.
 
 interface PetRow {
   key: string
-  pet: HubData['pets'][number]
   title: string
   sub?: string
+  late?: boolean
   taskId?: string
   icon?: string
   done: boolean
 }
 
-export function petRows(data: HubData, done: PetTaskDone[], today: string, t: ReturnType<typeof useI18n>['t']): PetRow[] {
-  const rows: PetRow[] = []
-  const doneToday = new Set(done.filter((d) => d.done_on === today).map((d) => d.task_id))
-  for (const pet of data.pets) {
-    for (const r of dailyChecklist(data.tasks, done, pet.id, today)) {
-      rows.push({ key: `d-${r.task.id}`, pet, title: r.task.title, taskId: r.task.id, icon: r.task.icon, done: !!r.done })
-    }
-    for (const r of routineStatus(data.tasks, data.done, pet.id, today)) {
-      if (r.lastDone && r.dueIn <= 0)
-        rows.push({
-          key: `i-${r.task.id}`,
-          pet,
-          title: r.task.title,
-          sub: r.dueIn < 0 ? t('casa.pets.late', { count: -r.dueIn }) : t('casa.pets.dueToday'),
-          taskId: r.task.id,
-          icon: r.task.icon,
-          done: doneToday.has(r.task.id),
-        })
-    }
-    for (const e of overdueEvents(data.petEvents, today).filter((x) => x.pet_id === pet.id)) {
-      rows.push({ key: `e-${e.id}`, pet, title: `🩺 ${e.title}`, sub: e.next_due === today ? t('casa.pets.dueToday') : t('casa.pets.overdue'), done: false })
-    }
-  }
-  // To-do first, the ticked ones after (still there to untick).
-  return rows.sort((a, b) => Number(a.done) - Number(b.done))
+export interface PetGroup {
+  pet: HubData['pets'][number]
+  rows: PetRow[]
+  doneCount: number
+  total: number
 }
 
-export function PetsPreview({ data, today, full, refresh, big = false }: { data: HubData; today: string; full: boolean; refresh: () => void; big?: boolean }) {
+export function petGroups(data: HubData, done: PetTaskDone[], today: string, t: ReturnType<typeof useI18n>['t']): PetGroup[] {
+  const doneToday = new Set(done.filter((d) => d.done_on === today).map((d) => d.task_id))
+  return data.pets.map((pet) => {
+    const late: PetRow[] = []
+    const daily: PetRow[] = []
+    const dueToday: PetRow[] = []
+    for (const e of overdueEvents(data.petEvents, today).filter((x) => x.pet_id === pet.id)) {
+      const isLate = e.next_due !== today
+      ;(isLate ? late : dueToday).push({ key: `e-${e.id}`, title: `🩺 ${e.title}`, sub: isLate ? t('casa.pets.overdue') : t('casa.pets.dueToday'), late: isLate, done: false })
+    }
+    for (const r of routineStatus(data.tasks, data.done, pet.id, today)) {
+      if (!r.lastDone || r.dueIn > 0) continue
+      const row: PetRow = {
+        key: `i-${r.task.id}`,
+        title: r.task.title,
+        sub: r.dueIn < 0 ? t('casa.pets.late', { count: -r.dueIn }) : t('casa.pets.dueToday'),
+        late: r.dueIn < 0,
+        taskId: r.task.id,
+        icon: r.task.icon,
+        done: doneToday.has(r.task.id),
+      }
+      ;(r.dueIn < 0 ? late : dueToday).push(row)
+    }
+    for (const r of dailyChecklist(data.tasks, done, pet.id, today)) {
+      daily.push({ key: `d-${r.task.id}`, title: r.task.title, taskId: r.task.id, icon: r.task.icon, done: !!r.done })
+    }
+    const rows = [...late, ...daily, ...dueToday]
+    const counted = rows.filter((r) => r.taskId)
+    return { pet, rows, doneCount: counted.filter((r) => r.done).length, total: counted.length }
+  })
+}
+
+/** Everything still to do today, across pets (the hub's subtitle). */
+export function petsLeftCount(data: HubData, today: string, t: ReturnType<typeof useI18n>['t']): number {
+  return petGroups(data, data.done, today, t).reduce((n, g) => n + g.rows.filter((r) => !r.done).length, 0)
+}
+
+function PetFace({ pet, size = 36 }: { pet: HubData['pets'][number]; size?: number }) {
+  const tint = pet.tag_color ?? GRAD.pets[0]
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full"
+      style={{ width: `${size / 16}rem`, height: `${size / 16}rem`, fontSize: `${(size * 0.5) / 16}rem`, background: pet.photo ? undefined : `${tint}2E`, boxShadow: `0 0 0 2px ${tint}` }}
+    >
+      {pet.photo ? <img src={pet.photo} alt="" className="h-full w-full object-cover" draggable={false} /> : pet.emoji}
+    </span>
+  )
+}
+
+function Progress({ done, total }: { done: number; total: number }) {
+  const pct = total ? (done / total) * 100 : 100
+  return (
+    <span className="block h-1.5 w-full overflow-hidden rounded-full bg-(--surface-2)">
+      <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: grad(GRAD.pets), transition: 'width .5s cubic-bezier(.2,.8,.2,1)' }} />
+    </span>
+  )
+}
+
+function PetHead({ g }: { g: PetGroup }) {
+  const { t } = useI18n()
+  return (
+    <div className="flex items-center gap-3 px-3 pt-2 pb-1.5">
+      <PetFace pet={g.pet} />
+      <span className="min-w-0 flex-1">
+        <span className="font-display block truncate text-[1.15rem] leading-tight">{g.pet.name}</span>
+        {g.total ? (
+          <span className="mt-1 flex items-center gap-2">
+            <span className="w-16 shrink-0">
+              <Progress done={g.doneCount} total={g.total} />
+            </span>
+            <span className="truncate text-[0.85rem] text-(--text-muted)">{t('casa.pets.progress', { done: g.doneCount, total: g.total })}</span>
+          </span>
+        ) : null}
+      </span>
+    </div>
+  )
+}
+
+function PetRowButton({ r, full, onToggle }: { r: PetRow; full: boolean; onToggle: (r: PetRow) => void }) {
+  const Icon = (r.icon && CARE_ICONS[r.icon as keyof typeof CARE_ICONS]) || PawPrint
+  return (
+    <li>
+      <button
+        onClick={() => onToggle(r)}
+        disabled={!full || !r.taskId}
+        data-noswipe
+        className="casa-press flex min-h-11 w-full items-center gap-3 rounded-[14px] px-3 py-1 text-left disabled:cursor-default"
+        style={r.late && !r.done ? { background: 'color-mix(in srgb, var(--expense) 9%, transparent)' } : undefined}
+      >
+        <span className="inline-flex w-6 shrink-0 justify-center text-(--text-muted)">
+          <Icon size={20} strokeWidth={2} aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className={`block truncate text-[1.02rem] ${r.done ? 'text-(--text-muted) line-through decoration-2' : ''}`}>{r.title}</span>
+          {r.sub ? <span className={`block truncate text-[0.85rem] ${r.late ? 'font-semibold text-(--expense)' : 'text-(--text-faint)'}`}>{r.sub}</span> : null}
+        </span>
+        {r.taskId ? <Round on={r.done} g={GRAD.pets} disabled={!full} /> : null}
+      </button>
+    </li>
+  )
+}
+
+export function PetsPreview({
+  data,
+  today,
+  full,
+  refresh,
+  big = false,
+  onOpen,
+}: {
+  data: HubData
+  today: string
+  full: boolean
+  refresh: () => void
+  big?: boolean
+  /** Tap a compact pet card (4+ pets) → the Pets panel. */
+  onOpen?: (el: HTMLElement) => void
+}) {
   const { t } = useI18n()
   const [done, setDone] = useState<PetTaskDone[]>(data.done)
   useEffect(() => setDone(data.done), [data.done])
-  const rows = petRows(data, done, today, t)
-  const multi = data.pets.length > 1
+  const groups = petGroups(data, done, today, t)
 
   async function toggle(r: PetRow) {
     if (!full || !r.taskId) return
@@ -321,40 +424,65 @@ export function PetsPreview({ data, today, full, refresh, big = false }: { data:
   }
 
   if (!data.pets.length) return <Quiet>{t('casa.pets.none')}</Quiet>
-  if (!rows.length) return <Quiet>{t('casa.pets.nothing')}</Quiet>
-  return (
-    <ul className={big ? 'grid gap-x-3 landscape:grid-cols-2' : ''}>
-      {rows.slice(0, big ? 24 : 6).map((r) => {
-        const Icon = (r.icon && CARE_ICONS[r.icon as keyof typeof CARE_ICONS]) || PawPrint
-        return (
-          <li key={r.key}>
-            <button
-              onClick={() => void toggle(r)}
-              disabled={!full || !r.taskId}
-              data-noswipe
-              className="casa-press flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left disabled:cursor-default"
-            >
-              <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center text-(--text-muted)">
-                {multi ? (
-                  <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[1.05rem]" style={{ background: `${r.pet.tag_color ?? GRAD.pets[0]}2A` }}>
-                    {r.pet.photo ? <img src={r.pet.photo} alt="" className="h-full w-full object-cover" draggable={false} /> : r.pet.emoji}
+  const n = groups.length
+
+  // 4+ pets: a compact card each — face, name, progress, the next thing to do.
+  if (n >= 4) {
+    return (
+      <ul className="grid gap-2 px-1 pt-1 [grid-template-columns:repeat(auto-fill,minmax(min(13rem,100%),1fr))]">
+        {groups.map((g) => {
+          // The big widget has room for the next few; a card shows the next one.
+          const todo = g.rows.filter((r) => !r.done).slice(0, big ? 3 : 1)
+          const next = todo[0]
+          return (
+            <li key={g.pet.id} className="rounded-[18px] bg-(--surface)/70">
+              <button onClick={(e) => onOpen?.(e.currentTarget)} data-noswipe className="casa-press flex w-full items-center gap-3 px-3 pt-2.5 pb-1 text-left">
+                <PetFace pet={g.pet} size={34} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-2">
+                    <span className="font-display min-w-0 flex-1 truncate text-[1.08rem]">{g.pet.name}</span>
+                    {g.total ? <span className="shrink-0 text-[0.85rem] font-semibold text-(--text-muted) tabular-nums">{g.doneCount}/{g.total}</span> : null}
                   </span>
-                ) : (
-                  <Icon size={22} strokeWidth={2} aria-hidden />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className={`block truncate text-[1.05rem] ${r.done ? 'text-(--text-muted) line-through decoration-2' : ''}`}>{r.title}</span>
-                {r.sub || multi ? (
-                  <span className="block truncate text-[0.85rem] text-(--text-faint)">{[multi ? r.pet.name : null, r.sub].filter(Boolean).join(' · ')}</span>
-                ) : null}
-              </span>
-              {r.taskId ? <Round on={r.done} g={GRAD.pets} disabled={!full} /> : null}
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+                  <span className="mt-1 block">
+                    <Progress done={g.doneCount} total={g.total} />
+                  </span>
+                </span>
+              </button>
+              {next ? (
+                <ul className="px-0.5 pb-1">
+                  {todo.map((r, k) => (
+                    <PetRowButton key={r.key} r={k ? r : { ...r, title: t('casa.pets.next', { title: r.title }) }} full={full} onToggle={() => void toggle(r)} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="px-3 pb-2.5 text-[0.9rem] text-(--text-muted)">✓ {t('casa.pets.allDoneShort')}</p>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    )
+  }
+
+  // 1–3 pets: a section per pet with its rows (side by side in the big widget).
+  const cols = big && n > 1 ? (n === 2 ? 'landscape:grid-cols-2' : 'landscape:grid-cols-3') : ''
+  return (
+    <div className={`grid gap-x-4 gap-y-1 ${cols}`}>
+      {groups.map((g) => (
+        <section key={g.pet.id} className="min-w-0">
+          <PetHead g={g} />
+          {g.rows.length ? (
+            <ul className={big && n === 1 ? 'grid gap-x-3 landscape:grid-cols-2' : ''}>
+              {g.rows.map((r) => (
+                <PetRowButton key={r.key} r={r} full={full} onToggle={(x) => void toggle(x)} />
+              ))}
+            </ul>
+          ) : (
+            <Quiet>{t('casa.pets.nothing')}</Quiet>
+          )}
+        </section>
+      ))}
+    </div>
   )
 }
 
@@ -363,33 +491,35 @@ export function PetsPreview({ data, today, full, refresh, big = false }: { data:
 export function MoneyWidget({ state, onOpen }: { state: 'plus' | 'pin' | 'open'; onOpen: (el: HTMLElement) => void }) {
   const { t } = useI18n()
   return (
-    <div className="casa-fade flex h-full flex-col items-center justify-center px-8 text-center">
-      <span className="relative inline-flex h-28 w-28 items-center justify-center rounded-[34px]" style={{ background: grad(GRAD.money), boxShadow: `0 24px 60px -24px ${GRAD.money[1]}` }}>
-        <Wallet size={54} color="#fff" strokeWidth={1.9} aria-hidden />
+    <div className="casa-scroll h-full">
+    <div className="casa-fade flex min-h-full flex-col items-center justify-center px-6 py-3 text-center">
+      <span className="relative inline-flex h-[clamp(4.5rem,15dvh,7rem)] w-[clamp(4.5rem,15dvh,7rem)] shrink-0 items-center justify-center rounded-[30%]" style={{ background: grad(GRAD.money), boxShadow: `0 24px 60px -24px ${GRAD.money[1]}` }}>
+        <Wallet className="h-1/2 w-1/2" color="#fff" strokeWidth={1.9} aria-hidden />
         {state !== 'open' ? (
           <span className="absolute -right-2 -bottom-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-(--card) shadow-lg">
             <Lock size={20} strokeWidth={2.6} className="text-(--text-muted)" aria-hidden />
           </span>
         ) : null}
       </span>
-      <p className="font-display mt-7 text-[2.2rem] leading-tight">{t('app.budget.name')}</p>
+      <p className="font-display mt-[clamp(10px,3dvh,28px)] text-[clamp(1.6rem,5dvh,2.2rem)] leading-tight">{t('app.budget.name')}</p>
       <p className="mt-2 max-w-[36ch] text-[1.05rem] text-(--text-muted)">
         {state === 'plus' ? t('casa.plan.noPlus') : state === 'pin' ? t('casa.money.pinSub') : t('casa.money.thisPeriod')}
       </p>
       {state === 'plus' ? (
-        <span className="mt-6">
+        <span className="mt-[clamp(8px,2.4dvh,24px)]">
           <PlusTag label="Plus" />
         </span>
       ) : null}
       <button
         onClick={(e) => onOpen(e.currentTarget)}
         data-noswipe
-        className="casa-press mt-7 inline-flex h-16 items-center gap-3 rounded-full px-8 text-[1.15rem] font-semibold text-white"
+        className="casa-press mt-[clamp(10px,3dvh,28px)] inline-flex h-14 shrink-0 items-center gap-3 rounded-full px-7 text-[1.15rem] sm:h-16 font-semibold text-white"
         style={{ background: grad(GRAD.money) }}
       >
         {state === 'pin' ? <KeyRound size={22} aria-hidden /> : null}
         {state === 'pin' ? t('casa.money.unlock') : state === 'plus' ? t('casa.plan.see') : t('casa.money.open')}
       </button>
+    </div>
     </div>
   )
 }

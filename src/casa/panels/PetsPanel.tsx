@@ -56,7 +56,7 @@ export default function PetsPanel({
         closeLabel={t('casa.close')}
         right={full ? undefined : <PlusTag label="Plus" />}
       />
-      <div className="casa-scroll flex-1 px-6 pb-10">
+      <div className="casa-scroll min-h-0 flex-1 px-4 pb-10 sm:px-6">
         {data.pets.length === 0 ? (
           <div className="casa-fade py-16 text-center">
             <p className="text-[3rem]" aria-hidden>
@@ -73,7 +73,7 @@ export default function PetsPanel({
               const reminders = overdueEvents(data.petEvents, today).filter((e) => e.pet_id === pet.id)
               const tint = pet.tag_color ?? GRAD.pets[0]
               return (
-                <section key={pet.id} className="casa-card casa-rise rounded-[30px] p-6" style={{ ['--i' as string]: pi }}>
+                <section key={pet.id} className="casa-card casa-rise rounded-[30px] p-4 sm:p-6" style={{ ['--i' as string]: pi }}>
                   <header className="mb-4 flex items-center gap-4">
                     <span
                       className="inline-flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-[1.5rem]"
@@ -87,15 +87,16 @@ export default function PetsPanel({
                     <p className="text-[0.95rem] text-(--text-muted)">{t('casa.pets.nothing')}</p>
                   ) : null}
                   <ul className="space-y-2.5">
-                    {daily.map(({ task, done: d }) => {
-                      const Icon = CARE_ICONS[task.icon] ?? PawPrint
-                      return (
-                        <li key={task.id}>
-                          <TaskButton label={task.title} Icon={Icon} on={!!d} disabled={!full} onClick={() => void toggle(task.id, !!d)} />
-                        </li>
-                      )
-                    })}
-                    {routines.map(({ task, dueIn }) => {
+                    {reminders.map((e) => (
+                      <li key={e.id} className="flex items-center gap-3 rounded-[20px] bg-(--surface) px-4 py-3 text-[0.95rem]">
+                        <span aria-hidden>🩺</span>
+                        <span className="flex-1 font-medium">{e.title}</span>
+                        <span className="text-[0.95rem] font-semibold text-(--expense)">
+                          {e.next_due === today ? t('casa.pets.dueToday') : t('casa.pets.overdue')}
+                        </span>
+                      </li>
+                    ))}
+                    {routines.filter((r) => r.dueIn < 0).map(({ task, dueIn }) => {
                       const Icon = CARE_ICONS[task.icon] ?? PawPrint
                       const on = doneToday.has(task.id)
                       return (
@@ -111,15 +112,30 @@ export default function PetsPanel({
                         </li>
                       )
                     })}
-                    {reminders.map((e) => (
-                      <li key={e.id} className="flex items-center gap-3 rounded-[20px] bg-(--surface) px-4 py-3 text-[0.95rem]">
-                        <span aria-hidden>🩺</span>
-                        <span className="flex-1 font-medium">{e.title}</span>
-                        <span className="text-[0.95rem] font-semibold text-(--expense)">
-                          {e.next_due === today ? t('casa.pets.dueToday') : t('casa.pets.overdue')}
-                        </span>
-                      </li>
-                    ))}
+                    {daily.map(({ task, done: d }) => {
+                      const Icon = CARE_ICONS[task.icon] ?? PawPrint
+                      return (
+                        <li key={task.id}>
+                          <TaskButton label={task.title} Icon={Icon} on={!!d} disabled={!full} onClick={() => void toggle(task.id, !!d)} />
+                        </li>
+                      )
+                    })}
+                    {routines.filter((r) => r.dueIn >= 0).map(({ task, dueIn }) => {
+                      const Icon = CARE_ICONS[task.icon] ?? PawPrint
+                      const on = doneToday.has(task.id)
+                      return (
+                        <li key={task.id}>
+                          <TaskButton
+                            label={task.title}
+                            sub={dueIn < 0 ? t('casa.pets.late', { count: -dueIn }) : t('casa.pets.dueToday')}
+                            Icon={Icon}
+                            on={on}
+                            disabled={!full}
+                            onClick={() => void toggle(task.id, on)}
+                          />
+                        </li>
+                      )
+                    })}
                   </ul>
                 </section>
               )

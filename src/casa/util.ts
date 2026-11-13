@@ -97,3 +97,12 @@ export function dateOf(iso: string): Date {
 
 /** First letter upper-case (pt/es dates come lower-case). */
 export const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+
+/** px at the 16 px base → rem, so sizes grow with the root font on big screens
+ *  (casa.css scales the root on TVs/monitors). */
+export const rem = (px: number) => `${px / 16}rem`
+
+/** The root font's scale over 16 px (1 on tablets, ~1.5 on a 1440p TV). */
+export function remScale(): number {
+  return (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16
+}

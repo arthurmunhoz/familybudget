@@ -332,10 +332,10 @@ export default function Roof({
     <>
       <div
         ref={dock}
-        className="casa-card relative mx-auto flex h-[84px] w-full max-w-[720px] items-center gap-3 rounded-[32px] pr-2.5 pl-4"
+        className="casa-liquid @container relative flex h-[4.5rem] w-full items-center gap-2 rounded-[28px] pr-2 pl-3 sm:gap-3"
         style={{ opacity: open ? 0 : 1, transition: 'opacity .25s' }}
       >
-        <button onClick={tapDock} className="flex min-w-0 flex-1 items-center gap-4 self-stretch text-left" aria-label={t('casa.roof.open')}>
+        <button onClick={tapDock} className="flex min-w-0 flex-1 items-center gap-3 self-stretch text-left sm:gap-4" aria-label={t('casa.roof.open')}>
           <span className="relative">
             <Orb size={52} />
             {full && supported ? (
@@ -360,12 +360,15 @@ export default function Roof({
           </span>
         </button>
         {!full ? (
-          <PlusTag label={t('casa.plan.noPlus')} />
+          // Only when the dock is wide enough to keep "Roof" readable.
+          <span className="hidden shrink-0 @[24rem]:inline-flex">
+            <PlusTag label={t('casa.plan.noPlus')} />
+          </span>
         ) : supported ? (
           <button
             onClick={toggleMute}
             aria-label={muted ? t('casa.roof.unmute') : t('casa.roof.mute')}
-            className="casa-press inline-flex h-14 w-14 items-center justify-center rounded-full bg-(--surface)"
+            className="casa-press inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-(--surface)"
           >
             {muted || ears === 'denied' ? <MicOff size={24} className="text-(--text-muted)" aria-hidden /> : <Mic size={24} color={GREEN} aria-hidden />}
           </button>
@@ -373,7 +376,7 @@ export default function Roof({
         <button
           onClick={tapDock}
           aria-label={t('casa.roof.open')}
-          className="casa-press inline-flex h-16 w-16 items-center justify-center rounded-[24px] text-white"
+          className="casa-press inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] text-white sm:h-16 sm:w-16 sm:rounded-[24px]"
           style={{ background: full ? grad(GRAD.orb) : 'var(--surface-2)' }}
         >
           <ArrowUp size={28} strokeWidth={2.6} aria-hidden />
@@ -388,7 +391,7 @@ export default function Roof({
           radius={44}
           scrim="deep"
           onBackdrop={() => void close()}
-          className="inset-3 sm:inset-5"
+          className="inset-2 sm:inset-5"
           style={{
             background:
               'radial-gradient(120% 80% at 15% 0%, #3d2b78 0%, transparent 60%), radial-gradient(90% 70% at 100% 100%, #0d5a52 0%, transparent 60%), #15111d',
@@ -460,24 +463,25 @@ function RoofStage({
   return (
     <div className="relative flex h-full flex-col">
       {listening ? <div className="casa-listen-edge" aria-hidden /> : null}
-      <header className="flex items-center gap-4 px-8 pt-7">
-        <Orb size={60} live={listening} />
-        <span className="font-display text-[2rem]">Roof</span>
+      <header className="flex shrink-0 items-center gap-4 px-[clamp(16px,3vw,2rem)] pt-[clamp(12px,3dvh,1.75rem)]">
+        <Orb size={52} live={listening} />
+        <span className="font-display text-[clamp(1.6rem,4dvh,2rem)]">Roof</span>
         <span className="flex-1" />
         <button
           onClick={onClose}
           aria-label={t('casa.close')}
-          className="casa-press inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-white"
+          className="casa-press inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-white sm:h-16 sm:w-16"
         >
           <X size={30} aria-hidden />
         </button>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col items-center justify-center px-10 text-center">
+      <main className="casa-scroll flex min-h-0 flex-1 flex-col items-center px-[clamp(16px,4vw,2.5rem)] py-[clamp(8px,2dvh,20px)] text-center">
+        <div className="my-auto flex w-full flex-col items-center">
         {stage.k === 'listen' || stage.k === 'type' ? (
           <div className="casa-fade w-full max-w-[1100px]">
             {stage.k === 'listen' ? (
-              <div className="mb-8 flex items-center justify-center gap-4 text-[#b9a7ff]">
+              <div className="mb-[clamp(12px,4dvh,2rem)] flex items-center justify-center gap-4 text-[#b9a7ff]">
                 <span className="casa-bars" aria-hidden>
                   <i />
                   <i />
@@ -485,23 +489,23 @@ function RoofStage({
                   <i />
                   <i />
                 </span>
-                <span className="text-[1.4rem] font-semibold tracking-wide">{t('casa.roof.listening')}</span>
+                <span className="text-[clamp(1.1rem,3dvh,1.4rem)] font-semibold tracking-wide">{t('casa.roof.listening')}</span>
               </div>
             ) : null}
             {heard ? (
-              <p key={heard.length > 40 ? 'l' : 's'} className="font-display text-[clamp(2.8rem,6vw,5.6rem)] leading-[1.05]">
+              <p key={heard.length > 40 ? 'l' : 's'} className="font-display text-[clamp(1.8rem,min(6vw,9dvh),5.6rem)] leading-[1.05]">
                 {heard}
               </p>
             ) : (
-              <p className="font-display text-[clamp(2.2rem,4.4vw,4rem)] leading-tight text-white/45">
+              <p className="font-display text-[clamp(1.5rem,min(4.4vw,7dvh),4rem)] leading-tight text-white/45">
                 {stage.k === 'listen' ? t('casa.roof.example') : t('casa.roof.typeHint')}
               </p>
             )}
           </div>
         ) : stage.k === 'think' ? (
           <div className="casa-fade w-full max-w-[1100px]">
-            <p className="font-display text-[clamp(2.4rem,5vw,4.6rem)] leading-[1.08] text-white/75">{stage.q}</p>
-            <span className="casa-dots mt-10 inline-block text-[#b9a7ff]" aria-label={t('casa.roof.thinking')}>
+            <p className="font-display text-[clamp(1.7rem,min(5vw,8dvh),4.6rem)] leading-[1.08] text-white/75">{stage.q}</p>
+            <span className="casa-dots mt-[clamp(16px,5dvh,2.5rem)] inline-block text-[#b9a7ff]" aria-label={t('casa.roof.thinking')}>
               <i />
               <i />
               <i />
@@ -511,10 +515,10 @@ function RoofStage({
           <WhoPicker dark question={stage.o.question} options={stage.o.options} onPick={(id) => onPick(stage.o, id)} onTimeout={onClose} />
         ) : stage.k === 'undone' ? (
           <div className="casa-pop flex flex-col items-center gap-5">
-            <span className="inline-flex h-28 w-28 items-center justify-center rounded-full bg-white/12">
-              <Undo2 size={56} aria-hidden />
+            <span className="inline-flex h-[clamp(4.5rem,15dvh,7rem)] w-[clamp(4.5rem,15dvh,7rem)] items-center justify-center rounded-full bg-white/12">
+              <Undo2 className="h-1/2 w-1/2" aria-hidden />
             </span>
-            <p className="font-display text-[3.2rem]">{t('casa.roof.undone')}</p>
+            <p className="font-display text-[clamp(2rem,7dvh,3.2rem)]">{t('casa.roof.undone')}</p>
           </div>
         ) : (
           <AnswerCard
@@ -524,9 +528,10 @@ function RoofStage({
             onView={onView}
           />
         )}
+        </div>
       </main>
 
-      <footer className="flex items-center gap-3 px-8 pt-3 pb-7">
+      <footer className="flex shrink-0 items-center gap-3 px-[clamp(12px,3vw,2rem)] pt-2 pb-[clamp(12px,3dvh,1.75rem)]">
         <form
           className="flex min-w-0 flex-1 items-center gap-3"
           onSubmit={(e) => {
@@ -542,7 +547,7 @@ function RoofStage({
               onFocus={onType}
               onChange={(e) => setText(e.target.value)}
               placeholder={t('casa.roof.typePlaceholder')}
-              className="h-16 w-full rounded-[22px] border border-white/10 bg-white/8 pr-5 pl-14 text-[1.3rem] text-white placeholder:text-white/40 outline-none focus:border-white/30"
+              className="h-14 w-full rounded-[22px] border border-white/10 bg-white/8 pr-5 pl-14 sm:h-16 text-[1.3rem] text-white placeholder:text-white/40 outline-none focus:border-white/30"
               style={{ fontSize: '1.3rem' }}
             />
           </span>
@@ -550,7 +555,7 @@ function RoofStage({
             <button
               type="submit"
               aria-label={t('casa.roof.send')}
-              className="casa-press inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] text-white"
+              className="casa-press inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] text-white sm:h-16 sm:w-16"
               style={{ background: grad(GRAD.orb) }}
             >
               <SendHorizontal size={26} aria-hidden />
@@ -561,7 +566,7 @@ function RoofStage({
           <button
             onClick={onListen}
             aria-label={t('casa.roof.listenAgain')}
-            className="casa-press inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white"
+            className="casa-press inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-white sm:h-16 sm:w-16"
             style={{ background: listening ? GREEN : 'rgb(255 255 255 / .12)', transition: 'background .3s' }}
           >
             <Mic size={28} aria-hidden />
@@ -590,15 +595,15 @@ function AnswerCard({
   const ink = dark ? '#3b2400' : '#fff'
   return (
     <div
-      className="casa-pop relative w-full max-w-[920px] overflow-hidden rounded-[44px] p-10 text-left landscape:p-12"
+      className="casa-pop relative w-full max-w-[57.5rem] overflow-hidden rounded-[clamp(28px,5vmin,44px)] p-[clamp(18px,4.5vmin,3rem)] text-left"
       style={{ background: grad(g), color: ink, boxShadow: `0 40px 90px -30px ${g[1]}` }}
     >
-      <div className="flex items-start gap-7">
-        {done?.check ? <CheckMark size={92} color={ink} /> : <span className="text-[4.2rem] leading-none" aria-hidden>{o.kind === 'bye' ? '👋' : ''}</span>}
+      <div className="flex items-start gap-[clamp(12px,3vmin,1.75rem)]">
+        {done?.check ? <CheckMark size={92} color={ink} max="15vmin" /> : <span className="text-[clamp(2.6rem,9vmin,4.2rem)] leading-none" aria-hidden>{o.kind === 'bye' ? '👋' : ''}</span>}
         <div className="min-w-0 flex-1">
-          <p className="font-display text-[clamp(2.2rem,4.2vw,3.6rem)] leading-[1.06]">{done ? done.title : o.kind === 'bye' ? o.text : ''}</p>
+          <p className="font-display text-[clamp(1.5rem,min(4.2vw,6.5dvh),3.6rem)] leading-[1.06]">{done ? done.title : o.kind === 'bye' ? o.text : ''}</p>
           {done?.lines?.length ? (
-            <ul className="mt-5 space-y-1.5 text-[1.45rem] opacity-90">
+            <ul className="mt-[clamp(8px,2dvh,1.25rem)] space-y-1 text-[clamp(1.05rem,3.2dvh,1.45rem)] opacity-90">
               {done.lines.map((l, i) => (
                 <li key={i} className="casa-rise" style={{ ['--i' as string]: i + 2 }}>
                   {l}
@@ -609,11 +614,11 @@ function AnswerCard({
         </div>
       </div>
       {done && (done.undo || done.view) ? (
-        <div className="mt-9 flex flex-wrap gap-3">
+        <div className="mt-[clamp(14px,4dvh,2.25rem)] flex flex-wrap gap-3">
           {done.undo ? (
             <button
               onClick={() => onUndo(done)}
-              className="casa-press inline-flex h-16 items-center gap-2.5 rounded-full px-7 text-[1.2rem] font-semibold"
+              className="casa-press inline-flex h-14 items-center gap-2.5 rounded-full px-6 text-[1.15rem] font-semibold sm:h-16 sm:px-7"
               style={{ background: dark ? 'rgb(59 36 0 / .12)' : 'rgb(255 255 255 / .2)' }}
             >
               <Undo2 size={24} aria-hidden />
@@ -623,7 +628,7 @@ function AnswerCard({
           {done.view ? (
             <button
               onClick={() => onView(done.view!)}
-              className="casa-press inline-flex h-16 items-center gap-2.5 rounded-full bg-white px-7 text-[1.2rem] font-semibold"
+              className="casa-press inline-flex h-14 items-center gap-2.5 rounded-full bg-white px-6 text-[1.15rem] font-semibold sm:h-16 sm:px-7"
               style={{ color: g[1] }}
             >
               <Eye size={24} aria-hidden />

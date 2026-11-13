@@ -6,6 +6,7 @@ import { useI18n } from '../../hooks/useI18n'
 import type { ShoppingItem } from '../../lib/types'
 import { addItem, setChecked, type HubData } from '../data'
 import { tick } from '../sound'
+import StoreLogo from '../../apps/shopping/StoreLogo'
 import { PlusTag } from '../ui'
 import { GRAD, grad, norm } from '../util'
 import { PanelHeader } from './Shell'
@@ -107,6 +108,42 @@ export default function ListsPanel({
     }
   }
 
+  const sections: { id: string; name: string; slug: string | null; items: ShoppingItem[] }[] =
+    filter === 'all'
+      ? [
+          { id: 'general', name: t('casa.list.general'), slug: null, items: shown.filter(inGeneral) },
+          ...data.stores.map((st) => ({ id: st.id, name: st.name, slug: st.slug, items: shown.filter((i) => i.store_id === st.id) })),
+        ].filter((x) => x.items.length)
+      : [{ id: filter, name: targetName, slug: null, items: shown }]
+
+  const itemRow = (item: ShoppingItem) => {
+    const going = ticking.has(item.id)
+    return (
+      <li key={item.id}>
+        <button
+          onClick={() => void toggle(item)}
+          disabled={!full}
+          className="casa-press casa-card flex min-h-[52px] w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left disabled:cursor-default"
+          style={{ opacity: going ? 0.55 : 1, transition: 'opacity .4s' }}
+        >
+          <span
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2"
+            style={{
+              borderColor: going ? 'transparent' : 'var(--surface-2)',
+              background: going ? grad(GRAD.lists) : 'transparent',
+              transition: 'all .25s',
+            }}
+          >
+            {going ? <Check size={16} strokeWidth={3.2} color="#3b2400" className="casa-pop" aria-hidden /> : null}
+          </span>
+          <span className="casa-strike min-w-0 flex-1 truncate text-[1.08rem] font-medium" style={{ backgroundSize: going ? '100% 2px' : '0% 2px' }}>
+            {item.label}
+          </span>
+        </button>
+      </li>
+    )
+  }
+
   return (
     <div className="flex h-full flex-col bg-(--bg)">
       <PanelHeader
@@ -117,7 +154,7 @@ export default function ListsPanel({
         onClose={onClose}
         closeLabel={t('casa.close')}
       />
-      <div className="casa-scroll flex gap-2 overflow-x-auto px-6 pb-3">
+      <div className="casa-scroll flex shrink-0 gap-2 overflow-x-auto px-4 pb-3 sm:px-6">
         {chips.map((c) => {
           const on = filter === c.id
           return (
@@ -143,7 +180,7 @@ export default function ListsPanel({
           e.preventDefault()
           void add()
         }}
-        className="mx-6 mb-3 flex items-center gap-2"
+        className="mx-4 mb-3 flex shrink-0 items-center gap-2 sm:mx-6"
       >
         <input
           value={text}
@@ -168,7 +205,7 @@ export default function ListsPanel({
         )}
       </form>
 
-      <div className="casa-scroll flex-1 px-6 pb-8">
+      <div className="casa-scroll min-h-0 flex-1 px-4 pb-8 sm:px-6">
         {shown.length === 0 ? (
           <div className="casa-fade flex flex-col items-center justify-center py-16 text-center">
             <span className="text-[4rem]" aria-hidden>
@@ -177,41 +214,20 @@ export default function ListsPanel({
             <p className="font-display mt-3 text-[2rem]">{t('casa.lists.empty')}</p>
           </div>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2 landscape:grid-cols-3">
-            {shown.map((item) => {
-              const going = ticking.has(item.id)
-              return (
-                <li key={item.id}>
-                  <button
-                    onClick={() => void toggle(item)}
-                    disabled={!full}
-                    className="casa-press casa-card flex min-h-[52px] w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left disabled:cursor-default"
-                    style={{ opacity: going ? 0.55 : 1, transition: 'opacity .4s' }}
-                  >
-                    <span
-                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2"
-                      style={{
-                        borderColor: going ? 'transparent' : 'var(--surface-2)',
-                        background: going ? grad(GRAD.lists) : 'transparent',
-                        transition: 'all .25s',
-                      }}
-                    >
-                      {going ? <Check size={16} strokeWidth={3.2} color="#3b2400" className="casa-pop" aria-hidden /> : null}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className="casa-strike block truncate text-[1.08rem] font-medium"
-                        style={{ backgroundSize: going ? '100% 2px' : '0% 2px' }}
-                      >
-                        {item.label}
-                      </span>
-                      {filter === 'all' ? <span className="block truncate text-[0.8rem] text-(--text-faint)">{storeName(item.store_id)}</span> : null}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          // "All": one section per list — its logo, name and count — with
+          // that list's items under it ("Geral" for items with no list).
+          sections.map((sec) => (
+            <section key={sec.id} className="mb-5">
+              {filter === 'all' ? (
+                <h3 className="mb-2 flex items-center gap-2.5">
+                  <StoreLogo slug={sec.slug} name={sec.name} size={30} />
+                  <span className="font-display min-w-0 truncate text-[1.25rem]">{sec.name}</span>
+                  <span className="shrink-0 rounded-full bg-(--surface) px-2 text-[0.85rem] font-semibold text-(--text-muted)">{sec.items.length}</span>
+                </h3>
+              ) : null}
+              <ul className="grid gap-2 sm:grid-cols-2 landscape:grid-cols-3">{sec.items.map((item) => itemRow(item))}</ul>
+            </section>
+          ))
         )}
 
         {shownDone.length ? (

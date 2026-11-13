@@ -14,18 +14,18 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Lock, Sparkles, type LucideIcon } from 'lucide-react'
-import { grad, prefersReducedMotion } from './util'
+import { grad, prefersReducedMotion, rem } from './util'
 import type { Member } from './data'
 
 export function Orb({ size = 40, live = false }: { size?: number; live?: boolean }) {
   return (
     <span
       className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full"
-      style={{ width: size, height: size, boxShadow: live ? '0 0 0 4px rgb(139 108 255 / .18)' : undefined }}
+      style={{ width: rem(size), height: rem(size), boxShadow: live ? '0 0 0 4px rgb(139 108 255 / .18)' : undefined }}
     >
       <span className="casa-orb absolute inset-[-25%]" />
       <span className="casa-orb-counter relative flex items-center justify-center">
-        <Sparkles size={size * 0.48} color="#fff" strokeWidth={2.2} aria-hidden />
+        <Sparkles size={rem(size * 0.48)} color="#fff" strokeWidth={2.2} aria-hidden />
       </span>
     </span>
   )
@@ -36,11 +36,11 @@ export function Avatar({ m, size = 56, ring = false }: { m: Pick<Member, 'first'
     <span
       className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-display"
       style={{
-        width: size,
-        height: size,
+        width: rem(size),
+        height: rem(size),
         background: m.avatar ? undefined : `${m.color}2E`,
         color: m.color,
-        fontSize: size * 0.42,
+        fontSize: rem(size * 0.42),
         boxShadow: ring ? `0 0 0 3px var(--bg), 0 0 0 5px ${m.color}` : undefined,
       }}
     >
@@ -58,14 +58,14 @@ export function IconChip({ icon: Icon, g, size = 56 }: { icon: LucideIcon; g: re
     <span
       className="inline-flex shrink-0 items-center justify-center"
       style={{
-        width: size,
-        height: size,
-        borderRadius: size * 0.32,
+        width: rem(size),
+        height: rem(size),
+        borderRadius: rem(size * 0.32),
         background: grad(g),
         boxShadow: `0 10px 24px -10px ${g[1]}aa, inset 0 1px 0 rgb(255 255 255 / .35)`,
       }}
     >
-      <Icon size={size * 0.5} color="#fff" strokeWidth={2.1} aria-hidden />
+      <Icon size={rem(size * 0.5)} color="#fff" strokeWidth={2.1} aria-hidden />
     </span>
   )
 }
@@ -80,9 +80,10 @@ export function PlusTag({ label }: { label: string }) {
 }
 
 /** A drawn ✓ in a circle (the confirmation mark). */
-export function CheckMark({ size = 72, color = '#fff' }: { size?: number; color?: string }) {
+export function CheckMark({ size = 72, color = '#fff', max }: { size?: number; color?: string; /** CSS cap, e.g. '14vmin'. */ max?: string }) {
+  const w = max ? `min(${rem(size)}, ${max})` : rem(size)
   return (
-    <svg className="casa-check casa-pop" width={size} height={size} viewBox="0 0 48 48" aria-hidden>
+    <svg className="casa-check casa-pop shrink-0" style={{ width: w, height: w }} viewBox="0 0 48 48" aria-hidden>
       <circle cx="24" cy="24" r="22" fill="rgb(255 255 255 / .22)" />
       <path d="M14 24.5 L21 31.5 L34 17.5" fill="none" stroke={color} strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>

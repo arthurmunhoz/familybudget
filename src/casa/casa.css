@@ -422,7 +422,7 @@
   --wx-sy: 46px;
   position: absolute;
   inset: 0 0 auto 0;
-  height: clamp(260px, 46vh, 400px);
+  height: clamp(320px, 70vh, 640px);
   overflow: hidden;
   pointer-events: none;
 }
@@ -703,4 +703,228 @@
   .casa-frame-in {
     animation-duration: 0.4s !important;
   }
+}
+
+/* Liquid glass (owner, 2026-11, "like the iPhone"): the containers stay
+   readable but let the weather and the page show through — a translucent
+   tint, a strong blur with extra saturation, a bright hairline edge and a
+   soft specular sheen across the top. Few, large elements only (blur cost). */
+.casa-liquid {
+  position: relative;
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.58), rgb(255 255 255 / 0.36));
+  border: 1px solid rgb(255 255 255 / 0.65);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    inset 0 -1px 0 rgb(255 255 255 / 0.25),
+    0 20px 50px -28px rgb(40 30 20 / 0.35);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  isolation: isolate;
+}
+.casa-liquid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0) 38%);
+  z-index: -1;
+}
+:root[data-theme='dark'] .casa-liquid {
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.10), rgb(255 255 255 / 0.04));
+  border-color: rgb(255 255 255 / 0.14);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 -1px 0 rgb(255 255 255 / 0.04),
+    0 24px 60px -30px rgb(0 0 0 / 0.7);
+}
+:root[data-theme='dark'] .casa-liquid::before {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0) 40%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .casa-liquid { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--card); }
+}
+
+/* ── Any screen (owner, 2026-11: "we don't know the device — portrait or
+   landscape, every size") ───────────────────────────────────────────────────
+   1. The root font grows on big screens (1080p ≈ 19px, 1440p TV = 24px), so
+      every rem-sized piece (type, spacing, buttons, avatars) grows with it and
+      a TV doesn't look like a postage stamp. Tablets and phones stay at 16px.
+      Tailwind's breakpoints are in rem of the *initial* font, so they don't move. */
+html:has(.casa-root) {
+  font-size: clamp(16px, min(1.05vw, 1.75vh), 24px);
+}
+
+/* 2. The PIN pad: keys sized to the room there is (all 12 always fit), side by
+      side with the title on short landscape screens. */
+.casa-pin {
+  --k: clamp(48px, min(10.5dvh, 17vw), 7rem);
+  --g: clamp(10px, 2dvh, 1.25rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 3.2dvh, 2.5rem);
+  min-height: 100%;
+  padding: clamp(8px, 2dvh, 24px) 16px;
+}
+.casa-pin-keys {
+  display: grid;
+  grid-template-columns: repeat(3, var(--k));
+  gap: var(--g);
+}
+.casa-pin-key {
+  width: var(--k);
+  height: var(--k);
+  font-size: calc(var(--k) * 0.38);
+}
+.casa-pin-key svg {
+  width: calc(var(--k) * 0.34);
+  height: calc(var(--k) * 0.34);
+}
+@media (orientation: landscape) and (max-height: 640px) {
+  .casa-pin {
+    flex-direction: row;
+    gap: clamp(24px, 7vw, 80px);
+    --k: clamp(48px, 14dvh, 6rem);
+  }
+}
+
+/* 3. The hub's layout (Hub.tsx). Landscape: the side column (clock, Roof, the
+      day at a glance, family, Money/frame) beside the areas, both full height;
+      the side scrolls on its own if a short screen can't hold it. Portrait
+      tablet: clock | Roof + tiles on top, family across, areas below. Phone:
+      one column and the hub scrolls. No dead corners at any size. */
+.casa-clock-size {
+  font-size: clamp(3.2rem, min(9vw, 15dvh), 11rem);
+}
+.casa-hub {
+  display: grid;
+  flex: 1 1 0;
+  min-height: 18rem;
+  gap: clamp(12px, 2dvh, 22px) clamp(18px, 3vw, 44px);
+}
+.casa-side {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2dvh, 20px);
+  min-height: 0;
+  min-width: 0;
+}
+.casa-side .s-glance {
+  flex: 1 1 0;
+  min-height: 8.5rem;
+}
+.casa-side .s-family,
+.casa-side .s-tiles {
+  flex-shrink: 0;
+}
+.casa-areas {
+  min-height: 0;
+  min-width: 0;
+}
+.casa-areas-cards {
+  display: grid;
+  gap: clamp(10px, 1.6dvh, 16px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+@media (orientation: landscape) {
+  .casa-hub {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.25fr);
+  }
+  .casa-side {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding-top: clamp(0px, 3dvh - 12px, 40px);
+  }
+  .casa-side::-webkit-scrollbar {
+    display: none;
+  }
+  .casa-areas-cards .a-cal {
+    grid-row: span 2;
+  }
+}
+@media (orientation: landscape) and (max-height: 640px) {
+  .casa-side .s-glance {
+    display: none;
+  }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .casa-side .s-clock p:last-child {
+    display: none;
+  }
+}
+
+@media (orientation: portrait) {
+  .casa-clock-size {
+    font-size: clamp(3.4rem, min(15vw, 10dvh), 10rem);
+  }
+  .casa-hub {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(24rem, 1fr);
+  }
+  .casa-side .s-glance {
+    display: none;
+  }
+  .casa-areas-cards {
+    grid-template-rows: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+  .casa-areas-cards .a-cal {
+    grid-column: span 2;
+  }
+}
+@media (orientation: portrait) and (min-width: 600px) {
+  .casa-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: 'clock roof' 'clock tiles' 'family family';
+    align-items: center;
+    column-gap: clamp(16px, 3vw, 32px);
+  }
+  .casa-side .s-clock {
+    grid-area: clock;
+  }
+  .casa-side .s-roof {
+    grid-area: roof;
+    max-width: none;
+  }
+  .casa-side .s-tiles {
+    grid-area: tiles;
+  }
+  .casa-side .s-family {
+    grid-area: family;
+  }
+}
+/* A phone used as the device: one column, the hub scrolls. */
+@media (orientation: portrait) and (max-width: 599px) {
+  .casa-hub {
+    flex: 0 0 auto;
+    grid-template-rows: auto auto;
+  }
+  .casa-areas-cards {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: 19rem;
+  }
+  .casa-areas-cards .a-cal {
+    grid-column: auto;
+    grid-row: span 1;
+  }
+  .casa-areas-widget {
+    height: max(28rem, 72dvh);
+  }
+}
+
+/* Painel: the summary keeps to weather + birthday and the family block takes
+   the room (the Calendar card already lists the events). */
+.casa-side .s-glance.s-glance-compact {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.casa-side .s-family.s-family-grow {
+  flex: 1 1 0;
+  min-height: 0;
 }

@@ -132,7 +132,7 @@ export default function Widgets({ pages }: { pages: WidgetPage[] }) {
   }
 
   return (
-    <section className="casa-card casa-rise flex h-full min-h-0 flex-col overflow-hidden rounded-[30px]" style={{ ['--i' as string]: 1 }}>
+    <section className="casa-liquid casa-rise flex h-full min-h-0 flex-col overflow-hidden rounded-[30px]" style={{ ['--i' as string]: 1 }}>
       <div
         ref={box}
         className="relative min-h-0 flex-1 overflow-hidden"

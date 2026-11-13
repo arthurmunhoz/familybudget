@@ -21,10 +21,10 @@ export function PanelHeader({
   right?: ReactNode
 }) {
   return (
-    <header className="flex items-center gap-4 px-6 pt-5 pb-3">
+    <header className="flex shrink-0 items-center gap-3 px-4 pt-[clamp(10px,2.4dvh,20px)] pb-[clamp(6px,1.6dvh,12px)] sm:gap-4 sm:px-6">
       <IconChip icon={icon} g={g} size={44} />
       <div className="min-w-0 flex-1">
-        <h2 className="font-display truncate text-[1.9rem] leading-none">{title}</h2>
+        <h2 className="font-display truncate text-[clamp(1.45rem,min(5vw,5dvh),1.9rem)] leading-none">{title}</h2>
         {sub ? <p className="mt-1 truncate text-[0.95rem] text-(--text-muted)">{sub}</p> : null}
       </div>
       {right}

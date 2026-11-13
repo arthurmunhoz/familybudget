@@ -80,10 +80,10 @@ export default function FamilyPanel({
                 tick()
                 setSel(null)
               }}
-              className="casa-press inline-flex h-12 items-center gap-1 rounded-full bg-(--surface) pr-5 pl-3 text-[1.05rem] font-semibold"
+              className="casa-press inline-flex h-12 min-w-12 shrink-0 items-center justify-center gap-1 rounded-full bg-(--surface) px-3 sm:pr-5 text-[1.05rem] font-semibold"
             >
               <ChevronLeft size={22} aria-hidden />
-              {t('casa.family.everyone')}
+              <span className="max-sm:sr-only">{t('casa.family.everyone')}</span>
             </button>
           ) : undefined
         }
@@ -91,7 +91,7 @@ export default function FamilyPanel({
       {member ? (
         <Profile key={member.email} m={member} data={data} today={today} isMe={member.email === me} />
       ) : (
-        <ul className="casa-scroll grid flex-1 content-start gap-3 px-6 pt-2 pb-10 [grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]">
+        <ul className="casa-scroll grid min-h-0 flex-1 content-start gap-3 px-4 pt-2 pb-10 [grid-template-columns:repeat(auto-fill,minmax(min(10.5rem,40vw),1fr))] sm:px-6">
           {data.members.map((m, i) => {
             const age = ageOf(m.profile?.birthday, today)
             const bday = m.profile?.birthday ? daysToBirthday(m.profile.birthday, today) : null
@@ -122,6 +122,11 @@ export default function FamilyPanel({
   )
 }
 
+/** The profile photo: 150 at the base, smaller on a short or narrow screen. */
+function portraitSize(): number {
+  return Math.round(Math.max(88, Math.min(150, window.innerHeight * 0.22, window.innerWidth * 0.36)))
+}
+
 function Profile({ m, data, today, isMe }: { m: Member; data: HubData; today: string; isMe: boolean }) {
   const { t, lang } = useI18n()
   const loc = LOCALE[lang]
@@ -145,10 +150,10 @@ function Profile({ m, data, today, isMe }: { m: Member; data: HubData; today: st
   const fields = FIELDS.filter(([k]) => p?.[k])
 
   return (
-    <div ref={el} className="casa-scroll flex-1 px-6 pb-10">
+    <div ref={el} className="casa-scroll min-h-0 flex-1 px-4 pb-10 sm:px-6">
       <div className="grid gap-5 landscape:grid-cols-[minmax(260px,0.8fr)_1.2fr]">
-        <section className="casa-card flex flex-col items-center self-start rounded-[30px] px-6 pt-8 pb-7 text-center">
-          <Avatar m={m} size={150} />
+        <section className="casa-card flex flex-col items-center self-start rounded-[30px] px-5 pt-[clamp(16px,4dvh,2rem)] pb-7 text-center">
+          <Avatar m={m} size={portraitSize()} />
           <p className="font-display mt-5 text-[2rem] leading-tight">{m.name}</p>
           {isMe ? <p className="mt-1 text-[0.95rem] text-(--text-faint)">{t('casa.family.thisDevice')}</p> : null}
           {p?.birthday ? (
@@ -168,7 +173,7 @@ function Profile({ m, data, today, isMe }: { m: Member; data: HubData; today: st
         </section>
 
         <div className="flex min-w-0 flex-col gap-5">
-          <section className="casa-card rounded-[30px] p-6">
+          <section className="casa-card rounded-[30px] p-4 sm:p-6">
             <h3 className="mb-3 flex items-center gap-2 text-[0.95rem] font-semibold uppercase tracking-[0.14em] text-(--text-faint)">
               <CalendarDays size={18} aria-hidden />
               {t('casa.family.today')}
@@ -192,11 +197,11 @@ function Profile({ m, data, today, isMe }: { m: Member; data: HubData; today: st
             )}
           </section>
 
-          <section className="casa-card rounded-[30px] p-6">
+          <section className="casa-card rounded-[30px] p-4 sm:p-6">
             {fields.length ? (
-              <dl className="grid grid-cols-2 gap-3">
+              <dl className="grid grid-cols-[repeat(auto-fill,minmax(min(9rem,100%),1fr))] gap-3">
                 {fields.map(([k, label]) => (
-                  <div key={k} className={`rounded-[18px] bg-(--surface) px-4 py-3 ${WIDE.has(k) ? 'col-span-2' : ''}`}>
+                  <div key={k} className={`rounded-[18px] bg-(--surface) px-4 py-3 ${WIDE.has(k) ? 'col-span-full' : ''}`}>
                     <dt className="text-[0.82rem] font-semibold uppercase tracking-[0.12em] text-(--text-faint)">{t(label)}</dt>
                     <dd className={`mt-0.5 text-[1.15rem] ${WIDE.has(k) ? 'whitespace-pre-line' : 'truncate'} ${k === 'allergies' ? 'font-semibold text-(--expense)' : ''}`}>
                       {String(p?.[k] ?? '')}

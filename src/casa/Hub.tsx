@@ -4,13 +4,13 @@
 // link, the photo frame (button or after N idle minutes), and Roof at the
 // bottom. Nothing navigates away: panels grow in place.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Images, ListChecks, Lock, PawPrint, Settings, Sparkles, Wallet } from 'lucide-react'
+import { CalendarDays, ListChecks, PawPrint, Settings, Sparkles } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../hooks/useTheme'
 import { useI18n } from '../hooks/useI18n'
 import { useHomeWeather, weatherIcon, type TempUnit } from '../lib/weather'
 import type { PanelId } from './assistant'
-import { useHubData, type HubData } from './data'
+import { useHubData } from './data'
 import { useFramePhotos } from './frame'
 import { FrameMode, FrameWidget } from './FrameShow'
 import CalendarPanel from './panels/CalendarPanel'
@@ -19,13 +19,14 @@ import ListsPanel from './panels/ListsPanel'
 import MoneyPanel from './panels/MoneyPanel'
 import PetsPanel from './panels/PetsPanel'
 import { usePrefs } from './prefs'
-import { CalendarPreview, ListsPreview, MoneyWidget, PetsPreview, PreviewCard, calendarSub, petRows } from './Previews'
+import { CalendarPreview, ListsPreview, MoneyWidget, PetsPreview, PreviewCard, calendarSub, petsLeftCount } from './Previews'
 import Roof from './Roof'
 import { sceneFor, WeatherScene } from './WeatherScene'
 import { usePlan } from './session'
 import { PlanSheet, SettingsSheet } from './Sheets'
 import { unlockAudioOnFirstTouch, tick } from './sound'
-import { Avatar, Grow, useNow, type GrowHandle } from './ui'
+import { FamilyBlock, Glance, QuickTiles } from './HubSide'
+import { Grow, useNow, type GrowHandle } from './ui'
 import { GRAD, LOCALE, cap, grad, isoOf, lsGet, lsSet } from './util'
 import Widgets, { type WidgetPage } from './Widgets'
 
@@ -33,17 +34,6 @@ const IDLE_LOCK_MS = 2 * 60_000
 const DRIFT_MS = 4 * 60_000
 
 type HubPanel = PanelId | 'family'
-
-function usePortrait(): boolean {
-  const [p, setP] = useState(() => window.matchMedia('(orientation: portrait)').matches)
-  useEffect(() => {
-    const mq = window.matchMedia('(orientation: portrait)')
-    const f = () => setP(mq.matches)
-    mq.addEventListener('change', f)
-    return () => mq.removeEventListener('change', f)
-  }, [])
-  return p
-}
 
 export default function Hub() {
   const { t, lang } = useI18n()
@@ -55,7 +45,6 @@ export default function Hub() {
   const album = useFramePhotos()
   const now = useNow(1000)
   const today = isoOf(now)
-  const portrait = usePortrait()
   const refresh = useCallback(() => void revalidate(), [revalidate])
 
   // The day changes at midnight: refetch so "today" means today.
@@ -171,7 +160,7 @@ export default function Hub() {
     name: data.members.find((m) => m.email === profile?.email)?.name ?? profile?.display_name ?? '',
   }
   const moneyState: 'plus' | 'pin' | 'open' = plan.full ? (unlocked ? 'open' : 'pin') : 'plus'
-  const petsLeft = useMemo(() => petRows(data, data.done, today, t).filter((r) => !r.done).length, [data, today, t])
+  const petsLeft = useMemo(() => petsLeftCount(data, today, t), [data, today, t])
   const listsSub = t('casa.lists.openCount', { count: data.open.length })
   const petsSub = data.pets.length ? (petsLeft ? t('casa.pets.dueCount', { count: petsLeft }) : t('casa.pets.allDone')) : undefined
 
@@ -199,7 +188,7 @@ export default function Hub() {
       label: t('casa.pets.title'),
       render: () => (
         <PreviewCard plain i={0} icon={PawPrint} g={GRAD.pets} title={t('casa.pets.title')} sub={petsSub} onOpen={(el) => openPanel('pets', el)}>
-          <PetsPreview data={data} today={today} full={plan.full} refresh={refresh} big />
+          <PetsPreview data={data} today={today} full={plan.full} refresh={refresh} big onOpen={(el) => openPanel('pets', el)} />
         </PreviewCard>
       ),
     },
@@ -228,12 +217,14 @@ export default function Hub() {
         </div>
       )}
 
+      {/* The whole hub scrolls only when a screen is too small to hold it
+          (a phone, a 480 px-tall tablet); otherwise everything fits. */}
       <div
-        className="casa-drift relative flex h-full flex-col px-[clamp(20px,3.2vw,48px)] pt-[clamp(14px,2.2vh,26px)] pb-[clamp(14px,2vh,24px)]"
+        className="casa-drift casa-scroll relative flex h-full flex-col px-[clamp(16px,3.2vw,48px)] pt-[clamp(10px,2.2dvh,26px)] pb-[clamp(12px,2dvh,24px)]"
         style={{ transform: `translate3d(${drift.x}px, ${drift.y}px, 0)` }}
       >
-        {/* top line */}
-        <header className="casa-fade flex items-center gap-3 text-[clamp(1.05rem,1.5vw,1.3rem)] text-(--text-muted)">
+        {/* top line: date · weather · family name, and the gear. */}
+        <header className="casa-fade flex shrink-0 items-center gap-3 text-[clamp(1rem,1.5vw,1.3rem)] text-(--text-muted)">
           <span className="min-w-0 flex-1 truncate">
             <span className="font-semibold text-(--text)">{cap(now.toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' }))}</span>
             {weather.weather && WIcon ? (
@@ -250,53 +241,75 @@ export default function Hub() {
             ) : null}
           </span>
           {plan.trialDays !== null && plan.full ? (
-            <span className="casa-glass hidden rounded-full px-3.5 py-1.5 text-[0.95rem] font-semibold landscape:inline">{t('casa.plan.trial', { count: plan.trialDays })}</span>
+            <span className="casa-glass hidden shrink-0 rounded-full px-3.5 py-1.5 text-[0.95rem] font-semibold sm:inline">{t('casa.plan.trial', { count: plan.trialDays })}</span>
           ) : null}
-          <button
-            onClick={(e) => openPanel('money', e.currentTarget)}
-            className="casa-glass casa-press inline-flex h-12 shrink-0 items-center gap-2 rounded-full pr-4 pl-1.5 text-[1rem] font-semibold text-(--text)"
-          >
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full" style={{ background: grad(GRAD.money) }}>
-              <Wallet size={18} color="#fff" strokeWidth={2.2} aria-hidden />
-            </span>
-            {t('app.budget.name')}
-            {moneyState !== 'open' ? <Lock size={15} strokeWidth={2.6} className="text-(--text-muted)" aria-hidden /> : null}
-          </button>
-          <button
-            onClick={() => {
-              tick()
-              setFrame(true)
-            }}
-            aria-label={t('casa.frame.title')}
-            className="casa-glass casa-press inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-(--text)"
-          >
-            <Images size={22} aria-hidden />
-          </button>
-          <FamilyStrip data={data} loading={loading} max={portrait ? 4 : 6} onOpen={(el) => openPanel('family', el)} />
           <button
             onClick={(e) => setSheet({ k: 'settings', origin: e.currentTarget.getBoundingClientRect() })}
             aria-label={t('casa.settings.title')}
-            className="casa-press inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-(--text-muted)"
+            className="casa-press -mr-2 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-(--text-muted)"
           >
             <Settings size={26} aria-hidden />
           </button>
         </header>
 
-        {/* middle: the clock, and the areas (cards or one big widget) */}
-        <div className="grid min-h-0 flex-1 gap-x-[clamp(20px,3vw,44px)] gap-y-4 py-3 portrait:grid-cols-[minmax(0,1fr)] portrait:grid-rows-[auto_minmax(0,1fr)] landscape:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <section className="casa-rise flex flex-col justify-center portrait:pt-4 portrait:pb-1" style={{ ['--i' as string]: 0 }}>
-            <div className="casa-drift" style={{ transform: `translate3d(${drift.cx}px, ${drift.cy}px, 0)` }}>
+        {/* middle: the side (clock, Roof, the day, family, Money/frame) and
+            the areas (cards or one big widget). casa.css › .casa-hub places
+            them for portrait / landscape / phone / short screens. */}
+        <div className="casa-hub py-[clamp(8px,1.6dvh,14px)]">
+          <section className="casa-side casa-rise" style={{ ['--i' as string]: 0 }}>
+            <div className="s-clock casa-drift" style={{ transform: `translate3d(${drift.cx}px, ${drift.cy}px, 0)` }}>
               <Clock now={now} loc={loc} />
-              <p className="font-display mt-2 text-[clamp(1.3rem,2vw,1.8rem)] text-(--text-muted)">{greeting}</p>
+              <p className="font-display mt-1 text-[clamp(1.2rem,min(2vw,3.4dvh),1.8rem)] text-(--text-muted)">{greeting}</p>
             </div>
+            <div className="s-roof w-full max-w-[28.75rem]">
+              <Roof
+                data={data}
+                full={plan.full}
+                today={today}
+                me={me}
+                refresh={refresh}
+                hidden={!!panel || !!sheet}
+                onOpenPanel={(id) => openPanel(id)}
+                onLocked={() => setSheet({ k: 'plan', origin: null })}
+                onOpenChange={setRoofOpen}
+              />
+            </div>
+            <Glance
+              className={prefs.layout === 'widgets' ? 's-glance' : 's-glance s-glance-compact'}
+              showEvents={prefs.layout === 'widgets'}
+              data={data}
+              today={today}
+              now={now}
+              weather={weather.weather}
+              alert={weather.alert}
+              city={weather.location?.city.split(',')[0] ?? null}
+              onCalendar={() => openPanel('calendar')}
+              onMember={(email) => openPanel('family', null, email)}
+            />
+            <FamilyBlock
+              className={prefs.layout === 'widgets' ? 's-family' : 's-family s-family-grow'}
+              data={data}
+              loading={loading}
+              onOpen={(el) => openPanel('family', el)}
+              onMember={(email, el) => openPanel('family', el, email)}
+            />
+            <QuickTiles
+              className="s-tiles"
+              moneyOpen={moneyState === 'open'}
+              onMoney={(el) => openPanel('money', el)}
+              onFrame={() => {
+                tick()
+                setFrame(true)
+              }}
+            />
           </section>
 
           {prefs.layout === 'widgets' ? (
-            <div className="min-h-0 min-w-0">
+            <div className="casa-areas casa-areas-widget">
               <Widgets pages={pages} />
             </div>
           ) : (
-            <section className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 portrait:grid-rows-[1.15fr_1fr] landscape:grid-rows-2">
+            <section className="casa-areas casa-areas-cards">
               <PreviewCard
                 i={1}
                 icon={CalendarDays}
@@ -304,7 +317,7 @@ export default function Hub() {
                 title={t('app.calendar.name')}
                 sub={calendarSub(data, today, now, t)}
                 onOpen={(el) => openPanel('calendar', el)}
-                className="portrait:col-span-2 landscape:row-span-2"
+                className="a-cal"
               >
                 <CalendarPreview data={data} today={today} now={now} big />
               </PreviewCard>
@@ -312,39 +325,28 @@ export default function Hub() {
                 <ListsPreview data={data} full={plan.full} refresh={refresh} />
               </PreviewCard>
               <PreviewCard i={3} icon={PawPrint} g={GRAD.pets} title={t('casa.pets.title')} sub={petsSub} onOpen={(el) => openPanel('pets', el)}>
-                <PetsPreview data={data} today={today} full={plan.full} refresh={refresh} />
+                <PetsPreview data={data} today={today} full={plan.full} refresh={refresh} onOpen={(el) => openPanel('pets', el)} />
               </PreviewCard>
             </section>
           )}
         </div>
 
         {!plan.full ? (
-          <div className="casa-card casa-rise mb-3 flex items-center gap-5 rounded-[26px] px-6 py-3.5" style={{ ['--i' as string]: 5 }}>
+          <div
+            className="casa-card casa-rise flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 rounded-[26px] px-[clamp(14px,2vw,24px)] py-[clamp(8px,1.6dvh,14px)]"
+            style={{ ['--i' as string]: 5 }}
+          >
             <Sparkles size={28} className="shrink-0 text-[#8B6CFF]" aria-hidden />
-            <p className="min-w-0 flex-1 text-[1.1rem] leading-snug text-(--text-muted)">{t('casa.plan.banner')}</p>
+            <p className="min-w-[min(16rem,60%)] flex-1 text-[clamp(1rem,2.4dvh,1.1rem)] leading-snug text-(--text-muted)">{t('casa.plan.banner')}</p>
             <button
               onClick={(e) => setSheet({ k: 'plan', origin: e.currentTarget.getBoundingClientRect() })}
-              className="casa-press h-14 shrink-0 rounded-full px-6 text-[1.1rem] font-semibold text-white"
+              className="casa-press h-12 shrink-0 rounded-full px-6 text-[1.05rem] font-semibold text-white sm:h-14"
               style={{ background: grad(GRAD.orb) }}
             >
               {t('casa.plan.see')}
             </button>
           </div>
         ) : null}
-
-        <div className="casa-rise mx-auto mt-[clamp(6px,1.2vh,12px)] w-full max-w-[880px]" style={{ ['--i' as string]: 6 }}>
-          <Roof
-            data={data}
-            full={plan.full}
-            today={today}
-            me={me}
-            refresh={refresh}
-            hidden={!!panel || !!sheet}
-            onOpenPanel={(id) => openPanel(id)}
-            onLocked={() => setSheet({ k: 'plan', origin: null })}
-            onOpenChange={setRoofOpen}
-          />
-        </div>
       </div>
 
       {panel ? (
@@ -403,7 +405,7 @@ function Clock({ now, loc }: { now: Date; loc: string }) {
   const minute = parts.find((p) => p.type === 'minute')?.value ?? ''
   const period = parts.find((p) => p.type === 'dayPeriod')?.value
   return (
-    <p className="casa-clock text-[clamp(4.5rem,10vw,9rem)] whitespace-nowrap" aria-label={now.toLocaleTimeString(loc, { hour: 'numeric', minute: '2-digit' })}>
+    <p className="casa-clock casa-clock-size whitespace-nowrap" aria-label={now.toLocaleTimeString(loc, { hour: 'numeric', minute: '2-digit' })}>
       {hour}
       <span className="casa-colon">:</span>
       {minute}
@@ -412,30 +414,3 @@ function Clock({ now, loc }: { now: Date; loc: string }) {
   )
 }
 
-/** Up to `max` overlapping faces + "+N"; the whole strip opens Família. */
-function FamilyStrip({ data, loading, max, onOpen }: { data: HubData; loading: boolean; max: number; onOpen: (el: HTMLElement) => void }) {
-  const { t } = useI18n()
-  const ms = data.members
-  if (loading && !ms.length) return <span className="casa-shimmer h-12 w-28 shrink-0 rounded-full" />
-  if (!ms.length) return null
-  const shown = ms.length > max ? ms.slice(0, max - 1) : ms
-  const extra = ms.length - shown.length
-  return (
-    <button
-      onClick={(e) => onOpen(e.currentTarget)}
-      aria-label={t('casa.family.title')}
-      className="casa-glass casa-press inline-flex h-12 shrink-0 items-center rounded-full py-1 pr-1.5 pl-1.5"
-    >
-      {shown.map((m, i) => (
-        <span key={m.email} className="casa-face inline-flex rounded-full" style={{ marginLeft: i ? -10 : 0, zIndex: shown.length - i }}>
-          <Avatar m={m} size={38} />
-        </span>
-      ))}
-      {extra > 0 ? (
-        <span className="casa-face relative -ml-2.5 inline-flex h-[38px] min-w-[38px] items-center justify-center rounded-full bg-(--surface-2) px-1.5 text-[0.9rem] font-bold text-(--text)">
-          +{extra}
-        </span>
-      ) : null}
-    </button>
-  )
-}

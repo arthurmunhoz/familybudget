@@ -132,20 +132,22 @@ export default function Pairing() {
   ]
 
   return (
-    <div className="casa-root flex items-center justify-center">
+    <div className="casa-root casa-scroll">
       <div className="casa-aurora" aria-hidden>
         <i />
         <i />
         <i />
       </div>
-      <div className="relative grid w-full max-w-[1180px] items-center gap-10 px-8 py-10 landscape:grid-cols-[1.1fr_1fr] landscape:gap-16 portrait:max-w-[720px]">
+      {/* Centred when it fits, scrolls (never clipped) when the screen is small. */}
+      <div className="relative flex min-h-full flex-col items-center justify-center gap-[clamp(12px,3dvh,24px)] py-[clamp(16px,4dvh,40px)]">
+      <div className="relative grid w-full max-w-[73.75rem] items-center gap-[clamp(20px,4dvh,40px)] px-[clamp(16px,4vw,2rem)] landscape:grid-cols-[1.1fr_1fr] landscape:gap-[clamp(24px,5vw,4rem)] portrait:max-w-[45rem]">
         <section className="casa-rise portrait:text-center" style={{ ['--i' as string]: 0 }}>
           <div className="portrait:flex portrait:justify-center">
-            <HomeArt size={150} />
+            <HomeArt size={150} fluid />
           </div>
-          <h1 className="font-display mt-6 text-[clamp(3.2rem,6.4vw,5.6rem)] leading-[0.95] tracking-tight">{t('casa.name')}</h1>
-          <p className="mt-4 max-w-[30ch] text-[clamp(1.25rem,2.1vw,1.7rem)] leading-snug text-(--text-muted) portrait:mx-auto">{t('casa.pair.tagline')}</p>
-          <ol className="mt-9 space-y-4 portrait:mx-auto portrait:max-w-[460px] portrait:text-left">
+          <h1 className="font-display mt-[clamp(8px,2.4dvh,24px)] text-[clamp(2.4rem,min(6.4vw,10dvh),5.6rem)] leading-[0.95] tracking-tight">{t('casa.name')}</h1>
+          <p className="mt-[clamp(8px,1.6dvh,16px)] max-w-[30ch] text-[clamp(1.1rem,min(2.1vw,3.4dvh),1.7rem)] leading-snug text-(--text-muted) portrait:mx-auto">{t('casa.pair.tagline')}</p>
+          <ol className="mt-[clamp(14px,4dvh,2.25rem)] space-y-[clamp(8px,1.6dvh,16px)] portrait:mx-auto portrait:max-w-[28.75rem] portrait:text-left">
             {steps.map((s, i) => (
               <li key={i} className="casa-rise flex items-center gap-4" style={{ ['--i' as string]: i + 2 }}>
                 <span
@@ -154,21 +156,21 @@ export default function Pairing() {
                 >
                   <s.icon size={24} strokeWidth={2.1} aria-hidden />
                 </span>
-                <span className="text-[1.25rem] leading-snug font-medium">{s.text}</span>
+                <span className="text-[clamp(1.05rem,2.8dvh,1.25rem)] leading-snug font-medium">{s.text}</span>
               </li>
             ))}
           </ol>
         </section>
 
         <section className="casa-rise flex justify-center" style={{ ['--i' as string]: 1 }}>
-          <div className="casa-card relative w-full max-w-[460px] rounded-[40px] p-9 text-center">
+          <div className="casa-card relative w-full max-w-[28.75rem] rounded-[clamp(28px,4vmin,40px)] p-[clamp(18px,3.5dvh,2.25rem)] text-center">
             {phase.k === 'code' ? (
               <div key={phase.code} className="casa-fade">
-                <div className="mx-auto aspect-square w-[min(300px,70vw)] rounded-[28px] bg-white p-6 shadow-[inset_0_0_0_1px_rgb(0_0_0/.06)]">
+                <div className="mx-auto aspect-square w-[min(18.75rem,62vw,40dvh)] rounded-[28px] bg-white p-[clamp(12px,2.4dvh,24px)] shadow-[inset_0_0_0_1px_rgb(0_0_0/.06)]">
                   <div className="h-full w-full [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: phase.svg }} />
                 </div>
-                <p className="mt-7 text-[15px] font-semibold uppercase tracking-[0.18em] text-(--text-faint)">{t('casa.pair.orCode')}</p>
-                <p className="font-display mt-1 text-[3.4rem] leading-none tracking-[0.06em]">{prettyCode(phase.code)}</p>
+                <p className="mt-[clamp(12px,3dvh,28px)] text-[15px] font-semibold uppercase tracking-[0.18em] text-(--text-faint)">{t('casa.pair.orCode')}</p>
+                <p className="font-display mt-1 text-[clamp(2.4rem,min(9vw,7dvh),3.4rem)] leading-none tracking-[0.06em]">{prettyCode(phase.code)}</p>
                 <p className="mt-5 flex items-center justify-center gap-2 text-[15px] text-(--text-muted)">
                   <span className="relative inline-flex h-2.5 w-2.5">
                     <span className="casa-breathe absolute inset-0 rounded-full bg-[#3f8f6a]" />
@@ -178,15 +180,15 @@ export default function Pairing() {
                 </p>
               </div>
             ) : phase.k === 'joining' ? (
-              <div className="casa-fade flex min-h-[460px] flex-col items-center justify-center gap-5">
+              <div className="casa-fade flex min-h-[min(28.75rem,60dvh)] flex-col items-center justify-center gap-5">
                 <span className="rounded-full p-5" style={{ background: grad(GRAD.money) }}>
                   <CheckMark size={84} />
                 </span>
                 <p className="font-display text-[2.2rem]">{t('casa.pair.joining')}</p>
               </div>
             ) : phase.k === 'error' ? (
-              <div className="casa-fade flex min-h-[460px] flex-col items-center justify-center gap-4">
-                <div className="mx-auto flex aspect-square w-[220px] items-center justify-center rounded-[28px] bg-(--surface)">
+              <div className="casa-fade flex min-h-[min(28.75rem,60dvh)] flex-col items-center justify-center gap-4">
+                <div className="mx-auto flex aspect-square w-[min(13.75rem,30dvh)] items-center justify-center rounded-[28px] bg-(--surface)">
                   <RefreshCw size={56} className="text-(--text-faint)" aria-hidden />
                 </div>
                 <p className="font-display mt-2 text-[1.9rem] leading-tight">{t('casa.pair.errorTitle')}</p>
@@ -201,8 +203,8 @@ export default function Pairing() {
                 </button>
               </div>
             ) : (
-              <div className="flex min-h-[460px] flex-col items-center justify-center gap-6">
-                <div className="casa-shimmer mx-auto aspect-square w-[min(300px,70vw)] rounded-[28px]" />
+              <div className="flex min-h-[min(28.75rem,60dvh)] flex-col items-center justify-center gap-6">
+                <div className="casa-shimmer mx-auto aspect-square w-[min(18.75rem,62vw,40dvh)] rounded-[28px]" />
                 <div className="casa-shimmer h-12 w-60 rounded-2xl" />
               </div>
             )}
@@ -213,21 +215,23 @@ export default function Pairing() {
       {import.meta.env.DEV && DEV_EMAIL ? (
         <button
           onClick={devLogin}
-          className="absolute bottom-6 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-(--surface-2) px-5 py-3 text-[15px] font-semibold text-(--text-muted)"
+          className="relative inline-flex shrink-0 items-center gap-2 rounded-full border border-(--surface-2) px-5 py-3 text-[15px] font-semibold text-(--text-muted)"
         >
           <Wrench size={16} aria-hidden />
           {t('casa.pair.dev')}
         </button>
       ) : null}
+      </div>
     </div>
   )
 }
 
 /** The Modo Casa art: a little standing screen showing the sunset-and-roof
  *  scene (the phone's photo-frame look), breathing slowly, window aglow. */
-export function HomeArt({ size = 140 }: { size?: number }) {
+export function HomeArt({ size = 140, fluid = false }: { size?: number; /** Shrink on short screens. */ fluid?: boolean }) {
+  const w = fluid ? `clamp(72px, 18dvh, ${size / 16}rem)` : `${size / 16}rem`
   return (
-    <svg className="casa-breathe-slow" width={size} height={size} viewBox="0 0 120 120" aria-hidden>
+    <svg className="casa-breathe-slow" style={{ width: w, height: w }} viewBox="0 0 120 120" aria-hidden>
       <defs>
         <linearGradient id="casaWood" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#C98A5A" />

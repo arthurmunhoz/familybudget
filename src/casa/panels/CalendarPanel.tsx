@@ -44,17 +44,20 @@ export default function CalendarPanel({
           full ? (
             <button
               onClick={() => setAdding((a) => !a)}
-              className="casa-press inline-flex h-12 items-center gap-2 rounded-full px-7 text-[0.98rem] font-semibold text-white"
+              aria-label={t('casa.cal.new')}
+              className="casa-press inline-flex h-12 min-w-12 shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[0.98rem] font-semibold text-white sm:px-7"
               style={{ background: grad(GRAD.calendar), boxShadow: '0 12px 26px -14px #FF2E63' }}
             >
               <Plus size={24} strokeWidth={2.6} aria-hidden />
-              {t('casa.cal.new')}
+              <span className="max-sm:sr-only">{t('casa.cal.new')}</span>
             </button>
           ) : (
             <PlusTag label="Plus" />
           )
         }
       />
+      {/* The form scrolls with the agenda, so a short screen never loses it. */}
+      <div className="casa-scroll min-h-0 flex-1 px-4 pb-10 sm:px-6">
       {adding ? (
         <NewEvent
           data={data}
@@ -65,7 +68,7 @@ export default function CalendarPanel({
           }}
         />
       ) : null}
-      <div className="casa-scroll grid flex-1 gap-8 px-6 pb-10 landscape:grid-cols-[1.15fr_1fr]">
+      <div className="grid gap-[clamp(20px,4dvh,2rem)] landscape:grid-cols-[1.15fr_1fr]">
         <section>
           <h3 className="mb-4 text-[0.95rem] font-semibold uppercase tracking-[0.16em] text-(--text-faint)">{t('casa.when.todayCap')}</h3>
           {todayList.length === 0 ? (
@@ -108,6 +111,7 @@ export default function CalendarPanel({
           </div>
         </section>
       </div>
+      </div>
     </div>
   )
 }
@@ -118,9 +122,9 @@ function EventRow({ o, color, big = false, i, data }: { o: Occurrence; color: st
   const emoji = KIND_EMOJI[o.event.kind]
   return (
     <li className="casa-rise" style={{ ['--i' as string]: i }}>
-      <div className={`casa-card flex items-center gap-4 rounded-[22px] ${big ? 'px-6 py-3' : 'px-5 py-3'}`}>
+      <div className={`casa-card flex items-center gap-3 rounded-[22px] sm:gap-4 ${big ? 'px-4 py-3 sm:px-6' : 'px-4 py-3 sm:px-5'}`}>
         <span className="h-12 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
-        <span className={`w-[5.2rem] shrink-0 font-semibold tabular-nums ${big ? 'text-[1.2rem]' : 'text-[0.95rem]'}`}>
+        <span className={`w-[4.4rem] shrink-0 sm:w-[5.2rem] font-semibold tabular-nums ${big ? 'text-[1.2rem]' : 'text-[0.95rem]'}`}>
           {o.event.all_day ? <span className="text-[0.95rem] text-(--text-muted)">{t('casa.cal.allDay')}</span> : o.event.start_time?.slice(0, 5)}
         </span>
         <span className="min-w-0 flex-1">
@@ -159,14 +163,14 @@ function NewEvent({ data, today, onDone }: { data: HubData; today: string; onDon
   }
 
   return (
-    <div className="casa-rise mx-8 mb-6 rounded-[30px] p-6 casa-card">
+    <div className="casa-rise casa-card mb-6 rounded-[30px] p-4 sm:p-6">
       <input
         autoFocus
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder={t('casa.cal.whatPlaceholder')}
-        className="h-16 w-full rounded-[20px] border border-(--surface-2) bg-(--bg) px-6 text-[1.1rem] outline-none focus:border-[#FF2E63]"
-        style={{ fontSize: '1.4rem' }}
+        className="h-[clamp(3.25rem,9dvh,4rem)] w-full rounded-[20px] border border-(--surface-2) bg-(--bg) px-5 text-[1.1rem] outline-none focus:border-[#FF2E63]"
+        style={{ fontSize: 'clamp(1.15rem, 3.5dvh, 1.4rem)' }}
       />
       <div className="casa-scroll mt-4 flex gap-2.5 overflow-x-auto">
         {choices.map((d, i) => {
