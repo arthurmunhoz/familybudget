@@ -184,3 +184,24 @@ async function upload(srcUri: string, width: number, compress: number, path: str
   }
 }
 
+
+/** A PDF's first page as its thumb + preview, rendered by the server (the
+ *  phone has no PDF renderer; `api/send-digest?action=doc-thumb`). Needs the
+ *  documents row to exist already — the server checks it as the caller. True
+ *  when the pictures were written. */
+export async function makePdfThumb(filePath: string): Promise<boolean> {
+  const base = process.env.EXPO_PUBLIC_API_BASE ?? ''
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!base || !token) return false
+  try {
+    const res = await fetch(`${base}/api/send-digest?action=doc-thumb`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ path: filePath }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}

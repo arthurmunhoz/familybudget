@@ -1256,6 +1256,8 @@ export const es: Record<keyof typeof en, string> = {
   'docs.shared': 'Compartido',
   'docs.owner': 'Propietario',
   'docs.type': 'Tipo',
+  'vault.title': 'Tu bóveda está cerrada',
+  'vault.opening': 'Abriendo…',
   'vault.locked': 'Bloqueado — verifica tu identidad para abrirlo.',
   'vault.unlock': 'Desbloquear',
   'vault.unlocking': 'Verificando…',

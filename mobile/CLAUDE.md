@@ -1163,6 +1163,17 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   else the 320 px thumb with "open to read it all". Older PDFs have no
   preview (no PDF renderer on device). Deleting/replacing a doc removes all
   three objects.
+- **Documents, 2026-11-13.** The lock screen is a vault door (`apps/docs/VaultDoor`
+  + `VaultGate`): wheel turns, bolts draw back, the door swings on its hinge and
+  the scene zooms into the documents (mounted underneath during `opening`);
+  sounds from `scripts/make-vault-sounds.py` via `vaultFeedback.ts` (guarded
+  expo-audio: check `requireOptionalNativeModule('ExpoAudio')` BEFORE requiring,
+  or a binary without it shows a red box in dev). **PDF pictures are rendered by
+  the server** (`api/send-digest?action=doc-thumb`, pdfjs + @napi-rs/canvas, as
+  the CALLER under RLS): `DocumentVault` asks for any PDF whose thumb is missing
+  (a few per visit, once per doc) — that also covers new uploads, since the list
+  reloads after a save. Switching to (or opening in) one-at-a-time scrolls the
+  card + "1 of n" into view (`fitPending`/`fitUntil`, the scroll deferred a beat).
 - **Date/time pickers open in their own sheet, never inline in a form.**
   `@/components/PickerSheet` (iOS bottom sheet + Done; Android's native dialog)
   for times and one-off dates; Money's `DatePickerModal` and Pet Care's

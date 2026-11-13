@@ -343,7 +343,11 @@ export function AskSheet({
       if (!openRef.current) return
       // ("ok" alone is a goodbye, not a hesitation — check that first.)
       if (!isGoodbye(heard)) heard = meaningfulRequest(heard)
-      if (!heard) return
+      if (!heard) {
+        // Just "er…" during a conversation: keep listening for the real reply.
+        if (followRef.current) void voice.start({ untilCancel: true })
+        return
+      }
       viaVoice.current = true
       void submitRef.current?.(heard)
     },
@@ -400,6 +404,10 @@ export function AskSheet({
   // 2026-11): the answer stays on screen and a small "listening" strip sits
   // under it, instead of the full listening view replacing it.
   const [follow, setFollow] = useState(false)
+  const followRef = useRef(false)
+  useEffect(() => {
+    followRef.current = follow
+  }, [follow])
   const followUp = follow && voiceOn
   const fullHearing = hearing && !followUp
   // Opened from the Home's mic: listen straight away — but only once the sheet
@@ -637,7 +645,8 @@ export function AskSheet({
           setTimeout(() => {
             if (!openRef.current || turn !== turnSeq.current || textRef.current.trim()) return
             setFollow(true)
-            void voice.start()
+            // Until the sheet closes or a goodbye — not a few seconds.
+            void voice.start({ untilCancel: true })
           }, 250)
         })
       }

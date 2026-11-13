@@ -1265,6 +1265,8 @@ export const en = {
   'docs.shared': 'Shared',
   'docs.owner': 'Owner',
   'docs.type': 'Type',
+  'vault.title': 'Your vault is locked',
+  'vault.opening': 'Opening…',
   'vault.locked': 'Locked — verify it’s you to open it.',
   'vault.unlock': 'Unlock',
   'vault.unlocking': 'Verifying…',

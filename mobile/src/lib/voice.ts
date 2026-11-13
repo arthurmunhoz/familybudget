@@ -216,6 +216,14 @@ export function useVoice(
   const begin = useRef<(() => void) | null>(null)
   const fallback = useRef<ReturnType<typeof setTimeout> | null>(null)
   const quietStart = useRef(false)
+  /** Keep listening through silence until cancel() (a conversation's
+   *  follow-up, owner 2026-11-13: a few seconds wasn't enough to read the
+   *  answer and reply). The recogniser still stops at each pause or silence;
+   *  this restarts it quietly — no chimes, state stays "listening". */
+  const untilCancel = useRef(false)
+  /** Restarts in a row that failed fast — a broken mic must not spin. */
+  const quickRestarts = useRef(0)
+  const lastRestart = useRef(0)
   /** Bumped by every start and cancel; a start that's been overtaken stops. */
   const startGen = useRef(0)
   /** start() is awaiting permissions / the app — not listening yet. */
@@ -234,6 +242,21 @@ export function useVoice(
   useEffect(() => {
     const m = speech()
     if (!m) return
+    const keepGoing = () => {
+      const now = Date.now()
+      quickRestarts.current = now - lastRestart.current < 1500 ? quickRestarts.current + 1 : 0
+      lastRestart.current = now
+      if (quickRestarts.current > 5) return false
+      retrying.current = true
+      latest.current = ''
+      segments.current = { done: '', current: '' }
+      const gen = startGen.current
+      setTimeout(() => {
+        retrying.current = false
+        if (gen === startGen.current && listening.current && untilCancel.current) begin.current?.()
+      }, 200)
+      return true
+    }
     const subs = [
       // The chime marks the moment you can talk: when the microphone is
       // actually delivering audio. 'start'/'audiostart' fire as soon as the
@@ -280,6 +303,8 @@ export function useVoice(
           }, 400)
           return
         }
+        // Silence in a conversation: listen again (see untilCancel).
+        if (untilCancel.current && listening.current && live.current && (e.error === 'no-speech' || e.error === 'speech-timeout') && keepGoing()) return
         if (listening.current && live.current) chime('stop')
         listening.current = false
         // "no-speech"/"aborted" are a user stopping or saying nothing — just idle.
@@ -293,6 +318,8 @@ export function useVoice(
         // The failed first try ends too — a retry is already on its way, so
         // this 'end' must not close the listen.
         if (retrying.current) return
+        // Ended on silence in a conversation: listen again, quietly.
+        if (untilCancel.current && live.current && !latest.current.trim() && keepGoing()) return
         listening.current = false
         if (live.current) chime('stop')
         setState('idle')
@@ -310,7 +337,7 @@ export function useVoice(
     }
   }, [goLive, short])
 
-  const start = useCallback(async (opts?: { quiet?: boolean }) => {
+  const start = useCallback(async (opts?: { quiet?: boolean; untilCancel?: boolean }) => {
     const m = speech()
     if (!m) return
     // A cancel() that lands while we're still awaiting permissions must win:
@@ -318,6 +345,8 @@ export function useVoice(
     // (owner, 2026-11: "Ei Roof", close the sheet, it kept listening).
     const gen = ++startGen.current
     quietStart.current = opts?.quiet === true
+    untilCancel.current = opts?.untilCancel === true
+    quickRestarts.current = 0
     opening.current = true
     // Was this the first time? Then the OS just showed its permission alerts,
     // and the app is still coming back from them — wait for it to be active

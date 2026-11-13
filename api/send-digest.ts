@@ -302,7 +302,74 @@ function latestPerKey(events: PetEvent[]): PetEvent[] {
   return out
 }
 
+// ?action=doc-thumb — a picture of a PDF document's first page (owner,
+// 2026-11-13: a PDF picked from Files had no thumbnail, only a placeholder —
+// the phones have no PDF renderer). Called by the app after a PDF upload and
+// to backfill older PDFs. Runs entirely as the CALLER (their JWT): RLS decides
+// whether they can see the documents row and read the file, and the storage
+// policy whether they can write under that household's prefix — no service
+// role. Writes the same two objects the phone writes for an image:
+// <household>/thumbs/<uuid>.jpg (320 px) and <household>/previews/<uuid>.jpg
+// (1240 px). Lives here only because Hobby caps us at 12 functions; the
+// renderer (pdfjs + @napi-rs/canvas) is imported lazily so the cron path
+// never loads it.
+async function docThumb(req: any, res: any) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'method' })
+  const url = process.env.VITE_SUPABASE_URL
+  const anon = process.env.VITE_SUPABASE_ANON_KEY
+  const jwt = String(req.headers?.authorization ?? '').replace(/^Bearer /, '')
+  if (!url || !anon || !jwt) return res.status(401).json({ error: 'auth' })
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body ?? {})
+  const path = String(body.path ?? '')
+  const m = /^([0-9a-f-]{36})\/(?:.+\/)?([^/]+)\.pdf$/i.exec(path)
+  if (!m) return res.status(400).json({ error: 'path' })
+  const db = createClient(url, anon, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${jwt}` } } })
+  const { data: row } = await db.from('documents').select('id').eq('file_path', path).maybeSingle()
+  if (!row) return res.status(404).json({ error: 'not_found' })
+  const { data: file, error: dlErr } = await db.storage.from('documents').download(path)
+  if (dlErr || !file) return res.status(404).json({ error: 'not_found' })
+  if (file.size > 20 * 1024 * 1024) return res.status(413).json({ error: 'too_big' })
+
+  try {
+    const { createCanvas } = await import('@napi-rs/canvas')
+    // Import the worker up front so the bundler ships it (pdfjs otherwise
+    // loads it by a path the file tracer can't see).
+    // @ts-expect-error -- the worker ships no type declarations
+    const worker = await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+    ;(globalThis as any).pdfjsWorker = worker
+    const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false, disableFontFace: true }).promise
+    const page = await doc.getPage(1)
+    const base = page.getViewport({ scale: 1 })
+    const render = async (width: number, quality: number) => {
+      const vp = page.getViewport({ scale: width / base.width })
+      const canvas = createCanvas(Math.ceil(vp.width), Math.ceil(vp.height))
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      await page.render({ canvasContext: ctx, viewport: vp, canvas }).promise
+      return canvas.encode('jpeg', quality)
+    }
+    const household = m[1]
+    const name = m[2]
+    const opts = { contentType: 'image/jpeg', cacheControl: '604800', upsert: true }
+    const preview = await render(1240, 72)
+    const thumb = await render(320, 60)
+    const up = await Promise.all([
+      db.storage.from('documents').upload(`${household}/thumbs/${name}.jpg`, thumb, opts),
+      db.storage.from('documents').upload(`${household}/previews/${name}.jpg`, preview, opts),
+    ])
+    await doc.destroy()
+    if (up.some((u) => u.error)) return res.status(500).json({ error: 'upload' })
+    return res.status(200).json({ ok: true })
+  } catch (e) {
+    console.error('doc-thumb', e)
+    return res.status(422).json({ error: 'render' })
+  }
+}
+
 export default async function handler(req: any, res: any) {
+  if (String(req.query?.action ?? '') === 'doc-thumb') return docThumb(req, res)
   // Only Vercel Cron (which sends the secret) may run this.
   const secret = process.env.CRON_SECRET
   // Unset secret still fails closed; the compare itself is constant-time.

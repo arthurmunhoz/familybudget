@@ -40,11 +40,12 @@ import { biometricAvailable, isVaultLockEnabled, setVaultLockEnabled } from '@/l
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { CATEGORIES, CAT_COLOR, CAT_LUCIDE, formatBytes, isImageDoc, previewPathFor, thumbPathFor } from './docUtils'
 import { DocCards } from './DocCards'
-import { pickFile, scanDocument } from './docPicker'
+import { makePdfThumb, pickFile, scanDocument } from './docPicker'
 import UploadSheet, { type PickedFile } from './UploadSheet'
 import EditSheet from './EditSheet'
 
 const VIEW_KEY = 'docs:view'
+const isPdfDoc = (d: FamilyDocument) => d.mime_type === 'application/pdf' || /\.pdf$/i.test(d.file_path)
 
 export default function DocumentVault() {
   const { c, dark } = useTheme()
@@ -62,13 +63,42 @@ export default function DocumentVault() {
   const [opening, setOpening] = useState<string | null>(null)
   // List (grouped rows) or one document at a time, large — per device.
   const [view, setView] = useState<'list' | 'cards'>('list')
+  const pageRef = useRef<ScrollView>(null)
+  const pageH = useRef(0)
+  /** Until when a card layout should still scroll it into view: the rows
+   *  above settle a beat after the first layout (filters, counts). */
+  const fitUntil = useRef(0)
+  /** A fit was asked for; its window starts at the cards' FIRST layout (the
+   *  documents may still be loading — behind the vault, say — when asked). */
+  const fitPending = useRef(false)
   useEffect(() => {
     void AsyncStorage.getItem(VIEW_KEY)
-      .then((v) => v === 'cards' && setView('cards'))
+      .then((v) => {
+        if (v !== 'cards') return
+        fitPending.current = true
+        setView('cards')
+      })
       .catch(() => {})
   }, [])
+  // Switching to one-at-a-time scrolls the page so the whole card — title,
+  // picture and the "1 of 12" counter — sits in view (owner, 2026-11-13: it
+  // opened cut off below the filters). Done once the cards have laid out.
+  function onCardsLayout(y: number, h: number) {
+    if (fitPending.current) {
+      fitPending.current = false
+      fitUntil.current = Date.now() + 1500
+    }
+    if (Date.now() > fitUntil.current || !pageH.current) return
+    const bottom = y + h + sp.lg - pageH.current
+    const to = Math.max(0, Math.min(bottom, y - sp.sm))
+    // A beat later: in the same pass the scroller may not know its new content
+    // height yet and would clamp the scroll short.
+    if (to > 0) setTimeout(() => pageRef.current?.scrollTo({ y: to, animated: true }), 80)
+  }
   function switchView() {
     const next = view === 'list' ? 'cards' : 'list'
+    fitPending.current = next === 'cards'
+    fitUntil.current = 0
     setView(next)
     void AsyncStorage.setItem(VIEW_KEY, next).catch(() => {})
   }
@@ -144,6 +174,7 @@ export default function DocumentVault() {
   // missing thumb is detected, so no `documents` column is needed.
   // The "one at a time" view also asks for each doc's larger PREVIEW.
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
+  const pdfTried = useRef(new Set<string>())
   const thumbKey = docs.map((d) => d.id).join(',') + view
   useEffect(() => {
     if (!docs.length) return
@@ -154,8 +185,24 @@ export default function DocumentVault() {
       ...(view === 'cards' ? [previewPathFor(d.file_path)] : []),
     ])
     getSignedUrls(paths)
-      .then((urls) => {
-        if (active) setThumbs(urls)
+      .then(async (urls) => {
+        if (!active) return
+        setThumbs(urls)
+        // PDFs with no picture yet (picked from Files — the phone can't
+        // render one): ask the server to draw the first page, a few at a
+        // time, once per doc per visit, then fetch the new pictures.
+        const missing = docs.filter(
+          (d) => isPdfDoc(d) && !urls[thumbPathFor(d.file_path)] && !pdfTried.current.has(d.file_path),
+        )
+        let made = false
+        for (const d of missing.slice(0, 6)) {
+          if (!active) return
+          pdfTried.current.add(d.file_path)
+          if (await makePdfThumb(d.file_path)) made = true
+        }
+        if (!made || !active) return
+        const again = await getSignedUrls(paths)
+        if (active) setThumbs(again)
       })
       .catch(() => {})
     return () => {
@@ -310,7 +357,12 @@ export default function DocumentVault() {
       {loading ? (
         <Loader />
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.lg }}>
+        <ScrollView
+          ref={pageRef}
+          onLayout={(e) => (pageH.current = e.nativeEvent.layout.height)}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.lg }}
+        >
           <Txt style={s.bigTitle}>{t('docs.title')}</Txt>
           <Txt style={[s.bigTitle, { color: c.textFaint }]}>
             {visible.length === 1 ? t('docs.countOne') : t('docs.countMany', { n: visible.length })}
@@ -389,6 +441,7 @@ export default function DocumentVault() {
           {visible.length === 0 ? (
             <EmptyState title={t('docs.empty')} subtitle={t('docs.emptyHint')} />
           ) : view === 'cards' ? (
+            <View onLayout={(e) => onCardsLayout(e.nativeEvent.layout.y, e.nativeEvent.layout.height)}>
             <DocCards
               docs={groups.flatMap((g) => g.docs)}
               urls={thumbs}
@@ -397,6 +450,7 @@ export default function DocumentVault() {
               onOpen={(d) => void openDoc(d)}
               onEdit={setEditing}
             />
+            </View>
           ) : (
             groups.map((group) => {
               const Icon = CAT_LUCIDE[group.cat] ?? FileText

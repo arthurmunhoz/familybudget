@@ -70,6 +70,7 @@ this doc is the contract for every agent that follows you.
 api/scan-receipt.ts        Receipt photo → structured entry (Claude vision)
 api/scan-bill.ts           Itemized bill photo → line items + tax/tip (Claude vision)
 api/send-digest.ts         Daily Vercel-Cron push digest (pets + dates)
+                           + ?action=doc-thumb: a PDF's first page → its thumb/preview JPEGs
 api/send-ping.ts         Push a household ping to everyone but the sender
 api/suggest-ping.ts      Free text → {kind,emoji,message} ping (Claude)
 api/widget.ts            iOS Home-Screen widget backend, per-device token (not a session).
