@@ -1,6 +1,6 @@
 // Modo Casa — the whole web app now (owner, 2026-11): a spare device at home
 // becomes the family's hub. No session → pairing; signed in → the hub.
-// Light/dark follow the system; the screen stays awake where the browser
+// Light/dark per Settings (system by default); the screen stays awake where the browser
 // lets us (Wake Lock API).
 import { useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
@@ -9,19 +9,27 @@ import { useTheme } from '../hooks/useTheme'
 import { supabase } from '../lib/supabase'
 import Hub from './Hub'
 import Pairing, { HomeArt } from './Pairing'
+import { usePrefs } from './prefs'
 import { useDeviceWatch } from './session'
 import { DEVICE_KEY, GRAD, grad, lsSet } from './util'
 import './casa.css'
 
-function useSystemTheme() {
+/** Light / dark per the device's Settings choice: Automático follows the
+ *  system (and its changes), Claro / Escuro pin it. */
+function useCasaTheme() {
   const { setTheme } = useTheme()
+  const { theme } = usePrefs()
   useEffect(() => {
+    if (theme !== 'auto') {
+      setTheme(theme)
+      return
+    }
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const apply = () => setTheme(mq.matches ? 'dark' : 'light')
     apply()
     mq.addEventListener('change', apply)
     return () => mq.removeEventListener('change', apply)
-  }, [setTheme])
+  }, [setTheme, theme])
 }
 
 type WakeLockSentinel = { release: () => Promise<void> }
@@ -50,7 +58,7 @@ function useKeepAwake(on: boolean) {
 export default function ModoCasa() {
   const { session, profile, loading, profileLoaded } = useAuth()
   const { t } = useI18n()
-  useSystemTheme()
+  useCasaTheme()
   useDeviceWatch(!!session)
   useKeepAwake(!!session && !!profile)
 

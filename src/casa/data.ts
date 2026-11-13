@@ -11,6 +11,7 @@ import { getSignedUrls } from '../lib/signedUrls'
 import { supabase } from '../lib/supabase'
 import type {
   CalendarEvent,
+  MemberProfile,
   Pet,
   PetCareTask,
   PetEvent,
@@ -26,6 +27,8 @@ export interface Member {
   first: string
   color: string
   avatar: string | null
+  /** Their Family-app profile (birthday, phone, sizes…), when filled in. */
+  profile: MemberProfile | null
 }
 
 export interface HubData {
@@ -59,7 +62,7 @@ async function loadHub(householdId: string, fallback: { email: string; display_n
   const [hh, mem, prof, ev, open, checked, stores, pets, tasks, done, petEv] = await Promise.all([
     supabase.from('households').select('name').eq('id', householdId).maybeSingle(),
     supabase.from('household_members').select('email, display_name, joined_at').eq('household_id', householdId).order('joined_at'),
-    supabase.from('member_profiles').select('email, avatar_path'),
+    supabase.from('member_profiles').select('*'),
     supabase.from('calendar_events').select('*'),
     supabase.from('shopping_items').select('*').eq('checked', false).order('created_at'),
     supabase.from('shopping_items').select('*').eq('checked', true).order('checked_at', { ascending: false }).limit(40),
@@ -72,9 +75,8 @@ async function loadHub(householdId: string, fallback: { email: string; display_n
   const roster: { email: string; display_name: string }[] =
     !mem.error && mem.data?.length ? (mem.data as { email: string; display_name: string }[]) : fallback
   const emails = roster.map((r) => r.email)
-  const avatarRows = ((prof.data ?? []) as { email: string; avatar_path: string | null }[]).filter(
-    (p) => p.avatar_path && emails.includes(p.email),
-  )
+  const profRows = ((prof.data ?? []) as MemberProfile[]).filter((p) => emails.includes(p.email))
+  const avatarRows = profRows.filter((p) => p.avatar_path)
   const petRows = (pets.data ?? []) as Pet[]
   const paths = [
     ...avatarRows.map((p) => p.avatar_path as string),
@@ -92,6 +94,7 @@ async function loadHub(householdId: string, fallback: { email: string; display_n
         first: firstName(name),
         color: memberColor(r.email, emails),
         avatar: a ? (urls[a] ?? null) : null,
+        profile: profRows.find((p) => p.email === r.email) ?? null,
       }
     }),
     events: (ev.data ?? []) as CalendarEvent[],
@@ -132,7 +135,7 @@ export function useHubData() {
       }, 400)
     }
     const ch = supabase.channel(`casa-${hid}`)
-    for (const table of ['shopping_items', 'shopping_stores', 'calendar_events', 'pet_task_done', 'pet_events', 'pets', 'pet_care_tasks']) {
+    for (const table of ['shopping_items', 'shopping_stores', 'calendar_events', 'pet_task_done', 'pet_events', 'pets', 'pet_care_tasks', 'member_profiles']) {
       ch.on('postgres_changes', { event: '*', schema: 'public', table }, soon)
     }
     ch.subscribe()

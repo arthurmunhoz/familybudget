@@ -1,12 +1,13 @@
-// Modo Casa — the two small sheets: this device's settings (weather city,
-// unit, language, unpair) and the calm "about Plus" note (no web checkout:
+// Modo Casa — the two small sheets: this device's settings (display mode,
+// theme, idle photo frame, weather city, unit, language, unpair) and the calm "about Plus" note (no web checkout:
 // it points to the phone app).
 import { forwardRef, useState } from 'react'
-import { Check, LogOut, MapPin, Smartphone, Sparkles, X } from 'lucide-react'
+import { Check, LayoutGrid, LogOut, MapPin, Monitor, Moon, PanelsTopLeft, Smartphone, Sparkles, Sun, X, type LucideIcon } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import { LANGUAGES } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
 import { geocodeCity, saveHomeLocation, loadHomeLocation, type TempUnit } from '../lib/weather'
+import { setPrefs, usePrefs, type FrameIdle, type LayoutPref, type ThemePref } from './prefs'
 import { Grow, IconChip, type GrowHandle } from './ui'
 import { DEVICE_KEY, GRAD, grad, lsSet } from './util'
 
@@ -18,6 +19,7 @@ export const SettingsSheet = forwardRef<
   const [city, setCity] = useState(() => loadHomeLocation()?.city ?? '')
   const [state, setState] = useState<'idle' | 'busy' | 'ok' | 'bad'>('idle')
   const [confirm, setConfirm] = useState(false)
+  const prefs = usePrefs()
 
   async function saveCity() {
     if (!city.trim()) {
@@ -46,6 +48,14 @@ export const SettingsSheet = forwardRef<
   const pill = (on: boolean) =>
     `casa-press h-14 rounded-full px-6 text-[1.1rem] font-semibold ${on ? 'text-white' : 'bg-(--surface)'}`
 
+  const h3 = 'mb-3 text-[0.95rem] font-semibold uppercase tracking-[0.16em] text-(--text-faint)'
+  const choice = <T extends string | number>(value: T, cur: T, label: string, set: (v: T) => void, Icon?: LucideIcon) => (
+    <button key={String(value)} onClick={() => set(value)} className={`${pill(cur === value)} inline-flex items-center gap-2`} style={cur === value ? { background: grad(GRAD.orb) } : undefined}>
+      {Icon ? <Icon size={20} aria-hidden /> : null}
+      {label}
+    </button>
+  )
+
   return (
     <Grow ref={ref} origin={origin} onBackdrop={onClose} radius={36} className="top-6 right-6 bottom-6 w-[min(560px,calc(100vw-48px))] bg-(--bg)">
       <div className="casa-scroll flex h-full flex-col gap-7 p-8">
@@ -57,7 +67,45 @@ export const SettingsSheet = forwardRef<
         </header>
 
         <section>
-          <h3 className="mb-3 text-[0.95rem] font-semibold uppercase tracking-[0.16em] text-(--text-faint)">{t('casa.settings.weather')}</h3>
+          <h3 className={h3}>{t('casa.settings.display')}</h3>
+          <div className={row}>
+            {(
+              [
+                ['panel', t('casa.settings.layoutPanel'), PanelsTopLeft],
+                ['widgets', t('casa.settings.layoutWidgets'), LayoutGrid],
+              ] as const
+            ).map(([v, l, I]) => choice<LayoutPref>(v, prefs.layout, l, (x) => setPrefs({ layout: x }), I))}
+          </div>
+          <p className="mt-2 text-[0.95rem] text-(--text-muted)">
+            {prefs.layout === 'panel' ? t('casa.settings.layoutPanelHint') : t('casa.settings.layoutWidgetsHint')}
+          </p>
+        </section>
+
+        <section>
+          <h3 className={h3}>{t('casa.settings.theme')}</h3>
+          <div className={row}>
+            {(
+              [
+                ['auto', t('casa.settings.themeAuto'), Monitor],
+                ['light', t('casa.settings.themeLight'), Sun],
+                ['dark', t('casa.settings.themeDark'), Moon],
+              ] as const
+            ).map(([v, l, I]) => choice<ThemePref>(v, prefs.theme, l, (x) => setPrefs({ theme: x }), I))}
+          </div>
+        </section>
+
+        <section>
+          <h3 className={h3}>{t('casa.settings.frame')}</h3>
+          <div className={row}>
+            {([0, 5, 15, 30] as const).map((v) =>
+              choice<FrameIdle>(v, prefs.frameIdle, v ? t('casa.settings.frameMin', { count: v }) : t('casa.settings.frameOff'), (x) => setPrefs({ frameIdle: x })),
+            )}
+          </div>
+          <p className="mt-2 text-[0.95rem] text-(--text-muted)">{t('casa.settings.frameHint')}</p>
+        </section>
+
+        <section>
+          <h3 className={h3}>{t('casa.settings.weather')}</h3>
           <form
             className="flex gap-3"
             onSubmit={(e) => {
@@ -93,7 +141,7 @@ export const SettingsSheet = forwardRef<
         </section>
 
         <section>
-          <h3 className="mb-3 text-[0.95rem] font-semibold uppercase tracking-[0.16em] text-(--text-faint)">{t('casa.settings.language')}</h3>
+          <h3 className={h3}>{t('casa.settings.language')}</h3>
           <div className={row}>
             {LANGUAGES.map((l) => (
               <button key={l.id} onClick={() => setLang(l.id)} className={pill(lang === l.id)} style={lang === l.id ? { background: grad(GRAD.orb) } : undefined}>
@@ -103,7 +151,7 @@ export const SettingsSheet = forwardRef<
           </div>
         </section>
 
-        <section className="mt-auto">
+        <section className="mt-auto pt-2">
           {confirm ? (
             <div className="casa-fade rounded-[24px] bg-(--surface) p-5">
               <p className="text-[1.15rem]">{t('casa.settings.unpairConfirm')}</p>

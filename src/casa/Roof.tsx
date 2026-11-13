@@ -45,6 +45,7 @@ export default function Roof({
   onOpenPanel,
   onLocked,
   hidden,
+  onOpenChange,
 }: {
   data: HubData
   full: boolean
@@ -55,6 +56,8 @@ export default function Roof({
   onLocked: () => void
   /** A panel is open: don't take the call (it would open over it). */
   hidden: boolean
+  /** Roof's full view opened/closed (the hub holds the photo frame meanwhile). */
+  onOpenChange?: (open: boolean) => void
 }) {
   const { t, lang } = useI18n()
   const supported = speechSupported()
@@ -77,6 +80,9 @@ export default function Roof({
   const viaVoice = useRef(false)
   const closing = useRef(false)
   const armed = full && supported && !muted && !hidden
+  const openCb = useRef(onOpenChange)
+  openCb.current = onOpenChange
+  useEffect(() => openCb.current?.(open), [open])
 
   const envRef = useRef<AskEnv | null>(null)
   envRef.current = { t, lang, today, data, me, history: history.current, refresh }
