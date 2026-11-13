@@ -26,7 +26,7 @@ import { RoofDock, ROOF_DOCK_H } from './home/RoofDock'
 import { FamilyStrip } from './home/FamilyStrip'
 import { useRoofPrefs } from '../lib/roof'
 import { turnOnRoofWake, useRoofWake } from '../lib/roofWake'
-import { voiceSupported } from '../lib/voice'
+import { playChime, voiceSupported } from '../lib/voice'
 import { usePlus } from '../lib/plus'
 import { APP_GRADIENT } from './home/palette'
 import { GradientBox } from './home/GradientBox'
@@ -302,6 +302,8 @@ export default function Hub() {
           if (wakeHeard.trim()) setAskSeed(wakeHeard.trim())
         }}
         onClose={() => {
+          // Closed while "Ei Roof" was still capturing: say it stopped.
+          if (wakeCapture) playChime('stop')
           setAsking(false)
           setWakeCapture(false)
           setWakeEpoch((e) => e + 1)

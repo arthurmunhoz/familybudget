@@ -331,6 +331,8 @@ export function AskSheet({
   const voice = useVoice(
     lang,
     (heard) => {
+      // A listen that finished after the sheet closed is dropped, never sent.
+      if (!openRef.current) return
       viaVoice.current = true
       void submitRef.current?.(heard)
     },
@@ -407,12 +409,21 @@ export function AskSheet({
     return () => clearTimeout(id)
   }, [listen, autoListen])
 
+  // Hidden by any route (backdrop, drag, back, the Home closing it): the mic
+  // and Roof's voice stop too.
+  useEffect(() => {
+    if (visible) return
+    cancelVoice()
+    roofHush()
+  }, [visible, cancelVoice])
+
   // A bare "Ei Roof" whose recogniser stopped at the pause: keep listening
   // here, without a second chime, and show it as listening from the start.
   const lastContinue = useRef(continueListening)
   useEffect(() => {
     if (!continueListening || continueListening === lastContinue.current) return
     lastContinue.current = continueListening
+    if (!openRef.current) return
     viaVoice.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the Home's hand-off
     setQuiet(true)

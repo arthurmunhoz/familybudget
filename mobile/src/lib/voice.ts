@@ -213,6 +213,10 @@ export function useVoice(
   const begin = useRef<(() => void) | null>(null)
   const fallback = useRef<ReturnType<typeof setTimeout> | null>(null)
   const quietStart = useRef(false)
+  /** Bumped by every start and cancel; a start that's been overtaken stops. */
+  const startGen = useRef(0)
+  /** start() is awaiting permissions / the app — not listening yet. */
+  const opening = useRef(false)
   const goLive = useCallback(() => {
     if (fallback.current) clearTimeout(fallback.current)
     fallback.current = null
@@ -306,7 +310,12 @@ export function useVoice(
   const start = useCallback(async (opts?: { quiet?: boolean }) => {
     const m = speech()
     if (!m) return
+    // A cancel() that lands while we're still awaiting permissions must win:
+    // otherwise the mic opened AFTER the sheet closed and answered silence
+    // (owner, 2026-11: "Ei Roof", close the sheet, it kept listening).
+    const gen = ++startGen.current
     quietStart.current = opts?.quiet === true
+    opening.current = true
     // Was this the first time? Then the OS just showed its permission alerts,
     // and the app is still coming back from them — wait for it to be active
     // (plus a beat for the audio session) before opening the microphone. Doing
@@ -315,15 +324,22 @@ export function useVoice(
     const before = await m.getPermissionsAsync?.().catch(() => null)
     const perm = await m.requestPermissionsAsync()
     if (!perm.granted) {
+      opening.current = false
       setState('denied')
       return
     }
     const justAsked = !before?.granted
+    if (gen !== startGen.current) return
     setState('starting')
     if (justAsked) {
       await whenActive()
       await sleep(350)
     }
+    if (gen !== startGen.current) {
+      setState('idle')
+      return
+    }
+    opening.current = false
     latest.current = ''
     alts.current = []
     segments.current = { done: '', current: '' }
@@ -372,11 +388,20 @@ export function useVoice(
    *  Plays the stop chime (when listening had gone live) so closing mid-listen
    *  sounds like it stopped, because it did. */
   const cancel = useCallback(() => {
+    startGen.current++
     if (fallback.current) clearTimeout(fallback.current)
     retrying.current = false
-    if (!listening.current) return
+    if (!listening.current) {
+      // Still opening (a quiet start carrying on from "Ei Roof", whose chime
+      // the user heard): it stops now, so say so.
+      if (quietStart.current && opening.current) chime('stop')
+      opening.current = false
+      setState('idle')
+      return
+    }
+    opening.current = false
     listening.current = false
-    if (live.current) chime('stop')
+    if (live.current || quietStart.current) chime('stop')
     setState('idle')
     speech()?.abort()
   }, [])
