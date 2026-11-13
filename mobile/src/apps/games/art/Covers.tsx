@@ -111,41 +111,50 @@ export function BattleshipCover() {
 }
 
 /** Quiz: a big round buzzer with question bubbles popping around it. */
+/** The quiz in pt is "Tortada" (owner, 2026-11-13): a cream pie flying at a
+ *  splat, strawberry on top. Original art. */
 export function QuizCover() {
-  const bob = useBob(1800, 3)
+  const bob = useBob(1500, 4)
   return (
     <>
       <Svg viewBox={VB} style={StyleSheet.absoluteFill}>
-        <G fill="rgba(255,255,255,0.9)">
-          <Circle cx={64} cy={52} r={18} />
-          <Path d="M58 66 L52 80 L70 68 Z" />
+        {/* the splat it's headed for */}
+        <G>
+          <Path
+            d="M236 58 Q252 40 268 56 Q290 50 288 74 Q306 86 290 102 Q296 124 272 120 Q262 140 244 124 Q222 132 222 110 Q204 98 220 84 Q214 62 236 58 Z"
+            fill="#FFF8EE"
+          />
+          <Circle cx={300} cy={60} r={6} fill="#FFF8EE" />
+          <Circle cx={210} cy={130} r={5} fill="#FFF8EE" />
+          <Circle cx={298} cy={128} r={4} fill="#FFF8EE" />
+          <Circle cx={262} cy={86} r={6} fill="#E8384F" />
+          <Circle cx={244} cy={104} r={3.5} fill="#C7873F" />
+          <Circle cx={276} cy={106} r={3} fill="#C7873F" />
+          <Ellipse cx={246} cy={70} rx={10} ry={4} fill="#fff" />
         </G>
-        <SvgText x={64} y={59} fontSize={20} fontWeight="900" fill="#6E3FD8" textAnchor="middle">
-          ?
-        </SvgText>
-        <G fill="rgba(255,255,255,0.75)">
-          <Circle cx={262} cy={46} r={13} />
-        </G>
-        <SvgText x={262} y={52} fontSize={15} fontWeight="900" fill="#6E3FD8" textAnchor="middle">
-          !
-        </SvgText>
-        <G stroke="#fff" strokeWidth={3} strokeLinecap="round" opacity={0.7}>
-          <Path d="M110 70 L122 80 M208 70 L196 80 M160 46 V58" />
+        {/* motion lines */}
+        <G stroke="#fff" strokeWidth={4} strokeLinecap="round" opacity={0.65}>
+          <Path d="M28 74 H70 M18 96 H64 M30 118 H72" />
         </G>
       </Svg>
       <Animated.View style={[StyleSheet.absoluteFill, bob]}>
         <Svg viewBox={VB} style={StyleSheet.absoluteFill}>
           <Defs>
-            <LinearGradient id="cvBuzz" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor="#FF8A8A" />
-              <Stop offset="1" stopColor="#E8405C" />
+            <LinearGradient id="cvTin" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#F1F4F7" />
+              <Stop offset="1" stopColor="#A9B3BE" />
             </LinearGradient>
           </Defs>
-          <Ellipse cx={160} cy={150} rx={62} ry={14} fill="rgba(255,255,255,0.9)" />
-          <Rect x={104} y={128} width={112} height={22} rx={8} fill="#fff" />
-          <Ellipse cx={160} cy={118} rx={42} ry={22} fill="#C9304C" />
-          <Ellipse cx={160} cy={110} rx={42} ry={22} fill="url(#cvBuzz)" />
-          <Ellipse cx={148} cy={103} rx={14} ry={5} fill="rgba(255,255,255,0.55)" />
+          <G transform="rotate(-10 140 100)">
+            <Path d="M86 112 L194 112 L184 140 Q140 150 96 140 Z" fill="url(#cvTin)" />
+            <Ellipse cx={140} cy={112} rx={57} ry={13} fill="#D9A15B" />
+            <Ellipse cx={140} cy={109} rx={52} ry={10} fill="#C7873F" />
+            <Path d="M92 106 Q90 80 112 76 Q118 58 140 62 Q162 56 170 76 Q192 80 188 106 Z" fill="#FFFDF8" />
+            <Path d="M104 96 Q118 84 132 94 Q146 84 160 94 Q172 86 180 96" stroke="#EADBC6" strokeWidth={4} fill="none" strokeLinecap="round" />
+            <Circle cx={140} cy={56} r={11} fill="#E8384F" />
+            <Path d="M134 47 Q140 41 146 47" stroke="#3DAA5B" strokeWidth={4} fill="none" strokeLinecap="round" />
+            <Ellipse cx={122} cy={76} rx={9} ry={3.5} fill="#fff" />
+          </G>
         </Svg>
       </Animated.View>
     </>

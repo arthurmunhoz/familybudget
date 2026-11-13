@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- bundled sounds + lazily-loaded native modules (see header) */
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-export type GameSound = 'tap' | 'pop' | 'ready' | 'hit' | 'miss' | 'turn' | 'start' | 'win' | 'lose' | 'trophy' | 'splash' | 'boom' | 'sink' | 'whoosh' | 'buzzer' | 'correct' | 'wrong' | 'tick' | 'applause'
+export type GameSound = 'tap' | 'pop' | 'ready' | 'hit' | 'miss' | 'turn' | 'start' | 'win' | 'lose' | 'trophy' | 'splash' | 'boom' | 'sink' | 'whoosh' | 'buzzer' | 'correct' | 'wrong' | 'tick' | 'applause' | 'splat'
 
 const FILES: Record<GameSound, number> = {
   tap: require('../../../assets/sounds/games/tap.wav'),
@@ -31,6 +31,7 @@ const FILES: Record<GameSound, number> = {
   wrong: require('../../../assets/sounds/games/wrong.wav'),
   tick: require('../../../assets/sounds/games/tick.wav'),
   applause: require('../../../assets/sounds/games/applause.wav'),
+  splat: require('../../../assets/sounds/games/splat.wav'),
 }
 
 interface Player {
@@ -99,6 +100,13 @@ function pool(name: GameSound) {
   const existing = pools.get(name)
   if (existing) return existing
   try {
+    // Native side first: requiring expo-audio on a binary without it throws
+    // at module load (a red box in development).
+    const { requireOptionalNativeModule } = require('expo-modules-core')
+    if (!requireOptionalNativeModule('ExpoAudio')) {
+      audioOk = false
+      return null
+    }
     const audio = require('expo-audio')
     if (audioOk === null) {
       // Play alongside music/podcasts and respect the silent switch.

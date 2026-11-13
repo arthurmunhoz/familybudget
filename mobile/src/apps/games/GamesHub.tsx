@@ -299,7 +299,12 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
   const [busy, setBusy] = useState(false)
   return (
     <Modal visible={!!game} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('common.cancel')} />
+      {/* The dim covers the WHOLE screen, sheet included: ending it where the
+          sheet starts left the page showing, undimmed, beside the sheet's
+          rounded corners — a light band that read as a broken shadow
+          (owner, 2026-11-13). */}
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={onClose} accessibilityLabel={t('common.cancel')} />
       <View style={[styles.sheet, { backgroundColor: c.sheet, paddingBottom: gap }]}>
         <View style={[styles.grabber, { backgroundColor: c.border }]} />
         {game ? (
@@ -372,6 +377,7 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
           }}
           curveBottom
         />
+      </View>
       </View>
     </Modal>
   )

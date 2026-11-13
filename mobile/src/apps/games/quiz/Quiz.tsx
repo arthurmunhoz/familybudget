@@ -32,6 +32,7 @@ import { useMembers } from '../members'
 import { GameBtn } from '../shared'
 import { Buzzer, CountdownRing } from './Buzzer'
 import { AttemptFlash } from './AttemptFlash'
+import { PieSplat } from './PieSplat'
 import { QuestionCard } from './QuestionCard'
 
 /** Seconds left on the server's clock for `deadline`, ticking every 100 ms. */
@@ -57,6 +58,7 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
   const gap = useBottomGap(sp.sm)
   const st = session.state as unknown as QuizState
   const myTeam = (players.find((p) => p.email === me)?.team ?? 'A') as Team
+  const teamOf = (email: string) => (players.find((p) => p.email === email)?.team ?? null) as Team | null
   const { left, now: secondsLeftNow } = useCountdown(st.deadline, st.now)
   const phase = st.phase
   const locked = (st.locked ?? []).includes(me)
@@ -66,7 +68,7 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
   const [firstAttempt] = useState(st.last?.at)
   const total = phase === 'answering' ? 15 : phase === 'reveal' ? 6 : 25
 
-  useEffect(() => preloadSounds(['buzzer', 'correct', 'wrong', 'tick', 'ready', 'win', 'miss', 'tap']), [])
+  useEffect(() => preloadSounds(['buzzer', 'correct', 'wrong', 'tick', 'ready', 'win', 'miss', 'tap', 'whoosh', 'splat']), [])
 
   // Deadline passed → ask the server to move on (once per deadline).
   const ticked = useRef('')
@@ -196,6 +198,11 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
       <Confetti fire={confetti} colors={TEAM_CONFETTI[myTeam]} />
       {st.last && st.last.at !== firstAttempt ? (
         <AttemptFlash key={st.last.at} text={st.last.text} correct={st.last.correct} timeout={st.last.timeout} name={name(st.last.email)} />
+      ) : null}
+      {/* The pie (owner, 2026-11-13): your team answered wrong, or the other
+          team got it right — it's your face. A beat after the word shows. */}
+      {st.last && st.last.at !== firstAttempt && (teamOf(st.last.email) === myTeam ? !st.last.correct : st.last.correct) ? (
+        <DelayedPie key={`pie-${st.last.at}`} />
       ) : null}
     </KeyboardAvoidingView>
   )
@@ -384,3 +391,13 @@ const styles = StyleSheet.create({
   capsule: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 58, borderRadius: 22, borderWidth: 1.5, paddingLeft: 16, paddingRight: 7, alignSelf: 'stretch' },
   capsuleBtn: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
 })
+
+/** The pie, after a beat (the attempt's word shows first). */
+function DelayedPie() {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setOn(true), 550)
+    return () => clearTimeout(id)
+  }, [])
+  return on ? <PieSplat /> : null
+}

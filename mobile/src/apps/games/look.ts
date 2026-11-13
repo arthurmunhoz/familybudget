@@ -22,7 +22,8 @@ export const TEAM_CONFETTI: Record<Team, string[]> = {
 export const COVER = {
   hangman: ['#FF9B6A', '#D9466F'] as Gradient,
   battleship: ['#38C6F5', '#2563D9'] as Gradient,
-  quiz: ['#B57CFF', '#6E3FD8'] as Gradient,
+  // Strawberry cream for the pie quiz (Tortada in pt, 2026-11-13).
+  quiz: ['#FF86B6', '#E2457E'] as Gradient,
 }
 
 /** Pieces of the hangman house = wrong guesses allowed (server: max_wrong). */
