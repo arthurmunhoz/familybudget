@@ -12,6 +12,7 @@ import type { HubData } from './data'
 import { chime, speak, stopSpeaking, tick } from './sound'
 import { CheckMark, Grow, Orb, PlusTag, type GrowHandle } from './ui'
 import { isGoodbye, RoofEars, speechSupported, type EarsState } from './wake'
+import { Capabilities, isCapabilitiesAsk, nextTip, type Tip } from './roofTips'
 import WhoPicker from './WhoPicker'
 import { GRAD, grad, lsGet, lsSet } from './util'
 
@@ -35,6 +36,7 @@ type Stage =
   | { k: 'answer'; o: Extract<Outcome, { kind: 'done' }> | { kind: 'bye'; text: string }; follow: boolean }
   | { k: 'pick'; o: Extract<Outcome, { kind: 'pick' }> }
   | { k: 'undone' }
+  | { k: 'caps' }
 
 export default function Roof({
   data,
@@ -73,6 +75,8 @@ export default function Roof({
   const [open, setOpen] = useState(false)
   const [origin, setOrigin] = useState<DOMRect | null>(null)
   const [stage, setStage] = useState<Stage>({ k: 'listen' })
+  // A different suggestion each time Roof opens (roofTips).
+  const [tip, setTip] = useState<Tip>(() => nextTip())
   const [heard, setHeard] = useState('')
   const [text, setText] = useState('')
   const dock = useRef<HTMLDivElement>(null)
@@ -115,6 +119,7 @@ export default function Roof({
 
   const openStage = useCallback((first: Stage) => {
     clearTimer()
+    setTip(nextTip())
     setOrigin(dock.current?.getBoundingClientRect() ?? null)
     setStage(first)
     setHeard('')
@@ -174,6 +179,17 @@ export default function Roof({
       clearTimer()
       if (isGoodbye(q)) {
         await show({ kind: 'bye', text: t('casa.roof.bye') }, q)
+        return
+      }
+      // "What can you do?" — the capabilities screen, right here (nothing spent).
+      if (isCapabilitiesAsk(q)) {
+        history.current = [...history.current, { q, a: 'capabilities' }].slice(-6)
+        setStage({ k: 'caps' })
+        if (viaVoice.current) {
+          earsRef.current?.pause()
+          await speak(t('casa.roof.capsSay'), lang)
+          if (openRef.current && supported && full) earsRef.current?.capture()
+        }
         return
       }
       if (localClose(q)) {
@@ -427,6 +443,8 @@ export default function Roof({
         >
           <RoofStage
             stage={stage}
+            tip={tip}
+            onTry={(p) => void ask(p)}
             heard={heard}
             text={text}
             setText={setText}
@@ -455,6 +473,8 @@ export default function Roof({
 
 function RoofStage({
   stage,
+  tip,
+  onTry,
   heard,
   text,
   setText,
@@ -468,6 +488,8 @@ function RoofStage({
   canListen,
 }: {
   stage: Stage
+  tip: Tip
+  onTry: (text: string) => void
   heard: string
   text: string
   setText: (s: string) => void
@@ -524,9 +546,16 @@ function RoofStage({
                 {heard}
               </p>
             ) : (
-              <p className="font-display text-[clamp(1.5rem,min(4.4vw,7dvh),4rem)] leading-tight text-white/45">
-                {stage.k === 'listen' ? t('casa.roof.example') : t('casa.roof.typeHint')}
-              </p>
+              stage.k === 'listen' ? (
+                <div>
+                  <p className="text-[clamp(1rem,2.6dvh,1.3rem)] text-white/55">{tip.kind === 'help' ? t('casa.roof.helpTip') : t('casa.roof.tryLabel')}</p>
+                  <p className="font-display mt-1 text-[clamp(1.5rem,min(4.4vw,7dvh),4rem)] leading-tight text-white/45">
+                    “{tip.kind === 'help' ? t('casa.roof.capsAsk') : t(tip.key)}”
+                  </p>
+                </div>
+              ) : (
+                <p className="font-display text-[clamp(1.5rem,min(4.4vw,7dvh),4rem)] leading-tight text-white/45">{t('casa.roof.typeHint')}</p>
+              )
             )}
           </div>
         ) : stage.k === 'think' ? (
@@ -538,6 +567,8 @@ function RoofStage({
               <i />
             </span>
           </div>
+        ) : stage.k === 'caps' ? (
+          <Capabilities onTry={onTry} />
         ) : stage.k === 'pick' ? (
           <WhoPicker dark question={stage.o.question} options={stage.o.options} onPick={(id) => onPick(stage.o, id)} onTimeout={onClose} />
         ) : stage.k === 'undone' ? (

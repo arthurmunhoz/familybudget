@@ -134,5 +134,5 @@ def write(name, x, target_peak):
 
 write('dial', dial(), 0.45)
 write('clunk', clunk(), 0.6)
-write('open', door_open(), 0.5)
+write('open', door_open(), 0.75)
 print('vault sounds written to', os.path.normpath(OUT))

@@ -532,6 +532,9 @@ function BudgetCard({
         ) : null}
         <ChevronRight size={22} color="rgba(255,255,255,0.85)" />
       </Pressable>
+      {/* A faint rule under the title: the title row is its own tap target
+          (the budget's page), apart from the balance below (owner, 2026-11-13). */}
+      <View style={{ height: StyleSheet.hairlineWidth * 2, marginTop: -4, backgroundColor: 'rgba(255,255,255,0.22)' }} />
 
       {selected ? (
         <>

@@ -101,6 +101,8 @@ import {
 } from './AnswerViews'
 import { GradientBox } from './GradientBox'
 import { HelpView } from './HelpView'
+import { CapabilitiesView } from './CapabilitiesView'
+import { isCapabilitiesAsk, nextTip, type Tip } from './roofTips'
 import { ListeningBars } from './ListeningBars'
 import { actMore, recurrenceLabel, recurringChoice, reminderLabel, type ActEnv, type ActionAnswer } from './askActions'
 import { categoriesContext, documentsContext, petTasksContext } from '@/lib/assistantActions'
@@ -165,6 +167,7 @@ type Answer =
   | { kind: 'split'; amount: number; people: number; tip: number; mode: 'choose' | 'even' }
   | { kind: 'discount'; amount: number; percent: number }
   | { kind: 'help'; topic: string; text: string }
+  | { kind: 'capabilities' }
   | { kind: 'unknown'; text: string }
   | { kind: 'error' }
 
@@ -431,6 +434,15 @@ export function AskSheet({
 
   // Hidden by any route (backdrop, drag, back, the Home closing it): the mic
   // and Roof's voice stop too.
+  // "{name}" in an example = someone else in the family.
+  const otherName = ((profiles.find((p) => p.email !== profile?.email) ?? profile)?.display_name ?? '').trim().split(/\s+/)[0] || 'Ana'
+  // A different suggestion each time the sheet opens (roofTips).
+  const [tip, setTip] = useState<Tip>({ kind: 'example', key: 'ask.ex2' })
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one pick per opening
+    if (visible) setTip(nextTip())
+  }, [visible])
+
   useEffect(() => {
     if (visible) return
     cancelVoice()
@@ -557,6 +569,8 @@ export function AskSheet({
         return undone(a.summary, a.undone)
       case 'help':
         return a.text || t('ask.openGames')
+      case 'capabilities':
+        return t('ask.capsSay')
       case 'family':
       case 'say':
       case 'unknown':
@@ -612,30 +626,9 @@ export function AskSheet({
     setAnswer(null)
     setBusy(true)
     try {
-      const ctx = await (ctxRef.current ?? loadContext()).catch(() => loadContext())
-      const [y, m, d] = today.split('-').map(Number)
-      const { intent, source, quota: q2 } = await understandWithSource(q, {
-        openItems: ctx.open.lines,
-        today,
-        weekday: new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' }),
-        lang,
-        stores: ctx.stores.map((s) => s.name),
-        members: profiles.map((p) => p.display_name),
-        budgets: ctx.budgets,
-        pets: ctx.pets,
-        petTasks: ctx.petTasks,
-        categories: ctx.categories,
-        documents: ctx.documents,
-        recentEntries: ctx.recent.entries,
-        events: ctx.recent.events,
-        me: profile?.display_name ?? '',
-        history: pastRef.current,
-      })
-      if (q2) setQuota(q2)
-      // How often the app had to guess or ask (codes only, never the words).
-      if (intent && source === 'local') reportGap(intent.intent, 'local_guess', lang)
-      if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
-      const a = await act(intent, ctx.stores)
+      // "What can you do?" — the capabilities screen, right here (instant,
+      // nothing sent or spent).
+      const a: Answer = isCapabilitiesAsk(q) ? { kind: 'capabilities' } : await understandAndAct(q)
       setAnswer(a)
       if (viaVoice.current) {
         const turn = ++turnSeq.current
@@ -660,6 +653,35 @@ export function AskSheet({
       setAnswer({ kind: 'error' })
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function understandAndAct(q: string): Promise<Answer> {
+    {
+      const ctx = await (ctxRef.current ?? loadContext()).catch(() => loadContext())
+      const [y, m, d] = today.split('-').map(Number)
+      const { intent, source, quota: q2 } = await understandWithSource(q, {
+        openItems: ctx.open.lines,
+        today,
+        weekday: new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' }),
+        lang,
+        stores: ctx.stores.map((s) => s.name),
+        members: profiles.map((p) => p.display_name),
+        budgets: ctx.budgets,
+        pets: ctx.pets,
+        petTasks: ctx.petTasks,
+        categories: ctx.categories,
+        documents: ctx.documents,
+        recentEntries: ctx.recent.entries,
+        events: ctx.recent.events,
+        me: profile?.display_name ?? '',
+        history: pastRef.current,
+      })
+      if (q2) setQuota(q2)
+      // How often the app had to guess or ask (codes only, never the words).
+      if (intent && source === 'local') reportGap(intent.intent, 'local_guess', lang)
+      if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
+      return await act(intent, ctx.stores)
     }
   }
 
@@ -840,6 +862,8 @@ export function AskSheet({
       case 'discount':
         return { kind: 'discount', amount: intent.amount, percent: intent.percent }
       case 'app_help':
+        // About Roof itself → the capabilities screen, not a paragraph.
+        if (intent.topic === 'roof') return { kind: 'capabilities' }
         return { kind: 'help', topic: intent.topic, text: intent.reply }
       case 'open_app': {
         const route = APP_ROUTE[intent.app]
@@ -1071,9 +1095,16 @@ export function AskSheet({
                     {warming ? t('ask.getReady') : t('ask.listening')}
                   </Txt>
                 </View>
-                <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 33, color: heardText ? c.text : c.textFaint }}>
-                  {heardText || t('ask.ex1')}
-                </Txt>
+                {heardText ? (
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 33, color: c.text }}>{heardText}</Txt>
+                ) : (
+                  <View style={{ gap: 4 }}>
+                    <Txt style={{ fontSize: 14, color: c.textMuted }}>{tip.kind === 'help' ? t('ask.helpTip') : t('ask.tryLabel')}</Txt>
+                    <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 33, color: c.textFaint }}>
+                      “{tip.kind === 'help' ? t('ask.capsAsk') : t(tip.key, { name: otherName })}”
+                    </Txt>
+                  </View>
+                )}
               </View>
             ) : query ? (
               <View style={[s.bubble, { backgroundColor: c.surface }]}>
@@ -1099,6 +1130,14 @@ export function AskSheet({
                         <Txt style={{ flex: 1, fontSize: 14.5, color: c.text }}>{t(k)}</Txt>
                       </Pressable>
                     ))}
+                    {/* Everything Roof can do, as a friendly screen. */}
+                    <Pressable
+                      onPress={() => submit(t('ask.capsAsk'))}
+                      style={({ pressed }) => [s.example, { borderColor: c.accent, opacity: pressed ? 0.6 : 1 }]}
+                    >
+                      <Sparkles size={15} color={c.accent} />
+                      <Txt style={{ flex: 1, fontSize: 14.5, fontFamily: fonts.semibold, color: c.accent }}>{t('ask.capsSee')}</Txt>
+                    </Pressable>
                   </View>
                 )}
               </>
@@ -1296,6 +1335,8 @@ export function AskSheet({
               />
             ) : answer?.kind === 'discount' ? (
               <DiscountView amount={answer.amount} percent={answer.percent} onOpen={() => go('/calc/discount')} />
+            ) : answer?.kind === 'capabilities' ? (
+              <CapabilitiesView onTry={(p) => void submit(p)} />
             ) : answer?.kind === 'help' ? (
               <HelpView topic={answer.topic} text={answer.text} onOpen={(r) => go(r)} />
             ) : answer?.kind === 'say' ? (

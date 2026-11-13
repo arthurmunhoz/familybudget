@@ -41,7 +41,7 @@ export function preloadVault() {
       const p = audio.createAudioPlayer(FILES[k]) as Player
       // Very quiet on purpose (owner, 2026-11-13, twice): a small touch
       // under the phone's volume, never something that draws attention.
-      p.volume = k === 'open' ? 0.14 : 0.15
+      p.volume = k === 'open' ? 0.24 : 0.15
       players[k] = p
     }
   } catch {
