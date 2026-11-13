@@ -31,9 +31,19 @@ const OPEN_WHAT: [RegExp, OpenTarget][] = [
   [/\b(dinheiro|money|orcamentos?|gastos?|budget|dinero|presupuesto)\b/, 'money'],
   [/\b(familia|family|perfis|profiles?)\b/, 'family'],
 ]
+/** "fecha o porta-retrato", "close it", "cierra eso", "pode sair"… — the
+ *  thing is already gone (the frame closes when Roof opens; a panel sits
+ *  under Roof), so Roof only closes ITSELF (owner, 2026-11-13: it re-opened
+ *  the frame instead). */
+const CLOSE_VERB = /\b(fech\w*|close|shut|cierr\w*|sai|sair|saia|tchau|volta\w*|voltar|exit|quit)\b/
+export function localClose(text: string): boolean {
+  const f = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ')
+  return CLOSE_VERB.test(f) && f.split(/\s+/).filter(Boolean).length <= 6
+}
+
 export function localOpen(text: string): OpenTarget | null {
   const f = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ')
-  if (!OPEN_VERB.test(f) || f.split(/\s+/).filter(Boolean).length > 7) return null
+  if (!OPEN_VERB.test(f) || CLOSE_VERB.test(f) || f.split(/\s+/).filter(Boolean).length > 7) return null
   for (const [re, target] of OPEN_WHAT) if (re.test(f)) return target
   return null
 }

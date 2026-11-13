@@ -36,13 +36,18 @@ const fold = (s: string) =>
 // "rufi", "hufe", "rúfi", "rubi", "roofy" (owner, 2026-11: a Brazilian
 // "Rúfi" wasn't caught). The bare "e"/"a" — ordinary words — only take the
 // exact spellings below, so "e rouba…" doesn't wake it.
-const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay|eu|hej)'
+const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay|eu|hej|ola|hola)'
 const CALL_WEAK = '(?:e|a)'
 const SOUNDS_LIKE = '(?:r|rr|h)(?:u|o|ou|oo)(?:f|ff|ph|v|b)(?:e|i|y|o|u|a|ie|io|ia|ey)?s?'
 const NAME =
   '(?:roof|roofs|roofe|ruf|ruff|ruffe|rufe|rufi|rufo|rufu|rufy|ruffy|rufus|ruth|rute|roofy|roofie|rouf|rof|rofe|rough|ruv|ru|rou|hoof|hoofe|huf|hufe|hufi|hufo|houf|uf|ufe|ufi)'
+// "Oi Casa" (pt) / "Oye Casa" (es) — owner, 2026-11-13: "Roof" with a
+// Brazilian or Spanish accent (the R, "Rúfi") kept being missed; "casa" sounds
+// the same in every accent. Only right after a greeting, since "casa" alone
+// is an everyday word ("vou pra casa"). English keeps "Hey Roof".
+const CASA_CALL = '(?:oi|oii|oie|ei|hey|ola|oye|hola|hey|e ai)'
 const WAKE = new RegExp(
-  `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^roof(?:\\s|$)`,
+  `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^roof(?:\\s|$)|(?:^|\\s)${CASA_CALL}\\s+casa(?:\\s|$)`,
 )
 
 // Sounds, not requests: a hesitation the recogniser wrote down ("er", "uh",
@@ -140,7 +145,7 @@ export function soundsLikeCalling(heard: string): boolean {
   const prev = w[w.length - 2] ?? ''
   const strong = new RegExp(`^${CALL_STRONG}$`)
   if (strong.test(last)) return true
-  return strong.test(prev) && /^(r|h|u|o)/.test(last)
+  return strong.test(prev) && /^(r|h|u|o|c)/.test(last)
 }
 
 // The last thing the wake listener heard — so the owner can see how the phone

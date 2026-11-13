@@ -13,15 +13,20 @@ const fold = (s: string) =>
     .replace(/\s+/g, ' ')
     .trim()
 
-const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay|eu|hej)'
+const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay|eu|hej|ola|hola)'
 const CALL_WEAK = '(?:e|a)'
 const SOUNDS_LIKE = '(?:r|rr|h)(?:u|o|ou|oo)(?:f|ff|ph|v|b)(?:e|i|y|o|u|a|ie|io|ia|ey)?s?'
 const NAME =
   '(?:roof|roofs|roofe|ruf|ruff|ruffe|rufe|rufi|rufo|rufu|rufy|ruffy|rufus|ruth|rute|roofy|roofie|rouf|rof|rofe|rough|ruv|ru|rou|hoof|hoofe|huf|hufe|hufi|hufo|houf|uf|ufe|ufi)'
+// "Oi Casa" (pt) / "Oye Casa" (es) — owner, 2026-11-13: "Roof" with a
+// Brazilian or Spanish accent (the R, "Rúfi") kept being missed; "casa" sounds
+// the same in every accent. Only right after a greeting, since "casa" alone
+// is an everyday word ("vou pra casa"). English keeps "Hey Roof".
+const CASA_CALL = '(?:oi|oii|oie|ei|hey|ola|oye|hola|e ai)'
 const WAKE = new RegExp(
   // A bare name at the very start counts too: Chrome's pt-BR recogniser often
   // drops the "Ei" and writes just "Rufi…" (owner, 2026-11-13).
-  `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^(?:roof|rufi|rufe|rufy|roofie|roofy)(?:\\s|$)`,
+  `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^(?:roof|rufi|rufe|rufy|roofie|roofy)(?:\\s|$)|(?:^|\\s)${CASA_CALL}\\s+casa(?:\\s|$)`,
 )
 
 const FILLERS = new Set(['er', 'err', 'erm', 'uh', 'uhh', 'um', 'umm', 'hum', 'hm', 'hmm', 'ah', 'ahn', 'eh', 'e', 'a', 'o', 'oh', 'ai', 'ei', 'hey', 'ok', 'okay', 'roof', 'ne', 'tipo', 'entao', 'bom'])
@@ -78,7 +83,7 @@ export function soundsLikeCalling(heard: string): boolean {
   const prev = w[w.length - 2] ?? ''
   const strong = new RegExp(`^${CALL_STRONG}$`)
   if (strong.test(last)) return true
-  return strong.test(prev) && /^(r|h|u|o)/.test(last)
+  return strong.test(prev) && /^(r|h|u|o|c)/.test(last)
 }
 
 // ── the recogniser ───────────────────────────────────────────────────────────

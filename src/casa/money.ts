@@ -4,7 +4,7 @@
 import { suggestCategory } from '../lib/categories'
 import { currentPeriodStart, periodEndISO, todayISO } from '../lib/format'
 import { supabase } from '../lib/supabase'
-import type { Budget, CategoryRule, Entry, Month } from '../lib/types'
+import type { Budget, CategoryOverride, CategoryRule, CustomCategory, Entry, Month } from '../lib/types'
 import { norm, sha256Hex } from './util'
 
 export interface BudgetSummary {
@@ -143,5 +143,40 @@ export async function deleteEntry(id: string, createdMonth?: string | null): Pro
   if (createdMonth) {
     const { count } = await supabase.from('entries').select('id', { count: 'exact', head: true }).eq('month_id', createdMonth)
     if (!count) await supabase.from('months').delete().eq('id', createdMonth)
+  }
+}
+
+// ── history (the wide Money board) ────────────────────────────────────────────
+
+export interface PeriodData {
+  month: Month
+  entries: Entry[]
+}
+
+export interface MoneyHistory {
+  /** Newest first, at most `limit`. */
+  periods: PeriodData[]
+  custom: CustomCategory[]
+  overrides: CategoryOverride[]
+}
+
+/** A budget's latest periods with their entries, for the history chart, the
+ *  category breakdown and the entry list. */
+export async function loadHistory(budget: Budget, limit = 12): Promise<MoneyHistory> {
+  const [m, cc, co] = await Promise.all([
+    supabase.from('months').select('*').eq('budget_id', budget.id).order('start_date', { ascending: false }).limit(limit),
+    supabase.from('custom_categories').select('*'),
+    supabase.from('category_overrides').select('*'),
+  ])
+  const months = (m.data ?? []) as Month[]
+  const ids = months.map((x) => x.id)
+  const { data: e } = ids.length
+    ? await supabase.from('entries').select('*').in('month_id', ids).order('entry_date', { ascending: false }).order('created_at', { ascending: false })
+    : { data: [] }
+  const entries = (e ?? []) as Entry[]
+  return {
+    periods: months.map((month) => ({ month, entries: entries.filter((x) => x.month_id === month.id) })),
+    custom: (cc.data ?? []) as CustomCategory[],
+    overrides: (co.data ?? []) as CategoryOverride[],
   }
 }

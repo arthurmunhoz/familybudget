@@ -108,3 +108,16 @@ describe('isGoodbye', () => {
     }
   })
 })
+
+describe('"Oi Casa" / "Oye Casa" (2026-11-13)', () => {
+  it('wakes on a greeting + casa, in pt and es', () => {
+    expect(afterWake('Oi Casa')).toBe('')
+    expect(afterWake('oi, casa, o que tem pra hoje')).toBe('o que tem pra hoje')
+    expect(afterWake('Oye casa qué hay en la lista')).toBe('qué hay en la lista')
+    expect(afterWake('Olá Casa')).toBe('')
+  })
+  it('does not wake on "casa" in ordinary talk', () => {
+    expect(afterWake('vou pra casa agora')).toBeNull()
+    expect(afterWake('a casa está limpa')).toBeNull()
+  })
+})

@@ -510,7 +510,7 @@ function buildContext(body: any, today: string): string {
 // the model answers from this and nothing else.
 const APP_GUIDE =
   'APP GUIDE (One Roof — answer app_help from this only): ' +
-  'Home: today\'s agenda and the assistant (typed, the mic, or "Ei Roof"/"Hey Roof" by voice, a Plus feature). ' +
+  'Home: today\'s agenda and the assistant (typed, the mic, or "Oi Casa" (pt) / "Oye Casa" (es) / "Hey Roof" (en) by voice, a Plus feature). ' +
   'Apps: Calendar (events, birthdays, reminders; Google/Apple Calendar sync on Plus), Money (budgets, expenses and income, AI receipt scan), ' +
   'Lists (shared live; for groceries by store or anything — chores, a trip, school), Pets (daily routines, vet visits, vaccines, reminders), Documents (family vault; Face ID lock on Plus), ' +
   'Family (each member\'s profile: birthday, phone, sizes, allergies), Utilities (split a bill evenly or by item, better deal per unit, discount, printable cards, photo frame), ' +

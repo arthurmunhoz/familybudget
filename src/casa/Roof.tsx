@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUp, Eye, Keyboard, Mic, MicOff, SendHorizontal, Undo2, X } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
-import { act, localOpen, summarize, understand, type AskEnv, type OpenTarget, type Outcome, type PanelId, type Tone } from './assistant'
+import { act, localClose, localOpen, summarize, understand, type AskEnv, type OpenTarget, type Outcome, type PanelId, type Tone } from './assistant'
 import type { HubData } from './data'
 import { chime, speak, stopSpeaking, tick } from './sound'
 import { CheckMark, Grow, Orb, PlusTag, type GrowHandle } from './ui'
@@ -174,6 +174,11 @@ export default function Roof({
       clearTimer()
       if (isGoodbye(q)) {
         await show({ kind: 'bye', text: t('casa.roof.bye') }, q)
+        return
+      }
+      if (localClose(q)) {
+        chime('done')
+        await close()
         return
       }
       const target = localOpen(q)
