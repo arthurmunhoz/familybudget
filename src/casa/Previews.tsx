@@ -2,7 +2,8 @@
 // carousel: the calendar's rest-of-today + tomorrow, every list with its first
 // open items (tick right there), the pets' routine for today (tick right
 // there), and the locked Money page. `big` = the roomier widget layout.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronRight, KeyRound, Lock, PawPrint, RotateCcw, Wallet, type LucideIcon } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import { addDays, KIND_EMOJI, type Occurrence } from '../lib/calendar'
@@ -16,6 +17,10 @@ import { Avatar, IconChip, PlusTag } from './ui'
 import { GRAD, LOCALE, grad } from './util'
 
 // ── frame ────────────────────────────────────────────────────────────────────
+
+/** Where a card's body can put a floating chip at the very top of the CARD
+ *  (above its header), outside the scrolling body that would clip it. */
+const CardTopSlot = createContext<HTMLDivElement | null>(null)
 
 /** A preview card: the header (chip · title · sub · chevron) opens the full
  *  panel; the body holds tappable rows and fades out at the bottom. */
@@ -41,11 +46,13 @@ export function PreviewCard({
   /** No card chrome (inside a widget page that has its own). */
   plain?: boolean
 }) {
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null)
   return (
     <section
-      className={`${plain ? 'h-full' : 'casa-liquid casa-rise rounded-[28px]'} flex min-h-0 flex-col overflow-hidden ${className}`}
+      className={`${plain ? 'h-full' : 'casa-liquid casa-rise rounded-[28px]'} relative flex min-h-0 flex-col overflow-hidden ${className}`}
       style={{ ['--i' as string]: i }}
     >
+      <div ref={setSlot} className="pointer-events-none absolute inset-x-0 top-1 z-20 flex justify-center" />
       <button onClick={(e) => onOpen(e.currentTarget)} className="casa-press flex shrink-0 items-center gap-3 px-4 pt-4 pb-2.5 text-left">
         <IconChip icon={icon} g={g} size={plain ? 46 : 38} />
         <span className="min-w-0 flex-1">
@@ -58,7 +65,9 @@ export function PreviewCard({
           fade at the foot; owner, 2026-11-13: the pets / lists cards had more
           than they showed and nothing moved. */}
       <div className="casa-fadeout relative min-h-0 flex-1">
-        <div className="casa-scroll h-full px-2 pb-6">{children}</div>
+        <div className="casa-scroll h-full px-2 pb-6">
+          <CardTopSlot.Provider value={slot}>{children}</CardTopSlot.Provider>
+        </div>
       </div>
     </section>
   )
@@ -251,8 +260,8 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
     }
   }
 
-  const undoChip = undo ? (
-    <div className="pointer-events-none sticky top-1 z-10 flex h-0 justify-center overflow-visible">
+  const topSlot = useContext(CardTopSlot)
+  const chip = undo ? (
       <button
         key={undo.id}
         onClick={() => void undoTick(undo)}
@@ -264,8 +273,14 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
         {t('casa.roof.undo')}
         <span className="max-w-[14ch] truncate font-normal opacity-70">· {undo.label}</span>
       </button>
-    </div>
   ) : null
+  // At the very top of the card, almost on its edge (owner, 2026-11-13);
+  // inline at the top when there's no card around it.
+  const undoChip = chip
+    ? topSlot
+      ? createPortal(chip, topSlot)
+      : <div className="pointer-events-none sticky top-1 z-10 flex h-0 justify-center overflow-visible">{chip}</div>
+    : null
 
   if (!groups.length) return <>{undoChip}<Quiet>{t('casa.lists.allDone')} ✓</Quiet></>
   return (
