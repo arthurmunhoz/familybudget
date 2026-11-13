@@ -1,32 +1,21 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import AnalyticsTracker from './components/AnalyticsTracker'
 import ErrorBoundary from './components/ErrorBoundary'
-import VaultGate from './components/VaultGate'
 import { useAuth } from './hooks/useAuth'
 import { isConfigured } from './lib/supabase'
 import Login from './pages/Login'
-import Hub from './pages/Hub'
-import Onboarding from './pages/Onboarding'
 
-// Hub apps are lazy-loaded so the bundle stays light as the family adds more.
-const Budgets = lazy(() => import('./apps/budget/Budgets'))
-const Months = lazy(() => import('./apps/budget/Months'))
-const MonthDetail = lazy(() => import('./apps/budget/MonthDetail'))
-const ShoppingList = lazy(() => import('./apps/shopping/ShoppingList'))
-const Pings = lazy(() => import('./apps/pings/Pings'))
-const Calendar = lazy(() => import('./apps/calendar/Calendar'))
-const PetCare = lazy(() => import('./apps/pets/PetCare'))
-const PetProfile = lazy(() => import('./apps/pets/PetProfile'))
-const DocumentVault = lazy(() => import('./apps/docs/DocumentVault'))
-const Family = lazy(() => import('./apps/family/Family'))
-const Calculator = lazy(() => import('./apps/calc/Calculator'))
-const Whereabouts = lazy(() => import('./apps/location/Whereabouts'))
+// The web app is ONLY Modo Casa now (owner, 2026-11 — see src/casa/). The old
+// screens' files stay in the repo but are unreachable; /admin keeps working for
+// the global admin (Google sign-in, as before).
+const ModoCasa = lazy(() => import('./casa/ModoCasa'))
 const Admin = lazy(() => import('./pages/Admin'))
 const AdminHousehold = lazy(() => import('./pages/AdminHousehold'))
 
 export default function App() {
   const { session, profile, loading, profileLoaded } = useAuth()
+  const location = useLocation()
 
   if (!isConfigured) {
     return (
@@ -41,63 +30,33 @@ export default function App() {
     )
   }
 
-  if (loading) {
+  const isAdminPath = location.pathname.startsWith('/admin')
+  const fallback = (
+    <Centered>
+      <p className="animate-pulse text-(--text-muted)">Loading…</p>
+    </Centered>
+  )
+
+  if (!isAdminPath) {
     return (
-      <Centered>
-        <p className="animate-pulse text-(--text-muted)">Loading…</p>
-      </Centered>
+      <ErrorBoundary>
+        <Suspense fallback={null}>
+          <ModoCasa />
+        </Suspense>
+      </ErrorBoundary>
     )
   }
 
+  if (loading) return fallback
   if (!session) return <Login />
-
-  // Signed in, but the profile lookup for THIS session hasn't landed yet —
-  // don't let a stale empty result flash the onboarding screen at a returning user.
-  if (!profileLoaded) {
-    return (
-      <Centered>
-        <p className="animate-pulse text-(--text-muted)">Loading…</p>
-      </Centered>
-    )
-  }
-
-  // Signed in with no household yet → self-serve onboarding (create or join).
-  // Open signup, so this is the normal path for a brand-new user, not an error.
-  if (!profile) return <Onboarding />
+  if (!profileLoaded) return fallback
+  if (!profile?.is_admin) return <Navigate to="/" replace />
 
   return (
     <ErrorBoundary>
-      <Suspense
-        fallback={
-          <Centered>
-            <p className="animate-pulse text-(--text-muted)">Loading…</p>
-          </Centered>
-        }
-      >
+      <Suspense fallback={fallback}>
         <AnalyticsTracker />
         <Routes>
-          <Route path="/" element={<Hub />} />
-          <Route path="/budget" element={<Budgets />} />
-          <Route path="/budget/:budgetId" element={<Months />} />
-          <Route path="/month/:id" element={<MonthDetail />} />
-          <Route path="/shopping" element={<ShoppingList />} />
-          <Route path="/pings" element={<Pings />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/pets" element={<PetCare />} />
-          <Route path="/pets/:petId" element={<PetProfile />} />
-          <Route
-            path="/docs"
-            element={
-              <VaultGate>
-                <DocumentVault />
-              </VaultGate>
-            }
-          />
-          {/* Important Dates merged into the calendar — keep old links working. */}
-          <Route path="/dates" element={<Navigate to="/calendar" replace />} />
-          <Route path="/family" element={<Family />} />
-          <Route path="/calc" element={<Calculator />} />
-          <Route path="/location" element={<Whereabouts />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/household/:id" element={<AdminHousehold />} />
           <Route path="*" element={<Navigate to="/" replace />} />
