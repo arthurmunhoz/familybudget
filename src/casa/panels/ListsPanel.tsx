@@ -1,6 +1,6 @@
 // Listas on the home device: every list's open items in big rows, tap to mark
 // "feito", add an item to the list on show, and the recently done ones below.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ListChecks, Plus, RotateCcw } from 'lucide-react'
 import { useI18n } from '../../hooks/useI18n'
 import type { ShoppingItem } from '../../lib/types'
@@ -33,6 +33,17 @@ export default function ListsPanel({
   const [filter, setFilter] = useState<Filter>('all')
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  // A tick can be a slip (owner, 2026-11-13): "Undo" for 3 s, top centre.
+  const [undo, setUndo] = useState<ShoppingItem | null>(null)
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+  }, [])
+  const offerUndo = (item: ShoppingItem) => {
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    setUndo(item)
+    undoTimer.current = setTimeout(() => setUndo(null), 3000)
+  }
 
   // Fresh data from the server (Realtime) wins unless we're mid-animation.
   useEffect(() => {
@@ -44,14 +55,25 @@ export default function ListsPanel({
 
   const valid = useMemo(() => new Set(data.stores.map((s) => s.id)), [data.stores])
   const inGeneral = (i: ShoppingItem) => !i.store_id || !valid.has(i.store_id)
-  const chips = useMemo(() => {
-    const out: { id: Filter; label: string; count: number }[] = [{ id: 'all', label: t('casa.lists.all'), count: open.length }]
-    const general = open.filter(inGeneral).length
-    out.push({ id: 'general', label: t('casa.list.general'), count: general })
-    for (const s of data.stores) out.push({ id: s.id, label: s.name, count: open.filter((i) => i.store_id === s.id).length })
-    return out
+  // Lists with something in them first, A–Z; then the empty ones, A–Z
+  // (owner, 2026-11-13). The same order for the chips and the sections.
+  const lists = useMemo(() => {
+    const all: { id: string; label: string; slug: string | null; count: number }[] = [
+      { id: 'general', label: t('casa.list.general'), slug: null, count: open.filter(inGeneral).length },
+      ...data.stores.map((s) => ({ id: s.id, label: s.name, slug: s.slug, count: open.filter((i) => i.store_id === s.id).length })),
+    ]
+    const byName = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+    return [...all.filter((x) => x.count > 0).sort(byName), ...all.filter((x) => x.count === 0).sort(byName)]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, data.stores, t])
+  const chips = useMemo(() => {
+    const out: { id: Filter; label: string; count: number; slug?: string | null; logo: boolean }[] = [
+      { id: 'all', label: t('casa.lists.all'), count: open.length, logo: false },
+    ]
+    for (const l of lists) out.push({ id: l.id, label: l.label, count: l.count, slug: l.slug, logo: true })
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, lists, t])
 
   const shown = open.filter((i) => (filter === 'all' ? true : filter === 'general' ? inGeneral(i) : i.store_id === filter))
   const shownDone = done.filter((i) => (filter === 'all' ? true : filter === 'general' ? inGeneral(i) : i.store_id === filter)).slice(0, 12)
@@ -70,6 +92,7 @@ export default function ListsPanel({
       n.delete(item.id)
       return n
     })
+    offerUndo(item)
     try {
       await setChecked([item.id], true)
     } finally {
@@ -110,10 +133,9 @@ export default function ListsPanel({
 
   const sections: { id: string; name: string; slug: string | null; items: ShoppingItem[] }[] =
     filter === 'all'
-      ? [
-          { id: 'general', name: t('casa.list.general'), slug: null, items: shown.filter(inGeneral) },
-          ...data.stores.map((st) => ({ id: st.id, name: st.name, slug: st.slug, items: shown.filter((i) => i.store_id === st.id) })),
-        ].filter((x) => x.items.length)
+      ? lists
+          .map((l) => ({ id: l.id, name: l.label, slug: l.slug, items: shown.filter((i) => (l.id === 'general' ? inGeneral(i) : i.store_id === l.id)) }))
+          .filter((x) => x.items.length)
       : [{ id: filter, name: targetName, slug: null, items: shown }]
 
   const itemRow = (item: ShoppingItem) => {
@@ -145,7 +167,27 @@ export default function ListsPanel({
   }
 
   return (
-    <div className="flex h-full flex-col bg-(--bg)">
+    <div className="relative flex h-full flex-col bg-(--bg)">
+      {undo ? (
+        <div className="pointer-events-none absolute inset-x-0 top-[clamp(70px,11dvh,104px)] z-20 flex justify-center">
+          <button
+            key={undo.id}
+            onClick={() => {
+              if (undoTimer.current) clearTimeout(undoTimer.current)
+              const item = undo
+              setUndo(null)
+              tick()
+              void untick(item)
+            }}
+            className="casa-pop casa-press pointer-events-auto inline-flex h-12 items-center gap-2.5 rounded-full px-5 text-[1rem] font-semibold shadow-xl"
+            style={{ background: 'var(--text)', color: 'var(--bg)' }}
+          >
+            <RotateCcw size={18} strokeWidth={2.6} aria-hidden />
+            <span className="max-w-[16ch] truncate">{t('casa.roof.undo')}</span>
+            <span className="max-w-[18ch] truncate font-normal opacity-70">· {undo.label}</span>
+          </button>
+        </div>
+      ) : null}
       <PanelHeader
         icon={ListChecks}
         g={GRAD.lists}
@@ -161,13 +203,14 @@ export default function ListsPanel({
             <button
               key={c.id}
               onClick={() => setFilter(c.id)}
-              className="casa-press inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-4 text-[0.98rem] font-semibold"
+              className="casa-press inline-flex h-11 shrink-0 items-center gap-2 rounded-full pr-4 pl-2.5 text-[0.98rem] font-semibold"
               style={
                 on
                   ? { background: grad(GRAD.lists), color: '#3b2400', boxShadow: '0 10px 24px -12px #FF9A1F' }
                   : { background: 'var(--surface)', color: 'var(--text)' }
               }
             >
+              {c.logo ? <StoreLogo slug={c.slug ?? null} name={c.label} size={24} /> : null}
               {c.label}
               <span className={`rounded-full px-2 text-[0.85rem] ${on ? 'bg-white/45' : 'bg-(--card) text-(--text-muted)'}`}>{c.count}</span>
             </button>

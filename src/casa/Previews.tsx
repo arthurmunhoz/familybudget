@@ -2,8 +2,8 @@
 // carousel: the calendar's rest-of-today + tomorrow, every list with its first
 // open items (tick right there), the pets' routine for today (tick right
 // there), and the locked Money page. `big` = the roomier widget layout.
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Check, ChevronRight, KeyRound, Lock, PawPrint, Wallet, type LucideIcon } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Check, ChevronRight, KeyRound, Lock, PawPrint, RotateCcw, Wallet, type LucideIcon } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import { addDays, KIND_EMOJI, type Occurrence } from '../lib/calendar'
 import { dailyChecklist, overdueEvents, routineStatus, taskTime } from '../lib/petCare'
@@ -205,7 +205,30 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
     const items = open.filter((i) => i.store_id === s.id)
     if (items.length) groups.push({ id: s.id, name: s.name, slug: s.slug, items })
   }
+  // A–Z, like the Lists panel (only lists with items show here).
+  groups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
   const per = big ? 6 : groups.length > 2 ? 2 : 3
+  // A tick can be a slip (owner, 2026-11-13): "Undo" for 3 s, top centre.
+  const [undo, setUndo] = useState<ShoppingItem | null>(null)
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+  }, [])
+  async function undoTick(item: ShoppingItem) {
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    setUndo(null)
+    tick()
+    setGone((s) => {
+      const n = new Set(s)
+      n.delete(item.id)
+      return n
+    })
+    try {
+      await setChecked([item.id], false)
+    } finally {
+      refresh()
+    }
+  }
 
   async function toggle(item: ShoppingItem) {
     if (!full || ticking.has(item.id)) return
@@ -218,6 +241,9 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
       n.delete(item.id)
       return n
     })
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    setUndo(item)
+    undoTimer.current = setTimeout(() => setUndo(null), 3000)
     try {
       await setChecked([item.id], true)
     } finally {
@@ -225,8 +251,26 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
     }
   }
 
-  if (!groups.length) return <Quiet>{t('casa.lists.allDone')} ✓</Quiet>
+  const undoChip = undo ? (
+    <div className="pointer-events-none sticky top-1 z-10 flex h-0 justify-center overflow-visible">
+      <button
+        key={undo.id}
+        onClick={() => void undoTick(undo)}
+        data-noswipe
+        className="casa-pop casa-press pointer-events-auto inline-flex h-10 items-center gap-2 rounded-full px-4 text-[0.92rem] font-semibold shadow-xl"
+        style={{ background: 'var(--text)', color: 'var(--bg)' }}
+      >
+        <RotateCcw size={16} strokeWidth={2.6} aria-hidden />
+        {t('casa.roof.undo')}
+        <span className="max-w-[14ch] truncate font-normal opacity-70">· {undo.label}</span>
+      </button>
+    </div>
+  ) : null
+
+  if (!groups.length) return <>{undoChip}<Quiet>{t('casa.lists.allDone')} ✓</Quiet></>
   return (
+    <>
+    {undoChip}
     <div className={big ? 'grid gap-x-3 landscape:grid-cols-2' : ''}>
       {groups.slice(0, big ? 12 : 3).map((g) => (
         <div key={g.id} className="mb-1">
@@ -262,6 +306,7 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
         </div>
       ))}
     </div>
+    </>
   )
 }
 
