@@ -148,6 +148,8 @@ export interface AskContext {
   petTasks?: string[]
   /** Spending categories, "groceries = Groceries". */
   categories?: string[]
+  /** The family's document titles — open_document returns one of them. */
+  documents?: string[]
   /** What's still to buy, "label @ store" — Claude matches questions to it. */
   openItems: string[]
   /** Latest money entries, "e1 = Ford's Garage · 54.20 · expense · 2026-11-08 · Arthur". */

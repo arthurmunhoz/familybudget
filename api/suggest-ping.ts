@@ -227,7 +227,7 @@ const ASSISTANT_SCHEMA = {
     title: {
       type: 'string',
       description:
-        'add_event: the event title ("Dentista", "Aniversário da Ana"). move_event / remove_event / edit_event / find_event: the event as the user names it, or as named earlier in the conversation for "it"/"that" ("" when it is the only one on that day). add_money: what it was ("Mercado", "Salário"). fix_money / remove_money: which entry, as said ("Uber", "Ford\'s Garage"), or as logged earlier in the conversation for "esse/that one"; "" = the last one the asker logged. Never "gorjeta"/"tip" or the correction itself. money_summary / list_money: a specific thing spent on that is NOT a category ("quanto gastei de Uber?" → "Uber", "farmácia"), else "". pet_log: what it was ("Antirrábica", "Consulta"). where_is: the place asked about ("o Léo já chegou na escola?" → "escola", "casa"), else "". open_document: the document as said ("passaporte"). send_nudge: the message to send, in the user language, first person, short ("Chego às 19h"). "" otherwise.',
+        'add_event: the event title ("Dentista", "Aniversário da Ana"). move_event / remove_event / edit_event / find_event: the event as the user names it, or as named earlier in the conversation for "it"/"that" ("" when it is the only one on that day). add_money: what it was ("Mercado", "Salário"). fix_money / remove_money: which entry, as said ("Uber", "Ford\'s Garage"), or as logged earlier in the conversation for "esse/that one"; "" = the last one the asker logged. Never "gorjeta"/"tip" or the correction itself. money_summary / list_money: a specific thing spent on that is NOT a category ("quanto gastei de Uber?" → "Uber", "farmácia"), else "". pet_log: what it was ("Antirrábica", "Consulta"). where_is: the place asked about ("o Léo já chegou na escola?" → "escola", "casa"), else "". open_document: the document meant, matched to DOCUMENTS by meaning in ANY language ("seguro da moto" / "motorcycle insurance" → "Insurance card (motorcycle) - front"); when several are the same thing in parts (front/back, page 1/2), the part they share ("Insurance card (motorcycle)"); not in DOCUMENTS → as said ("passaporte"). send_nudge: the message to send, in the user language, first person, short ("Chego às 19h"). "" otherwise.',
     },
     ref: {
       type: 'string',
@@ -490,6 +490,7 @@ function buildContext(body: any, today: string): string {
     `MEMBERS: ${strList(body?.members, 15).join(', ') || '(unknown)'}`,
     `KNOWN BUDGETS: ${strList(body?.budgets, 15).join(', ') || '(none)'}`,
     `PETS: ${strList(body?.pets, 15).join(', ') || '(none)'}`,
+    `DOCUMENTS: ${strList(body?.documents, 60, 120).join(' | ') || '(none)'}`,
     // Each pet's routine, "Lola: Comida, Passeio" — pet_done returns these names.
     `PET TASKS: ${strList(body?.petTasks, 20, 300).join(' | ') || '(none)'}`,
     // Spending categories as "id = name" (built-ins + the household's own).

@@ -51,6 +51,12 @@
       "v3 = Natação · 2026-11-10 18:00 · Léo",
       "v4 = Natação · 2026-11-17 18:00 · Léo",
       "v5 = Reunião escola · 2026-11-13 08:30"
+    ],
+    "documents": [
+      "Insurance card (motorcycle) - front",
+      "Insurance card (motorcycle) - back",
+      "Car insurance - 2026/2027",
+      "Passaporte do Léo"
     ]
   },
   "cases": [
@@ -656,6 +662,18 @@
       "expect": {
         "intent": "list_items",
         "store": "Tarefas"
+      }
+    },
+    {
+      "text": "abre o seguro da moto",
+      "expect": {
+        "intent": "open_document"
+      }
+    },
+    {
+      "text": "show the motorcycle insurance",
+      "expect": {
+        "intent": "open_document"
       }
     }
   ]

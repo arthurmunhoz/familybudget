@@ -569,16 +569,40 @@ export function compareDeals(deals: Deal[]): { rows: DealRow[]; savingPct: numbe
 
 /** Documents matching what was said (title, or its category id), of the
  *  member named when one was. Opening goes through the vault (and its lock). */
+// Words that say nothing about WHICH document ("abre o meu …", "the").
+const DOC_STOP = new Set(['de', 'da', 'do', 'das', 'dos', 'the', 'of', 'my', 'meu', 'minha', 'o', 'a', 'os', 'as', 'el', 'la', 'los', 'las', 'mi', 'and', 'e', 'y', 'card', 'cartao', 'tarjeta', 'documento', 'document', 'doc'])
+const docWords = (s: string) => norm(s).split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !DOC_STOP.has(w))
+
+/** The documents `said` means — by the words they share, in any order
+ *  ("motorcycle insurance" → "Insurance card (motorcycle) - front"/"- back"),
+ *  best matches only. Shared documents (no owner) always count, also when a
+ *  person was named (owner, 2026-11: titles never match the request exactly). */
 export async function findDocuments(said: string, owner: Profile | null): Promise<FamilyDocument[]> {
   const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false })
   const n = norm(said)
-  const pool = ((data ?? []) as FamilyDocument[]).filter((d) => !owner || d.owner_email === owner.email)
+  const pool = ((data ?? []) as FamilyDocument[]).filter((d) => !owner || !d.owner_email || d.owner_email === owner.email)
   const exact = pool.filter((d) => norm(d.title) === n)
   if (exact.length) return exact
-  const words = n.split(/\s+/).filter((w) => w.length > 2)
-  return pool.filter(
-    (d) => norm(d.title).includes(n) || n.includes(norm(d.title)) || norm(d.category) === n || (words.length > 0 && words.every((w) => norm(d.title).includes(w))),
-  )
+  const want = docWords(said)
+  if (!want.length) return []
+  const scored = pool
+    .map((d) => {
+      const have = [...docWords(d.title), ...docWords(d.category ?? '')]
+      // A word counts when one contains the other ("moto" ~ "motorcycle").
+      const hits = want.filter((w) => have.some((h) => h === w || (w.length >= 4 && (h.startsWith(w) || w.startsWith(h)))))
+      return { d, score: hits.length / want.length }
+    })
+    .filter((x) => x.score > 0)
+  if (!scored.length) return []
+  const best = Math.max(...scored.map((x) => x.score))
+  // Keep the best (and near-best) — "front" and "back" of the same card both.
+  return scored.filter((x) => x.score >= best - 0.001 && x.score >= 0.5).map((x) => x.d)
+}
+
+/** Document titles for the model — it picks the one meant, in any language. */
+export async function documentsContext(): Promise<string[]> {
+  const { data } = await supabase.from('documents').select('title').order('created_at', { ascending: false }).limit(60)
+  return ((data ?? []) as { title: string }[]).map((d) => d.title)
 }
 
 // ── a day overview ───────────────────────────────────────────────────────────

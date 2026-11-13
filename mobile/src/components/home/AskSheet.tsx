@@ -103,7 +103,7 @@ import { GradientBox } from './GradientBox'
 import { HelpView } from './HelpView'
 import { ListeningBars } from './ListeningBars'
 import { actMore, recurrenceLabel, recurringChoice, reminderLabel, type ActEnv, type ActionAnswer } from './askActions'
-import { categoriesContext, petTasksContext } from '@/lib/assistantActions'
+import { categoriesContext, documentsContext, petTasksContext } from '@/lib/assistantActions'
 import { fetchPingPresets, presetText, sendPing } from '@/lib/pings'
 import { usePlus } from '@/lib/plus'
 import { categoryById } from '@/lib/categories'
@@ -175,6 +175,7 @@ interface Loaded {
   pets: string[]
   petTasks: string[]
   categories: string[]
+  documents: string[]
   recent: { entries: string[]; events: string[] }
 }
 
@@ -286,13 +287,14 @@ export function AskSheet({
   const loadContext = useCallback(() => {
     const firstName = (email: string | null) => profiles.find((p) => p.email === email)?.display_name.split(' ')[0] ?? ''
     const p = (async (): Promise<Loaded> => {
-      const [stores, budgetRows, petRows, petTasks, categories, recent] = await Promise.all([
+      const [stores, budgetRows, petRows, petTasks, categories, recent, documents] = await Promise.all([
         fetchStores(),
         supabase.from('budgets').select('name'),
         supabase.from('pets').select('name'),
         petTasksContext().catch(() => []),
         categoriesContext().catch(() => []),
         recentContext(today, firstName).catch(() => ({ entries: [], events: [] })),
+        documentsContext().catch(() => []),
       ])
       const open = await openItemsContext(stores)
       return {
@@ -302,6 +304,7 @@ export function AskSheet({
         pets: ((petRows.data ?? []) as { name: string }[]).map((x) => x.name),
         petTasks,
         categories,
+        documents,
         recent,
       }
     })()
@@ -613,6 +616,7 @@ export function AskSheet({
         pets: ctx.pets,
         petTasks: ctx.petTasks,
         categories: ctx.categories,
+        documents: ctx.documents,
         recentEntries: ctx.recent.entries,
         events: ctx.recent.events,
         me: profile?.display_name ?? '',
