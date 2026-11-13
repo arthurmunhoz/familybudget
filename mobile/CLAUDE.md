@@ -858,6 +858,12 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   series and left the first reminder overdue forever). The digest must fetch
   ALL events, not just those with a `next_due` — a final dose logged with no
   next date is what ends a series. `__tests__/petCare.test.ts` pins this.
+- **Routine TIME (migration 107, 2026-11-13).** `pet_care_tasks.at_time` is when a
+  routine item happens and orders the day everywhere (`routineOrder` /
+  `taskTime` in both `lib/petCare.ts` files, the iOS widget payload in
+  `api/widget.ts`, Modo Casa): timed first, earliest first, untimed after in
+  their manual order. The reminder is a separate switch under the time
+  (`remind_at` = the same time when on, null when off). Rows show the time.
 - **Pet routine reminders are LOCAL notifications** (migration 098, 2026-11;
   `lib/petReminders.ts` + the pure `lib/petReminderPlan.ts`, pinned by
   `__tests__/petReminders.test.ts`). A routine (`pet_care_tasks`, either kind)

@@ -89,7 +89,7 @@ const INTENTS = [
   'app_help',
   'unknown',
 ] as const
-const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'games', 'settings', '']
+const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'frame', 'games', 'settings', '']
 const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'plus', 'families', 'roof', 'casa', 'other', '']
 const RECURRENCES = ['none', 'daily', 'weekly', 'monthly', 'yearly']
 const EVENT_KINDS = ['event', 'birthday', 'anniversary', 'renewal', 'other']
@@ -309,7 +309,7 @@ const ASSISTANT_SCHEMA = {
         'pets_due naming several pets ("a rotina da Lola e da Chloe"): all of them, comma-separated ("Lola, Chloe").',
     },
     field: { type: 'string', enum: FIELDS, description: 'family_info / family_update: which detail. "" otherwise.' },
-    app: { type: 'string', enum: APPS, description: 'open_app: which part (budget = money, calc = utilities). "" otherwise.' },
+    app: { type: 'string', enum: APPS, description: 'open_app: which part (budget = money, calc = utilities, frame = the photo frame / porta-retrato / slideshow, shopping = lists). "" otherwise.' },
     topic: {
       type: 'string',
       enum: TOPICS,

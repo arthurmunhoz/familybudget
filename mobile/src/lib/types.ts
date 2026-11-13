@@ -160,6 +160,9 @@ export interface PetCareTask {
    *  phone reminds remind_at + PET_REMINDER_GRACE_MIN later if nobody has
    *  marked it (lib/petReminders.ts). */
   remind_at?: string | null
+  /** Time of day ("08:00:00"), migration 107 — orders the day; the reminder
+   *  (remind_at) is separate and optional. */
+  at_time?: string | null
 }
 
 /** A completion of a task on a day; unique per (task, day). */

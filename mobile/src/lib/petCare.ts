@@ -61,6 +61,24 @@ export function overdueEvents(events: PetEvent[], today: string): PetEvent[] {
 // Daily tasks are a checklist that resets each day (ordered by sort_order);
 // interval tasks are due every interval_days from their latest completion.
 
+/** A routine item's time of day ("08:00"), or null: its own time (migration
+ *  107), else its reminder time (098) for items set before 107. */
+export function taskTime(t: { at_time?: string | null; remind_at?: string | null }): string | null {
+  const v = t.at_time ?? t.remind_at
+  return v ? v.slice(0, 5) : null
+}
+
+/** The day's order (owner, 2026-11-13): timed items first, earliest first;
+ *  untimed after, in their manual order. Same everywhere a routine is listed. */
+export function routineOrder(a: PetCareTask, b: PetCareTask): number {
+  const ta = taskTime(a)
+  const tb = taskTime(b)
+  if (ta && tb && ta !== tb) return ta < tb ? -1 : 1
+  if (ta && !tb) return -1
+  if (!ta && tb) return 1
+  return a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
+}
+
 const dayMs = 86_400_000
 function isoDiff(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number)
@@ -94,7 +112,7 @@ export function dailyChecklist(
 ): { task: PetCareTask; done: PetTaskDone | null }[] {
   return tasks
     .filter((t) => t.pet_id === petId && t.kind === 'daily')
-    .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
+    .sort(routineOrder)
     .map((task) => ({
       task,
       done: done.find((d) => d.task_id === task.id && d.done_on === today) ?? null,

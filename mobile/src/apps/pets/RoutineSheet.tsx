@@ -23,7 +23,7 @@
 import { useMemo, useState } from 'react'
 import { Alert, Keyboard, Modal, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { Bell, BellRing, GripVertical, Plus, Sparkles, Trash2, X } from 'lucide-react-native'
+import { Bell, BellRing, Clock, GripVertical, Plus, Sparkles, Trash2, X } from 'lucide-react-native'
 
 import { DraggableList } from '@/components/DraggableList'
 import { GradientBox } from '@/components/home/GradientBox'
@@ -38,14 +38,15 @@ import { useSheetLift } from '@/hooks/useSheetLift'
 import { track } from '@/lib/analytics'
 import { formatTime } from '@/lib/calendar'
 import type { TKey } from '@/lib/i18n'
-import { templateTasks } from '@/lib/petCare'
-import { PET_REMINDER_GRACE_MIN, remindAtHHMM } from '@/lib/petReminderPlan'
+import { routineOrder, taskTime, templateTasks } from '@/lib/petCare'
+import { PET_REMINDER_GRACE_MIN } from '@/lib/petReminderPlan'
 import { ensureReminderPermission } from '@/lib/petReminders'
 import { supabase } from '@/lib/supabase'
 import type { Pet, PetCareTask, PetTaskIcon } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 import { CARE_ICONS, CARE_ICON_IDS } from './petUi'
 import { TintButton } from '@/components/TintButton'
+import { Toggle } from '@/components/Toggle'
 import { CADENCE_PRESETS, everyLabel } from './careText'
 
 const ROW_H = 62
@@ -82,22 +83,27 @@ function CloseBtn({ onPress }: { onPress: () => void }) {
   )
 }
 
-/** "Reminder · Approximate time  ~8:00 ×" — one card in the task editor. The
- *  time opens a PickerSheet NESTED here (inside the editor's modal). Unset, the
- *  chip reads "Add"; on iOS opening it starts the wheels at 8:00 (the wheels
- *  apply live, so Done alone keeps that), on Android the system dialog only
- *  sets a time when confirmed. */
-function ReminderCard({
+/** "Time  8:00 ×" + "Remind if nobody marks it" — one card in the task
+ *  editor (owner, 2026-11-13: a time puts the day's routine in order; the
+ *  reminder is a separate, optional switch). The time opens a PickerSheet
+ *  NESTED here (inside the editor's modal). Unset, the chip reads "Add"; on
+ *  iOS opening it starts the wheels at 8:00 (they apply live, so Done alone
+ *  keeps that), on Android the system dialog only sets a time when confirmed. */
+function TimeCard({
   tint,
   soft,
   value,
   onChange,
+  remind,
+  onRemind,
 }: {
   tint: string
   soft: string
-  /** "HH:MM" or null (no reminder). */
+  /** "HH:MM" or null (no time). */
   value: string | null
   onChange: (v: string | null) => void
+  remind: boolean
+  onRemind: (v: boolean) => void
 }) {
   const { c } = useTheme()
   const { t, lang } = useI18n()
@@ -109,44 +115,70 @@ function ReminderCard({
   }
   return (
     <>
-      <Label>{t('petcare.reminder')}</Label>
-      <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, padding: sp.md }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+      <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border, marginTop: sp.md }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.md }}>
           <View style={[styles.rowIcon, { backgroundColor: value ? tint : soft }]}>
-            {value ? <BellRing size={18} color="#fff" /> : <Bell size={18} color={tint} />}
+            <Clock size={18} color={value ? '#fff' : tint} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('petcare.reminderTime')}</Txt>
-            <Txt style={{ fontSize: 13, lineHeight: 17, color: c.textMuted }}>
-              {value ? t('petcare.reminderHint', { n: PET_REMINDER_GRACE_MIN }) : t('petcare.reminderOff')}
-            </Txt>
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('petcare.time')}</Txt>
+            <Txt style={{ fontSize: 13, lineHeight: 17, color: c.textMuted }}>{value ? t('petcare.timeHint') : t('petcare.timeOff')}</Txt>
           </View>
           <Pressable
             onPress={openPicker}
             accessibilityRole="button"
-            accessibilityLabel={t('petcare.reminderTime')}
+            accessibilityLabel={t('petcare.time')}
             hitSlop={4}
             style={({ pressed }) => [styles.chip, { backgroundColor: value ? soft : tint, opacity: pressed ? 0.7 : 1 }]}
           >
             <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: value ? tint : '#fff' }}>
-              {value ? `~${formatTime(value, locale)}` : t('petcare.reminderAdd')}
+              {value ? formatTime(value, locale) : t('petcare.reminderAdd')}
             </Txt>
           </Pressable>
           {value ? (
             <Pressable
-              onPress={() => onChange(null)}
+              onPress={() => {
+                onChange(null)
+                onRemind(false)
+              }}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel={t('petcare.reminderClear')}
+              accessibilityLabel={t('petcare.timeClear')}
               style={[styles.close, { backgroundColor: c.surface }]}
             >
               <X size={14} color={c.textMuted} />
             </Pressable>
           ) : null}
         </View>
+        {value ? (
+          <Pressable
+            onPress={() => onRemind(!remind)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: remind }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: sp.md,
+              padding: sp.md,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.border,
+            }}
+          >
+            <View style={[styles.rowIcon, { backgroundColor: remind ? tint : soft }]}>
+              {remind ? <BellRing size={18} color="#fff" /> : <Bell size={18} color={tint} />}
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.text }}>{t('petcare.remindMe')}</Txt>
+              <Txt style={{ fontSize: 13, lineHeight: 17, color: c.textMuted }}>
+                {remind ? t('petcare.reminderHint', { n: PET_REMINDER_GRACE_MIN }) : t('petcare.reminderOff')}
+              </Txt>
+            </View>
+            <Toggle tint={tint} value={remind} onValueChange={onRemind} />
+          </Pressable>
+        ) : null}
       </View>
       <PickerSheet
-        title={t('petcare.reminderTime')}
+        title={t('petcare.time')}
         tint={tint}
         visible={open}
         mode="time"
@@ -170,8 +202,10 @@ function TaskEditor({
   setIcon,
   intervalDays,
   setIntervalDays,
-  remindAt,
-  setRemindAt,
+  atTime,
+  setAtTime,
+  remind,
+  setRemind,
   busy,
   onSave,
   onClose,
@@ -185,8 +219,10 @@ function TaskEditor({
   setIcon: (v: PetTaskIcon) => void
   intervalDays: string
   setIntervalDays: (v: string) => void
-  remindAt: string | null
-  setRemindAt: (v: string | null) => void
+  atTime: string | null
+  setAtTime: (v: string | null) => void
+  remind: boolean
+  setRemind: (v: boolean) => void
   busy: boolean
   onSave: () => void
   onClose: () => void
@@ -283,8 +319,8 @@ function TaskEditor({
               </>
             ) : null}
 
-            {/* reminder — optional approximate time (migration 098) */}
-            <ReminderCard tint={tint} soft={soft} value={remindAt} onChange={setRemindAt} />
+            {/* time (107) — orders the day; reminder (098) optional */}
+            <TimeCard tint={tint} soft={soft} value={atTime} onChange={setAtTime} remind={remind} onRemind={setRemind} />
 
             {/* icon — tinted tiles, the chosen one solid */}
             <Label>{t('petcare.iconLabel')}</Label>
@@ -367,13 +403,14 @@ export function RoutineSheet({
   const [icon, setIcon] = useState<PetTaskIcon>('paw')
   const kind = section
   const [intervalDays, setIntervalDays] = useState('7')
-  const [remindAt, setRemindAt] = useState<string | null>(null)
+  const [atTime, setAtTime] = useState<string | null>(null)
+  const [remind, setRemind] = useState(false)
 
   const daily = useMemo(
     () =>
       tasks
         .filter((tk) => tk.kind === 'daily')
-        .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)),
+        .sort(routineOrder),
     [tasks],
   )
   const intervals = useMemo(
@@ -388,7 +425,8 @@ export function RoutineSheet({
     setTitle('')
     setIcon(section === 'interval' ? 'bath' : 'paw')
     setIntervalDays('30')
-    setRemindAt(null)
+    setAtTime(null)
+    setRemind(false)
   }
 
   function openEdit(task: PetCareTask) {
@@ -396,7 +434,8 @@ export function RoutineSheet({
     setTitle(task.title)
     setIcon(task.icon)
     setIntervalDays(String(task.interval_days ?? 7))
-    setRemindAt(remindAtHHMM(task.remind_at))
+    setAtTime(taskTime(task))
+    setRemind(task.remind_at != null)
   }
 
   async function save() {
@@ -411,17 +450,22 @@ export function RoutineSheet({
       interval_days: kind === 'interval' ? days : null,
     }
     // Only sent when there's something to say: a database without migration
-    // 098 has no remind_at column, and naming it would fail every save.
-    const hadReminder = editing !== 'new' && editing !== null && editing.remind_at != null
-    if (remindAt || hadReminder) fields.remind_at = remindAt
-    const { error } =
+    // 098 / 107 lacks the column, and naming it would fail every save.
+    const remindAt = remind && atTime ? atTime : null
+    const old = editing !== 'new' && editing !== null ? editing : null
+    if (remindAt || old?.remind_at != null) fields.remind_at = remindAt
+    if (atTime || old?.at_time != null) fields.at_time = atTime
+    const write = (f: Record<string, unknown>) =>
       editing === 'new'
-        ? await supabase.from('pet_care_tasks').insert({
-            ...fields,
-            pet_id: pet.id,
-            sort_order: tasks.length,
-          })
-        : await supabase.from('pet_care_tasks').update(fields).eq('id', (editing as PetCareTask).id)
+        ? supabase.from('pet_care_tasks').insert({ ...f, pet_id: pet.id, sort_order: tasks.length })
+        : supabase.from('pet_care_tasks').update(f).eq('id', (editing as PetCareTask).id)
+    let { error } = await write(fields)
+    // Server without 107 yet: keep the time as the reminder, like before.
+    if (error && 'at_time' in fields && /at_time/.test(error.message ?? '')) {
+      delete fields.at_time
+      if (atTime) fields.remind_at = atTime
+      ;({ error } = await write(fields))
+    }
     setBusy(false)
     if (error) {
       Alert.alert(t('pets.saveFailed'))
@@ -431,7 +475,7 @@ export function RoutineSheet({
     setEditing(null)
     // A time was set: this is the moment to ask for notifications (once), and
     // BEFORE onChanged re-syncs the reminders, which never prompts.
-    if (remindAt) await ensureReminderPermission()
+    if (remind && atTime) await ensureReminderPermission()
     onChanged()
   }
 
@@ -520,11 +564,11 @@ export function RoutineSheet({
           <Txt style={{ flex: 1, fontFamily: fonts.display, fontSize: 16.5, color: c.text }} numberOfLines={1}>
             {task.title}
           </Txt>
-          {remindAtHHMM(task.remind_at) ? (
+          {taskTime(task) ? (
             <View style={[styles.pill, { backgroundColor: soft, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-              <Bell size={11} color={tint} />
+              {task.remind_at ? <Bell size={11} color={tint} /> : <Clock size={11} color={tint} />}
               <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: tint }}>
-                {`~${formatTime(remindAtHHMM(task.remind_at) as string, LOCALES[lang] ?? 'en')}`}
+                {formatTime(taskTime(task) as string, LOCALES[lang] ?? 'en')}
               </Txt>
             </View>
           ) : null}
@@ -639,8 +683,10 @@ export function RoutineSheet({
             setIcon={setIcon}
             intervalDays={intervalDays}
             setIntervalDays={setIntervalDays}
-            remindAt={remindAt}
-            setRemindAt={setRemindAt}
+            atTime={atTime}
+            setAtTime={setAtTime}
+            remind={remind}
+            setRemind={setRemind}
             busy={busy}
             onSave={save}
             onClose={() => setEditing(null)}

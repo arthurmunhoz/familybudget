@@ -21,7 +21,8 @@ import { Check, ChevronLeft, ChevronRight, PawPrint, Pencil, Trash2, X, type Luc
 
 import { Btn, Txt } from '@/components/ui'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import type { EventSeries } from '@/lib/petCare'
+import { taskTime, type EventSeries } from '@/lib/petCare'
+import { formatTime } from '@/lib/calendar'
 import { useI18n } from '@/hooks/useI18n'
 import { formatDay } from '@/lib/format'
 import type { PetCareTask, PetEvent, PetTaskDone } from '@/lib/types'
@@ -31,6 +32,8 @@ import { TYPE_COLOR } from './petColors'
 import { GradientBox } from '@/components/home/GradientBox'
 import { shade } from '@/components/home/palette'
 import { everyLabel } from './careText'
+
+const TIME_LOCALE: Record<string, string> = { en: 'en', es: 'es', pt: 'pt-BR' }
 
 
 // ── shared bits ──────────────────────────────────────────────────────────────
@@ -158,7 +161,7 @@ export function TodayCard({
   title: string
 }) {
   const { c } = useTheme()
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const done = rows.filter((r) => r.isDone).length
   const all = rows.length > 0 && done === rows.length
   return (
@@ -255,6 +258,11 @@ export function TodayCard({
                       </Txt>
                     ) : null}
                   </View>
+                  {taskTime(row.task) ? (
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 13.5, color: row.isDone ? c.textFaint : tint }}>
+                      {formatTime(taskTime(row.task) as string, TIME_LOCALE[lang] ?? 'en')}
+                    </Txt>
+                  ) : null}
                   <View
                     style={[
                       s.check,

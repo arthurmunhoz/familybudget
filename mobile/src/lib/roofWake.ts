@@ -36,7 +36,7 @@ const fold = (s: string) =>
 // "rufi", "hufe", "rúfi", "rubi", "roofy" (owner, 2026-11: a Brazilian
 // "Rúfi" wasn't caught). The bare "e"/"a" — ordinary words — only take the
 // exact spellings below, so "e rouba…" doesn't wake it.
-const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay)'
+const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay|eu|hej)'
 const CALL_WEAK = '(?:e|a)'
 const SOUNDS_LIKE = '(?:r|rr|h)(?:u|o|ou|oo)(?:f|ff|ph|v|b)(?:e|i|y|o|u|a|ie|io|ia|ey)?s?'
 const NAME =

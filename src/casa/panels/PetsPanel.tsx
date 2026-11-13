@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Check, PawPrint } from 'lucide-react'
 import { useI18n } from '../../hooks/useI18n'
-import { dailyChecklist, overdueEvents, routineStatus } from '../../lib/petCare'
+import { dailyChecklist, overdueEvents, routineStatus, taskTime } from '../../lib/petCare'
 import type { PetTaskDone } from '../../lib/types'
 import { CARE_ICONS } from '../../apps/pets/careIcons'
 import { petTaskDone, petsDue, type HubData } from '../data'
@@ -86,57 +86,59 @@ export default function PetsPanel({
                   {daily.length === 0 && routines.length === 0 && reminders.length === 0 ? (
                     <p className="text-[0.95rem] text-(--text-muted)">{t('casa.pets.nothing')}</p>
                   ) : null}
+                  {/* today's work first: the routine in time order, then
+                      what's due today; the late things apart, under a faint
+                      rule and a red title (owner, 2026-11-13) */}
                   <ul className="space-y-2.5">
-                    {reminders.map((e) => (
-                      <li key={e.id} className="flex items-center gap-3 rounded-[20px] bg-(--surface) px-4 py-3 text-[0.95rem]">
-                        <span aria-hidden>🩺</span>
-                        <span className="flex-1 font-medium">{e.title}</span>
-                        <span className="text-[0.95rem] font-semibold text-(--expense)">
-                          {e.next_due === today ? t('casa.pets.dueToday') : t('casa.pets.overdue')}
-                        </span>
-                      </li>
-                    ))}
-                    {routines.filter((r) => r.dueIn < 0).map(({ task, dueIn }) => {
-                      const Icon = CARE_ICONS[task.icon] ?? PawPrint
-                      const on = doneToday.has(task.id)
-                      return (
-                        <li key={task.id}>
-                          <TaskButton
-                            label={task.title}
-                            sub={dueIn < 0 ? t('casa.pets.late', { count: -dueIn }) : t('casa.pets.dueToday')}
-                            Icon={Icon}
-                            on={on}
-                            disabled={!full}
-                            onClick={() => void toggle(task.id, on)}
-                          />
-                        </li>
-                      )
-                    })}
                     {daily.map(({ task, done: d }) => {
                       const Icon = CARE_ICONS[task.icon] ?? PawPrint
                       return (
                         <li key={task.id}>
-                          <TaskButton label={task.title} Icon={Icon} on={!!d} disabled={!full} onClick={() => void toggle(task.id, !!d)} />
+                          <TaskButton label={task.title} sub={taskTime(task) ?? undefined} Icon={Icon} on={!!d} disabled={!full} onClick={() => void toggle(task.id, !!d)} />
                         </li>
                       )
                     })}
-                    {routines.filter((r) => r.dueIn >= 0).map(({ task, dueIn }) => {
+                    {routines.filter((r) => r.dueIn === 0).map(({ task }) => {
                       const Icon = CARE_ICONS[task.icon] ?? PawPrint
                       const on = doneToday.has(task.id)
                       return (
                         <li key={task.id}>
-                          <TaskButton
-                            label={task.title}
-                            sub={dueIn < 0 ? t('casa.pets.late', { count: -dueIn }) : t('casa.pets.dueToday')}
-                            Icon={Icon}
-                            on={on}
-                            disabled={!full}
-                            onClick={() => void toggle(task.id, on)}
-                          />
+                          <TaskButton label={task.title} sub={t('casa.pets.dueToday')} Icon={Icon} on={on} disabled={!full} onClick={() => void toggle(task.id, on)} />
                         </li>
                       )
                     })}
+                    {reminders.filter((e) => e.next_due === today).map((e) => (
+                      <li key={e.id} className="flex items-center gap-3 rounded-[20px] bg-(--surface) px-4 py-3 text-[0.95rem]">
+                        <span aria-hidden>🩺</span>
+                        <span className="flex-1 font-medium">{e.title}</span>
+                        <span className="text-[0.95rem] font-semibold text-(--text-muted)">{t('casa.pets.dueToday')}</span>
+                      </li>
+                    ))}
                   </ul>
+                  {reminders.some((e) => e.next_due !== today) || routines.some((r) => r.dueIn < 0) ? (
+                    <>
+                      <div className="mt-4 mb-2 h-px bg-(--border) opacity-70" aria-hidden />
+                      <p className="mb-2 px-1 text-[0.82rem] font-semibold tracking-[0.14em] text-(--expense) uppercase">{t('casa.pets.lateTitle')}</p>
+                      <ul className="space-y-2.5">
+                        {reminders.filter((e) => e.next_due !== today).map((e) => (
+                          <li key={e.id} className="flex items-center gap-3 rounded-[20px] bg-(--surface) px-4 py-3 text-[0.95rem]">
+                            <span aria-hidden>🩺</span>
+                            <span className="flex-1 font-medium">{e.title}</span>
+                            <span className="text-[0.95rem] font-semibold text-(--expense)">{t('casa.pets.late', { count: daysBetween(e.next_due as string, today) })}</span>
+                          </li>
+                        ))}
+                        {routines.filter((r) => r.dueIn < 0).map(({ task, dueIn }) => {
+                          const Icon = CARE_ICONS[task.icon] ?? PawPrint
+                          const on = doneToday.has(task.id)
+                          return (
+                            <li key={task.id}>
+                              <TaskButton label={task.title} sub={t('casa.pets.late', { count: -dueIn })} Icon={Icon} on={on} disabled={!full} onClick={() => void toggle(task.id, on)} />
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </>
+                  ) : null}
                 </section>
               )
             })}
@@ -184,4 +186,11 @@ function TaskButton({
       </span>
     </button>
   )
+}
+
+/** Days from a due date to today. */
+function daysBetween(due: string, today: string): number {
+  const [ay, am, ad] = due.split('-').map(Number)
+  const [by, bm, bd] = today.split('-').map(Number)
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000)
 }

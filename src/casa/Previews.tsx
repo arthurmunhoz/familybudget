@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Check, ChevronRight, KeyRound, Lock, PawPrint, Wallet, type LucideIcon } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
 import { addDays, KIND_EMOJI, type Occurrence } from '../lib/calendar'
-import { dailyChecklist, overdueEvents, routineStatus } from '../lib/petCare'
+import { dailyChecklist, overdueEvents, routineStatus, taskTime } from '../lib/petCare'
 import type { PetTaskDone, ShoppingItem } from '../lib/types'
 import { CARE_ICONS } from '../apps/pets/careIcons'
 import StoreLogo from '../apps/shopping/StoreLogo'
@@ -43,7 +43,7 @@ export function PreviewCard({
 }) {
   return (
     <section
-      className={`${plain ? '' : 'casa-liquid casa-rise rounded-[28px]'} flex min-h-0 flex-col overflow-hidden ${className}`}
+      className={`${plain ? 'h-full' : 'casa-liquid casa-rise rounded-[28px]'} flex min-h-0 flex-col overflow-hidden ${className}`}
       style={{ ['--i' as string]: i }}
     >
       <button onClick={(e) => onOpen(e.currentTarget)} className="casa-press flex shrink-0 items-center gap-3 px-4 pt-4 pb-2.5 text-left">
@@ -54,7 +54,12 @@ export function PreviewCard({
         </span>
         <ChevronRight size={22} className="shrink-0 text-(--text-faint)" aria-hidden />
       </button>
-      <div className={`relative min-h-0 flex-1 px-2 pb-2 ${plain ? 'casa-scroll' : 'casa-fadeout overflow-hidden'}`}>{children}</div>
+      {/* Scrolls (wheel, finger, mouse drag — see dragScroll.ts) with a soft
+          fade at the foot; owner, 2026-11-13: the pets / lists cards had more
+          than they showed and nothing moved. */}
+      <div className="casa-fadeout relative min-h-0 flex-1">
+        <div className="casa-scroll h-full px-2 pb-6">{children}</div>
+      </div>
     </section>
   )
 }
@@ -261,9 +266,10 @@ export function ListsPreview({ data, full, refresh, big = false }: { data: HubDa
 }
 
 // ── pets ─────────────────────────────────────────────────────────────────────
-// Grouped BY PET, in the phone's Pet Care order: what's overdue first (vet /
-// vaccine reminders, late routines), then the daily routine in its own order,
-// then the routines due today. The layout follows the number of pets:
+// Grouped BY PET: today's work first — the daily routine in time order
+// (migration 107), then routines / reminders due today — and THEN, under a
+// faint rule and a red "Overdue" title, what's late, each with its days late
+// (owner, 2026-11-13: the late items were mixed in above the routine). The layout follows the number of pets:
 // 1 → the full list; 2–3 → a section per pet (columns in the big widget);
 // 4+ → a compact card per pet (progress + the next thing to do), tap to open.
 
@@ -274,12 +280,17 @@ interface PetRow {
   late?: boolean
   taskId?: string
   icon?: string
+  /** "08:00" — a routine item's time of day. */
+  time?: string
   done: boolean
 }
 
 export interface PetGroup {
   pet: HubData['pets'][number]
+  /** Today's work, in order. */
   rows: PetRow[]
+  /** Late things, shown apart under "Overdue". */
+  late: PetRow[]
   doneCount: number
   total: number
 }
@@ -291,8 +302,9 @@ export function petGroups(data: HubData, done: PetTaskDone[], today: string, t: 
     const daily: PetRow[] = []
     const dueToday: PetRow[] = []
     for (const e of overdueEvents(data.petEvents, today).filter((x) => x.pet_id === pet.id)) {
-      const isLate = e.next_due !== today
-      ;(isLate ? late : dueToday).push({ key: `e-${e.id}`, title: `🩺 ${e.title}`, sub: isLate ? t('casa.pets.overdue') : t('casa.pets.dueToday'), late: isLate, done: false })
+      const days = daysLate(e.next_due as string, today)
+      const isLate = days > 0
+      ;(isLate ? late : dueToday).push({ key: `e-${e.id}`, title: `🩺 ${e.title}`, sub: isLate ? t('casa.pets.late', { count: days }) : t('casa.pets.dueToday'), late: isLate, done: false })
     }
     for (const r of routineStatus(data.tasks, data.done, pet.id, today)) {
       if (!r.lastDone || r.dueIn > 0) continue
@@ -308,17 +320,17 @@ export function petGroups(data: HubData, done: PetTaskDone[], today: string, t: 
       ;(r.dueIn < 0 ? late : dueToday).push(row)
     }
     for (const r of dailyChecklist(data.tasks, done, pet.id, today)) {
-      daily.push({ key: `d-${r.task.id}`, title: r.task.title, taskId: r.task.id, icon: r.task.icon, done: !!r.done })
+      daily.push({ key: `d-${r.task.id}`, title: r.task.title, taskId: r.task.id, icon: r.task.icon, time: taskTime(r.task) ?? undefined, done: !!r.done })
     }
-    const rows = [...late, ...daily, ...dueToday]
-    const counted = rows.filter((r) => r.taskId)
-    return { pet, rows, doneCount: counted.filter((r) => r.done).length, total: counted.length }
+    const rows = [...daily, ...dueToday]
+    const counted = [...rows, ...late].filter((r) => r.taskId)
+    return { pet, rows, late, doneCount: counted.filter((r) => r.done).length, total: counted.length }
   })
 }
 
 /** Everything still to do today, across pets (the hub's subtitle). */
 export function petsLeftCount(data: HubData, today: string, t: ReturnType<typeof useI18n>['t']): number {
-  return petGroups(data, data.done, today, t).reduce((n, g) => n + g.rows.filter((r) => !r.done).length, 0)
+  return petGroups(data, data.done, today, t).reduce((n, g) => n + [...g.rows, ...g.late].filter((r) => !r.done).length, 0)
 }
 
 function PetFace({ pet, size = 36 }: { pet: HubData['pets'][number]; size?: number }) {
@@ -380,9 +392,34 @@ function PetRowButton({ r, full, onToggle }: { r: PetRow; full: boolean; onToggl
           <span className={`block truncate text-[1.02rem] ${r.done ? 'text-(--text-muted) line-through decoration-2' : ''}`}>{r.title}</span>
           {r.sub ? <span className={`block truncate text-[0.85rem] ${r.late ? 'font-semibold text-(--expense)' : 'text-(--text-faint)'}`}>{r.sub}</span> : null}
         </span>
+        {r.time ? <span className={`shrink-0 text-[0.92rem] font-semibold tabular-nums ${r.done ? 'text-(--text-faint)' : 'text-(--text-muted)'}`}>{r.time}</span> : null}
         {r.taskId ? <Round on={r.done} g={GRAD.pets} disabled={!full} /> : null}
       </button>
     </li>
+  )
+}
+
+/** Days from a due date to today (0 = due today). */
+function daysLate(due: string, today: string): number {
+  const [ay, am, ad] = due.split('-').map(Number)
+  const [by, bm, bd] = today.split('-').map(Number)
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000)
+}
+
+/** The faint rule + red "Overdue" title, then the late rows. */
+function LateBlock({ rows, full, onToggle, cols }: { rows: PetRow[]; full: boolean; onToggle: (r: PetRow) => void; cols?: string }) {
+  const { t } = useI18n()
+  if (!rows.length) return null
+  return (
+    <>
+      <div className="mx-3 mt-2 mb-1 h-px bg-(--border) opacity-70" aria-hidden />
+      <p className="px-3 pt-1 pb-0.5 text-[0.78rem] font-semibold tracking-[0.14em] text-(--expense) uppercase">{t('casa.pets.lateTitle')}</p>
+      <ul className={cols ?? ''}>
+        {rows.map((r) => (
+          <PetRowButton key={r.key} r={r} full={full} onToggle={onToggle} />
+        ))}
+      </ul>
+    </>
   )
 }
 
@@ -432,7 +469,7 @@ export function PetsPreview({
       <ul className="grid gap-2 px-1 pt-1 [grid-template-columns:repeat(auto-fill,minmax(min(13rem,100%),1fr))]">
         {groups.map((g) => {
           // The big widget has room for the next few; a card shows the next one.
-          const todo = g.rows.filter((r) => !r.done).slice(0, big ? 3 : 1)
+          const todo = [...g.rows, ...g.late].filter((r) => !r.done).slice(0, big ? 3 : 1)
           const next = todo[0]
           return (
             <li key={g.pet.id} className="rounded-[18px] bg-(--surface)/70">
@@ -477,9 +514,10 @@ export function PetsPreview({
                 <PetRowButton key={r.key} r={r} full={full} onToggle={(x) => void toggle(x)} />
               ))}
             </ul>
-          ) : (
+          ) : g.late.length ? null : (
             <Quiet>{t('casa.pets.nothing')}</Quiet>
           )}
+          <LateBlock rows={g.late} full={full} onToggle={(x) => void toggle(x)} cols={big && n === 1 ? 'grid gap-x-3 landscape:grid-cols-2' : undefined} />
         </section>
       ))}
     </div>

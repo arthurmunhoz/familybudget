@@ -272,3 +272,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-104-extra-family-plus.sql (creating ANOTHER family: only the OWNER of an active family with a PAID Plus (trial doesn't count) — 'plus_required' / 'plus_owner_required'; the new family rides on that Plus via households.plus_from/plus_by, read by household_is_plus(); the payer can't hand it over while paying — 'plus_owner'; max 3 families per account on create AND join — 'household_limit')
 --   migration-105-modo-casa.sql (Modo Casa: home_devices (paired tablets) + home_pair_codes (service-role pairing, api/widget.ts ?action=casa-start|claim|poll) + home_settings (Money PIN hash); home_trial_ends()/home_plan(): 30 days from the first tablet, then display-only without Plus)
 --   migration-106-casa-home-loc.sql (home_pair_codes.home_loc: the phone's home city handed to the device at pairing)
+--   migration-107-pet-task-time.sql (pet_care_tasks.at_time: a routine item's time of day, orders the day)

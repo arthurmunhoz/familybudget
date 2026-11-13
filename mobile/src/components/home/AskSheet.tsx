@@ -133,6 +133,7 @@ const APP_ROUTE: Record<string, string> = {
   family: '/family',
   docs: '/docs',
   calc: '/calc',
+  frame: '/calc/frame',
   games: '/games',
   settings: '/settings',
 }

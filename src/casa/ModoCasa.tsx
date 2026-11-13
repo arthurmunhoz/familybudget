@@ -11,6 +11,7 @@ import Hub from './Hub'
 import Pairing, { HomeArt } from './Pairing'
 import { usePrefs } from './prefs'
 import { useDeviceWatch } from './session'
+import { installDragScroll } from './dragScroll'
 import { DEVICE_KEY, GRAD, grad, lsSet } from './util'
 import './casa.css'
 
@@ -19,6 +20,8 @@ import './casa.css'
 function useCasaTheme() {
   const { setTheme } = useTheme()
   const { theme } = usePrefs()
+  // Mouse press-and-drag scrolls like a finger (see dragScroll.ts).
+  useEffect(() => installDragScroll(), [])
   useEffect(() => {
     if (theme !== 'auto') {
       setTheme(theme)

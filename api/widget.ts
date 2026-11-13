@@ -793,7 +793,7 @@ export default async function handler(req: any, res: any) {
       db.from('pets').select('id, name, emoji, species').eq('household_id', household).order('name'),
       db
         .from('pet_care_tasks')
-        .select('id, pet_id, kind, title, icon, interval_days, sort_order, created_at, pets!inner(household_id)')
+        .select('id, pet_id, kind, title, icon, interval_days, sort_order, created_at, at_time, remind_at, pets!inner(household_id)')
         .eq('pets.household_id', household)
         .order('sort_order'),
       db
@@ -817,6 +817,8 @@ export default async function handler(req: any, res: any) {
       interval_days: number | null
       sort_order: number
       created_at: string
+      at_time: string | null
+      remind_at: string | null
     }
     type DoneRow = { task_id: string; done_on: string; done_by: string }
     const allTasks = (taskRows.data ?? []) as unknown as TaskRow[]
@@ -831,7 +833,16 @@ export default async function handler(req: any, res: any) {
       const mine = allTasks.filter((tk) => tk.pet_id === p.id)
       const daily = mine
         .filter((tk) => tk.kind === 'daily')
-        .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
+        // The day's order (migration 107; same rule as lib/petCare routineOrder):
+        // timed first, earliest first, then untimed in their manual order.
+        .sort((a, b) => {
+          const ta = (a.at_time ?? a.remind_at)?.slice(0, 5) ?? null
+          const tb = (b.at_time ?? b.remind_at)?.slice(0, 5) ?? null
+          if (ta && tb && ta !== tb) return ta < tb ? -1 : 1
+          if (ta && !tb) return -1
+          if (!ta && tb) return 1
+          return a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
+        })
         .map((tk) => {
           const d = allDone.find((x) => x.task_id === tk.id && x.done_on === day)
           return { id: tk.id, title: tk.title, icon: tk.icon, done: !!d, doneBy: d ? nameOf(d.done_by) : null }

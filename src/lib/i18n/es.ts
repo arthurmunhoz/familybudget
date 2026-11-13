@@ -783,6 +783,7 @@ export const es: Record<keyof typeof en, string> = {
   "casa.pets.nothing": "Nada más por hoy.",
   "casa.pets.dueToday": "para hoy",
   "casa.pets.late": "{count} día de atraso|{count} días de atraso",
+  "casa.pets.lateTitle": "Atrasado",
   "casa.pets.overdue": "atrasado",
   "casa.money.pinSub": "Protegido con el PIN de la familia",
   "casa.money.pinTitle": "Escribe el PIN",

@@ -139,6 +139,10 @@ export interface PetCareTask {
   interval_days: number | null
   sort_order: number
   created_at: string
+  /** Time of day ("08:00:00"), migration 107 — orders the day. */
+  at_time?: string | null
+  /** Reminder time, migration 098. */
+  remind_at?: string | null
 }
 
 /** A completion of a task on a day; unique per (task, day). */

@@ -16,6 +16,27 @@ type T = (key: TKey, vars?: Record<string, string | number>) => string
 
 export type Tone = 'lists' | 'calendar' | 'pets' | 'money' | 'orb' | 'event'
 export type PanelId = 'calendar' | 'lists' | 'pets' | 'money'
+/** What "open …" can bring up on the device. */
+export type OpenTarget = PanelId | 'family' | 'frame'
+
+/** "abre o calendário", "show the lists", "mostra os pets", "porta-retrato"…
+ *  Caught HERE before the server (owner, 2026-11-13: "open the photo frame"
+ *  did nothing): instant, free, works offline. */
+const OPEN_VERB = /\b(abr\w*|mostr\w*|ver|veja|vai (pra|para)|ir (pra|para)|entr\w*|open|show|go to|abr[ae]|muestr\w*|ensen\w*|ir a)\b/
+const OPEN_WHAT: [RegExp, OpenTarget][] = [
+  [/\b(porta.?retratos?|fotos?|album|frame|photo frame|slideshow|marco|retratos?)\b/, 'frame'],
+  [/\b(calendarios?|agenda|eventos?|calendar|events?)\b/, 'calendar'],
+  [/\b(listas?|compras|mercado|lists?|shopping|groceries)\b/, 'lists'],
+  [/\b(pets?|cachorr\w*|gat[oa]s?|cao|caes|bichos?|mascotas?|perr\w*|dogs?|cats?)\b/, 'pets'],
+  [/\b(dinheiro|money|orcamentos?|gastos?|budget|dinero|presupuesto)\b/, 'money'],
+  [/\b(familia|family|perfis|profiles?)\b/, 'family'],
+]
+export function localOpen(text: string): OpenTarget | null {
+  const f = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ')
+  if (!OPEN_VERB.test(f) || f.split(/\s+/).filter(Boolean).length > 7) return null
+  for (const [re, target] of OPEN_WHAT) if (re.test(f)) return target
+  return null
+}
 
 export interface PickOption {
   id: string
@@ -39,6 +60,7 @@ export type Outcome =
       check: boolean
     }
   | { kind: 'pick'; question: string; options: PickOption[]; onPick: (id: string) => Promise<Outcome> }
+  | { kind: 'open'; target: OpenTarget }
   | { kind: 'pin' }
   | { kind: 'bye'; text: string }
 
@@ -481,6 +503,11 @@ export async function act(env: AskEnv, raw: Raw, full: boolean): Promise<Outcome
         },
       }
     }
+    case 'open_app': {
+      const map: Record<string, OpenTarget> = { calendar: 'calendar', shopping: 'lists', budget: 'money', pets: 'pets', family: 'family', frame: 'frame', calc: 'frame' }
+      const target = map[str('app')]
+      return target ? { kind: 'open', target } : phone(t)
+    }
     case 'app_help':
     case 'unknown':
     case 'find_items': {
@@ -497,5 +524,6 @@ export function summarize(o: Outcome): string {
   if (o.kind === 'done') return [o.title, ...(o.lines ?? [])].join(' ').slice(0, 200)
   if (o.kind === 'pick') return o.question
   if (o.kind === 'bye') return o.text
+  if (o.kind === 'open') return `open ${o.target}`
   return 'PIN'
 }

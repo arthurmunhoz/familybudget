@@ -13,13 +13,15 @@ const fold = (s: string) =>
     .replace(/\s+/g, ' ')
     .trim()
 
-const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay)'
+const CALL_STRONG = '(?:ei|hey|hei|ey|ai|oi|hay|oye|rei|eai|ok|okay|eu|hej)'
 const CALL_WEAK = '(?:e|a)'
 const SOUNDS_LIKE = '(?:r|rr|h)(?:u|o|ou|oo)(?:f|ff|ph|v|b)(?:e|i|y|o|u|a|ie|io|ia|ey)?s?'
 const NAME =
   '(?:roof|roofs|roofe|ruf|ruff|ruffe|rufe|rufi|rufo|rufu|rufy|ruffy|rufus|ruth|rute|roofy|roofie|rouf|rof|rofe|rough|ruv|ru|rou|hoof|hoofe|huf|hufe|hufi|hufo|houf|uf|ufe|ufi)'
 const WAKE = new RegExp(
-  `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^roof(?:\\s|$)`,
+  // A bare name at the very start counts too: Chrome's pt-BR recogniser often
+  // drops the "Ei" and writes just "Rufi…" (owner, 2026-11-13).
+  `(?:^|\\s)(?:${CALL_STRONG}\\s+(?:${NAME}|${SOUNDS_LIKE})|${CALL_WEAK}\\s+${NAME})(?:\\s|$)|^(?:roof|rufi|rufe|rufy|roofie|roofy)(?:\\s|$)`,
 )
 
 const FILLERS = new Set(['er', 'err', 'erm', 'uh', 'uhh', 'um', 'umm', 'hum', 'hm', 'hmm', 'ah', 'ahn', 'eh', 'e', 'a', 'o', 'oh', 'ai', 'ei', 'hey', 'ok', 'okay', 'roof', 'ne', 'tipo', 'entao', 'bom'])
@@ -125,6 +127,9 @@ export interface EarsHandlers {
   /** A pause after words (or ~7 s of nothing): the request ('' = nothing). */
   onDone: (request: string) => void
   onState: (s: EarsState) => void
+  /** What the wake listener is hearing (no call in it yet) — shown faintly on
+   *  the dock so a missed "Ei Roof" can be seen and the spellings tuned. */
+  onRaw?: (text: string) => void
 }
 
 const LANGS: Record<string, string> = { en: 'en-US', pt: 'pt-BR', es: 'es-ES' }
@@ -276,7 +281,7 @@ export class RoofEars {
     rec.lang = LANGS[this.lang] ?? 'pt-BR'
     rec.continuous = true
     rec.interimResults = true
-    rec.maxAlternatives = 1
+    rec.maxAlternatives = 3
     this.results = []
     this.finals = []
     this.scanFrom = 0
@@ -327,7 +332,13 @@ export class RoofEars {
     if (this.mode === 'paused') return
 
     if (this.mode === 'wake' && !this.woke) {
-      const after = afterWake(heard)
+      let after = afterWake(heard)
+      // The recogniser's other guesses for the latest stretch may hold the call.
+      if (after === null) {
+        const last = e.results[e.results.length - 1]
+        for (let k = 1; k < (last?.length ?? 0) && after === null; k++) after = afterWake(last[k]?.transcript ?? '')
+      }
+      if (after === null) this.h.onRaw?.(heard)
       if (after === null) {
         if (soundsLikeCalling(heard)) {
           if (this.hearingOff) clearTimeout(this.hearingOff)

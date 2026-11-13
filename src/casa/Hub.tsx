@@ -269,7 +269,11 @@ export default function Hub() {
                 me={me}
                 refresh={refresh}
                 hidden={!!panel || !!sheet}
-                onOpenPanel={(id) => openPanel(id)}
+                onOpenPanel={(id) => {
+                  // The frame closes itself while Roof is up; open it once Roof has gone.
+                  if (id === 'frame') setTimeout(() => setFrame(true), 80)
+                  else openPanel(id)
+                }}
                 onLocked={() => setSheet({ k: 'plan', origin: null })}
                 onOpenChange={setRoofOpen}
               />

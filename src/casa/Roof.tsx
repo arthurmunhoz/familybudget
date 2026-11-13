@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUp, Eye, Keyboard, Mic, MicOff, SendHorizontal, Undo2, X } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
-import { act, summarize, understand, type AskEnv, type Outcome, type PanelId, type Tone } from './assistant'
+import { act, localOpen, summarize, understand, type AskEnv, type OpenTarget, type Outcome, type PanelId, type Tone } from './assistant'
 import type { HubData } from './data'
 import { chime, speak, stopSpeaking, tick } from './sound'
 import { CheckMark, Grow, Orb, PlusTag, type GrowHandle } from './ui'
@@ -52,7 +52,7 @@ export default function Roof({
   today: string
   me: { email: string; name: string }
   refresh: () => void
-  onOpenPanel: (id: PanelId) => void
+  onOpenPanel: (id: OpenTarget) => void
   onLocked: () => void
   /** A panel is open: don't take the call (it would open over it). */
   hidden: boolean
@@ -66,6 +66,10 @@ export default function Roof({
   // phone app listens on-device only). Turning it on says so first.
   const [muted, setMuted] = useState(() => lsGet(WAKE_KEY) !== 'on')
   const [ears, setEars] = useState<EarsState>('off')
+  // What the wake listener just heard (no call in it), shown faintly for a
+  // moment — so a missed "Ei Roof" shows what the browser made of it.
+  const [raw, setRaw] = useState('')
+  const rawOff = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [open, setOpen] = useState(false)
   const [origin, setOrigin] = useState<DOMRect | null>(null)
   const [stage, setStage] = useState<Stage>({ k: 'listen' })
@@ -129,6 +133,12 @@ export default function Roof({
         onOpenPanel('money')
         return
       }
+      if (o.kind === 'open') {
+        chime('done')
+        await close()
+        onOpenPanel(o.target)
+        return
+      }
       if (o.kind === 'pick') {
         chime('start')
         setStage({ k: 'pick', o })
@@ -164,6 +174,11 @@ export default function Roof({
       clearTimer()
       if (isGoodbye(q)) {
         await show({ kind: 'bye', text: t('casa.roof.bye') }, q)
+        return
+      }
+      const target = localOpen(q)
+      if (target) {
+        await show({ kind: 'open', target }, q)
         return
       }
       setStage({ k: 'think', q })
@@ -223,6 +238,11 @@ export default function Roof({
       onHeard: (s) => handlers.current.onHeard(s),
       onDone: (s) => handlers.current.onDone(s),
       onState: setEars,
+      onRaw: (s) => {
+        setRaw(s.slice(-60))
+        if (rawOff.current) clearTimeout(rawOff.current)
+        rawOff.current = setTimeout(() => setRaw(''), 3500)
+      },
     })
     earsRef.current = e
     const vis = () => document.visibilityState === 'visible' && e.wakeUp()
@@ -321,7 +341,9 @@ export default function Roof({
   const sub = !full
     ? null
     : live
-      ? t('casa.roof.sayIt')
+      ? raw
+        ? `“${raw}”`
+        : t('casa.roof.sayIt')
       : supported && ears === 'denied'
         ? t('casa.roof.micDenied')
         : supported && muted
