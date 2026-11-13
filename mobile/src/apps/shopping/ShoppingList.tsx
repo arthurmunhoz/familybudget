@@ -29,6 +29,7 @@ import {
   View,
 } from 'react-native'
 import { Pressable } from '@/components/Pressable'
+import { RoofExamples } from '@/components/RoofExamples'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUp, Check, ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
 import { router } from 'expo-router'
@@ -846,15 +847,18 @@ export default function ShoppingList() {
           >
             <ChevronLeft size={22} color={c.text} />
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('shopping.manageStores')}
-            onPress={() => setPicking(true)}
-            hitSlop={8}
-            style={[styles.round, { backgroundColor: c.card, borderColor: c.border }]}
-          >
-            <Store size={19} color={c.text} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: sp.sm }}>
+            <RoofExamples variant="pill" examples={['roofEx.shop.1', 'roofEx.shop.2', 'roofEx.shop.3', 'roofEx.shop.4']} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('shopping.manageStores')}
+              onPress={() => setPicking(true)}
+              hitSlop={8}
+              style={[styles.round, { backgroundColor: c.card, borderColor: c.border }]}
+            >
+              <Store size={19} color={c.text} />
+            </Pressable>
+          </View>
         </View>
 
         {loading ? (

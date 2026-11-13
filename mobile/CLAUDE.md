@@ -403,6 +403,18 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     the Family TILE are gone from the Home (Settings no longer lists Family).
   - Prefs are ONE external store (`useSyncExternalStore` in lib/roof.ts): the
     old hook copied the launch-time value and Settings / Home drifted apart.
+- **"Ask Roof" on every app** (`components/RoofExamples`, 2026-11): a sheet of
+  example requests for THAT area; tapping one opens AskSheet with it typed in
+  (`seed` — nothing is sent or spent until the user sends; the Home's generic
+  examples hide when `seed` is set). `variant="card"` under Utilities' title;
+  `variant="pill"` ("✨ Roof") in the top bar of Calendar, Shopping, Money
+  (AppHeader `right`), Documents, Nudges, Games (GameTopBar `right`), Pets and
+  Family (PhotoHero `extra`). Examples are `roofEx.<area>.<n>` keys; "{name}"
+  = another member's first name. Only list things the assistant really does.
+- **Home loading**: FamilyStrip shows a borderless breathing skeleton (a
+  borderWidth with no colour drew black rings on Android); RoofDock takes
+  `loading` (Plus or Roof prefs unknown — `useRoofPrefsReady`) and draws the
+  whole dock with an empty mute slot, fading the dot and button in.
 - **Assistant knows the app** (`app_help`, 2026-11-12): `APP_GUIDE` in
   api/suggest-ping.ts is the only source it may answer from (keep it TRUE when
   features change); `topic` picks what the app shows under the reply —

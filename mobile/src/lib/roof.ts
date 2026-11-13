@@ -38,13 +38,22 @@ export function loadRoofPrefs(): Promise<RoofPrefs> {
         const j = raw ? (JSON.parse(raw) as Partial<RoofPrefs>) : {}
         // A switch flipped before the disk answered wins over what was stored.
         current = { ...DEFAULTS, ...j, ...touched }
+        ready = true
         subs.forEach((f) => f(current))
         return current
       })
-      .catch(() => current)
+      .catch(() => {
+        ready = true
+        subs.forEach((f) => f(current))
+        return current
+      })
   }
   return loaded
 }
+
+// Read from disk yet? Until then the Home draws the dock's placeholder rather
+// than a guess that flips a moment later.
+let ready = false
 
 // Prefs changed this session (see loadRoofPrefs).
 let touched: Partial<RoofPrefs> = {}
@@ -73,6 +82,15 @@ const subscribe = (f: () => void) => {
   }
 }
 const snapshot = () => current
+
+/** True once the stored prefs have been read (see `ready`). */
+export function useRoofPrefsReady(): boolean {
+  useEffect(() => {
+    void loadRoofPrefs()
+  }, [])
+  return useSyncExternalStore(subscribe, readySnapshot)
+}
+const readySnapshot = () => ready
 
 // ── speaking ─────────────────────────────────────────────────────────────────
 

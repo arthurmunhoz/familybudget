@@ -2,7 +2,8 @@
 // from the bottom dock, which is Roof's now). Each member is a tinted initial
 // with their first name — tap for their page — and "Family" opens the app.
 // Scrolls sideways when the family is bigger than the row.
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Animated, Easing, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { ChevronRight } from 'lucide-react-native'
 
@@ -20,7 +21,7 @@ export function FamilyStrip({ members, emails, me }: { members: Profile[]; email
     <View style={s.wrap}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={s.row}>
         {members.length === 0
-          ? [0, 1].map((i) => <View key={i} style={[s.avatar, { backgroundColor: c.surface2 }]} />)
+          ? <StripSkeleton color={c.textFaint} />
           : members.map((p) => {
               const tint = memberColor(p.email, emails)
               const first = (p.display_name || p.email).trim().split(/\s+/)[0]
@@ -53,7 +54,37 @@ export function FamilyStrip({ members, emails, me }: { members: Profile[]; email
   )
 }
 
+/** While the members load (a household always has you, so an empty list
+ *  means "not here yet"): two soft breathing circles with a name bar under
+ *  each — no border, the same size as the real ones (owner, 2026-11: the old
+ *  placeholder drew white balls with a black ring on Android). */
+function StripSkeleton({ color }: { color: string }) {
+  const [pulse] = useState(() => new Animated.Value(0.1))
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.22, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.1, duration: 700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [pulse])
+  return (
+    <>
+      {[0, 1].map((i) => (
+        <View key={i} style={s.member}>
+          <Animated.View style={[s.ghost, { backgroundColor: color, opacity: pulse }]} />
+          <Animated.View style={[s.ghostName, { backgroundColor: color, opacity: pulse }]} />
+        </View>
+      ))}
+    </>
+  )
+}
+
 const s = StyleSheet.create({
+  ghost: { width: 48, height: 48, borderRadius: 24 },
+  ghostName: { width: 34, height: 9, borderRadius: 5, marginTop: 5 },
   wrap: { flexDirection: 'row', alignItems: 'center', gap: sp.sm, marginTop: sp.lg },
   row: { alignItems: 'flex-start', gap: 14, paddingRight: sp.sm },
   member: { alignItems: 'center', gap: 4 },

@@ -11,6 +11,7 @@ import { router } from 'expo-router'
 import { ChevronLeft, Settings2 } from 'lucide-react-native'
 
 import { Screen, Txt } from '@/components/ui'
+import { RoofExamples } from '@/components/RoofExamples'
 import { Toast, type ToastData } from '@/components/Toast'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
@@ -75,15 +76,18 @@ export default function NudgesScreen() {
             >
               <ChevronLeft size={22} color={c.text} />
             </Pressable>
-            <Pressable
-              onPress={() => setSettingsOpen(true)}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('pings.settings')}
-              style={({ pressed }) => [roundBtn, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Settings2 size={19} color={c.text} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: sp.sm }}>
+              <RoofExamples variant="pill" examples={['roofEx.nudge.1', 'roofEx.nudge.2', 'roofEx.nudge.3']} />
+              <Pressable
+                onPress={() => setSettingsOpen(true)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('pings.settings')}
+                style={({ pressed }) => [roundBtn, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Settings2 size={19} color={c.text} />
+              </Pressable>
+            </View>
           </View>
         }
       >

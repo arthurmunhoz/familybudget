@@ -22,6 +22,7 @@ import { Bone, PawPrint, Pill, Plus, Scale, Stethoscope, Syringe, type LucideIco
 import { useScreenCorner } from '@/hooks/useScreenCorner'
 
 import { AppHeader, Btn, Loader, Txt } from '@/components/ui'
+import { RoofExamples } from '@/components/RoofExamples'
 import { TintButton } from '@/components/TintButton'
 import { Toast, type ToastData } from '@/components/Toast'
 import { PhotoHero, type HeroItem } from '@/components/PhotoHero'
@@ -644,6 +645,7 @@ export default function PetCare() {
       ) : (
         <>
           <PhotoHero
+            extra={<RoofExamples variant="pill" examples={['roofEx.pets.1', 'roofEx.pets.2', 'roofEx.pets.3']} />}
             items={heroItems}
             selectedId={selectedPet}
             collapse={collapse}

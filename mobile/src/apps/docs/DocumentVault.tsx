@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
+import { RoofExamples } from '@/components/RoofExamples'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as LocalAuthentication from 'expo-local-authentication'
 import * as WebBrowser from 'expo-web-browser'
@@ -277,6 +278,7 @@ export default function DocumentVault() {
           <ChevronLeft size={22} color={c.text} />
         </Pressable>
         <View style={{ flexDirection: 'row', gap: sp.sm }}>
+        <RoofExamples variant="pill" examples={['roofEx.docs.1', 'roofEx.docs.2']} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={view === 'list' ? t('docs.viewCards') : t('docs.viewList')}

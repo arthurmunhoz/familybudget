@@ -13,6 +13,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated'
 import { ChevronRight, Send, Users } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
+import { RoofExamples } from '@/components/RoofExamples'
 import { Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
 import type { Gradient } from '@/components/home/palette'
@@ -64,7 +65,10 @@ export function GamesHub() {
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={styles.wrap}>
         <View style={{ paddingHorizontal: sp.lg }}>
-          <GameTopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+          <GameTopBar
+            onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            right={<RoofExamples variant="pill" examples={['roofEx.games.1', 'roofEx.games.2', 'roofEx.games.3']} />}
+          />
         </View>
         <ScrollView contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xxl * 2 }}>
           <Txt style={styles.bigTitle}>{t('games.title')}</Txt>

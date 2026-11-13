@@ -65,11 +65,13 @@ type Props = {
    *  card, which used to sit under a long card where small Android screens
    *  hid it behind the navigation bar (2026-11). Takes the "+" slot. */
   action?: { icon: ReactNode; text: string; onPress: () => void }
+  /** Something to sit left of the "+" / action, top-right (the Roof pill). */
+  extra?: ReactNode
   /** 0 = host scrolled to the top (hero open), 1 = collapsed. Optional. */
   collapse?: Animated.AnimatedInterpolation<number> | Animated.Value
 }
 
-export function PhotoHero({ items, selectedId, onSelect, onPressItem, onAdd, addLabel, action, collapse = STILL }: Props) {
+export function PhotoHero({ items, selectedId, onSelect, onPressItem, onAdd, addLabel, action, extra, collapse = STILL }: Props) {
   const { c } = useTheme()
   const { t } = useI18n()
   const { width } = useWindowDimensions()
@@ -247,6 +249,8 @@ export function PhotoHero({ items, selectedId, onSelect, onPressItem, onAdd, add
         <GlassButton onPress={back} label={t('common.back')}>
           <ChevronLeft size={24} color="#fff" />
         </GlassButton>
+        <View pointerEvents="box-none" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {extra}
         {action ? (
           <Pressable
             onPress={action.onPress}
@@ -272,6 +276,7 @@ export function PhotoHero({ items, selectedId, onSelect, onPressItem, onAdd, add
             <Plus size={22} color="#fff" />
           </GlassButton>
         ) : null}
+        </View>
       </View>
 
       {/* Side arrows, each with a tiny avatar of where it leads. */}

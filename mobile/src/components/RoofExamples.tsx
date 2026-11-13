@@ -2,7 +2,9 @@
 // sheet of things you can ask Roof about THAT part of the app (owner,
 // 2026-11: instead of one tip sentence). Tapping an example opens Roof right
 // there with it typed in — you read it, then send (nothing is spent on a tap).
-// Reusable: pass the examples' i18n keys and the screen's tint.
+// Reusable: pass the examples' i18n keys ("{name}" = another member). `variant`: 'card' (a row
+// under the title — Utilities) or 'pill' (a compact "✨ Roof" for a screen's
+// top bar, where a full card would eat room: Calendar, Shopping, Money…).
 import { useEffect, useState } from 'react'
 import { Modal, StyleSheet, View } from 'react-native'
 import { ArrowUpRight, ChevronRight, X } from 'lucide-react-native'
@@ -12,13 +14,20 @@ import { Txt } from '@/components/ui'
 import { AskSheet } from '@/components/home/AskSheet'
 import { Orb } from '@/components/home/AnswerViews'
 import { useBottomGap } from '@/hooks/useBottomGap'
-import { useI18n } from '@/hooks/useI18n'
+import { useAuth } from '@/lib/auth'
 import type { TKey } from '@/lib/i18n'
+import { useI18n } from '@/hooks/useI18n'
 import { fonts, sp, useTheme } from '@/theme/theme'
 
-export function RoofExamples({ examples }: { examples: TKey[] }) {
+export function RoofExamples({ examples: keys, variant = 'card' }: { examples: TKey[]; variant?: 'card' | 'pill' }) {
   const { c } = useTheme()
   const { t } = useI18n()
+  // "{name}" in an example = someone else in the family (else you), so the
+  // examples read like this household's own requests.
+  const { profile, profiles } = useAuth()
+  const other = profiles.find((p) => p.email !== profile?.email) ?? profile
+  const name = (other?.display_name ?? '').trim().split(/\s+/)[0] || 'Ana'
+  const examples = keys.map((k) => t(k, { name }))
   const bottomGap = useBottomGap(sp.lg)
   const [open, setOpen] = useState(false)
   const [asking, setAsking] = useState<string | null>(null)
@@ -38,6 +47,18 @@ export function RoofExamples({ examples }: { examples: TKey[] }) {
 
   return (
     <>
+      {variant === 'pill' ? (
+        <Pressable
+          onPress={() => setOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('roofEx.title')}
+          hitSlop={6}
+          style={({ pressed }) => [s.pill, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Orb size={26} />
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: c.text }}>Roof</Txt>
+        </Pressable>
+      ) : (
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
@@ -54,6 +75,7 @@ export function RoofExamples({ examples }: { examples: TKey[] }) {
         </View>
         <ChevronRight size={18} color={c.textFaint} />
       </Pressable>
+      )}
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={s.backdrop}>
@@ -80,7 +102,7 @@ export function RoofExamples({ examples }: { examples: TKey[] }) {
                 <Pressable
                   key={k}
                   onPress={() => {
-                    setQueued(t(k))
+                    setQueued(k)
                     setOpen(false)
                   }}
                   accessibilityRole="button"
@@ -90,7 +112,7 @@ export function RoofExamples({ examples }: { examples: TKey[] }) {
                     { opacity: pressed ? 0.6 : 1 },
                   ]}
                 >
-                  <Txt style={{ flex: 1, fontSize: 15.5, lineHeight: 21, color: c.text }}>“{t(k)}”</Txt>
+                  <Txt style={{ flex: 1, fontSize: 15.5, lineHeight: 21, color: c.text }}>“{k}”</Txt>
                   <ArrowUpRight size={18} color={c.accent} />
                 </Pressable>
               ))}
@@ -110,6 +132,7 @@ export function RoofExamples({ examples }: { examples: TKey[] }) {
 }
 
 const s = StyleSheet.create({
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 40, paddingLeft: 7, paddingRight: 14, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: sp.md, paddingVertical: 12, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: sp.lg, paddingHorizontal: sp.lg },

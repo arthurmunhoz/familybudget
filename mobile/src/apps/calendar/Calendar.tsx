@@ -14,6 +14,7 @@
 // Google/Apple-sourced rows (source !== 'oneroof') render read-only.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { APP_GRADIENT } from '@/components/home/palette'
+import { RoofExamples } from '@/components/RoofExamples'
 import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
@@ -471,6 +472,9 @@ export default function Calendar() {
             <AppleIcon size={17} color={appleConnected ? c.text : c.textFaint} />
           </Pressable>
         ) : null}
+        <View style={{ marginLeft: 'auto' }}>
+          <RoofExamples variant="pill" examples={['roofEx.cal.1', 'roofEx.cal.2', 'roofEx.cal.3', 'roofEx.cal.4']} />
+        </View>
       </View>
 
       {loading ? (

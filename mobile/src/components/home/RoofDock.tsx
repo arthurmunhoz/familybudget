@@ -28,6 +28,7 @@ export function RoofDock({
   onOpen,
   onWakeTap,
   shape,
+  loading = false,
 }: {
   /** off = "Ei Roof" turned off; needsPlus = free plan (no mute button). */
   wake: RoofDockState
@@ -36,6 +37,10 @@ export function RoofDock({
   onWakeTap: () => void
   /** On a Face ID iPhone the dock follows the screen's bottom curve. */
   shape?: { radius: number } | null
+  /** Plus / the saved prefs not known yet: draw the dock whole (orb, name,
+   *  arrow, an empty slot for the mute button) and fade the dot and button in
+   *  once they are — never a state that flips a moment later. */
+  loading?: boolean
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -53,7 +58,12 @@ export function RoofDock({
     return () => loop.stop()
   }, [live, breath])
 
-  const canMute = wake === 'waiting' || wake === 'paused' || wake === 'off'
+  const [appear] = useState(() => new Animated.Value(loading ? 0 : 1))
+  useEffect(() => {
+    if (loading) return
+    Animated.timing(appear, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start()
+  }, [loading, appear])
+  const canMute = !loading && (wake === 'waiting' || wake === 'paused' || wake === 'off')
   const muteLabel = live ? t('roof.pause') : wake === 'paused' ? t('roof.resume') : t('roof.chipOff')
 
   return (
@@ -72,8 +82,8 @@ export function RoofDock({
       >
         <View>
           <Orb size={34} />
-          {wake !== 'needsPlus' && wake !== 'unsupported' ? (
-            <View style={[s.dotWrap, { backgroundColor: c.sheet }]}>
+          {!loading && wake !== 'needsPlus' && wake !== 'unsupported' ? (
+            <Animated.View style={[s.dotWrap, { backgroundColor: c.sheet, opacity: appear }]}>
               {live ? (
                 <Animated.View
                   style={[
@@ -86,7 +96,7 @@ export function RoofDock({
                 />
               ) : null}
               <View style={[s.dot, { backgroundColor: live ? GREEN : c.textFaint }]} />
-            </View>
+            </Animated.View>
           ) : null}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -99,7 +109,9 @@ export function RoofDock({
           ) : null}
         </View>
       </Pressable>
+      {loading ? <View style={[s.round, { backgroundColor: c.surface, opacity: 0.6 }]} /> : null}
       {canMute ? (
+        <Animated.View style={{ opacity: appear }}>
         <Pressable
           onPress={onWakeTap}
           accessibilityRole="button"
@@ -109,6 +121,7 @@ export function RoofDock({
         >
           {live ? <Mic size={18} color={GREEN} /> : <MicOff size={18} color={c.textMuted} />}
         </Pressable>
+        </Animated.View>
       ) : null}
       <Pressable
         onPress={onOpen}

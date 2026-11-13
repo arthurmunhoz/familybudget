@@ -23,6 +23,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { CalendarDays, CalendarRange, Camera, Check, ChevronDown, ChevronRight, Lock, Plus, Sun, Wallet, X } from 'lucide-react-native'
 
 import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
+import { RoofExamples } from '@/components/RoofExamples'
 import { GradientBox } from '@/components/home/GradientBox'
 import { APP_GRADIENT, BUDGET_GRADIENTS, budgetLook } from '@/components/home/palette'
 import { AnimatedLock } from '@/components/AnimatedLock'
@@ -216,7 +217,10 @@ export default function Budgets() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
-        <AppHeader title={t('app.budget.name')} />
+        <AppHeader
+          title={t('app.budget.name')}
+          right={<RoofExamples variant="pill" examples={['roofEx.money.1', 'roofEx.money.2', 'roofEx.money.3', 'roofEx.money.4']} />}
+        />
       </View>
 
       {loading ? (

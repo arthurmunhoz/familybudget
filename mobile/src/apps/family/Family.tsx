@@ -20,6 +20,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useTheme, sp, radius, fonts } from '@/theme/theme'
 import { AppHeader, Txt, Loader, EmptyState } from '@/components/ui'
+import { RoofExamples } from '@/components/RoofExamples'
 import { GradientBox } from '@/components/home/GradientBox'
 import { APP_GRADIENT } from '@/components/home/palette'
 import { TintButton } from '@/components/TintButton'
@@ -244,6 +245,7 @@ export default function Family({ initialEmail }: { initialEmail?: string } = {})
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right']}>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }} pointerEvents="box-none">
       <PhotoHero
+        extra={<RoofExamples variant="pill" examples={['roofEx.family.1', 'roofEx.family.2', 'roofEx.family.3']} />}
         items={heroItems}
         selectedId={m?.email ?? null}
         onSelect={setSelectedEmail}

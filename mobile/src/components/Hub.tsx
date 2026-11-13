@@ -24,7 +24,7 @@ import InviteBanner from './InviteBanner'
 import { AskSheet } from './home/AskSheet'
 import { RoofDock, ROOF_DOCK_H } from './home/RoofDock'
 import { FamilyStrip } from './home/FamilyStrip'
-import { useRoofPrefs } from '../lib/roof'
+import { useRoofPrefs, useRoofPrefsReady } from '../lib/roof'
 import { turnOnRoofWake, useRoofWake } from '../lib/roofWake'
 import { playChime, voiceSupported } from '../lib/voice'
 import { usePlus } from '../lib/plus'
@@ -58,7 +58,8 @@ export default function Hub() {
   // Roof listens only while the Home is the screen in front, the sheet is
   // closed, the family turned it on and has Plus (lib/roofWake).
   const roof = useRoofPrefs()
-  const { isPlus } = usePlus()
+  const { isPlus, loading: plusLoading } = usePlus()
+  const roofReady = useRoofPrefsReady()
   const [homeFocused, setHomeFocused] = useState(true)
   const [roofPaused, setRoofPaused] = useState(false)
   useFocusEffect(
@@ -285,6 +286,7 @@ export default function Hub() {
             })
           }}
           shape={corner ? { radius: corner.radius } : null}
+          loading={plusLoading || !roofReady}
         />
       </View>
 
