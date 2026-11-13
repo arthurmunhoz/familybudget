@@ -1045,18 +1045,22 @@ export function AskSheet({
                   <Orb />
                   <Txt style={{ fontFamily: fonts.display, fontSize: 20 }}>{t('ask.title')}</Txt>
                 </View>
-                <View style={{ gap: sp.sm }}>
-                  {(['ask.ex1', 'ask.ex2', 'ask.ex3'] as TKey[]).map((k) => (
-                    <Pressable
-                      key={k}
-                      onPress={() => submit(t(k))}
-                      style={({ pressed }) => [s.example, { borderColor: c.border, opacity: pressed ? 0.6 : 1 }]}
-                    >
-                      <Sparkles size={15} color={c.accent} />
-                      <Txt style={{ flex: 1, fontSize: 14.5, color: c.text }}>{t(k)}</Txt>
-                    </Pressable>
-                  ))}
-                </View>
+                {/* Opened with a request already typed (an app's "Ask Roof"
+                    examples): the Home's generic examples would only distract. */}
+                {seed ? null : (
+                  <View style={{ gap: sp.sm }}>
+                    {(['ask.ex1', 'ask.ex2', 'ask.ex3'] as TKey[]).map((k) => (
+                      <Pressable
+                        key={k}
+                        onPress={() => submit(t(k))}
+                        style={({ pressed }) => [s.example, { borderColor: c.border, opacity: pressed ? 0.6 : 1 }]}
+                      >
+                        <Sparkles size={15} color={c.accent} />
+                        <Txt style={{ flex: 1, fontSize: 14.5, color: c.text }}>{t(k)}</Txt>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
               </>
             )}
 

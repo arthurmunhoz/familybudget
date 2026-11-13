@@ -4,7 +4,8 @@
 // height (flex), so the tiles grow on tall phones and shrink to a floor on
 // small ones (only below that floor does the page scroll). Icons are the
 // tools' own two-tone line art (ToolArt) on the bare card — no coloured
-// squares. A hint says the Home's ask bar runs them too ("divide 58,71 em 3").
+// squares. A "Roof does this for you" card opens examples to ask Roof
+// (components/RoofExamples) — tap one and Roof opens with it typed in.
 // Each tool is its own route under app/calc/ (native back gesture).
 //
 // Order (owner, 2026-11): At home (photo frame) + Printables side by side on
@@ -26,6 +27,7 @@ import { Sparkles } from 'lucide-react-native'
 import Animated, { Easing, FadeInDown } from 'react-native-reanimated'
 
 import { Pressable } from '@/components/Pressable'
+import { RoofExamples } from '@/components/RoofExamples'
 import { Txt } from '@/components/ui'
 import type { Gradient } from '@/components/home/palette'
 import { TOOL_LOOK } from '@/apps/calc/look'
@@ -101,12 +103,10 @@ export default function UtilitiesScreen() {
         <Txt style={styles.bigTitle}>{t('calc.title')}</Txt>
         <Txt style={[styles.count, { color: c.textFaint }]}>{t('calc.toolsCount', { n: TOOL_COUNT })}</Txt>
 
-        {/* the ask bar runs these too — say so where people come looking */}
-        <View style={[styles.tip, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Sparkles size={15} color={c.accent} />
-          <Txt variant="muted" style={{ flex: 1, fontSize: 13 }} numberOfLines={2}>
-            {t('calc.askTip')}
-          </Txt>
+        {/* Roof runs these too — say so where people come looking: a card
+            that opens examples to ask (owner, 2026-11). */}
+        <View style={{ marginTop: sp.md }}>
+          <RoofExamples examples={['roofEx.calc.1', 'roofEx.calc.2', 'roofEx.calc.3', 'roofEx.calc.4']} />
         </View>
 
         <View style={styles.grid}>
@@ -179,16 +179,6 @@ function ToolTile({ tool, locked, onPress }: { tool: Tool; locked: boolean; onPr
 const styles = StyleSheet.create({
   bigTitle: { fontFamily: fonts.display, fontSize: 36, lineHeight: 42, letterSpacing: -0.8 },
   count: { fontFamily: fonts.display, fontSize: 22, lineHeight: 28, letterSpacing: -0.4, marginTop: 2 },
-  tip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.sm,
-    marginTop: sp.md,
-    paddingHorizontal: sp.md,
-    paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
   aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
   sectionLabel: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: sp.sm },
   // The rows split whatever height is left; each has a floor so a small phone
