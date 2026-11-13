@@ -645,47 +645,6 @@ export default function Settings() {
 
 
 
-        {/* Which apps show on the hub, and in what order */}
-        <View style={{ gap: sp.sm }}>
-          <SectionLabel>{t('settings.apps')}</SectionLabel>
-          <Card>
-            <DraggableList
-              data={orderedApps}
-              rowHeight={52}
-              onReorder={setAppOrder}
-              renderItem={(app) => {
-                const hidden = hiddenApps.includes(app.id)
-                return (
-                  <View
-                    style={{
-                      height: 52,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: sp.md,
-                      paddingHorizontal: sp.xs,
-                      opacity: hidden ? 0.45 : 1,
-                    }}
-                  >
-                    <GripVertical size={16} color={c.textFaint} />
-                    <IconTile colors={APP_GRADIENT[app.id] ?? APP_GRADIENT.admin} size={32}>
-                      <app.icon size={16} color="#fff" />
-                    </IconTile>
-                    <Txt style={{ flex: 1, fontWeight: '500' }} numberOfLines={1}>
-                      {t(`app.${app.id}.name` as TKey)}
-                    </Txt>
-                    <Toggle
-                      value={!hidden}
-                      onValueChange={() => toggleApp(app.id)}
-                    />
-                  </View>
-                )
-              }}
-            />
-          </Card>
-          <Txt variant="faint">{t('settings.appsHint')}</Txt>
-        </View>
-
-
         {/* Modo Casa — a spare device at home as the family hub */}
         <View style={{ gap: sp.sm }} onLayout={registerSection('casa')}>
           <SectionLabel>{t('settings.casa')}</SectionLabel>
@@ -823,6 +782,48 @@ export default function Settings() {
               <Txt variant="faint">{t(cityMsg)}</Txt>
             ) : null}
           </Card>
+        </View>
+
+
+        {/* Which apps show on the hub, and in what order — near the end,
+            right above Account (owner, 2026-11-13). */}
+        <View style={{ gap: sp.sm }}>
+          <SectionLabel>{t('settings.apps')}</SectionLabel>
+          <Card>
+            <DraggableList
+              data={orderedApps}
+              rowHeight={52}
+              onReorder={setAppOrder}
+              renderItem={(app) => {
+                const hidden = hiddenApps.includes(app.id)
+                return (
+                  <View
+                    style={{
+                      height: 52,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: sp.md,
+                      paddingHorizontal: sp.xs,
+                      opacity: hidden ? 0.45 : 1,
+                    }}
+                  >
+                    <GripVertical size={16} color={c.textFaint} />
+                    <IconTile colors={APP_GRADIENT[app.id] ?? APP_GRADIENT.admin} size={32}>
+                      <app.icon size={16} color="#fff" />
+                    </IconTile>
+                    <Txt style={{ flex: 1, fontWeight: '500' }} numberOfLines={1}>
+                      {t(`app.${app.id}.name` as TKey)}
+                    </Txt>
+                    <Toggle
+                      value={!hidden}
+                      onValueChange={() => toggleApp(app.id)}
+                    />
+                  </View>
+                )
+              }}
+            />
+          </Card>
+          <Txt variant="faint">{t('settings.appsHint')}</Txt>
         </View>
 
 
