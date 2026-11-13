@@ -79,7 +79,7 @@ import {
 import type { TKey } from '@/lib/i18n'
 import { useVoice, voiceSupported } from '@/lib/voice'
 import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
-import { meaningfulRequest } from '@/lib/roofWake'
+import { isGoodbye, meaningfulRequest } from '@/lib/roofWake'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import {
   ActionView,
@@ -583,6 +583,19 @@ export function AskSheet({
     commitTurn()
     setQuery(q)
     setText('')
+    // "Obrigado" / "até mais" — the end of the conversation: answer here
+    // (nothing sent, nothing spent), say it, then close instead of listening
+    // again (owner, 2026-11).
+    if (isGoodbye(q)) {
+      const turn = turnSeq.current
+      const bye = t('ask.bye')
+      setAnswer({ kind: 'say', text: bye })
+      const said = viaVoice.current && roof.speak && !isFree ? roofSay(bye, lang) : new Promise<void>((r) => setTimeout(r, 1200))
+      void said.then(() => {
+        if (openRef.current && turn === turnSeq.current) closeSheet()
+      })
+      return
+    }
     setAnswer(null)
     setBusy(true)
     try {

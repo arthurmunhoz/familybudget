@@ -1399,6 +1399,7 @@ export const es: Record<keyof typeof en, string> = {
   'shopping.allDone': "¡Todo listo!",
   'shopping.addedBy': "Agregado por {name}",
   'ask.listening': "Escuchando…",
+  'ask.bye': "¡De nada! Hasta luego.",
   'ask.openGames': "Abrir Juegos",
   'ask.helpSeeRules': "Toca para ver las reglas",
   'ask.helpSeePlus': "Ver Plus",

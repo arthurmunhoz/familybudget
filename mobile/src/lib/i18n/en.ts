@@ -1409,6 +1409,7 @@ export const en = {
   'shopping.allDone': "All done!",
   'shopping.addedBy': "Added by {name}",
   'ask.listening': "Listening…",
+  'ask.bye': "You’re welcome! See you.",
   'ask.openGames': "Open Games",
   'ask.helpSeeRules': "Tap to see the rules",
   'ask.helpSeePlus': "See Plus",

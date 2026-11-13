@@ -56,6 +56,30 @@ export function meaningfulRequest(text: string): string {
   return words.some((w) => !FILLERS.has(w)) ? text.trim() : ''
 }
 
+// A request that is only thanks / a goodbye ends the conversation: Roof
+// answers it on the phone (no model call, nothing spent), says it, and closes
+// instead of listening again (owner, 2026-11). Anything more ("obrigado, põe
+// leite") is a real request and goes through as usual.
+const BYE_WORDS = new Set([
+  // pt
+  'obrigado', 'obrigada', 'obrigadao', 'brigado', 'brigada', 'valeu', 'vlw', 'falou', 'tchau', 'tchauzinho', 'ate', 'mais', 'logo',
+  'depois', 'amanha', 'so', 'isso', 'e', 'era', 'nada', 'muito', 'mto', 'roof', 'ei', 'ok', 'beleza', 'blz', 'otimo', 'perfeito',
+  'show', 'certo', 'entao', 'por', 'hoje', 'tudo', 'tranquilo', 'de',
+  // en
+  'thanks', 'thank', 'you', 'thx', 'bye', 'goodbye', 'see', 'later', 'that', 'thats', 's', 'all', 'great', 'cool', 'perfect', 'got', 'it',
+  'so', 'much', 'for', 'now', 'cheers', 'hey',
+  // es
+  'gracias', 'adios', 'hasta', 'luego', 'pronto', 'eso', 'es', 'todo', 'chao', 'vale', 'perfecto', 'genial', 'oye',
+])
+const BYE_CORE = /\b(obrigad[oa]|obrigadao|brigad[oa]|valeu|vlw|falou|tchau|tchauzinho|ate (mais|logo|amanha|depois)|so isso|era so isso|e isso|thanks|thank you|thx|bye|goodbye|see you|that s all|thats all|gracias|adios|hasta (luego|pronto)|eso es todo|chao)\b/
+
+/** Is `text` only thanks / a goodbye (in pt, en or es)? */
+export function isGoodbye(text: string): boolean {
+  const f = fold(text)
+  if (!f || !BYE_CORE.test(f)) return false
+  return f.split(' ').every((w) => BYE_WORDS.has(w))
+}
+
 /** The wake phrase in `heard`? Returns what came AFTER it (maybe ''), or null.
  *  Works on the ORIGINAL text so the request keeps its accents. */
 export function afterWake(heard: string): string | null {

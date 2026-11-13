@@ -1,4 +1,4 @@
-import { afterWake, meaningfulRequest, soundsLikeCalling } from '../src/lib/roofWake'
+import { afterWake, isGoodbye, meaningfulRequest, soundsLikeCalling } from '../src/lib/roofWake'
 import { speakable, voiceKey } from '../src/lib/roof'
 
 describe('afterWake ("Ei Roof")', () => {
@@ -93,5 +93,18 @@ describe('soundsLikeCalling (the dock dots)', () => {
   it('stays off for ordinary talk', () => {
     expect(soundsLikeCalling('vou lavar a roupa')).toBe(false)
     expect(soundsLikeCalling('ei amor tudo bem')).toBe(false)
+  })
+})
+
+describe('isGoodbye', () => {
+  it('thanks and goodbyes end the conversation', () => {
+    for (const t of ['Obrigado!', 'obrigada, até mais', 'Valeu, Roof', 'tchau', 'é só isso, obrigado', 'Thanks!', 'thank you so much', "that's all, bye", 'gracias, adiós', 'eso es todo']) {
+      expect([t, isGoodbye(t)]).toEqual([t, true])
+    }
+  })
+  it('a real request with thanks in it is still a request', () => {
+    for (const t of ['obrigado, põe leite na lista', 'thanks, what is on tomorrow?', 'o que tem até amanhã?', 'tudo bem?', 'mais leite']) {
+      expect([t, isGoodbye(t)]).toEqual([t, false])
+    }
   })
 })
