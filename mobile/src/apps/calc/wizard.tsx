@@ -14,7 +14,7 @@
 // swipe-back gesture is turned off past the first step — a stray edge swipe
 // would otherwise drop everything you'd entered (on the by-item split, that's
 // a metered photo scan).
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, type ReactNode, type RefObject } from 'react'
 import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, router } from 'expo-router'
@@ -64,6 +64,8 @@ export function WizardScreen({
   hideProgress,
   swipeBack,
   sideBySide = false,
+  scrollRef,
+  onScroll,
 }: {
   /** Which tool — its colour runs through the whole flow (look.ts). */
   kind: ToolArtKind
@@ -81,6 +83,10 @@ export function WizardScreen({
   /** Primary and secondary as two equal buttons in one row (the luggage tag's
    *  Print / Save — owner, 2026-11), a little shorter than the docked one. */
   sideBySide?: boolean
+  /** The page's scroller, for a screen that scrolls itself (the luggage tag's
+   *  "Edit details ↓"). */
+  scrollRef?: RefObject<ScrollView | null>
+  onScroll?: (y: number) => void
   /** Allow the iOS edge swipe to leave the wizard. Defaults to the first step
    *  only; result screens (whose back arrow exits) turn it on too. */
   swipeBack?: boolean
@@ -117,9 +123,12 @@ export function WizardScreen({
         </DismissKeyboard>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView
+            ref={scrollRef}
             style={{ flex: 1 }}
             contentContainerStyle={[styles.column, { paddingBottom: sp.xl, flexGrow: 1 }]}
             keyboardShouldPersistTaps="handled"
+            onScroll={onScroll ? (e) => onScroll(e.nativeEvent.contentOffset.y) : undefined}
+            scrollEventThrottle={onScroll ? 32 : undefined}
           >
             <Animated.View
               key={index}

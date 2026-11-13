@@ -405,6 +405,7 @@ export const es: Record<keyof typeof en, string> = {
   'bill.newPhotoBody': 'Esto borra los artículos actuales. Las personas se quedan.',
   'printable.print': 'Imprimir',
   'printable.saveImage': 'Guardar',
+  'printable.editDetails': 'Editar datos',
   'printable.color': 'Color',
   'printable.fillFrom': 'Rellenar para',
   'printable.cutHint': 'Recorta por la línea discontinua. Ponle cinta o plastifícala para que dure.',

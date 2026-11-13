@@ -6,13 +6,14 @@
 // filled in. It never leaves the phone — nothing here touches Supabase except
 // reading household members' phones for the quick-fill.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as Localization from 'expo-localization'
 import { router } from 'expo-router'
 import {
   BedDouble,
   Check,
+  ChevronDown,
   House,
   ImageDown,
   Mail,
@@ -33,7 +34,7 @@ import { DICTS, type TKey } from '@/lib/i18n'
 import { formatPhone } from '@/lib/phone'
 import { fetchMemberPhones } from '@/lib/pings'
 import { pickOn } from '@/theme/contrast'
-import { sp, useTheme } from '@/theme/theme'
+import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 import { TOOL_LOOK, toolCard } from '../look'
 import { Avatar, firstName } from '../shared'
@@ -72,6 +73,9 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
   const [loaded, setLoaded] = useState(false)
   const [phones, setPhones] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<'print' | 'share' | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
+  const [scrolled, setScrolled] = useState(false)
+  const [fieldsY, setFieldsY] = useState(0)
 
   useEffect(() => {
     fetchMemberPhones().then(setPhones).catch(() => {})
@@ -177,6 +181,10 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
       onBack={exit}
       hideProgress
       sideBySide
+      scrollRef={scrollRef}
+      onScroll={(y) => {
+        if (y > 40 && !scrolled) setScrolled(true)
+      }}
       primary={{
         label: t('printable.print'),
         onPress: () => void run('print'),
@@ -203,12 +211,32 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
             <Card values={values} color={color} width={previewW} label={printLabel} />
           </View>
         </View>
+        {/* The preview fills the screen, so nothing said there was more below
+            to edit (owner, 2026-11): a quiet way down, gone once you scroll. */}
+        {!scrolled ? (
+          <Pressable
+            onPress={() => {
+              setScrolled(true)
+              scrollRef.current?.scrollTo({ y: Math.max(0, fieldsY - sp.md), animated: true })
+            }}
+            accessibilityRole="button"
+            hitSlop={8}
+            style={({ pressed }) => [styles.editHint, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.6 : 1 }]}
+          >
+            <PenLine size={14} color={LOOK.tint} />
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: LOOK.tint }}>{t('printable.editDetails')}</Txt>
+            <ChevronDown size={15} color={LOOK.tint} />
+          </Pressable>
+        ) : null}
         <Txt variant="faint" style={styles.note}>
           {t(template.intro)}
         </Txt>
       </View>
 
-      <SectionLabel>{t('printable.color')}</SectionLabel>
+
+      <View onLayout={(e) => setFieldsY(e.nativeEvent.layout.y)}>
+        <SectionLabel>{t('printable.color')}</SectionLabel>
+      </View>
       <View style={styles.swatches}>
         {CARD_COLORS.map((col) => {
           const on = col === color
@@ -290,6 +318,17 @@ const styles = StyleSheet.create({
     marginBottom: sp.xl,
   },
   note: { fontSize: 12.5, lineHeight: 17, marginTop: sp.md, textAlign: 'center' },
+  editHint: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: sp.md,
+  },
   shadow: {
     shadowColor: '#000',
     shadowOpacity: 0.18,

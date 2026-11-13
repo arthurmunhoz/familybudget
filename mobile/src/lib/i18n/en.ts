@@ -412,6 +412,7 @@ export const en = {
   'bill.newPhotoBody': 'This clears the current items. People stay.',
   'printable.print': 'Print',
   'printable.saveImage': 'Save or share',
+  'printable.editDetails': 'Edit details',
   'printable.color': 'Colour',
   'printable.fillFrom': 'Fill in for',
   'printable.cutHint': 'Cut along the dashed line. Tape or laminate it to make it last.',
