@@ -56,13 +56,13 @@ export default function PetsPanel({
         closeLabel={t('casa.close')}
         right={full ? undefined : <PlusTag label="Plus" />}
       />
-      <div className="casa-scroll flex-1 px-8 pb-10">
+      <div className="casa-scroll flex-1 px-6 pb-10">
         {data.pets.length === 0 ? (
           <div className="casa-fade py-16 text-center">
-            <p className="text-[4rem]" aria-hidden>
+            <p className="text-[3rem]" aria-hidden>
               🐾
             </p>
-            <p className="font-display mt-2 text-[2rem]">{t('casa.pets.none')}</p>
+            <p className="font-display mt-2 text-[1.5rem]">{t('casa.pets.none')}</p>
           </div>
         ) : (
           <div className="grid gap-5 landscape:grid-cols-2">
@@ -76,15 +76,15 @@ export default function PetsPanel({
                 <section key={pet.id} className="casa-card casa-rise rounded-[30px] p-6" style={{ ['--i' as string]: pi }}>
                   <header className="mb-4 flex items-center gap-4">
                     <span
-                      className="inline-flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-[2rem]"
+                      className="inline-flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-[1.5rem]"
                       style={{ background: pet.photo ? undefined : `${tint}33`, boxShadow: `0 0 0 3px var(--card), 0 0 0 5px ${tint}` }}
                     >
                       {pet.photo ? <img src={pet.photo} alt="" className="h-full w-full object-cover" draggable={false} /> : pet.emoji}
                     </span>
-                    <h3 className="font-display text-[2rem] leading-none">{pet.name}</h3>
+                    <h3 className="font-display text-[1.5rem] leading-none">{pet.name}</h3>
                   </header>
                   {daily.length === 0 && routines.length === 0 && reminders.length === 0 ? (
-                    <p className="text-[1.1rem] text-(--text-muted)">{t('casa.pets.nothing')}</p>
+                    <p className="text-[0.95rem] text-(--text-muted)">{t('casa.pets.nothing')}</p>
                   ) : null}
                   <ul className="space-y-2.5">
                     {daily.map(({ task, done: d }) => {
@@ -112,7 +112,7 @@ export default function PetsPanel({
                       )
                     })}
                     {reminders.map((e) => (
-                      <li key={e.id} className="flex items-center gap-3 rounded-[20px] bg-(--surface) px-4 py-3 text-[1.1rem]">
+                      <li key={e.id} className="flex items-center gap-3 rounded-[20px] bg-(--surface) px-4 py-3 text-[0.95rem]">
                         <span aria-hidden>🩺</span>
                         <span className="flex-1 font-medium">{e.title}</span>
                         <span className="text-[0.95rem] font-semibold text-(--expense)">
@@ -157,7 +157,7 @@ function TaskButton({
         <Icon size={24} strokeWidth={2} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className={`block truncate text-[1.25rem] font-medium ${on ? 'text-(--text-muted) line-through decoration-2' : ''}`}>{label}</span>
+        <span className={`block truncate text-[1.05rem] font-medium ${on ? 'text-(--text-muted) line-through decoration-2' : ''}`}>{label}</span>
         {sub ? <span className="block text-[0.95rem] text-(--text-faint)">{sub}</span> : null}
       </span>
       <span

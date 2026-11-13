@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ListChecks, Lock, PawPrint, Settings, Sparkles, Wallet, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { useTheme } from '../hooks/useTheme'
 import { useI18n } from '../hooks/useI18n'
 import { addDays, KIND_EMOJI } from '../lib/calendar'
 import { useHomeWeather, weatherIcon, type TempUnit } from '../lib/weather'
@@ -14,10 +15,11 @@ import ListsPanel from './panels/ListsPanel'
 import MoneyPanel from './panels/MoneyPanel'
 import PetsPanel from './panels/PetsPanel'
 import Roof from './Roof'
+import { sceneFor, WeatherScene } from './WeatherScene'
 import { usePlan } from './session'
 import { PlanSheet, SettingsSheet } from './Sheets'
 import { unlockAudioOnFirstTouch, tick } from './sound'
-import { Avatar, Grow, IconChip, PlusTag, useNow, type GrowHandle } from './ui'
+import { Avatar, Grow, IconChip, useNow, type GrowHandle } from './ui'
 import { GRAD, LOCALE, cap, grad, isoOf, lsGet, lsSet } from './util'
 
 const IDLE_LOCK_MS = 2 * 60_000
@@ -26,6 +28,7 @@ const DRIFT_MS = 4 * 60_000
 export default function Hub() {
   const { t, lang } = useI18n()
   const { profile } = useAuth()
+  const { theme } = useTheme()
   const plan = usePlan()
   const { data, loading, revalidate } = useHubData()
   const now = useNow(1000)
@@ -136,11 +139,17 @@ export default function Hub() {
 
   return (
     <div className="casa-root">
-      <div className="casa-aurora" aria-hidden>
-        <i />
-        <i />
-        <i />
-      </div>
+      {/* The weather sky behind the top-left, like the phone's Home
+          (owner, 2026-11); the soft aurora only when no city is set. */}
+      {weather.weather ? (
+        <WeatherScene kind={sceneFor(weather.weather.code, weather.weather.isDay !== false)} dark={theme === 'dark'} className="w-[min(78vw,110vh)]" />
+      ) : (
+        <div className="casa-aurora" aria-hidden>
+          <i />
+          <i />
+          <i />
+        </div>
+      )}
 
       <div
         className="casa-drift relative flex h-full flex-col px-[clamp(20px,3.2vw,48px)] pt-[clamp(16px,2.4vh,28px)] pb-[clamp(14px,2vh,24px)]"
@@ -176,40 +185,34 @@ export default function Hub() {
           </button>
         </header>
 
-        {/* middle */}
-        <div className="casa-scroll grid min-h-0 flex-1 content-center gap-x-[clamp(24px,3.5vw,56px)] gap-y-6 py-3 landscape:grid-cols-[1fr_1.08fr] landscape:items-center">
+        {/* middle: the day on the left, ONE card per area on the right — each
+            card is that area's only way in (owner, 2026-11: the tile row
+            below repeated them). */}
+        <div className="casa-scroll grid min-h-0 flex-1 content-center gap-x-[clamp(20px,3vw,44px)] gap-y-5 py-3 landscape:grid-cols-[0.9fr_1.1fr] landscape:items-center">
           <section className="casa-rise" style={{ ['--i' as string]: 0 }}>
             <div className="casa-drift" style={{ transform: `translate3d(${drift.cx}px, ${drift.cy}px, 0)` }}>
               <Clock now={now} loc={loc} />
-              <p className="font-display mt-3 text-[clamp(1.6rem,2.6vw,2.4rem)] text-(--text-muted)">{greeting}</p>
+              <p className="font-display mt-1 text-[clamp(1.3rem,2vw,1.8rem)] text-(--text-muted)">{greeting}</p>
             </div>
             <Members data={data} me={profile?.email} loading={loading} />
           </section>
 
-          <section className="grid gap-4">
+          <section className="grid grid-cols-2 gap-3">
             <NextCard
               data={data}
               next={next}
               now={now}
               today={today}
               loc={loc}
+              tomorrow={tomorrowList}
               onClick={(el) => openPanel('calendar', el)}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <ListsCard data={data} onClick={(el) => openPanel('lists', el)} />
-              <PetsCard due={due} onClick={(el) => openPanel('pets', el)} />
-            </div>
-            <div className="casa-card casa-rise flex min-h-[60px] items-center gap-3 rounded-[22px] px-5 py-3 text-[1.15rem]" style={{ ['--i' as string]: 4 }}>
-              <span className="font-semibold">{t('casa.when.tomorrowCap')}</span>
-              <span className="min-w-0 flex-1 truncate text-(--text-muted)">
-                {tomorrowList.length
-                  ? tomorrowList
-                      .slice(0, 4)
-                      .map((o) => `${o.event.all_day ? '' : `${o.event.start_time?.slice(0, 5)} `}${KIND_EMOJI[o.event.kind] ? `${KIND_EMOJI[o.event.kind]} ` : ''}${o.event.title}`)
-                      .join('  ·  ')
-                  : t('casa.cal.freeTomorrow')}
-              </span>
-            </div>
+            <ListsCard data={data} onClick={(el) => openPanel('lists', el)} />
+            <PetsCard due={due} onClick={(el) => openPanel('pets', el)} />
+            <MoneyCard
+              locked={plan.full ? (unlocked ? null : 'pin') : 'plus'}
+              onClick={(el) => openPanel('money', el)}
+            />
           </section>
         </div>
 
@@ -227,40 +230,7 @@ export default function Hub() {
           </div>
         ) : null}
 
-        {/* tiles */}
-        <nav className="grid grid-cols-4 gap-[clamp(10px,1.4vw,18px)]">
-          <Tile
-            i={6}
-            id="calendar"
-            icon={CalendarDays}
-            label={t('app.calendar.name')}
-            sub={todayList.length ? t('casa.tile.today', { count: todayList.length }) : t('casa.tile.free')}
-            tiles={tiles}
-            onOpen={openPanel}
-          />
-          <Tile
-            i={7}
-            id="lists"
-            icon={ListChecks}
-            label={t('casa.lists.title')}
-            sub={t('casa.lists.openCount', { count: data.open.length })}
-            tiles={tiles}
-            onOpen={openPanel}
-          />
-          <Tile i={8} id="pets" icon={PawPrint} label={t('casa.pets.title')} sub={due.length ? t('casa.pets.dueCount', { count: due.length }) : t('casa.pets.allDone')} tiles={tiles} onOpen={openPanel} />
-          <Tile
-            i={9}
-            id="money"
-            icon={Wallet}
-            label={t('app.budget.name')}
-            sub={plan.full ? (unlocked ? t('casa.money.open') : t('casa.money.locked')) : ''}
-            lock={plan.full ? (unlocked ? null : 'pin') : 'plus'}
-            tiles={tiles}
-            onOpen={openPanel}
-          />
-        </nav>
-
-        <div className="casa-rise mt-[clamp(10px,1.6vh,18px)]" style={{ ['--i' as string]: 10 }}>
+        <div className="casa-rise mx-auto mt-[clamp(8px,1.4vh,14px)] w-full max-w-[880px]" style={{ ['--i' as string]: 6 }}>
           <Roof
             data={data}
             full={plan.full}
@@ -315,7 +285,7 @@ function Clock({ now, loc }: { now: Date; loc: string }) {
   const minute = parts.find((p) => p.type === 'minute')?.value ?? ''
   const period = parts.find((p) => p.type === 'dayPeriod')?.value
   return (
-    <p className="casa-clock text-[clamp(7rem,15.5vw,14.5rem)] whitespace-nowrap" aria-label={now.toLocaleTimeString(loc, { hour: 'numeric', minute: '2-digit' })}>
+    <p className="casa-clock text-[clamp(4.5rem,10vw,9rem)] whitespace-nowrap" aria-label={now.toLocaleTimeString(loc, { hour: 'numeric', minute: '2-digit' })}>
       {hour}
       <span className="casa-colon">:</span>
       {minute}
@@ -328,23 +298,70 @@ function Members({ data, me, loading }: { data: HubData; me?: string; loading: b
   const { t } = useI18n()
   if (loading && !data.members.length) {
     return (
-      <div className="mt-8 flex gap-5">
+      <div className="mt-5 flex gap-4">
         {[0, 1, 2].map((i) => (
-          <span key={i} className="casa-shimmer h-[68px] w-[68px] rounded-full" />
+          <span key={i} className="casa-shimmer h-[52px] w-[52px] rounded-full" />
         ))}
       </div>
     )
   }
   return (
-    <ul className="casa-scroll mt-8 flex gap-5 overflow-x-auto pb-1">
+    <ul className="casa-scroll mt-5 flex gap-4 overflow-x-auto pb-1">
       {data.members.map((m, i) => (
         <li key={m.email} className="casa-rise flex shrink-0 flex-col items-center gap-2" style={{ ['--i' as string]: i + 1 }}>
-          <Avatar m={m} size={68} ring={m.email === me} />
-          <span className="max-w-[5.5rem] truncate text-[1rem] font-semibold text-(--text-muted)">{m.email === me ? `${m.first}` : m.first}</span>
+          <Avatar m={m} size={52} ring={m.email === me} />
+          <span className="max-w-[5rem] truncate text-[0.9rem] font-semibold text-(--text-muted)">{m.email === me ? `${m.first}` : m.first}</span>
         </li>
       ))}
       {!data.members.length ? <li className="text-(--text-faint)">{t('casa.noMembers')}</li> : null}
     </ul>
+  )
+}
+
+/** The four area cards share one frame: chip + name, a big number or line,
+ *  and a quiet detail line. Compact on purpose (owner, 2026-11). */
+function AreaCard({
+  i,
+  icon,
+  g,
+  title,
+  big,
+  bigSub,
+  detail,
+  badge,
+  onClick,
+}: {
+  i: number
+  icon: LucideIcon
+  g: readonly string[]
+  title: string
+  big?: string
+  bigSub?: string
+  detail?: string
+  badge?: React.ReactNode
+  onClick: (el: HTMLElement) => void
+}) {
+  return (
+    <button
+      onClick={(e) => onClick(e.currentTarget)}
+      className="casa-card casa-press casa-rise flex min-h-[132px] flex-col rounded-[24px] p-4 text-left"
+      style={{ ['--i' as string]: i }}
+    >
+      <span className="flex items-center gap-2.5">
+        <span className="relative">
+          <IconChip icon={icon} g={g} size={38} />
+          {badge}
+        </span>
+        <span className="font-display text-[1.3rem]">{title}</span>
+      </span>
+      {big ? (
+        <span className="mt-2.5 flex min-w-0 items-baseline gap-2">
+          <span className="font-display truncate text-[2.1rem] leading-none">{big}</span>
+          {bigSub ? <span className="shrink-0 text-[0.95rem] text-(--text-muted)">{bigSub}</span> : null}
+        </span>
+      ) : null}
+      {detail ? <span className="mt-1.5 block truncate text-[0.95rem] text-(--text-muted)">{detail}</span> : null}
+    </button>
   )
 }
 
@@ -354,6 +371,7 @@ function NextCard({
   now,
   today,
   loc,
+  tomorrow,
   onClick,
 }: {
   data: HubData
@@ -361,34 +379,41 @@ function NextCard({
   now: Date
   today: string
   loc: string
+  tomorrow: ReturnType<typeof agenda> extends Map<string, infer L> ? L : never
   onClick: (el: HTMLElement) => void
 }) {
   const { t } = useI18n()
+  const tmr = tomorrow.length
+    ? `${t('casa.when.tomorrowCap')}: ${tomorrow
+        .slice(0, 3)
+        .map((o) => `${o.event.all_day ? '' : `${o.event.start_time?.slice(0, 5)} `}${o.event.title}`)
+        .join(' · ')}`
+    : undefined
   if (!next) {
     const upcoming = [...agenda(data.events, addDays(today, 1), 14).entries()].find(([, l]) => l.length)
     return (
-      <button onClick={(e) => onClick(e.currentTarget)} className="casa-card casa-press casa-rise flex min-h-[150px] items-center gap-5 rounded-[32px] p-6 text-left" style={{ ['--i' as string]: 1 }}>
-        <IconChip icon={CalendarDays} g={GRAD.calendar} size={64} />
-        <span className="min-w-0">
-          <span className="font-display block text-[clamp(1.7rem,2.6vw,2.3rem)] leading-tight">{t('casa.cal.nothingMore')}</span>
-          {upcoming ? (
-            <span className="mt-1 block truncate text-[1.1rem] text-(--text-muted)">
-              {t('casa.cal.nextOn', {
+      <AreaCard
+        i={1}
+        icon={CalendarDays}
+        g={GRAD.calendar}
+        title={t('app.calendar.name')}
+        big={t('casa.cal.nothingMore')}
+        detail={
+          tmr ??
+          (upcoming
+            ? t('casa.cal.nextOn', {
                 title: upcoming[1][0].event.title,
                 day: new Date(upcoming[0] + 'T12:00').toLocaleDateString(loc, { weekday: 'long', day: 'numeric' }),
-              })}
-            </span>
-          ) : null}
-        </span>
-      </button>
+              })
+            : undefined)
+        }
+        onClick={onClick}
+      />
     )
   }
   const ev = next.event
-  const g = ev.kind === 'birthday' || ev.kind === 'anniversary' ? GRAD.birthday : GRAD.event
-  const owner = data.members.find((m) => m.email === ev.owner_email)
   const mins = now.getHours() * 60 + now.getMinutes()
-  const start = minutesOf(ev.start_time)
-  const inMin = start - mins
+  const inMin = minutesOf(ev.start_time) - mins
   const when = ev.all_day
     ? t('casa.cal.allDay')
     : inMin <= 0
@@ -397,31 +422,15 @@ function NextCard({
         ? t('casa.cal.inMinutes', { count: inMin })
         : t('casa.cal.inHours', { h: Math.floor(inMin / 60), m: String(inMin % 60).padStart(2, '0') })
   return (
-    <button
-      onClick={(e) => onClick(e.currentTarget)}
-      className="casa-press casa-rise relative flex min-h-[150px] items-center gap-5 overflow-hidden rounded-[32px] p-7 text-left text-white"
-      style={{ ['--i' as string]: 1, background: grad(g), boxShadow: `0 24px 50px -26px ${g[1]}` }}
-    >
-      <span className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full bg-white/10" aria-hidden />
-      <span className="pointer-events-none absolute -bottom-20 right-24 h-40 w-40 rounded-full bg-white/8" aria-hidden />
-      <span className="relative min-w-0 flex-1">
-        <span className="block text-[1rem] font-semibold uppercase tracking-[0.14em] opacity-80">{t('casa.cal.nextToday')}</span>
-        <span className="font-display mt-1 block truncate text-[clamp(2rem,3.4vw,3rem)] leading-[1.05]">
-          {KIND_EMOJI[ev.kind] ? `${KIND_EMOJI[ev.kind]} ` : ''}
-          {ev.title}
-        </span>
-        <span className="mt-2 block truncate text-[1.2rem] opacity-90">
-          {!ev.all_day ? `${ev.start_time?.slice(0, 5)} · ` : ''}
-          {when}
-          {ev.location ? ` · ${ev.location}` : ''}
-        </span>
-      </span>
-      {owner ? (
-        <span className="relative rounded-full" style={{ boxShadow: '0 0 0 3px rgb(255 255 255 / .5)' }}>
-          <Avatar m={owner} size={64} />
-        </span>
-      ) : null}
-    </button>
+    <AreaCard
+      i={1}
+      icon={CalendarDays}
+      g={GRAD.calendar}
+      title={t('app.calendar.name')}
+      big={`${KIND_EMOJI[ev.kind] ? `${KIND_EMOJI[ev.kind]} ` : ''}${ev.title}`}
+      detail={`${!ev.all_day ? `${ev.start_time?.slice(0, 5)} · ` : ''}${when}${ev.location ? ` · ${ev.location}` : ''}`}
+      onClick={onClick}
+    />
   )
 }
 
@@ -436,98 +445,54 @@ function ListsCard({ data, onClick }: { data: HubData; onClick: (el: HTMLElement
     if (n) groups.push({ name: s.name, n })
   }
   return (
-    <button onClick={(e) => onClick(e.currentTarget)} className="casa-card casa-press casa-rise flex min-h-[170px] flex-col rounded-[30px] p-6 text-left" style={{ ['--i' as string]: 2 }}>
-      <span className="flex items-center gap-3">
-        <IconChip icon={ListChecks} g={GRAD.lists} size={48} />
-        <span className="font-display text-[1.7rem]">{t('casa.lists.title')}</span>
-      </span>
-      <span className="mt-3 flex items-baseline gap-2">
-        <span className="font-display text-[3rem] leading-none">{data.open.length}</span>
-        <span className="text-[1.1rem] text-(--text-muted)">{t('casa.lists.openWord', { count: data.open.length })}</span>
-      </span>
-      <span className="mt-2 block truncate text-[1.05rem] text-(--text-muted)">
-        {groups.length ? groups.map((g) => `${g.name} ${g.n}`).join('  ·  ') : t('casa.lists.allDone')}
-      </span>
-    </button>
+    <AreaCard
+      i={2}
+      icon={ListChecks}
+      g={GRAD.lists}
+      title={t('casa.lists.title')}
+      big={String(data.open.length)}
+      bigSub={t('casa.lists.openWord', { count: data.open.length })}
+      detail={groups.length ? groups.map((g) => `${g.name} ${g.n}`).join(' · ') : t('casa.lists.allDone')}
+      onClick={onClick}
+    />
   )
 }
 
 function PetsCard({ due, onClick }: { due: ReturnType<typeof petsDue>; onClick: (el: HTMLElement) => void }) {
   const { t } = useI18n()
   return (
-    <button onClick={(e) => onClick(e.currentTarget)} className="casa-card casa-press casa-rise flex min-h-[170px] flex-col rounded-[30px] p-6 text-left" style={{ ['--i' as string]: 3 }}>
-      <span className="flex items-center gap-3">
-        <IconChip icon={PawPrint} g={GRAD.pets} size={48} />
-        <span className="font-display text-[1.7rem]">{t('casa.pets.title')}</span>
-      </span>
-      {due.length ? (
-        <>
-          <span className="mt-3 flex items-baseline gap-2">
-            <span className="font-display text-[3rem] leading-none">{due.length}</span>
-            <span className="text-[1.1rem] text-(--text-muted)">{t('casa.pets.today', { count: due.length })}</span>
-          </span>
-          <span className="mt-2 block truncate text-[1.05rem] text-(--text-muted)">
-            {due
-              .slice(0, 3)
-              .map((d) => `${d.pet.emoji} ${d.title}`)
-              .join('  ·  ')}
-          </span>
-        </>
-      ) : (
-        <span className="font-display mt-4 block text-[1.6rem] leading-tight text-(--text-muted)">{t('casa.pets.allDone')} ✓</span>
-      )}
-    </button>
+    <AreaCard
+      i={3}
+      icon={PawPrint}
+      g={GRAD.pets}
+      title={t('casa.pets.title')}
+      big={due.length ? String(due.length) : '✓'}
+      bigSub={due.length ? t('casa.pets.today', { count: due.length }) : t('casa.pets.allDone')}
+      detail={due.length ? due.slice(0, 3).map((d) => `${d.pet.emoji} ${d.title}`).join(' · ') : undefined}
+      onClick={onClick}
+    />
   )
 }
 
-function Tile({
-  i,
-  id,
-  icon,
-  label,
-  sub,
-  lock,
-  tiles,
-  onOpen,
-}: {
-  i: number
-  id: PanelId
-  icon: LucideIcon
-  label: string
-  sub: string
-  lock?: 'pin' | 'plus' | null
-  tiles: React.MutableRefObject<Partial<Record<PanelId, HTMLElement | null>>>
-  onOpen: (id: PanelId, el?: HTMLElement | null) => void
-}) {
+function MoneyCard({ locked, onClick }: { locked: 'pin' | 'plus' | null; onClick: (el: HTMLElement) => void }) {
   const { t } = useI18n()
   return (
-    <button
-      ref={(el) => {
-        tiles.current[id] = el
-      }}
-      onClick={(e) => onOpen(id, e.currentTarget)}
-      className="casa-card casa-press casa-rise flex min-h-[112px] items-center gap-4 rounded-[30px] px-5 py-4 text-left portrait:flex-col portrait:items-start portrait:gap-3"
-      style={{ ['--i' as string]: i }}
-    >
-      <span className="relative">
-        <IconChip icon={icon} g={GRAD[id]} size={60} />
-        {lock === 'pin' ? (
-          <span className="absolute -right-1.5 -bottom-1.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-(--card) shadow">
-            <Lock size={15} strokeWidth={2.6} className="text-(--text-muted)" aria-hidden />
+    <AreaCard
+      i={4}
+      icon={Wallet}
+      g={GRAD.money}
+      title={t('app.budget.name')}
+      badge={
+        locked ? (
+          <span className="absolute -right-1 -bottom-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-(--card) shadow">
+            <Lock size={11} strokeWidth={2.8} className="text-(--text-muted)" aria-hidden />
           </span>
-        ) : null}
-      </span>
-      <span className="min-w-0">
-        <span className="font-display block truncate text-[clamp(1.35rem,1.9vw,1.75rem)] leading-tight">{label}</span>
-        {lock === 'plus' ? (
-          <span className="mt-1 block">
-            <PlusTag label={t('casa.plan.noPlus')} />
-          </span>
-        ) : sub ? (
-          <span className="mt-0.5 block truncate text-[1rem] text-(--text-muted)">{sub}</span>
-        ) : null}
-      </span>
-    </button>
+        ) : null
+      }
+      big={locked === 'plus' ? undefined : locked === 'pin' ? '••••' : t('casa.money.open')}
+      detail={locked === 'plus' ? t('casa.plan.noPlus') : locked === 'pin' ? t('casa.money.locked') : undefined}
+      onClick={onClick}
+    />
   )
 }
 

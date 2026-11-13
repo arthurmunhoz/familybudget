@@ -3,6 +3,7 @@
 // the family's devices, set the Money PIN. The device itself is the web app.
 import { supabase } from '@/lib/supabase'
 import { sha256Hex } from '@/lib/sha256'
+import { loadHomeLocation } from '@/lib/weather'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 export const CASA_URL = 'one-roof-app.vercel.app'
@@ -55,7 +56,7 @@ export async function claimHomeDevice(code: string, name: string): Promise<{ ok:
     const res = await fetch(`${API_BASE}/api/widget?action=casa-claim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ code: normalizeCode(code), name: name.trim() }),
+      body: JSON.stringify({ code: normalizeCode(code), name: name.trim(), home_loc: await loadHomeLocation().catch(() => null) }),
     })
     if (res.ok) return { ok: true }
     const j = (await res.json().catch(() => null)) as { error?: string } | null

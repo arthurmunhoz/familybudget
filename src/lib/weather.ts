@@ -29,6 +29,8 @@ export interface CurrentWeather {
   temperature: number
   /** WMO weather-interpretation code. */
   code: number
+  /** Daytime at the location (false = night sky). */
+  isDay?: boolean
   /** Unit suffix as returned by the API, e.g. "°F". */
   unit: string
 }
@@ -133,11 +135,11 @@ export async function fetchCurrentWeather(
   unit: TempUnit = 'fahrenheit',
 ): Promise<CurrentWeather | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=${unit}`
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&temperature_unit=${unit}`
     const res = await fetch(url)
     if (!res.ok) return null
     const json = (await res.json()) as {
-      current?: { temperature_2m: number; weather_code: number }
+      current?: { temperature_2m: number; weather_code: number; is_day?: number }
       current_units?: { temperature_2m?: string }
     }
     const cur = json.current
@@ -145,6 +147,7 @@ export async function fetchCurrentWeather(
     return {
       temperature: Math.round(cur.temperature_2m),
       code: cur.weather_code,
+      isDay: cur.is_day !== 0,
       unit: json.current_units?.temperature_2m ?? (unit === 'celsius' ? '°C' : '°F'),
     }
   } catch {

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { RefreshCw, Smartphone, Settings2, ScanLine, Wrench } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
+import { saveHomeLocation } from '../lib/weather'
 import { supabase } from '../lib/supabase'
 import { API_BASE, DEVICE_KEY, GRAD, grad, lsSet, prettyCode } from './util'
 import { CheckMark } from './ui'
@@ -92,7 +93,7 @@ export default function Pairing() {
           return
         }
         if (!res.ok) return
-        const j = (await res.json()) as { pending?: boolean; token_hash?: string; device_id?: string; household_id?: string }
+        const j = (await res.json()) as { pending?: boolean; token_hash?: string; device_id?: string; household_id?: string; home_loc?: { city?: string; lat?: number; lon?: number } | null }
         if (j.pending || !j.token_hash) return
         stop = true
         clearInterval(id)
@@ -103,6 +104,12 @@ export default function Pairing() {
           return
         }
         if (j.device_id) lsSet(DEVICE_KEY, j.device_id)
+        // The phone's home city came with the pairing: the weather and its sky
+        // show right away, no setup (owner, 2026-11).
+        const hl = j.home_loc
+        if (hl && typeof hl.lat === 'number' && typeof hl.lon === 'number' && hl.city) {
+          saveHomeLocation({ city: hl.city, lat: hl.lat, lon: hl.lon })
+        }
       } catch {
         /* offline for a moment — keep polling */
       }

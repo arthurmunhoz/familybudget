@@ -44,7 +44,7 @@ export default function CalendarPanel({
           full ? (
             <button
               onClick={() => setAdding((a) => !a)}
-              className="casa-press inline-flex h-16 items-center gap-2 rounded-full px-7 text-[1.15rem] font-semibold text-white"
+              className="casa-press inline-flex h-12 items-center gap-2 rounded-full px-7 text-[0.98rem] font-semibold text-white"
               style={{ background: grad(GRAD.calendar), boxShadow: '0 12px 26px -14px #FF2E63' }}
             >
               <Plus size={24} strokeWidth={2.6} aria-hidden />
@@ -65,15 +65,15 @@ export default function CalendarPanel({
           }}
         />
       ) : null}
-      <div className="casa-scroll grid flex-1 gap-8 px-8 pb-10 landscape:grid-cols-[1.15fr_1fr]">
+      <div className="casa-scroll grid flex-1 gap-8 px-6 pb-10 landscape:grid-cols-[1.15fr_1fr]">
         <section>
           <h3 className="mb-4 text-[0.95rem] font-semibold uppercase tracking-[0.16em] text-(--text-faint)">{t('casa.when.todayCap')}</h3>
           {todayList.length === 0 ? (
             <div className="casa-card casa-fade rounded-[28px] p-8 text-center">
-              <p className="text-[3rem]" aria-hidden>
+              <p className="text-[2.2rem]" aria-hidden>
                 ☕
               </p>
-              <p className="font-display mt-2 text-[1.8rem]">{t('casa.cal.freeDay')}</p>
+              <p className="font-display mt-2 text-[1.4rem]">{t('casa.cal.freeDay')}</p>
             </div>
           ) : (
             <ul className="space-y-3">
@@ -90,7 +90,7 @@ export default function CalendarPanel({
               const list = days.get(d) ?? []
               return (
                 <div key={d} className="casa-rise" style={{ ['--i' as string]: di }}>
-                  <p className="mb-2 text-[1.1rem] font-semibold first-letter:uppercase">
+                  <p className="mb-2 text-[0.95rem] font-semibold first-letter:uppercase">
                     {d === addDays(today, 1) ? t('casa.when.tomorrowCap') : dateOf(d).toLocaleDateString(loc, { weekday: 'long', day: 'numeric' })}
                   </p>
                   {list.length === 0 ? (
@@ -118,13 +118,13 @@ function EventRow({ o, color, big = false, i, data }: { o: Occurrence; color: st
   const emoji = KIND_EMOJI[o.event.kind]
   return (
     <li className="casa-rise" style={{ ['--i' as string]: i }}>
-      <div className={`casa-card flex items-center gap-4 rounded-[22px] ${big ? 'px-6 py-5' : 'px-5 py-3'}`}>
+      <div className={`casa-card flex items-center gap-4 rounded-[22px] ${big ? 'px-6 py-3' : 'px-5 py-3'}`}>
         <span className="h-12 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
-        <span className={`w-[5.2rem] shrink-0 font-semibold tabular-nums ${big ? 'text-[1.5rem]' : 'text-[1.1rem]'}`}>
+        <span className={`w-[5.2rem] shrink-0 font-semibold tabular-nums ${big ? 'text-[1.2rem]' : 'text-[0.95rem]'}`}>
           {o.event.all_day ? <span className="text-[0.95rem] text-(--text-muted)">{t('casa.cal.allDay')}</span> : o.event.start_time?.slice(0, 5)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className={`block truncate font-medium ${big ? 'text-[1.6rem]' : 'text-[1.2rem]'}`}>
+          <span className={`block truncate font-medium ${big ? 'text-[1.25rem]' : 'text-[1rem]'}`}>
             {emoji ? `${emoji} ` : ''}
             {o.event.title}
           </span>
@@ -165,7 +165,7 @@ function NewEvent({ data, today, onDone }: { data: HubData; today: string; onDon
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder={t('casa.cal.whatPlaceholder')}
-        className="h-16 w-full rounded-[20px] border border-(--surface-2) bg-(--bg) px-6 text-[1.4rem] outline-none focus:border-[#FF2E63]"
+        className="h-16 w-full rounded-[20px] border border-(--surface-2) bg-(--bg) px-6 text-[1.1rem] outline-none focus:border-[#FF2E63]"
         style={{ fontSize: '1.4rem' }}
       />
       <div className="casa-scroll mt-4 flex gap-2.5 overflow-x-auto">
@@ -175,7 +175,7 @@ function NewEvent({ data, today, onDone }: { data: HubData; today: string; onDon
             <button
               key={d}
               onClick={() => setDay(d)}
-              className="casa-press h-14 shrink-0 rounded-full px-5 text-[1.05rem] font-semibold first-letter:uppercase"
+              className="casa-press h-11 shrink-0 rounded-full px-5 text-[0.92rem] font-semibold first-letter:uppercase"
               style={on ? { background: grad(GRAD.calendar), color: '#fff' } : { background: 'var(--surface)' }}
             >
               {i === 0 ? t('casa.when.todayCap') : i === 1 ? t('casa.when.tomorrowCap') : dateOf(d).toLocaleDateString(loc, { weekday: 'short', day: 'numeric' })}
@@ -187,14 +187,14 @@ function NewEvent({ data, today, onDone }: { data: HubData; today: string; onDon
           value={time}
           onChange={(e) => setTime(e.target.value)}
           aria-label={t('casa.cal.time')}
-          className="h-14 shrink-0 rounded-full border border-(--surface-2) bg-(--bg) px-5 text-[1.05rem]"
+          className="h-14 shrink-0 rounded-full border border-(--surface-2) bg-(--bg) px-5 text-[0.92rem]"
         />
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <span className="text-[1rem] font-semibold text-(--text-muted)">{t('casa.who.title')}</span>
         <button
           onClick={() => setOwner(null)}
-          className="casa-press h-14 rounded-full px-5 text-[1.05rem] font-semibold"
+          className="casa-press h-11 rounded-full px-5 text-[0.92rem] font-semibold"
           style={owner === null ? { background: grad(GRAD.frame), color: '#fff' } : { background: 'var(--surface)' }}
         >
           {t('casa.who.everyone')}
@@ -203,7 +203,7 @@ function NewEvent({ data, today, onDone }: { data: HubData; today: string; onDon
           <button
             key={m.email}
             onClick={() => setOwner(m.email)}
-            className="casa-press inline-flex h-14 items-center gap-2 rounded-full pr-5 pl-1.5 text-[1.05rem] font-semibold"
+            className="casa-press inline-flex h-11 items-center gap-2 rounded-full pr-5 pl-1.5 text-[0.92rem] font-semibold"
             style={owner === m.email ? { background: `${m.color}33`, boxShadow: `inset 0 0 0 2px ${m.color}` } : { background: 'var(--surface)' }}
           >
             <Avatar m={m} size={44} />
@@ -211,13 +211,13 @@ function NewEvent({ data, today, onDone }: { data: HubData; today: string; onDon
           </button>
         ))}
         <span className="flex-1" />
-        <button onClick={() => onDone(false)} className="casa-press h-14 rounded-full px-6 text-[1.1rem] font-semibold text-(--text-muted)">
+        <button onClick={() => onDone(false)} className="casa-press h-11 rounded-full px-6 text-[0.95rem] font-semibold text-(--text-muted)">
           {t('common.cancel')}
         </button>
         <button
           onClick={() => void save()}
           disabled={!title.trim() || busy}
-          className="casa-press h-14 rounded-full px-8 text-[1.1rem] font-semibold text-white disabled:opacity-50"
+          className="casa-press h-11 rounded-full px-6 text-[0.95rem] font-semibold text-white disabled:opacity-50"
           style={{ background: grad(GRAD.calendar) }}
         >
           {t('common.save')}

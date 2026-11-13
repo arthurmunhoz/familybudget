@@ -122,47 +122,27 @@ export const Grow = forwardRef<
     scrim?: 'soft' | 'deep'
     children: ReactNode
   }
->(function Grow({ origin, tint, radius = 36, className = '', style, onBackdrop, scrim = 'soft', children }, ref) {
+>(function Grow({ radius = 36, className = '', style, onBackdrop, scrim = 'soft', children }, ref) {
   const panel = useRef<HTMLDivElement>(null)
-  const ghost = useRef<HTMLDivElement>(null)
   const inner = useRef<HTMLDivElement>(null)
   const back = useRef<HTMLDivElement>(null)
 
-  const clipFrom = (): string | null => {
-    const el = panel.current
-    if (!el || !origin) return null
-    const r = el.getBoundingClientRect()
-    const top = Math.max(0, origin.top - r.top)
-    const left = Math.max(0, origin.left - r.left)
-    const right = Math.max(0, r.right - origin.right)
-    const bottom = Math.max(0, r.bottom - origin.bottom)
-    return `inset(${top}px ${right}px ${bottom}px ${left}px round 28px)`
-  }
 
+
+  // Simple and smooth (owner, 2026-11: the clip-path "grow from the card" felt
+  // laggy on a tablet): the scrim fades, the panel fades up from a hair below
+  // and slightly smaller — opacity + transform only, so it runs on the GPU.
   useLayoutEffect(() => {
     const el = panel.current
     if (!el) return
     const reduce = prefersReducedMotion()
-    back.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reduce ? 150 : 420, easing: 'ease', fill: 'both' })
-    const from = clipFrom()
-    if (reduce || !from) {
-      el.animate([{ opacity: 0, transform: reduce ? 'none' : 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }], {
-        duration: reduce ? 160 : 420,
-        easing: EASE,
-        fill: 'both',
-      })
-      if (ghost.current) ghost.current.style.opacity = '0'
-      return
-    }
-    el.animate([{ clipPath: from }, { clipPath: `inset(0px 0px 0px 0px round ${radius}px)` }], { duration: 620, easing: EASE, fill: 'both' })
-    ghost.current?.animate([{ opacity: 1 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 560, easing: 'ease-out', fill: 'both' })
-    inner.current?.animate(
+    back.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: reduce ? 120 : 220, easing: 'ease-out', fill: 'both' })
+    el.animate(
       [
-        { opacity: 0, transform: 'translateY(26px)' },
-        { opacity: 0, transform: 'translateY(26px)', offset: 0.3 },
+        { opacity: 0, transform: reduce ? 'none' : 'translateY(14px) scale(.985)' },
         { opacity: 1, transform: 'none' },
       ],
-      { duration: 700, easing: EASE, fill: 'both' },
+      { duration: reduce ? 140 : 260, easing: EASE, fill: 'both' },
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -172,18 +152,15 @@ export const Grow = forwardRef<
       const el = panel.current
       if (!el) return
       const reduce = prefersReducedMotion()
-      const from = clipFrom()
       const anims: Animation[] = []
-      if (back.current) anims.push(back.current.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduce ? 140 : 380, easing: 'ease', fill: 'both' }))
-      if (reduce || !from) {
-        anims.push(el.animate([{ opacity: 1 }, { opacity: 0, transform: reduce ? 'none' : 'translateY(20px) scale(.98)' }], { duration: reduce ? 140 : 300, easing: 'ease-in', fill: 'both' }))
-      } else {
-        anims.push(inner.current!.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, easing: 'ease-in', fill: 'both' }))
-        if (ghost.current) anims.push(ghost.current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 80, easing: 'ease', fill: 'both' }))
-        anims.push(
-          el.animate([{ clipPath: `inset(0px 0px 0px 0px round ${radius}px)` }, { clipPath: from }], { duration: 460, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'both' }),
-        )
-      }
+      if (back.current) anims.push(back.current.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduce ? 100 : 180, easing: 'ease-in', fill: 'both' }))
+      anims.push(
+        el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: reduce ? 'none' : 'translateY(10px) scale(.99)' }], {
+          duration: reduce ? 100 : 180,
+          easing: 'ease-in',
+          fill: 'both',
+        }),
+      )
       await Promise.all(anims.map((a) => a.finished.catch(() => undefined)))
     },
   }))
@@ -199,15 +176,12 @@ export const Grow = forwardRef<
         className="absolute inset-0"
         style={{
           background: scrim === 'deep' ? 'rgb(20 12 30 / .55)' : 'rgb(40 24 14 / .28)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
         }}
       />
-      <div ref={panel} className={`absolute overflow-hidden ${className}`} style={{ borderRadius: radius, ...style }}>
+      <div ref={panel} className={`absolute overflow-hidden shadow-2xl ${className}`} style={{ borderRadius: radius, willChange: 'transform, opacity', ...style }}>
         <div ref={inner} className="relative h-full w-full">
           {children}
         </div>
-        {tint ? <div ref={ghost} className="pointer-events-none absolute inset-0" style={{ background: grad(tint), opacity: 0 }} /> : null}
       </div>
     </div>,
     document.body,

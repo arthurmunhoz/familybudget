@@ -67,7 +67,7 @@ export default function MoneyPanel({
             <Lock size={54} color="#fff" strokeWidth={2} aria-hidden />
           </span>
           <p className="font-display mt-7 text-[2.4rem] leading-tight">{t('casa.money.noPinTitle')}</p>
-          <p className="mt-3 flex max-w-[40ch] items-center gap-2 text-[1.3rem] text-(--text-muted)">
+          <p className="mt-3 flex max-w-[40ch] items-center gap-2 text-[1.05rem] text-(--text-muted)">
             <Smartphone size={22} aria-hidden />
             {t('casa.money.noPinBody')}
           </p>
@@ -166,11 +166,11 @@ function MoneyOpen({ data }: { data: HubData }) {
   const nameOf = (email: string) => data.members.find((m) => m.email === email)
 
   return (
-    <div className="casa-scroll flex-1 px-8 pb-10">
+    <div className="casa-scroll flex-1 px-6 pb-10">
       <div className="mb-6 flex justify-end">
         <button
           onClick={() => setAdding((a) => !a)}
-          className="casa-press inline-flex h-16 items-center gap-2 rounded-full px-7 text-[1.15rem] font-semibold text-white"
+          className="casa-press inline-flex h-12 items-center gap-2 rounded-full px-7 text-[0.98rem] font-semibold text-white"
           style={{ background: grad(GRAD.money), boxShadow: '0 12px 26px -14px #0FA37F' }}
         >
           <Plus size={24} strokeWidth={2.6} aria-hidden />
@@ -193,7 +193,7 @@ function MoneyOpen({ data }: { data: HubData }) {
           <div className="casa-shimmer h-64 rounded-[32px]" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="font-display py-16 text-center text-[2rem]">{t('casa.roof.noBudget')}</p>
+        <p className="font-display py-16 text-center text-[1.5rem]">{t('casa.roof.noBudget')}</p>
       ) : (
         <div className="grid gap-5 landscape:grid-cols-2">
           {rows.map((r, i) => {
@@ -203,7 +203,7 @@ function MoneyOpen({ data }: { data: HubData }) {
               <section key={r.budget.id} className="casa-rise overflow-hidden rounded-[32px]" style={{ ['--i' as string]: i }}>
                 <div className="p-7 text-white" style={{ background: grad(g) }}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="font-display truncate text-[1.8rem]">{r.budget.name}</h3>
+                    <h3 className="font-display truncate text-[1.4rem]">{r.budget.name}</h3>
                     {r.month ? <span className="inline-block text-[1rem] opacity-80 first-letter:uppercase">{periodName(r.budget.period, r.month.start_date, loc)}</span> : null}
                   </div>
                   <p className="mt-3 text-[1rem] opacity-80">{t('casa.money.balance')}</p>
@@ -216,24 +216,24 @@ function MoneyOpen({ data }: { data: HubData }) {
                 </div>
                 <ul className="casa-card divide-y divide-(--surface) rounded-b-[32px] border-t-0">
                   {r.latest.length === 0 ? (
-                    <li className="px-7 py-5 text-[1.05rem] text-(--text-muted)">{t('casa.money.noEntries')}</li>
+                    <li className="px-7 py-3 text-[0.92rem] text-(--text-muted)">{t('casa.money.noEntries')}</li>
                   ) : (
                     r.latest.map((e) => {
                       const cat = categoryById(e.category)
                       const who = nameOf(e.person_email)
                       return (
                         <li key={e.id} className="flex items-center gap-4 px-7 py-3.5">
-                          <span className="text-[1.6rem]" aria-hidden>
+                          <span className="text-[1.25rem]" aria-hidden>
                             {cat.icon}
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[1.15rem] font-medium">{e.label}</span>
+                            <span className="block truncate text-[0.98rem] font-medium">{e.label}</span>
                             <span className="block text-[0.9rem] text-(--text-faint)">
                               {dateOf(e.entry_date).toLocaleDateString(loc, { day: 'numeric', month: 'short' })}
                               {who ? ` · ${who.first}` : ''}
                             </span>
                           </span>
-                          <span className={`text-[1.2rem] font-semibold tabular-nums ${e.type === 'income' ? 'text-(--income)' : ''}`}>
+                          <span className={`text-[1rem] font-semibold tabular-nums ${e.type === 'income' ? 'text-(--income)' : ''}`}>
                             {e.type === 'income' ? '+' : '−'}
                             {formatMoney(Number(e.amount))}
                           </span>
@@ -310,7 +310,7 @@ function NewEntry({ data, budgets, onDone }: { data: HubData; budgets: Budget[];
           <button
             key={k}
             onClick={() => setType(k)}
-            className="casa-press h-14 rounded-full px-6 text-[1.1rem] font-semibold"
+            className="casa-press h-11 rounded-full px-6 text-[0.95rem] font-semibold"
             style={type === k ? { background: grad(GRAD.money), color: '#fff' } : { background: 'var(--surface)' }}
           >
             {k === 'expense' ? t('casa.money.expense') : t('casa.money.income')}
@@ -322,7 +322,7 @@ function NewEntry({ data, budgets, onDone }: { data: HubData; budgets: Budget[];
               <button
                 key={b.id}
                 onClick={() => setBudgetId(b.id)}
-                className="casa-press h-14 rounded-full px-5 text-[1.05rem] font-semibold"
+                className="casa-press h-11 rounded-full px-5 text-[0.92rem] font-semibold"
                 style={budgetId === b.id ? { background: grad(budgetGradient(b.id)), color: '#fff' } : { background: 'var(--surface)' }}
               >
                 {b.name}
@@ -344,7 +344,7 @@ function NewEntry({ data, budgets, onDone }: { data: HubData; budgets: Budget[];
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder={t('casa.money.whatPlaceholder')}
-          className="h-20 min-w-[14rem] flex-1 rounded-[22px] border border-(--surface-2) bg-(--bg) px-6 text-[1.4rem] outline-none focus:border-[#0FA37F]"
+          className="h-20 min-w-[14rem] flex-1 rounded-[22px] border border-(--surface-2) bg-(--bg) px-6 text-[1.1rem] outline-none focus:border-[#0FA37F]"
           style={{ fontSize: '1.4rem' }}
         />
       </div>
@@ -354,7 +354,7 @@ function NewEntry({ data, budgets, onDone }: { data: HubData; budgets: Budget[];
           <button
             key={m.email}
             onClick={() => setPerson(m.email)}
-            className="casa-press inline-flex h-14 items-center gap-2 rounded-full pr-5 pl-1.5 text-[1.05rem] font-semibold"
+            className="casa-press inline-flex h-11 items-center gap-2 rounded-full pr-5 pl-1.5 text-[0.92rem] font-semibold"
             style={person === m.email ? { background: `${m.color}33`, boxShadow: `inset 0 0 0 2px ${m.color}` } : { background: 'var(--surface)' }}
           >
             <Avatar m={m} size={44} />
@@ -362,13 +362,13 @@ function NewEntry({ data, budgets, onDone }: { data: HubData; budgets: Budget[];
           </button>
         ))}
         <span className="flex-1" />
-        <button onClick={() => onDone(false)} className="casa-press h-14 rounded-full px-6 text-[1.1rem] font-semibold text-(--text-muted)">
+        <button onClick={() => onDone(false)} className="casa-press h-11 rounded-full px-6 text-[0.95rem] font-semibold text-(--text-muted)">
           {t('common.cancel')}
         </button>
         <button
           onClick={() => void save()}
           disabled={!ok || busy}
-          className="casa-press h-14 rounded-full px-8 text-[1.1rem] font-semibold text-white disabled:opacity-50"
+          className="casa-press h-11 rounded-full px-6 text-[0.95rem] font-semibold text-white disabled:opacity-50"
           style={{ background: grad(GRAD.money) }}
         >
           {t('common.save')}

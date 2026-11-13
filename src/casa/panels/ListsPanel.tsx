@@ -117,14 +117,14 @@ export default function ListsPanel({
         onClose={onClose}
         closeLabel={t('casa.close')}
       />
-      <div className="casa-scroll flex gap-3 overflow-x-auto px-8 pb-4">
+      <div className="casa-scroll flex gap-2 overflow-x-auto px-6 pb-3">
         {chips.map((c) => {
           const on = filter === c.id
           return (
             <button
               key={c.id}
               onClick={() => setFilter(c.id)}
-              className="casa-press inline-flex h-14 shrink-0 items-center gap-2.5 rounded-full px-6 text-[1.1rem] font-semibold"
+              className="casa-press inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-4 text-[0.98rem] font-semibold"
               style={
                 on
                   ? { background: grad(GRAD.lists), color: '#3b2400', boxShadow: '0 10px 24px -12px #FF9A1F' }
@@ -132,7 +132,7 @@ export default function ListsPanel({
               }
             >
               {c.label}
-              <span className={`rounded-full px-2 text-[0.95rem] ${on ? 'bg-white/45' : 'bg-(--card) text-(--text-muted)'}`}>{c.count}</span>
+              <span className={`rounded-full px-2 text-[0.85rem] ${on ? 'bg-white/45' : 'bg-(--card) text-(--text-muted)'}`}>{c.count}</span>
             </button>
           )
         })}
@@ -143,24 +143,24 @@ export default function ListsPanel({
           e.preventDefault()
           void add()
         }}
-        className="mx-8 mb-5 flex items-center gap-3"
+        className="mx-6 mb-3 flex items-center gap-2"
       >
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={!full}
           placeholder={full ? t('casa.lists.addTo', { list: targetName }) : t('casa.plan.displayOnly')}
-          className="h-16 min-w-0 flex-1 rounded-[22px] border border-(--surface-2) bg-(--card) px-6 text-[1.3rem] outline-none focus:border-[#FF9A1F] disabled:opacity-60"
-          style={{ fontSize: '1.3rem' }}
+          className="h-12 min-w-0 flex-1 rounded-[16px] border border-(--surface-2) bg-(--card) px-4 outline-none focus:border-[#FF9A1F] disabled:opacity-60"
+          style={{ fontSize: '1.05rem' }}
         />
         {full ? (
           <button
             type="submit"
             disabled={!text.trim() || busy}
-            className="casa-press inline-flex h-16 shrink-0 items-center gap-2 rounded-[22px] px-7 text-[1.2rem] font-semibold disabled:opacity-50"
+            className="casa-press inline-flex h-12 shrink-0 items-center gap-1.5 rounded-[16px] px-5 text-[1rem] font-semibold disabled:opacity-50"
             style={{ background: grad(GRAD.lists), color: '#3b2400' }}
           >
-            <Plus size={24} strokeWidth={2.6} aria-hidden />
+            <Plus size={19} strokeWidth={2.6} aria-hidden />
             {t('casa.lists.add')}
           </button>
         ) : (
@@ -168,7 +168,7 @@ export default function ListsPanel({
         )}
       </form>
 
-      <div className="casa-scroll flex-1 px-8 pb-10">
+      <div className="casa-scroll flex-1 px-6 pb-8">
         {shown.length === 0 ? (
           <div className="casa-fade flex flex-col items-center justify-center py-16 text-center">
             <span className="text-[4rem]" aria-hidden>
@@ -177,35 +177,35 @@ export default function ListsPanel({
             <p className="font-display mt-3 text-[2rem]">{t('casa.lists.empty')}</p>
           </div>
         ) : (
-          <ul className="grid gap-3 landscape:grid-cols-2">
-            {shown.map((item, i) => {
+          <ul className="grid gap-2 sm:grid-cols-2 landscape:grid-cols-3">
+            {shown.map((item) => {
               const going = ticking.has(item.id)
               return (
-                <li key={item.id} className="casa-rise" style={{ ['--i' as string]: Math.min(i, 10) }}>
+                <li key={item.id}>
                   <button
                     onClick={() => void toggle(item)}
                     disabled={!full}
-                    className="casa-press casa-card flex min-h-[76px] w-full items-center gap-4 rounded-[24px] px-5 py-3 text-left disabled:cursor-default"
+                    className="casa-press casa-card flex min-h-[52px] w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left disabled:cursor-default"
                     style={{ opacity: going ? 0.55 : 1, transition: 'opacity .4s' }}
                   >
                     <span
-                      className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[3px]"
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2"
                       style={{
                         borderColor: going ? 'transparent' : 'var(--surface-2)',
                         background: going ? grad(GRAD.lists) : 'transparent',
                         transition: 'all .25s',
                       }}
                     >
-                      {going ? <Check size={26} strokeWidth={3} color="#3b2400" className="casa-pop" aria-hidden /> : null}
+                      {going ? <Check size={16} strokeWidth={3.2} color="#3b2400" className="casa-pop" aria-hidden /> : null}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span
-                        className="casa-strike block truncate text-[1.45rem] font-medium"
+                        className="casa-strike block truncate text-[1.08rem] font-medium"
                         style={{ backgroundSize: going ? '100% 2px' : '0% 2px' }}
                       >
                         {item.label}
                       </span>
-                      {filter === 'all' ? <span className="block text-[0.95rem] text-(--text-faint)">{storeName(item.store_id)}</span> : null}
+                      {filter === 'all' ? <span className="block truncate text-[0.8rem] text-(--text-faint)">{storeName(item.store_id)}</span> : null}
                     </span>
                   </button>
                 </li>
@@ -215,7 +215,7 @@ export default function ListsPanel({
         )}
 
         {shownDone.length ? (
-          <section className="mt-9">
+          <section className="mt-6">
             <h3 className="mb-3 text-[0.95rem] font-semibold uppercase tracking-[0.16em] text-(--text-faint)">{t('casa.lists.done')}</h3>
             <ul className="flex flex-wrap gap-2.5">
               {shownDone.map((item) => (
@@ -223,7 +223,7 @@ export default function ListsPanel({
                   <button
                     onClick={() => void untick(item)}
                     disabled={!full}
-                    className="casa-press inline-flex h-12 items-center gap-2 rounded-full bg-(--surface) px-4 text-[1.05rem] text-(--text-muted)"
+                    className="casa-press inline-flex h-10 items-center gap-2 rounded-full bg-(--surface) px-3.5 text-[0.95rem] text-(--text-muted)"
                   >
                     <span className="line-through decoration-2">{item.label}</span>
                     {full ? <RotateCcw size={16} aria-hidden /> : null}

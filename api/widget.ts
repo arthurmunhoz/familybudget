@@ -444,7 +444,7 @@ async function casaPair(action: string, req: any, res: any, url: string, service
       return res.status(200).json({ pending: true })
     }
     await db.from('home_pair_codes').update({ collected_at: new Date().toISOString() }).eq('code', code)
-    return res.status(200).json({ token_hash: row.token_hash, device_id: row.device_id, household_id: row.household_id })
+    return res.status(200).json({ token_hash: row.token_hash, device_id: row.device_id, household_id: row.household_id, home_loc: row.home_loc ?? null })
   }
 
   if (action === 'casa-claim') {
@@ -478,6 +478,12 @@ async function casaPair(action: string, req: any, res: any, url: string, service
     if ((count ?? 0) >= limit) return res.status(402).json({ error: plus === true ? 'device_limit' : 'plus_required' })
 
     const name = String(body.name ?? '').trim().slice(0, 40) || 'Dispositivo'
+    // The phone's home city (for the device's weather), if it has one.
+    const hl = body.home_loc
+    const homeLoc =
+      hl && typeof hl.lat === 'number' && typeof hl.lon === 'number' && Math.abs(hl.lat) <= 90 && Math.abs(hl.lon) <= 180
+        ? { city: String(hl.city ?? '').slice(0, 80), lat: hl.lat, lon: hl.lon }
+        : null
     const { data: dev, error: devErr } = await db
       .from('home_devices')
       .insert({ household_id: household, paired_by: email, name })
@@ -495,7 +501,7 @@ async function casaPair(action: string, req: any, res: any, url: string, service
     }
     await db
       .from('home_pair_codes')
-      .update({ household_id: household, device_id: dev.id, claimed_by: email, claimed_at: new Date().toISOString(), token_hash: tokenHash })
+      .update({ household_id: household, device_id: dev.id, claimed_by: email, claimed_at: new Date().toISOString(), token_hash: tokenHash, home_loc: homeLoc })
       .eq('code', code)
     return res.status(200).json({ ok: true, device_id: dev.id })
   }

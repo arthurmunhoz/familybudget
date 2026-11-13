@@ -100,13 +100,11 @@
 }
 
 .casa-card {
-  background: color-mix(in srgb, var(--card) 86%, transparent);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
   border: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
   box-shadow:
     0 1px 0 rgb(255 255 255 / 0.5) inset,
     0 18px 50px -24px rgb(60 30 10 / 0.28);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 :root[data-theme='dark'] .casa-card {
   box-shadow:
@@ -413,4 +411,17 @@
   .casa-check path {
     animation-duration: 0.01s;
   }
+}
+
+/* The weather sky drifts very slowly (clouds breathing), never distracting. */
+.casa-sky {
+  animation: casa-sky 24s ease-in-out infinite alternate;
+  transform-origin: 0 0;
+}
+@keyframes casa-sky {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(14px, 6px, 0) scale(1.03); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .casa-sky { animation: none !important; }
 }
