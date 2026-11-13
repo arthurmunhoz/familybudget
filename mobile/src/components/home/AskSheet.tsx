@@ -338,7 +338,8 @@ export function AskSheet({
       // A listen that finished after the sheet closed is dropped, never sent;
       // so is a bare hesitation ("er", "é…") — that's not a request.
       if (!openRef.current) return
-      heard = meaningfulRequest(heard)
+      // ("ok" alone is a goodbye, not a hesitation — check that first.)
+      if (!isGoodbye(heard)) heard = meaningfulRequest(heard)
       if (!heard) return
       viaVoice.current = true
       void submitRef.current?.(heard)

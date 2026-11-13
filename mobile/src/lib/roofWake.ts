@@ -64,14 +64,14 @@ const BYE_WORDS = new Set([
   // pt
   'obrigado', 'obrigada', 'obrigadao', 'brigado', 'brigada', 'valeu', 'vlw', 'falou', 'tchau', 'tchauzinho', 'ate', 'mais', 'logo',
   'depois', 'amanha', 'so', 'isso', 'e', 'era', 'nada', 'muito', 'mto', 'roof', 'ei', 'ok', 'beleza', 'blz', 'otimo', 'perfeito',
-  'show', 'certo', 'entao', 'por', 'hoje', 'tudo', 'tranquilo', 'de',
+  'show', 'certo', 'entao', 'por', 'hoje', 'tudo', 'tranquilo', 'de', 'fechou', 'maravilha', 'brigadao', 'ta', 'bom', 'okay',
   // en
   'thanks', 'thank', 'you', 'thx', 'bye', 'goodbye', 'see', 'later', 'that', 'thats', 's', 'all', 'great', 'cool', 'perfect', 'got', 'it',
   'so', 'much', 'for', 'now', 'cheers', 'hey',
   // es
   'gracias', 'adios', 'hasta', 'luego', 'pronto', 'eso', 'es', 'todo', 'chao', 'vale', 'perfecto', 'genial', 'oye',
 ])
-const BYE_CORE = /\b(obrigad[oa]|obrigadao|brigad[oa]|valeu|vlw|falou|tchau|tchauzinho|ate (mais|logo|amanha|depois)|so isso|era so isso|e isso|thanks|thank you|thx|bye|goodbye|see you|that s all|thats all|gracias|adios|hasta (luego|pronto)|eso es todo|chao)\b/
+const BYE_CORE = /\b(fechou|maravilha|ok|okay|brigadao|obrigad[oa]|obrigadao|brigad[oa]|valeu|vlw|falou|tchau|tchauzinho|ate (mais|logo|amanha|depois)|so isso|era so isso|e isso|thanks|thank you|thx|bye|goodbye|see you|that s all|thats all|gracias|adios|hasta (luego|pronto)|eso es todo|chao)\b/
 
 /** Is `text` only thanks / a goodbye (in pt, en or es)? */
 export function isGoodbye(text: string): boolean {
