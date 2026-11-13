@@ -637,6 +637,26 @@
         "intent": "open_app",
         "app": "games"
       }
+    },
+    {
+      "text": "põe estudar o capítulo 3 na lista de tarefas",
+      "expect": {
+        "intent": "add_items",
+        "store": "Tarefas"
+      }
+    },
+    {
+      "text": "limpa os feitos",
+      "expect": {
+        "intent": "clear_checked"
+      }
+    },
+    {
+      "text": "o que tem na lista de tarefas?",
+      "expect": {
+        "intent": "list_items",
+        "store": "Tarefas"
+      }
     }
   ]
 }

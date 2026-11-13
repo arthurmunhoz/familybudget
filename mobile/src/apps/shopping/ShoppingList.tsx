@@ -31,7 +31,7 @@ import {
 import { Pressable } from '@/components/Pressable'
 import { RoofExamples } from '@/components/RoofExamples'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUp, Check, ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, ShoppingCart, Store, Trash2, X } from 'lucide-react-native'
+import { ArrowUp, Check, ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, ListChecks, ListPlus, Trash2, X } from 'lucide-react-native'
 import { router } from 'expo-router'
 import { GradientBox } from '@/components/home/GradientBox'
 import { useScreenCorner } from '@/hooks/useScreenCorner'
@@ -54,6 +54,7 @@ import {
 } from '@/lib/offline'
 import { supabase } from '@/lib/supabase'
 import { channelName } from '@/lib/realtime'
+import type { TKey } from '@/lib/i18n'
 import { STORE_CATALOG, STORE_COLORS, type StoreCatalogEntry } from '@/lib/stores'
 import { fetchStoreSuggestions, type SuggestedStore } from '@/lib/storeSuggest'
 import type { ShoppingItem, ShoppingStore } from '@/lib/types'
@@ -654,6 +655,18 @@ export default function ShoppingList() {
   const suggestedToAdd = (suggestions ?? [])
     .filter((sg) => !stores.some((s) => s.name.trim().toLowerCase() === sg.name.trim().toLowerCase()))
     .sort((a, b) => a.name.localeCompare(b.name))
+  // Lists that aren't a store, offered first (any not created yet).
+  const listIdeas = (
+    [
+      ['shopping.idea.tasks', '#5B6CF0'],
+      ['shopping.idea.trip', '#0EA5A4'],
+      ['shopping.idea.school', '#8B5CF6'],
+      ['shopping.idea.pharmacy', '#E4554A'],
+      ['shopping.idea.gifts', '#EC4899'],
+    ] as [TKey, string][]
+  )
+    .map(([k, color]) => ({ name: t(k), color }) as SuggestedStore)
+    .filter((sg) => !stores.some((s) => s.name.trim().toLowerCase() === sg.name.trim().toLowerCase()))
   // A–Z for the picker sheet only. `stores` itself keeps its creation order,
   // which is what the chip row and the list's own store sections are built
   // from — sorting it here would silently reorder the shopping list too.
@@ -749,7 +762,7 @@ export default function ShoppingList() {
         {section.isStore ? (
           <StoreLogo slug={section.slug} name={section.title} color={section.color} size={22} />
         ) : (
-          <ShoppingCart size={18} strokeWidth={2} color={c.textFaint} />
+          <ListChecks size={18} strokeWidth={2} color={c.textFaint} />
         )}
         {/* The Home's section-label voice: small caps, tracked, muted. */}
         <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}>
@@ -809,7 +822,7 @@ export default function ShoppingList() {
           onPress={() => selectStore(null)}
           icon={
             <GradientBox colors={SHOP_TILE} radius={10} style={styles.tileIcon}>
-              <ShoppingCart size={17} color="#fff" strokeWidth={2.2} />
+              <ListChecks size={17} color="#fff" strokeWidth={2.2} />
             </GradientBox>
           }
         />
@@ -856,7 +869,7 @@ export default function ShoppingList() {
               hitSlop={8}
               style={[styles.round, { backgroundColor: c.card, borderColor: c.border }]}
             >
-              <Store size={19} color={c.text} />
+              <ListPlus size={19} color={c.text} />
             </Pressable>
           </View>
         </View>
@@ -868,7 +881,7 @@ export default function ShoppingList() {
             {listHeader}
             <View style={styles.empty}>
               <GradientBox colors={SHOP_TILE} radius={22} style={styles.emptyIcon}>
-                <ShoppingCart size={32} strokeWidth={2} color="#fff" />
+                <ListChecks size={32} strokeWidth={2} color="#fff" />
               </GradientBox>
               <Txt style={{ fontFamily: fonts.display, fontSize: 22, marginTop: sp.lg }}>{t('shopping.empty')}</Txt>
               <Txt variant="muted" style={{ textAlign: 'center' }}>
@@ -1012,7 +1025,7 @@ export default function ShoppingList() {
           >
             <View style={styles.sheetHead}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-                <Store size={20} strokeWidth={2} color={c.text} />
+                <ListChecks size={20} strokeWidth={2} color={c.text} />
                 <Txt variant="h2">
                   {customOpen ? t('shopping.newStore') : t('shopping.stores')}
                 </Txt>
@@ -1154,6 +1167,30 @@ export default function ShoppingList() {
                               <Pencil size={15} strokeWidth={2} color={c.textFaint} />
                             </Pressable>
                           </View>
+                        ))}
+                      </View>
+                    </>
+                  ) : null}
+
+                  {/* Lists aren't only stores (owner, 2026-11): a few ideas
+                      for anything else — chores, a trip, school… */}
+                  {listIdeas.length > 0 ? (
+                    <>
+                      <Txt variant="label" style={[styles.groupLabel, { color: c.textFaint }]}>
+                        {t('shopping.ideas').toUpperCase()}
+                      </Txt>
+                      <View style={styles.grid}>
+                        {listIdeas.map((sg) => (
+                          <Pressable
+                            key={sg.name}
+                            onPress={() => addSuggestedStore(sg)}
+                            style={[styles.storeTile, { backgroundColor: c.surface }]}
+                          >
+                            <StoreLogo slug={null} name={sg.name} color={sg.color} size={28} />
+                            <Txt numberOfLines={1} style={{ flex: 1, fontWeight: '500' }}>
+                              {sg.name}
+                            </Txt>
+                          </Pressable>
                         ))}
                       </View>
                     </>

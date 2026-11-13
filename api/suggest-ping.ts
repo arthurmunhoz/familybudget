@@ -102,13 +102,13 @@ const ASSISTANT_SCHEMA = {
       type: 'string',
       enum: [...INTENTS],
       description: [
-        'add_items = put things on a shopping list.',
-        'move_items = move items that are already on the list to another store ("passa o leite pro Costco").',
-        'clear_checked = clear / delete the bought (checked) items from the list or one store ("limpa os comprados do Costco").',
-        'uncheck_items = put a bought item back as still to buy ("desmarca o leite", "o leite eu não comprei ainda").',
-        'list_items = asks what is on the shopping list (all of it, or one store).',
+        'add_items = put things on a list — the household\'s lists are for anything: groceries at a store, chores ("tarefas"), a trip, school ("prova"). "põe estudar o capítulo 3 na lista de tarefas" is add_items with store "Tarefas".',
+        'move_items = move items that are already on a list to another list ("passa o leite pro Costco").',
+        'clear_checked = clear / delete the done (checked) items from the lists or one list ("limpa os feitos", "limpa os comprados do Costco").',
+        'uncheck_items = put a done item back as still to do ("desmarca o leite", "o leite eu não comprei ainda").',
+        'list_items = asks what is on the lists (all of them, or one list).',
         'find_items = asks whether specific things are on the list ("is there coconut water on the list?", "tem leite na lista?").',
-        'check_items = STATES items were bought / are in the cart ("já comprei o leite"). A question is never check_items.',
+        'check_items = STATES items were bought / done ("já comprei o leite", "terminei a redação"). A question is never check_items.',
         'remove_items = take items off the shopping list. ONLY shopping-list items: never when the user talks about a gasto / despesa / lançamento / expense / charge, or names a place that is not in KNOWN STORES but was just logged as an expense — that is remove_money.',
         'agenda = asks what is on the calendar for a day.',
         'add_event = schedule something on the calendar, including repeating events ("natação toda terça às 18h") and special dates (birthdays, anniversaries, renewals).',
@@ -156,7 +156,7 @@ const ASSISTANT_SCHEMA = {
     store: {
       type: 'string',
       description:
-        'Shopping intents (for move_items: the store to move TO): the STORE named, matched to KNOWN STORES when it is the same store (return that exact spelling), else as written. A generic list ("lista de compras", "shopping list", "a lista", "mercado" without a store name) is NOT a store: return "". "" when none was named.',
+        'List intents (for move_items: the list to move TO): the LIST named — a store ("Costco") or any list ("Tarefas", "Viagem") — matched to KNOWN STORES (the household\'s lists) when it is the same one (return that exact spelling), else as written. A generic list ("lista de compras", "shopping list", "a lista", "mercado" without a name) is no particular list: return "". "" when none was named.',
     },
     scope: {
       type: 'string',
@@ -486,7 +486,7 @@ function buildContext(body: any, today: string): string {
   return [
     `TODAY: ${today} (${str(body?.weekday, 20)})`,
     `APP LANGUAGE: ${LANG_NAME[str(body?.lang, 8)] ?? 'Portuguese (Brazil)'}`,
-    `KNOWN STORES: ${strList(body?.stores).join(', ') || '(none yet)'}`,
+    `KNOWN STORES (the household's lists — stores or any list): ${strList(body?.stores).join(', ') || '(none yet)'}`,
     `MEMBERS: ${strList(body?.members, 15).join(', ') || '(unknown)'}`,
     `KNOWN BUDGETS: ${strList(body?.budgets, 15).join(', ') || '(none)'}`,
     `PETS: ${strList(body?.pets, 15).join(', ') || '(none)'}`,
@@ -511,7 +511,7 @@ const APP_GUIDE =
   'APP GUIDE (One Roof — answer app_help from this only): ' +
   'Home: today\'s agenda and the assistant (typed, the mic, or "Ei Roof"/"Hey Roof" by voice, a Plus feature). ' +
   'Apps: Calendar (events, birthdays, reminders; Google/Apple Calendar sync on Plus), Money (budgets, expenses and income, AI receipt scan), ' +
-  'Shopping (lists by store, shared live), Pets (daily routines, vet visits, vaccines, reminders), Documents (family vault; Face ID lock on Plus), ' +
+  'Lists (shared live; for groceries by store or anything — chores, a trip, school), Pets (daily routines, vet visits, vaccines, reminders), Documents (family vault; Face ID lock on Plus), ' +
   'Family (each member\'s profile: birthday, phone, sizes, allergies), Utilities (split a bill evenly or by item, better deal per unit, discount, printable cards, photo frame), ' +
   'Nudges (one-tap messages to the family, urgent ones too), Location (family map, places with arrival alerts, safety radius; iPhone only), Games. ' +
   'GAMES — played live, each person on their own phone, in two teams (Orange and Purple); someone opens a room in Games, the others join and tap ready, the host starts: ' +
