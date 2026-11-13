@@ -98,16 +98,22 @@ def clunk():
 
 
 def door_open():
-    n = int(RATE * 1.1)
+    """Heavy door swinging (owner, 2026-11-13: deeper, softer, fading out —
+    v1's airy swell read as a hiss). A low body that slides down in pitch,
+    a muffled air swell under it, and a long exponential tail."""
+    dur = 1.6
+    n = int(RATE * dur)
     noise = [random.random() * 2 - 1 for _ in range(n)]
-    air = lowpass(highpass(noise, 140), 900)
+    air = lowpass(lowpass(highpass(noise, 60), 320), 320)
     out = []
     for i in range(n):
         t = i / RATE
-        swell = math.sin(math.pi * min(1.0, t / 1.05)) ** 1.6
-        hinge = math.sin(TAU * (310 + 90 * t) * t + 0.8 * math.sin(TAU * 7 * t)) * 0.08 * math.exp(-t / 0.45)
-        out.append(1.6 * air[i] * swell + hinge)
-    return reverb(out, 0.25)
+        rise = min(1.0, t / 0.25) ** 2
+        fade = math.exp(-max(0.0, t - 0.3) / 0.42)
+        f = 95 - 25 * min(1.0, t / dur)
+        body = (math.sin(TAU * f * t) + 0.45 * math.sin(TAU * f * 2.01 * t) + 0.2 * math.sin(TAU * f * 3.02 * t)) * 0.35
+        out.append((body + 2.2 * air[i]) * rise * fade)
+    return reverb(lowpass(out, 700), 0.3)
 
 
 def write(name, x, target_peak):
@@ -126,7 +132,7 @@ def write(name, x, target_peak):
         w.writeframes(b''.join(data))
 
 
-write('dial', dial(), 0.6)
-write('clunk', clunk(), 0.85)
-write('open', door_open(), 0.55)
+write('dial', dial(), 0.45)
+write('clunk', clunk(), 0.6)
+write('open', door_open(), 0.5)
 print('vault sounds written to', os.path.normpath(OUT))
