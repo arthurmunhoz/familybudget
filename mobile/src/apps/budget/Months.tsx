@@ -59,6 +59,8 @@ import { budgetLook, type Gradient } from '@/components/home/palette'
 import { TintButton } from '@/components/TintButton'
 import { GradientBox } from '@/components/home/GradientBox'
 import { FormSection, NoteRow, RowIcon } from '@/components/form'
+import { BudgetIconPicker } from './BudgetIconPicker'
+import { budgetIcon } from './budgetIcons'
 import { FormSheet } from './FormSheet'
 import { BudgetAccessSheet } from './BudgetAccessSheet'
 import { DatePickerModal } from './shared'
@@ -83,6 +85,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [name, setName] = useState('')
+  const [icon, setIcon] = useState('💰')
   const [saving, setSaving] = useState(false)
   // "Who can view" sheet + visibility-change guard.
   const [accessOpen, setAccessOpen] = useState(false)
@@ -226,7 +229,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
     const trimmed = name.trim()
     if (!trimmed) return
     setSaving(true)
-    const { error } = await supabase.from('budgets').update({ name: trimmed }).eq('id', budgetId)
+    const { error } = await supabase.from('budgets').update({ name: trimmed, icon }).eq('id', budgetId)
     setSaving(false)
     setRenameOpen(false)
     if (error) {
@@ -463,6 +466,7 @@ export default function Months({ budgetId }: { budgetId: string }) {
                   onPress={() => {
                     setMenuOpen(false)
                     setName(budget?.name ?? '')
+                    setIcon(budgetIcon(budget))
                     setRenameOpen(true)
                   }}
                 />
@@ -521,6 +525,8 @@ export default function Months({ budgetId }: { budgetId: string }) {
           colors={budgetLook(budgetId).colors}
           name={name}
           onName={setName}
+          icon={icon}
+          onIcon={setIcon}
           saving={saving}
           onSave={renameBudget}
           onClose={() => setRenameOpen(false)}
@@ -563,6 +569,8 @@ function RenameBudgetSheet({
   colors,
   name,
   onName,
+  icon,
+  onIcon,
   saving,
   onSave,
   onClose,
@@ -570,6 +578,8 @@ function RenameBudgetSheet({
   colors: Gradient
   name: string
   onName: (v: string) => void
+  icon: string
+  onIcon: (v: string) => void
   saving: boolean
   onSave: () => void
   onClose: () => void
@@ -594,6 +604,9 @@ function RenameBudgetSheet({
           onSubmitEditing={() => name.trim() && onSave()}
         />
       </FormSection>
+      <View style={{ marginTop: sp.lg }}>
+        <BudgetIconPicker value={icon} onChange={onIcon} tint={colors[1]} />
+      </View>
     </FormSheet>
   )
 }

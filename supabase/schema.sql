@@ -273,3 +273,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-105-modo-casa.sql (Modo Casa: home_devices (paired tablets) + home_pair_codes (service-role pairing, api/widget.ts ?action=casa-start|claim|poll) + home_settings (Money PIN hash); home_trial_ends()/home_plan(): 30 days from the first tablet, then display-only without Plus)
 --   migration-106-casa-home-loc.sql (home_pair_codes.home_loc: the phone's home city handed to the device at pairing)
 --   migration-107-pet-task-time.sql (pet_care_tasks.at_time: a routine item's time of day, orders the day)
+--   migration-108-budget-icon.sql (budgets.icon: an emoji per budget)

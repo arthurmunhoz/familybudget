@@ -12,6 +12,7 @@ import {
   Dimensions,
   Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,8 +20,9 @@ import {
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg'
 import { router, useFocusEffect } from 'expo-router'
-import { CalendarDays, CalendarRange, Camera, Check, ChevronDown, ChevronRight, Lock, Plus, Sun, Wallet, X } from 'lucide-react-native'
+import { CalendarDays, CalendarRange, Camera, Check, ChevronDown, ChevronRight, Lock, Plus, Sun, X } from 'lucide-react-native'
 
 import { AppHeader, EmptyState, Loader, NewItemButton, Txt } from '@/components/ui'
 import { RoofExamples } from '@/components/RoofExamples'
@@ -33,6 +35,8 @@ import { useBottomGap } from '@/hooks/useBottomGap'
 import { useScreenCorner } from '@/hooks/useScreenCorner'
 import { useSheetLift } from '@/hooks/useSheetLift'
 import { StatChip } from './StatChip'
+import { BudgetIconPicker } from './BudgetIconPicker'
+import { budgetIcon } from './budgetIcons'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useToday } from '@/hooks/useToday'
@@ -67,6 +71,7 @@ export default function Budgets() {
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [period, setPeriod] = useState<Period>('monthly')
+  const [icon, setIcon] = useState('💰')
   const [isPrivate, setIsPrivate] = useState(false)
   const [saving, setSaving] = useState(false)
   // Which private budget's "who can view" sheet is open.
@@ -187,6 +192,7 @@ export default function Budgets() {
       return
     }
     setName('')
+    setIcon('💰')
     setPeriod('monthly')
     setIsPrivate(false)
     setCreateOpen(true)
@@ -200,7 +206,7 @@ export default function Budgets() {
     // only sent when private so a non-Plus insert stays byte-identical to before.
     const { error } = await supabase
       .from('budgets')
-      .insert({ name: trimmed, period, ...(isPrivate ? { visibility: 'private' as const } : {}) })
+      .insert({ name: trimmed, period, ...(icon !== '💰' ? { icon } : {}), ...(isPrivate ? { visibility: 'private' as const } : {}) })
     setSaving(false)
     setCreateOpen(false)
     if (error) {
@@ -219,7 +225,7 @@ export default function Budgets() {
       <View style={{ paddingHorizontal: sp.lg }}>
         <AppHeader
           title={t('app.budget.name')}
-          right={<RoofExamples variant="pill" examples={['roofEx.money.1', 'roofEx.money.2', 'roofEx.money.3', 'roofEx.money.4']} />}
+          right={<RoofExamples variant="pill" examples={['roofEx.money.5', 'roofEx.money.1', 'roofEx.money.2', 'roofEx.money.3', 'roofEx.money.4']} />}
         />
       </View>
 
@@ -270,6 +276,8 @@ export default function Budgets() {
           onName={setName}
           period={period}
           onPeriod={setPeriod}
+          icon={icon}
+          onIcon={setIcon}
           isPrivate={isPrivate}
           onPrivate={setIsPrivate}
           showPrivate={isPlus}
@@ -294,6 +302,8 @@ export default function Budgets() {
 function NewBudgetSheet({
   name,
   onName,
+  icon,
+  onIcon,
   period,
   onPeriod,
   isPrivate,
@@ -305,6 +315,8 @@ function NewBudgetSheet({
 }: {
   name: string
   onName: (v: string) => void
+  icon: string
+  onIcon: (v: string) => void
   period: Period
   onPeriod: (p: Period) => void
   isPrivate: boolean
@@ -342,9 +354,9 @@ function NewBudgetSheet({
         >
           {/* the name, large and typed in place */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.md, paddingHorizontal: sp.lg, paddingBottom: sp.lg }}>
-            <GradientBox colors={green} radius={18} style={{ width: 56, height: 56, alignItems: 'center', justifyContent: 'center' }}>
-              <Wallet size={26} color="#fff" />
-            </GradientBox>
+            <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+              <Txt style={{ fontSize: 28 }}>{icon}</Txt>
+            </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted }}>
                 {t('budget.newTitle')}
@@ -373,6 +385,13 @@ function NewBudgetSheet({
           </View>
 
           <View style={{ paddingHorizontal: sp.lg, gap: sp.lg, paddingBottom: sp.lg }}>
+            {/* the budget's icon (migration 108) */}
+            <View>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted, marginBottom: sp.sm }}>
+                {t('budget.icon')}
+              </Txt>
+              <BudgetIconPicker value={icon} onChange={onIcon} tint={green[1]} />
+            </View>
             {/* grouping: three equal tiles */}
             <View>
               <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1.1, textTransform: 'uppercase', color: c.textMuted, marginBottom: sp.sm }}>
@@ -494,6 +513,7 @@ function BudgetCard({
   onAccess: () => void
 }) {
   const { t } = useI18n()
+  const { c, dark } = useTheme()
 
   // Which period this card previews. Defaults to current/latest; resets if the
   // selected one disappears after a revalidate.
@@ -510,11 +530,29 @@ function BudgetCard({
   const openHistory = () => router.push(`/budget/${b.id}`)
   const openPeriod = () => selected && router.push(`/budget/${b.id}/${selected.id}`)
 
+  // Lighter (owner, 2026-11-13: "too heavy with colour"): a plain card with
+  // the budget's gradient kept to its icon tile, a soft wash at the top and
+  // the New entry button — the numbers carry the card, not the paint.
+  const tint = look.colors[1]
   return (
-    <GradientBox colors={look.colors} radius={28} style={{ padding: 18, gap: 14 }}>
-      {/* title row: budget name (+ private chip) + details chevron */}
-      <Pressable onPress={openHistory} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
-        <Txt style={{ flex: 1, minWidth: 0, fontFamily: fonts.display, fontSize: 20, color: '#fff' }} numberOfLines={1}>
+    <View style={[s.card, { backgroundColor: Platform.OS === 'android' ? c.sheet : c.card, borderColor: c.border }]}>
+      {/* Sized in points, not %: a percentage canvas kept its first size and
+          stopped short of the card's right edge. The card clips the excess. */}
+      <Svg style={s.wash} width={1400} height={170} pointerEvents="none">
+        <Defs>
+          <SvgLinearGradient id={`bw${b.id}`} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={tint} stopOpacity={dark ? 0.22 : 0.13} />
+            <Stop offset="1" stopColor={tint} stopOpacity={0} />
+          </SvgLinearGradient>
+        </Defs>
+        <Rect width={1400} height={170} fill={`url(#bw${b.id})`} />
+      </Svg>
+      {/* title row: icon + budget name (+ private chip) + details chevron */}
+      <Pressable onPress={openHistory} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+        <View style={[s.tile, { backgroundColor: c.surface }]}>
+          <Txt style={{ fontSize: 19 }}>{budgetIcon(b)}</Txt>
+        </View>
+        <Txt style={{ flex: 1, minWidth: 0, fontFamily: fonts.display, fontSize: 20, color: c.text }} numberOfLines={1}>
           {b.name}
         </Txt>
         {/* Private budgets say so, and the chip IS the way in to the access
@@ -524,34 +562,42 @@ function BudgetCard({
             onPress={onAccess}
             accessibilityRole="button"
             hitSlop={6}
-            style={({ pressed }) => [s.glassChip, { opacity: pressed ? 0.7 : 1 }]}
+            style={({ pressed }) => [s.glassChip, { backgroundColor: tint + '1F', opacity: pressed ? 0.7 : 1 }]}
           >
-            <Lock size={12} color="#fff" />
-            <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 11 }}>{t('budget.whoCanView')}</Txt>
+            <Lock size={12} color={tint} />
+            <Txt style={{ color: tint, fontFamily: fonts.semibold, fontSize: 11 }}>{t('budget.whoCanView')}</Txt>
           </Pressable>
         ) : null}
-        <ChevronRight size={22} color="rgba(255,255,255,0.85)" />
+        <ChevronRight size={22} color={c.textFaint} />
       </Pressable>
       {/* A faint rule under the title: the title row is its own tap target
           (the budget's page), apart from the balance below (owner, 2026-11-13). */}
-      <View style={{ height: StyleSheet.hairlineWidth * 2, marginTop: -4, backgroundColor: 'rgba(255,255,255,0.22)' }} />
+      <View style={{ height: StyleSheet.hairlineWidth, marginTop: -2, backgroundColor: c.border }} />
 
       {selected ? (
         <>
           {/* balance (left, big) + period dropdown (right) */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm }}>
             <Pressable onPress={openPeriod} style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>{t('chart.currentBalance')}</Txt>
+              <Txt style={{ fontSize: 13, color: c.textMuted }}>{t('chart.currentBalance')}</Txt>
+              {/* Size from the length, not adjustsFontSizeToFit: iOS sometimes
+                  measured it before layout and drew the balance tiny. */}
               <Txt
-                adjustsFontSizeToFit
                 numberOfLines={1}
-                style={{ fontSize: 38, lineHeight: 44, fontFamily: fonts.display, color: '#fff', fontVariant: ['tabular-nums'], letterSpacing: -0.6 }}
+                style={{
+                  fontSize: balanceSize(formatMoney(balance)),
+                  lineHeight: 44,
+                  fontFamily: fonts.display,
+                  color: c.text,
+                  fontVariant: ['tabular-nums'],
+                  letterSpacing: -0.6,
+                }}
               >
                 {formatMoney(balance)}
               </Txt>
             </Pressable>
             <PeriodDropdown
-              onColor
+              tint={tint}
               value={selected.id}
               options={months.map((m) => ({ id: m.id, label: periodLabel(b.period, m.start_date) }))}
               onChange={setSelectedId}
@@ -559,9 +605,9 @@ function BudgetCard({
           </View>
 
           {hasUpcoming && (
-            <Txt style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', marginTop: -8 }}>
+            <Txt style={{ fontSize: 12.5, color: c.textMuted, marginTop: -8 }}>
               {t('home.withUpcoming')}{' '}
-              <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, fontVariant: ['tabular-nums'], color: '#fff' }}>
+              <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, fontVariant: ['tabular-nums'], color: c.text }}>
                 {formatMoney(expected)}
               </Txt>
             </Txt>
@@ -569,8 +615,8 @@ function BudgetCard({
 
           {/* received / spent */}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <StatChip label={t('chart.received')} value={income} max={barMax} up />
-            <StatChip label={t('chart.spent')} value={spent} max={barMax} />
+            <StatChip label={t('chart.received')} value={income} max={barMax} up onCard />
+            <StatChip label={t('chart.spent')} value={spent} max={barMax} onCard />
           </View>
 
           <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -578,26 +624,35 @@ function BudgetCard({
               accessibilityRole="button"
               accessibilityLabel={t('detail.scanAria')}
               onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?scan=1`)}
-              style={({ pressed }) => [s.camera, { opacity: pressed ? 0.75 : 1 }]}
+              style={({ pressed }) => [s.camera, { backgroundColor: tint + '1A', opacity: pressed ? 0.75 : 1 }]}
             >
-              <Camera size={21} color="#fff" />
+              <Camera size={21} color={tint} />
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={() => selected && router.push(`/budget/${b.id}/${selected.id}?add=1`)}
-              style={({ pressed }) => [s.newEntry, { opacity: pressed ? 0.85 : 1 }]}
+              style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.85 : 1 })}
             >
-              <Txt style={{ color: look.ink, fontFamily: fonts.semibold, fontSize: 15 }}>{t('detail.newEntry')}</Txt>
+              {/* Neutral dark (owner, 2026-11-13): enough coloured buttons on
+                  this screen already. */}
+              <View style={[s.newEntry, { borderRadius: 16, backgroundColor: dark ? '#E9E9EC' : '#2A2A30' }]}>
+                <Txt style={{ color: dark ? '#17171A' : '#fff', fontFamily: fonts.semibold, fontSize: 15 }}>{t('detail.newEntry')}</Txt>
+              </View>
             </Pressable>
           </View>
         </>
       ) : (
         <Pressable onPress={openHistory}>
-          <Txt style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{t('home.noneYet')}</Txt>
+          <Txt style={{ fontSize: 14, color: c.textMuted }}>{t('home.noneYet')}</Txt>
         </Pressable>
       )}
-    </GradientBox>
+    </View>
   )
+}
+
+/** The balance's font size by its length (fits beside the period pill). */
+function balanceSize(text: string): number {
+  return text.length > 13 ? 28 : text.length > 11 ? 32 : 38
 }
 
 /** In-card period picker: a pill that opens a dropdown of the budget's periods,
@@ -607,12 +662,15 @@ function PeriodDropdown({
   options,
   onChange,
   onColor,
+  tint,
 }: {
   value: string
   options: { id: string; label: string }[]
   onChange: (id: string) => void
   /** Sitting on a gradient card: translucent white pill, white text. */
   onColor?: boolean
+  /** The budget's colour for the pill on a plain card. */
+  tint?: string
 }) {
   const { c } = useTheme()
   const ref = useRef<View>(null)
@@ -638,17 +696,17 @@ function PeriodDropdown({
           flexDirection: 'row',
           alignItems: 'center',
           gap: 3,
-          backgroundColor: onColor ? 'rgba(255,255,255,0.2)' : c.accentSoft,
+          backgroundColor: onColor ? 'rgba(255,255,255,0.2)' : tint ? tint + '1C' : c.accentSoft,
           borderRadius: radius.pill,
           paddingHorizontal: 12,
           paddingVertical: 6,
           opacity: pressed ? 0.7 : 1,
         })}
       >
-        <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: onColor ? '#fff' : c.accent }}>
+        <Txt style={{ fontSize: 12, fontFamily: fonts.semibold, color: onColor ? '#fff' : (tint ?? c.accent) }}>
           {current?.label ?? ''}
         </Txt>
-        <ChevronDown size={12} color={onColor ? '#fff' : c.accent} strokeWidth={2.5} />
+        <ChevronDown size={12} color={onColor ? '#fff' : (tint ?? c.accent)} strokeWidth={2.5} />
       </Pressable>
 
       <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -721,9 +779,11 @@ const s = StyleSheet.create({
     width: 52,
     height: 50,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  newEntry: { flex: 1, height: 50, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  newEntry: { height: 50, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: 28, borderWidth: StyleSheet.hairlineWidth, padding: 18, gap: 14, overflow: 'hidden' },
+  wash: { position: 'absolute', top: 0, left: 0, right: 0, height: 170 },
+  tile: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 })

@@ -9,11 +9,11 @@ import { Txt } from '@/components/ui'
 import { formatMoney } from '@/lib/format'
 import { fonts, useTheme } from '@/theme/theme'
 
-export function StatChip({ label, value, max, up }: { label: string; value: number; max: number; up?: boolean }) {
+export function StatChip({ label, value, max, up, onCard }: { label: string; value: number; max: number; up?: boolean; /** On a plain card (not a gradient): a soft surface panel. */ onCard?: boolean }) {
   const { c, dark } = useTheme()
   const tone = up ? c.income : c.expense
   return (
-    <View style={[s.stat, { backgroundColor: dark ? 'rgba(12,13,17,0.42)' : '#FFFFFF' }]}>
+    <View style={[s.stat, { backgroundColor: onCard ? c.surface : dark ? 'rgba(12,13,17,0.42)' : '#FFFFFF' }]}>
       <Txt style={{ fontSize: 12, color: c.textMuted }} numberOfLines={1}>
         <Txt style={{ fontSize: 12, color: tone, fontFamily: fonts.semibold }}>{up ? '↑ ' : '↓ '}</Txt>
         {label}

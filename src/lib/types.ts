@@ -27,6 +27,8 @@ export interface Budget {
   name: string
   period: Period
   created_at: string
+  /** Emoji icon, migration 108 (null = 💰). */
+  icon?: string | null
 }
 
 /** One budget period (named "months" historically): monthly = 1st of month,

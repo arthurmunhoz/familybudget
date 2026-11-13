@@ -26,6 +26,8 @@ export interface Budget {
   name: string
   period: Period
   created_at: string
+  /** Emoji icon, migration 108 (null = 💰). */
+  icon?: string | null
   /** 'household' = everyone in the household sees it (the default, and every
    *  budget that predates migration 058). 'private' = only the owner and the
    *  people they've shared it with — enforced by RLS, not by this field. */
