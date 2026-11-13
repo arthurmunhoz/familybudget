@@ -2,6 +2,7 @@
 // in-app account deletion (required by Apple Guideline 5.1.1(v)). Sections are
 // separated by dividers; Plus shows a certificate badge + the included feature
 // list when active, and notifications shows a live on/off status.
+import { ExportSheet } from '@/components/ExportSheet'
 import { RoofSettings } from '@/components/RoofSettings'
 import { CasaSettings } from '@/components/CasaSettings'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -28,6 +29,7 @@ import {
   BellRing,
   ChevronLeft,
   ChevronRight,
+  Download,
   GripVertical,
   LogOut,
   Mail,
@@ -289,6 +291,7 @@ export default function Settings() {
   const { isPlus, restore, isTrial, trialDaysLeft, trialExpired, managementUrl } = usePlus()
   const { t, lang, setLang } = useI18n()
   const [pushMsg, setPushMsg] = useState<TKey | null>(null)
+  const [exporting, setExporting] = useState(false)
   const [pushOn, setPushOn] = useState<boolean | null>(null)
 
   const [homeLoc, setHomeLoc] = useState<HomeLocation | null>(null)
@@ -836,6 +839,12 @@ export default function Settings() {
               icon={<IconTile colors={['#9AA0AA', '#737985']} size={32}><Mail size={16} color="#fff" /></IconTile>}
               label={profile?.email ?? ''}
             />
+            {/* Any member can take the family's data out (owner, 2026-11-13). */}
+            <AccountRow
+              icon={<IconTile colors={['#4FA3E0', '#2F6FC4']} size={32}><Download size={16} color="#fff" /></IconTile>}
+              label={t('export.row')}
+              onPress={() => setExporting(true)}
+            />
             <AccountRow
               icon={<IconTile colors={['#6E7BF2', '#4B57C9']} size={32}><LogOut size={16} color="#fff" /></IconTile>}
               label={t('settings.signOut')}
@@ -850,6 +859,7 @@ export default function Settings() {
           </Card>
         </View>
       </View>
+      <ExportSheet visible={exporting} onClose={() => setExporting(false)} />
     </Screen>
   )
 }

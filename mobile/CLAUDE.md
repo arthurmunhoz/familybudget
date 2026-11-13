@@ -362,6 +362,14 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   clears any choice an older build saved. Pickers opened from an app take
   that app's colour (`PickerSheet tint`, via `DateTimeRow` / `DayRow`). Note the apps list
   is a DraggableList: a scroll gesture that STARTS on a row can pick it up.
+- **Export family data (2026-11-13, Settings › Account, any member):**
+  `lib/familyExport.ts` reads with the member's own session (RLS decides —
+  others' private budgets stay out; no location, no photos) and writes one
+  .zip (`lib/zip.ts`, pure-JS STORE zip, tested with `unzip -t`): CSVs with a
+  UTF-8 BOM, names/headers in the app language (`export.*` keys) + optionally
+  the vault files under Documents/ after Face ID. `components/ExportSheet`
+  shares it from the Modal's `onDismiss` — presenting the share sheet while
+  the Modal slides out silently fails on iOS. Export only, no import.
 - **Wake phrase per language (2026-11-13):** pt "Oi Casa", es "Oye Casa", en
   "Hey Roof" — "Roof" with a Brazilian/Spanish R kept being missed. `CASA_CALL`
   in `lib/roofWake.ts` and `src/casa/wake.ts` (greeting + "casa" only; "casa"
