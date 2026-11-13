@@ -297,6 +297,7 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
   const [pick, setPick] = useState<number | null>(null)
   const count = pick ?? (game === 'quiz' ? 10 : 6)
   const [busy, setBusy] = useState(false)
+  const theme = game ? COVER[game][1] : GAME_ACTION_SOLID
   return (
     <Modal visible={!!game} transparent animationType="slide" onRequestClose={onClose}>
       {/* The dim covers the WHOLE screen, sheet included: ending it where the
@@ -354,9 +355,16 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
                   feedback('tap')
                   setPick(n)
                 }}
-                style={[styles.roundOpt, { backgroundColor: on ? GAME_ACTION_SOLID : c.surface, borderColor: on ? GAME_ACTION_SOLID : c.border }]}
+                // Selected = an outline + a faint wash in the game's own
+                // colour, not a solid blue fill (owner, 2026-11-13).
+                style={[
+                  styles.roundOpt,
+                  on
+                    ? { backgroundColor: theme + '14', borderColor: theme, borderWidth: 2 }
+                    : { backgroundColor: c.surface, borderColor: c.border },
+                ]}
               >
-                <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: on ? c.onAction : c.text }}>{n}</Txt>
+                <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: on ? theme : c.text }}>{n}</Txt>
               </Pressable>
             )
           })}
@@ -365,6 +373,8 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
         ) : null}
         <GameBtn
           title={t('games.createRoom')}
+          // In the game's own colours, like its banner (owner, 2026-11-13).
+          colors={game ? COVER[game] : undefined}
           loading={busy}
           style={{ marginTop: sp.xl }}
           onPress={async () => {
