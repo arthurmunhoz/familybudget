@@ -284,7 +284,9 @@ export function useVoice(
         setTranscript(text)
         if (e.isFinal && text.trim() && listening.current) {
           listening.current = false
-          chime('stop')
+          // Mid-conversation the request just flows on — no chime (the stop
+          // chime still plays when the sheet closes, via cancel()).
+          if (!untilCancel.current) chime('stop')
           setState('idle')
           finalRef.current(text.trim(), alts.current.filter((a) => a !== text.trim()))
         }

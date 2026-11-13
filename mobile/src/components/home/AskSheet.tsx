@@ -346,7 +346,7 @@ export function AskSheet({
       if (!isGoodbye(heard)) heard = meaningfulRequest(heard)
       if (!heard) {
         // Just "er…" during a conversation: keep listening for the real reply.
-        if (followRef.current) void voice.start({ untilCancel: true })
+        if (followRef.current) void voice.start({ quiet: true, untilCancel: true })
         return
       }
       viaVoice.current = true
@@ -646,8 +646,11 @@ export function AskSheet({
           setTimeout(() => {
             if (!openRef.current || turn !== turnSeq.current || textRef.current.trim()) return
             setFollow(true)
-            // Until the sheet closes or a goodbye — not a few seconds.
-            void voice.start({ untilCancel: true })
+            // Until the sheet closes or a goodbye — not a few seconds. QUIET:
+            // it's the same conversation carrying on, so no new chime (a
+            // second chime read as a glitch / a restart — owner, 2026-11-13);
+            // the "listening" strip under the answer says it.
+            void voice.start({ quiet: true, untilCancel: true })
           }, 250)
         })
       }
