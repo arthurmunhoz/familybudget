@@ -415,6 +415,18 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   borderWidth with no colour drew black rings on Android); RoofDock takes
   `loading` (Plus or Roof prefs unknown — `useRoofPrefsReady`) and draws the
   whole dock with an empty mute slot, fading the dot and button in.
+- **Modo Casa (migration 105, 2026-11-13)**: the WEB app is now only the home
+  device hub (`src/casa/`); pairing = `api/widget.ts ?action=casa-start|claim|poll`
+  (device shows code/QR `oneroof://casa?code=` → phone `app/casa.tsx` → Settings
+  › Modo Casa `components/CasaSettings` claims it → the device exchanges a
+  magic-link token for its OWN session as that member). Unpair sets
+  `home_devices.revoked_at`; the device signs out on its next check (load,
+  focus/visibility, every 5 min). Money PIN = sha256("<household>:<pin>")
+  (`lib/sha256.ts`, tested against node). Limits: 1 device free, 5 Plus
+  (server); trial 30 days from the first device (`home_plan()`); other free-tier
+  locks are on the device's screen only (by design). Never say "tablet" in UI
+  copy — "dispositivo". Vercel: deploy with `--force` after adding an action to
+  an existing function (a cached build served the old widget.ts once).
 - **Assistant knows the app** (`app_help`, 2026-11-12): `APP_GUIDE` in
   api/suggest-ping.ts is the only source it may answer from (keep it TRUE when
   features change); `topic` picks what the app shows under the reply —

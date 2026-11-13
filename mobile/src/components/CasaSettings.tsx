@@ -264,18 +264,22 @@ function PairSheet({ initialCode, onClose, onPaired }: { initialCode: string; on
     <Sheet colors={CASA} icon={<MonitorSmartphone size={24} color="#fff" />} title={t('casa.pairTitle')} hint={t('casa.pairHint', { url: CASA_URL })} onClose={onClose}>
       <View style={[s.capsule, { backgroundColor: c.surface, borderColor: err ? c.expense : c.border }]}>
         <TextInput
-          value={shown.length > 3 ? `${shown.slice(0, 3)} ${shown.slice(3)}` : shown}
+          // Plain value (no inserted space): formatting the text while typing
+          // made the cursor jump and scrambled the letters. Spacing is visual.
+          value={shown}
           onChangeText={(v) => {
             setCode(normalizeCode(v))
             setErr(null)
           }}
-          placeholder="K7P 4QX"
+          placeholder="K7P4QX"
           placeholderTextColor={c.textFaint}
           autoCapitalize="characters"
           autoCorrect={false}
+          autoComplete="off"
+          spellCheck={false}
           autoFocus={!initialCode}
-          maxLength={7}
-          style={{ flex: 1, fontSize: 26, letterSpacing: 6, fontFamily: fonts.semibold, color: c.text, textAlign: 'center', paddingVertical: 0 }}
+          maxLength={6}
+          style={{ flex: 1, fontSize: 26, letterSpacing: 8, fontFamily: fonts.semibold, color: c.text, textAlign: 'center', paddingVertical: 0 }}
         />
       </View>
       <View style={[s.capsule, { backgroundColor: c.surface, borderColor: c.border, height: 50 }]}>
