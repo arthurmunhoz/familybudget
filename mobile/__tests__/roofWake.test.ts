@@ -1,4 +1,4 @@
-import { afterWake, meaningfulRequest } from '../src/lib/roofWake'
+import { afterWake, meaningfulRequest, soundsLikeCalling } from '../src/lib/roofWake'
 import { speakable, voiceKey } from '../src/lib/roof'
 
 describe('afterWake ("Ei Roof")', () => {
@@ -81,5 +81,17 @@ describe('fillers are not requests', () => {
     expect(meaningfulRequest('er')).toBe('')
     expect(meaningfulRequest('ER')).toBe('')
     expect(meaningfulRequest('o que tem hoje')).toBe('o que tem hoje')
+  })
+})
+
+describe('soundsLikeCalling (the dock dots)', () => {
+  it('lights for a call starting', () => {
+    expect(soundsLikeCalling('ei')).toBe(true)
+    expect(soundsLikeCalling('Hey')).toBe(true)
+    expect(soundsLikeCalling('ei ru')).toBe(true)
+  })
+  it('stays off for ordinary talk', () => {
+    expect(soundsLikeCalling('vou lavar a roupa')).toBe(false)
+    expect(soundsLikeCalling('ei amor tudo bem')).toBe(false)
   })
 })

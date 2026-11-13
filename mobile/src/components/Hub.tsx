@@ -26,7 +26,7 @@ import { RoofDock, ROOF_DOCK_H } from './home/RoofDock'
 import { FamilyStrip } from './home/FamilyStrip'
 import { useRoofPrefs, useRoofPrefsReady } from '../lib/roof'
 import { turnOnRoofWake, useRoofWake } from '../lib/roofWake'
-import { playChime, voiceSupported } from '../lib/voice'
+import { CHIME_MS, playChime, voiceSupported } from '../lib/voice'
 import { usePlus } from '../lib/plus'
 import { APP_GRADIENT } from './home/palette'
 import { GradientBox } from './home/GradientBox'
@@ -74,6 +74,7 @@ export default function Hub() {
   const [wakeHeard, setWakeHeard] = useState('')
   const [wakeEpoch, setWakeEpoch] = useState(0)
   const [askContinue, setAskContinue] = useState({ n: 0, quiet: true })
+  const [wakeHold, setWakeHold] = useState(false)
   const wakeHandlers = useMemo(
     () => ({
       onWake: () => {
@@ -99,7 +100,7 @@ export default function Hub() {
     [],
   )
   const wake = useRoofWake(
-    roof.wake && isPlus && homeFocused && !roofPaused && (!asking || wakeCapture),
+    roof.wake && isPlus && homeFocused && !roofPaused && !wakeHold && (!asking || wakeCapture),
     lang,
     wakeHandlers,
     wakeEpoch,
@@ -310,7 +311,13 @@ export default function Hub() {
           if (wakeCapture) playChime('stop')
           setAsking(false)
           setWakeCapture(false)
-          setWakeEpoch((e) => e + 1)
+          // Wait for the closing chime before the wake listener takes the mic
+          // again — restarting it mid-chime cut the chime off.
+          setWakeHold(true)
+          setTimeout(() => {
+            setWakeHold(false)
+            setWakeEpoch((e) => e + 1)
+          }, CHIME_MS + 120)
         }}
       />
     </SafeAreaView>

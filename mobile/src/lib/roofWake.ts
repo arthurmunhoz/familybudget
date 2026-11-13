@@ -103,7 +103,21 @@ export async function turnOnRoofWake(): Promise<'ok' | 'unsupported' | 'denied'>
   return 'ok'
 }
 
-export type WakeState = 'off' | 'waiting' | 'unsupported'
+/** 'hearing' = a call is starting ("Ei…", "Hey…", "Ei Ru…") and the phone is
+ *  still writing it down — the dock shows three dots until it becomes
+ *  "Ei Roof" (the sheet opens) or doesn't (they fade). */
+export type WakeState = 'off' | 'waiting' | 'hearing' | 'unsupported'
+
+/** Does `heard` END like the start of a call? Only the tail counts, so
+ *  ordinary talk in the room doesn't light the dots. */
+export function soundsLikeCalling(heard: string): boolean {
+  const w = fold(heard).split(' ').filter(Boolean)
+  const last = w[w.length - 1] ?? ''
+  const prev = w[w.length - 2] ?? ''
+  const strong = new RegExp(`^${CALL_STRONG}$`)
+  if (strong.test(last)) return true
+  return strong.test(prev) && /^(r|h|u|o)/.test(last)
+}
 
 // The last thing the wake listener heard — so the owner can see how the phone
 // writes "Ei Roof" in their voice and we can teach it (2026-11). MEMORY ONLY:
@@ -171,6 +185,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
     // still sounding cuts it off (iOS reconfigures the audio), which is why
     // the call was sometimes silent and only the closing chime was heard.
     let chimeAt = 0
+    let hearingOff: ReturnType<typeof setTimeout> | null = null
     const fire = (handOff = false) => {
       if (!woke) return
       const req = woke.req
@@ -251,7 +266,21 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
         noteHeard(heard)
         if (!woke) {
           const after = afterWake(heard)
-          if (after === null) return
+          if (after === null) {
+            // Maybe the start of a call: show the dots, drop them after a
+            // beat of nothing more.
+            if (soundsLikeCalling(heard)) {
+              setState('hearing')
+              if (hearingOff) clearTimeout(hearingOff)
+              hearingOff = setTimeout(() => {
+                hearingOff = null
+                if (alive && !woke) setState('waiting')
+              }, 1600)
+            }
+            return
+          }
+          if (hearingOff) clearTimeout(hearingOff)
+          hearingOff = null
           woke = { req: after, seg: { done: '', current: heard } }
           playChime('start')
           chimeAt = Date.now()
@@ -310,16 +339,22 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
     return () => {
       alive = false
       clear()
+      if (hearingOff) clearTimeout(hearingOff)
       app.remove()
       subs.forEach((s) => s.remove())
       // A delayed abort (letting the chime finish) is left to run on its own.
       if (running) {
         running = false
-        try {
-          m.abort()
-        } catch {
-          /* noop */
-        }
+        // Off a beat later: closing the sheet mid-capture plays the stop
+        // chime right now, and tearing the session down at once cut it off.
+        // The listeners are already gone, so nothing it hears meanwhile counts.
+        setTimeout(() => {
+          try {
+            m.abort()
+          } catch {
+            /* noop */
+          }
+        }, CHIME_MS)
       }
       setState('off')
     }

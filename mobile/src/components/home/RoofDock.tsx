@@ -44,7 +44,8 @@ export function RoofDock({
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
-  const live = wake === 'waiting'
+  const hearing = wake === 'hearing'
+  const live = wake === 'waiting' || hearing
   const [breath] = useState(() => new Animated.Value(0))
   useEffect(() => {
     if (!live) return
@@ -63,7 +64,7 @@ export function RoofDock({
     if (loading) return
     Animated.timing(appear, { toValue: 1, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start()
   }, [loading, appear])
-  const canMute = !loading && (wake === 'waiting' || wake === 'paused' || wake === 'off')
+  const canMute = !loading && (live || wake === 'paused' || wake === 'off')
   const muteLabel = live ? t('roof.pause') : wake === 'paused' ? t('roof.resume') : t('roof.chipOff')
 
   return (
@@ -100,7 +101,12 @@ export function RoofDock({
           ) : null}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt style={{ fontFamily: fonts.display, fontSize: 18, lineHeight: 22, color: c.text }}>Roof</Txt>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 18, lineHeight: 22, color: c.text }}>Roof</Txt>
+            {/* A call is being heard ("Ei…"): three quiet dots until it opens
+                or fades (owner, 2026-11). */}
+            {hearing ? <TypingDots color={c.textFaint} /> : null}
+          </View>
           {/* While it listens: how to call it, quietly (owner, 2026-11). */}
           {live ? (
             <Txt numberOfLines={1} style={{ fontSize: 12.5, lineHeight: 16, color: c.textFaint }}>
@@ -137,6 +143,42 @@ export function RoofDock({
       >
         <ArrowUp size={21} color={c.onAction} strokeWidth={2.6} />
       </Pressable>
+    </View>
+  )
+}
+
+/** Three dots rising one after another — "I'm hearing something". */
+function TypingDots({ color }: { color: string }) {
+  const [vals] = useState(() => [0, 1, 2].map(() => new Animated.Value(0)))
+  useEffect(() => {
+    const loops = vals.map((v, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 140),
+          Animated.timing(v, { toValue: 1, duration: 280, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(v, { toValue: 0, duration: 280, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.delay((2 - i) * 140),
+        ]),
+      ),
+    )
+    loops.forEach((l) => l.start())
+    return () => loops.forEach((l) => l.stop())
+  }, [vals])
+  return (
+    <View style={{ flexDirection: 'row', gap: 3, paddingBottom: 5 }}>
+      {vals.map((v, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: 4.5,
+            height: 4.5,
+            borderRadius: 3,
+            backgroundColor: color,
+            opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }),
+            transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }],
+          }}
+        />
+      ))}
     </View>
   )
 }

@@ -75,6 +75,9 @@ function chimes() {
   }
   return players
 }
+/** The chimes are 0.24 s; touching the mic before they end cuts them off. */
+export const CHIME_MS = 280
+
 function chime(which: 'start' | 'stop') {
   const p = chimes()?.[which]
   if (!p) return
@@ -401,9 +404,20 @@ export function useVoice(
     }
     opening.current = false
     listening.current = false
-    if (live.current || quietStart.current) chime('stop')
+    const chimed = live.current || quietStart.current
+    if (chimed) chime('stop')
     setState('idle')
-    speech()?.abort()
+    // Turning the mic off reconfigures the audio session, which cut the stop
+    // chime in half (owner, 2026-11). Let it finish first — unless a new
+    // listen has started meanwhile.
+    if (!chimed) {
+      speech()?.abort()
+      return
+    }
+    const gen = startGen.current
+    setTimeout(() => {
+      if (gen === startGen.current) speech()?.abort()
+    }, CHIME_MS)
   }, [])
 
   return { state, transcript, start, stop, cancel }
