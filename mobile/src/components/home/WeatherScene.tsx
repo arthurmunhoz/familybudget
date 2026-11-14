@@ -4,7 +4,7 @@
 // fading out downward into the page so every line of text stays legible.
 // Pure vector (react-native-svg), no images. The whole drawing sits under one
 // vertical-fade mask; colours are pastel in light mode and deep in dark.
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Svg, { Circle, Defs, G, Line, LinearGradient, Mask, Path, RadialGradient, Rect, Stop } from 'react-native-svg'
 
@@ -56,9 +56,15 @@ export function WeatherScene({ kind, height = 300 }: { kind: SceneKind; height?:
   const { dark } = useTheme()
   const p = useMemo(() => palette(kind, dark), [kind, dark])
   const rnd = useMemo(() => seq(120, kind.length * 97 + 13), [kind])
+  // The art is drawn on a 400×340 board scaled to COVER the view, so on a
+  // wide view its bottom is cut off. The fade must end at the visible bottom
+  // edge, or the cut shows as a line above the apps (owner, 2026-11-13 — on
+  // the Galaxy S9+ about 13% of the board was cut, mid-fade).
+  const [w, setW] = useState(0)
+  const vis = w > 0 ? Math.min(1, height / (H * Math.max(w / W, height / H))) : 0.8
 
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { height }]}>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { height }]} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
       <Svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMinYMin slice">
         <Defs>
           <LinearGradient id="sky" x1="0" y1="0" x2="0.35" y2="1">
@@ -74,8 +80,11 @@ export function WeatherScene({ kind, height = 300 }: { kind: SceneKind; height?:
               esquerdo") and never fights the greeting or the gear button. */}
           <LinearGradient id="fadeY" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor="#fff" stopOpacity={p.strength} />
-            <Stop offset="0.5" stopColor="#fff" stopOpacity={p.strength * 0.85} />
-            <Stop offset="1" stopColor="#fff" stopOpacity={0} />
+            <Stop offset={0.42 * vis} stopColor="#fff" stopOpacity={p.strength * 0.85} />
+            <Stop offset={0.62 * vis} stopColor="#fff" stopOpacity={p.strength * 0.55} />
+            <Stop offset={0.78 * vis} stopColor="#fff" stopOpacity={p.strength * 0.25} />
+            <Stop offset={0.9 * vis} stopColor="#fff" stopOpacity={p.strength * 0.07} />
+            <Stop offset={vis} stopColor="#fff" stopOpacity={0} />
           </LinearGradient>
           <LinearGradient id="fadeX" x1="0" y1="0" x2="1" y2="0">
             <Stop offset="0" stopColor="#fff" stopOpacity={1} />
