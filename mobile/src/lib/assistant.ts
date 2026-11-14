@@ -880,14 +880,30 @@ export async function openItemsContext(stores: ShoppingStore[]): Promise<{ lines
 export async function checkItems(said: string[]): Promise<{ hits: ShoppingItem[]; missing: string[] }> {
   const { data } = await supabase.from('shopping_items').select('*').eq('checked', false)
   const r = matchOpen(said, (data ?? []) as ShoppingItem[])
-  if (r.hits.length) {
-    const { error } = await supabase
-      .from('shopping_items')
-      .update({ checked: true, checked_at: new Date().toISOString() })
-      .in('id', r.hits.map((i) => i.id))
-    if (error) throw error
-  }
+  await checkItemIds(r.hits.map((i) => i.id))
   return r
+}
+
+/** Tick these items off (bought) — the same write as ticking them on the list,
+ *  so Realtime moves them on every phone. `uncheckItems` is its Undo. Also used
+ *  by Money's receipt scan ("remove them from the lists?"). */
+export async function checkItemIds(ids: string[]): Promise<void> {
+  if (!ids.length) return
+  const { error } = await supabase
+    .from('shopping_items')
+    .update({ checked: true, checked_at: new Date().toISOString() })
+    .in('id', ids)
+  if (error) throw error
+}
+
+/** The household's open list items + its stores (RLS-scoped) — what a receipt
+ *  scan sends so the model can say which ones the purchase covered. */
+export async function fetchOpenList(): Promise<{ open: ShoppingItem[]; stores: ShoppingStore[] }> {
+  const [stores, { data }] = await Promise.all([
+    fetchStores(),
+    supabase.from('shopping_items').select('*').eq('checked', false).order('created_at').limit(300),
+  ])
+  return { open: (data ?? []) as ShoppingItem[], stores }
 }
 
 export async function uncheckItems(ids: string[]): Promise<void> {

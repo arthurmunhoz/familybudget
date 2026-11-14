@@ -37,6 +37,10 @@ import { budgetLook } from '@/components/home/palette'
 import { GradientBox } from '@/components/home/GradientBox'
 import { CameraArt } from './CameraArt'
 import { ScanBeam, ScanLabel } from './ScanBeam'
+import ReceiptListsSheet from './ReceiptListsSheet'
+import { Toast, type ToastData } from '@/components/Toast'
+import { checkItemIds, fetchOpenList, uncheckItems } from '@/lib/assistant'
+import { matchGroups, scanListPayload, type MatchGroup } from '@/lib/receiptMatches'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
@@ -81,6 +85,13 @@ export default function MonthDetail({
   const [editing, setEditing] = useState<Entry | null>(null)
   const [prefill, setPrefill] = useState<EntryPrefill | undefined>(undefined)
   const [scanning, setScanning] = useState(false)
+  // Receipt ↔ lists: the open list items the scan matched ride with the
+  // prefill and are offered ONLY once that entry is saved (cancel drops them).
+  const [scanMatch, setScanMatch] = useState<string[] | null>(null)
+  const [listOffer, setListOffer] = useState<MatchGroup[] | null>(null)
+  const [listShown, setListShown] = useState(false)
+  const [listBusy, setListBusy] = useState(false)
+  const [toast, setToast] = useState<ToastData | null>(null)
 
   // "Shrinks and lands" (see LandingGhost). The saved row is shown at once from
   // the insert's own result, until the refetch replaces `entries` (identity
@@ -241,14 +252,63 @@ export default function MonthDetail({
   }, [landingId, landingVisible])
 
   function onEntrySaved(l?: EntryLanding) {
+    const matched = !editing ? scanMatch : null
+    setScanMatch(null)
     setFormOpen(false)
     setAutoEntryClosed(true)
     setPrefill(undefined)
+    if (matched?.length) {
+      // Re-read the lists: an item bought on another phone while the form
+      // was up must not be offered again.
+      fetchOpenList()
+        .then(({ open, stores }) => {
+          const groups = matchGroups(matched, open, stores)
+          if (groups.length) setListOffer(groups)
+        })
+        .catch(() => {})
+    }
     if (l) {
       setPending({ entry: l.entry, base: entries })
       setLanding({ entry: l.entry, from: offset(l.rect, hostOrigin.current), to: null, landed: false })
     }
     load()
+  }
+
+  // The lists sheet waits for the landing ghost to finish (and a beat for the
+  // form's Modal to be fully gone — two Modals overlapping fail on iOS).
+  useEffect(() => {
+    if (!listOffer || landing || listShown) return
+    const timer = setTimeout(() => setListShown(true), 320)
+    return () => clearTimeout(timer)
+  }, [listOffer, landing, listShown])
+
+  function closeListOffer() {
+    setListShown(false)
+    setListOffer(null)
+  }
+
+  async function removeFromLists(ids: string[]) {
+    setListBusy(true)
+    try {
+      await checkItemIds(ids)
+      closeListOffer()
+      setToast({
+        emoji: '🛒',
+        text: ids.length === 1 ? t('receiptLists.doneOne') : t('receiptLists.done', { count: ids.length }),
+        action: {
+          label: t('receiptLists.undo'),
+          onPress: () => {
+            uncheckItems(ids)
+              .then(() => setToast({ text: t('receiptLists.undone') }))
+              .catch(() => Alert.alert(t('receiptLists.failed')))
+          },
+        },
+      })
+    } catch {
+      Alert.alert(t('receiptLists.failed'))
+    } finally {
+      setListBusy(false)
+    }
   }
 
   const nameOf = useCallback(
@@ -287,6 +347,12 @@ export default function MonthDetail({
     if (result.canceled || !result.assets[0]) return
 
     setScanning(true)
+    setScanMatch(null)
+    // The household's open list items go with the photo, so the same model
+    // call can say which ones this purchase bought. Never blocks the scan.
+    const listItems = fetchOpenList()
+      .then(({ open, stores }) => scanListPayload(open, stores, t('shopping.anywhere')))
+      .catch(() => [])
     try {
       const ctx = ImageManipulator.manipulate(result.assets[0].uri).resize({ width: 1200 })
       const ref = await ctx.renderAsync()
@@ -298,7 +364,11 @@ export default function MonthDetail({
       const res = await fetch(`${API_BASE}/api/scan-receipt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ image: out.base64, media_type: 'image/jpeg' }),
+        body: JSON.stringify({
+          image: out.base64,
+          media_type: 'image/jpeg',
+          ...(await listItems.then((li) => (li.length ? { listItems: li } : {}))),
+        }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -320,6 +390,9 @@ export default function MonthDetail({
         subcategory: json.subcategory,
         entry_date: json.date,
       })
+      setScanMatch(
+        Array.isArray(json.matchedItems) ? json.matchedItems.filter((x: unknown) => typeof x === 'string') : null,
+      )
       setFormOpen(true)
     } catch (err) {
       Alert.alert(err instanceof Error ? err.message : t('detail.scanFailed'))
@@ -481,6 +554,7 @@ export default function MonthDetail({
                   onPress={() => {
                     setEditing(e)
                     setPrefill(undefined)
+                    setScanMatch(null)
                     setFormOpen(true)
                   }}
                   onLongPress={() => removeEntry(e)}
@@ -504,6 +578,7 @@ export default function MonthDetail({
                 onPress={() => {
                   setEditing(e)
                   setPrefill(undefined)
+                  setScanMatch(null)
                   setFormOpen(true)
                 }}
                 onLongPress={() => removeEntry(e)}
@@ -573,6 +648,7 @@ export default function MonthDetail({
           onPress={() => {
             setEditing(null)
             setPrefill(undefined)
+            setScanMatch(null)
             setFormOpen(true)
           }}
           style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.85 : 1 })}
@@ -606,6 +682,7 @@ export default function MonthDetail({
             setFormOpen(false)
             setAutoEntryClosed(true)
             setPrefill(undefined)
+            setScanMatch(null)
           }}
           onSaved={onEntrySaved}
         />
@@ -651,6 +728,11 @@ export default function MonthDetail({
           </LandingGhost>
         ) : null}
       </View>
+
+      {listOffer && listShown ? (
+        <ReceiptListsSheet groups={listOffer} busy={listBusy} onConfirm={removeFromLists} onClose={closeListOffer} />
+      ) : null}
+      <Toast data={toast} />
     </SafeAreaView>
   )
 }

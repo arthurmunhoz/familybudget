@@ -352,6 +352,27 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   given this: its add capsule stays open, adds can be several items at once,
   rows swap a `tmp-` id for the server's (remount mid-flight) and the
   SectionList virtualises — it keeps its scroll-to + pulse confirmation.
+- **A scanned receipt ticks off the family's lists (2026-11-14).** `scanReceipt`
+  (MonthDetail) also sends `listItems: {id, name, list}[]` — the household's
+  OPEN `shopping_items` (`fetchOpenList` in lib/assistant, RLS-scoped) shaped by
+  `scanListPayload` (lib/receiptMatches, ≤150, "General" for no store). The SAME
+  Haiku call in `api/scan-receipt.ts` then returns `matchedItems: string[]`
+  (ids): the model sees refs `i1…` (not uuids), writes one short entry per
+  receipt product line with the ref it bought or null (asking only for hits
+  skipped the "broader kind" matches like "roupas pro Léo" ← "CAMISETA M/C
+  AZ"), and the server maps refs back, dropping unknown ones. No `listItems`
+  → request, prompt, schema, max_tokens and response exactly as before (older
+  apps). The ids ride with the prefill (`scanMatch`) and are offered ONLY when
+  that new entry is SAVED (cancel / New entry / editing drop them): after the
+  landing ghost and a 320 ms beat (two overlapping Modals fail on iOS),
+  `ReceiptListsSheet` (FormSheet, Lists gradient, kicker "Expense saved",
+  "3 items from your lists", rows grouped by list via the pure `matchGroups`
+  — re-read at save time so items bought elsewhere drop out — each pre-ticked)
+  → "Remove from lists" = `checkItemIds` (the same `checked`/`checked_at`
+  write as the list and the assistant's `check_items`, so Realtime moves them
+  everywhere) + a `Toast` with Undo (`uncheckItems`). Toast now takes an
+  optional `action` (tappable pill, stays 5 s). Nothing matched / empty lists
+  → no sheet. Pinned by `__tests__/receiptMatches.test.ts`.
 - **Nudge banners on the Hub (`apps/pings/NudgesBanner`, 2026-11):** a
   RECEIVED nudge is a gradient card in the Nudges colour (red when urgent),
   "From Sam · 4m ago", the message large, Got it / Call as pills inside. A

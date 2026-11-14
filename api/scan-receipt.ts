@@ -79,6 +79,73 @@ const RECEIPT_SCHEMA = {
   additionalProperties: false,
 }
 
+// Optional (2026-11): the household's OPEN list items, so the same Haiku call
+// can say which of them this receipt bought. The app sends
+// `listItems: {id, name, list}[]`; the model sees short refs (i1, i2…) instead
+// of uuids (fewer tokens, and an invented id can't come back), and the server
+// maps the refs it returns back to ids. The model writes one short entry per
+// receipt PRODUCT line with the ref it bought (or null): asked only for the
+// hits, Haiku skipped the "broader kind" matches ("roupas pro Léo" ← a T-shirt
+// line, "material escolar" ← a notebook); walking every line got them all,
+// still conservative, for ~150-200 output tokens on a 10-line receipt.
+// Response: `matchedItems: string[]` (ids). Without `listItems` the request,
+// the prompt, the schema, max_tokens and the response are exactly as before.
+const MAX_LIST_ITEMS = 150
+type ListItem = { id: string; name: string; list: string }
+
+function cleanListItems(raw: unknown): ListItem[] {
+  if (!Array.isArray(raw)) return []
+  const out: ListItem[] = []
+  const seen = new Set<string>()
+  for (const r of raw) {
+    if (out.length >= MAX_LIST_ITEMS) break
+    if (!r || typeof r !== 'object') continue
+    const id = typeof (r as any).id === 'string' ? (r as any).id.trim().slice(0, 64) : ''
+    const name =
+      typeof (r as any).name === 'string' ? (r as any).name.replace(/\s+/g, ' ').trim().slice(0, 80) : ''
+    const list =
+      typeof (r as any).list === 'string' ? (r as any).list.replace(/\s+/g, ' ').trim().slice(0, 40) : ''
+    if (!id || !name || seen.has(id)) continue
+    seen.add(id)
+    out.push({ id, name, list })
+  }
+  return out
+}
+
+const MATCH_SCHEMA = {
+  ...RECEIPT_SCHEMA,
+  properties: {
+    ...RECEIPT_SCHEMA.properties,
+    matchedItems: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          line: { type: 'string', description: 'The receipt line, as printed' },
+          ref: {
+            anyOf: [{ type: 'string' }, { type: 'null' }],
+            description: 'The open list item this line bought, e.g. "i3", or null',
+          },
+        },
+        required: ['line', 'ref'],
+        additionalProperties: false,
+      },
+      description:
+        'One entry per product line on the receipt (short), with the list item it bought or null.',
+    },
+  },
+  required: [...RECEIPT_SCHEMA.required, 'matchedItems'],
+}
+
+function matchPrompt(items: ListItem[]): string {
+  return [
+    '',
+    "The family also keeps shopping lists. These items are still open (ref: item — list):",
+    ...items.map((it, i) => `i${i + 1}: ${it.name}${it.list ? ` — ${it.list}` : ''}`),
+    '- matchedItems: one entry per PRODUCT line of the receipt (skip totals, taxes, payment lines; write the line short, e.g. "LEITE INT 1L"), each with ref = the open list item that line bought, or null. Read the line as the product it is (receipt lines are abbreviated: "LEITE INT 1L" is milk, "CAMISETA M/C AZ INF" is a kids\' T-shirt, "DETERG" is dish soap, "CADERNO" is a notebook) and compare it with the list in any language. A line bought a list item when it IS that item (brands, abbreviations, plurals, sizes and synonyms count: "leite" ← "LEITE INT 1L") or when the list item is a broader kind of thing the line belongs to ("frutas" ← a banana; "camisetas" or "roupas pro Léo" ← a T-shirt — a list item may say who it is for, match it by the kind of thing; "material escolar" ← a notebook; "produtos de limpeza" ← detergent). The list name is only where the family planned to buy it: an item counts whatever store this receipt is from. Otherwise ref is null — never a vague guess. For a receipt that is not an itemized purchase of goods (fuel, restaurant, services) return [].',
+  ].join('\n')
+}
+
 /** Coerce whatever the model returned into a strict, zero-padded YYYY-MM-DD
  *  (or null). The date field on the form does a lexicographic period check and
  *  the native date input needs exact padding, so an unpadded "2026-6-9" must
@@ -130,7 +197,8 @@ export default async function handler(req: any, res: any) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const { image, media_type } = req.body ?? {}
+  const { image, media_type, listItems: rawListItems } = req.body ?? {}
+  const listItems = cleanListItems(rawListItems)
   if (!image || typeof image !== 'string') {
     return res.status(400).json({ error: 'Missing image' })
   }
@@ -183,7 +251,9 @@ export default async function handler(req: any, res: any) {
     async function extract(model: string) {
       const response = await client.messages.create({
         model,
-        max_tokens: 1024,
+        // A list match writes one short entry per receipt line — room for a
+        // long supermarket receipt (a cut-off answer would fail the scan).
+        max_tokens: listItems.length ? 4096 : 1024,
         messages: [
           {
             role: 'user',
@@ -205,13 +275,13 @@ export default async function handler(req: any, res: any) {
                   '- date: the purchase/transaction date, converted to YYYY-MM-DD with zero-padded month and day (e.g. a receipt showing 6/9/26 becomes 2026-06-09). Null only if no date is visible.',
                   '- category: the best-fitting spending category',
                   "- subcategory: a short, specific subcategory inferred from the line items when they clearly point to one (e.g. 'Produce' for groceries, 'Gas' for fuel, 'Pharmacy' for a drugstore), otherwise null.",
-                ].join('\n'),
+                ].join('\n') + (listItems.length ? matchPrompt(listItems) : ''),
               },
             ],
           },
         ],
         output_config: {
-          format: { type: 'json_schema', schema: RECEIPT_SCHEMA },
+          format: { type: 'json_schema', schema: listItems.length ? MATCH_SCHEMA : RECEIPT_SCHEMA },
         },
       })
       const text = response.content.find((b) => b.type === 'text')
@@ -233,6 +303,20 @@ export default async function handler(req: any, res: any) {
     parsed.date = normalizeDate(parsed.date)
     parsed.subcategory =
       typeof parsed.subcategory === 'string' ? parsed.subcategory.trim() || null : null
+    if (listItems.length) {
+      // Refs → the app's ids; anything the model made up is dropped.
+      const refs: unknown[] = Array.isArray(parsed.matchedItems) ? parsed.matchedItems : []
+      const ids = new Set<string>()
+      for (const hit of refs) {
+        const ref = hit && typeof hit === 'object' ? (hit as any).ref : hit
+        const m = typeof ref === 'string' ? ref.trim().match(/^i(\d+)$/i) : null
+        const item = m ? listItems[Number(m[1]) - 1] : undefined
+        if (item) ids.add(item.id)
+      }
+      parsed.matchedItems = [...ids]
+    } else {
+      delete parsed.matchedItems
+    }
 
     // Meter the successful scan (best-effort — never fail the response on this).
     try {

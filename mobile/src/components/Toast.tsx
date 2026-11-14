@@ -2,18 +2,25 @@
 // it as a sibling of the screen body (NOT inside a ScrollView) so it floats over
 // the whole screen. Feed it a NEW `data` object each time you want it to show —
 // the effect keys on the object reference, so sending the same thing twice in a
-// row re-triggers it. pointerEvents=none so it never blocks a tap underneath.
+// row re-triggers it. pointerEvents=none so it never blocks a tap underneath —
+// except a toast with an `action` (Undo), whose pill takes taps and stays up
+// longer (ACTION_MS) so there's time to reach it.
 import { useEffect, useRef, useState } from 'react'
 import { Animated } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { Pressable } from './Pressable'
 import { Txt } from './ui'
 import { radius, sp, useTheme } from '../theme/theme'
 
 export interface ToastData {
   emoji?: string
   text: string
+  /** A single action on the pill (e.g. Undo). Tapping it hides the toast. */
+  action?: { label: string; onPress: () => void }
 }
+
+const ACTION_MS = 5000
 
 export function Toast({ data, duration = 1900 }: { data: ToastData | null; duration?: number }) {
   const { c, dark } = useTheme()
@@ -34,7 +41,7 @@ export function Toast({ data, duration = 1900 }: { data: ToastData | null; durat
       Animated.timing(anim, { toValue: 0, duration: 200, useNativeDriver: true }).start(
         ({ finished }) => finished && setShown(null),
       )
-    }, duration)
+    }, data.action ? Math.max(duration, ACTION_MS) : duration)
     return () => clearTimeout(timer)
   }, [data, duration, anim])
 
@@ -42,7 +49,7 @@ export function Toast({ data, duration = 1900 }: { data: ToastData | null; durat
 
   return (
     <Animated.View
-      pointerEvents="none"
+      pointerEvents={shown.action ? 'box-none' : 'none'}
       style={{
         position: 'absolute',
         left: 0,
@@ -74,6 +81,24 @@ export function Toast({ data, duration = 1900 }: { data: ToastData | null; durat
         <Txt style={{ color: onPill, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
           {shown.text}
         </Txt>
+        {shown.action ? (
+          <Pressable
+            onPress={() => {
+              const act = shown.action
+              Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }).start(
+                ({ finished }) => finished && setShown(null),
+              )
+              act?.onPress()
+            }}
+            hitSlop={10}
+            accessibilityRole="button"
+            style={{ marginLeft: sp.xs }}
+          >
+            <Txt style={{ color: onPill, fontWeight: '700', fontSize: 14, textDecorationLine: 'underline' }}>
+              {shown.action.label}
+            </Txt>
+          </Pressable>
+        ) : null}
       </Animated.View>
     </Animated.View>
   )
