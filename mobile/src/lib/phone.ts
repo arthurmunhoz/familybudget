@@ -94,3 +94,50 @@ export function formatPhone(raw: string, region: string | null = null): string {
   if (g) return `+${g.cc} ${national(g.cc, g.national)}`
   return groups(digits)
 }
+
+// ── As you type (2026-11-14) ────────────────────────────────────────────────
+// The field shows the number grouped while it's being typed ("(415) 123-12",
+// "(11) 98765-4"), not a run of digits. Only digits and a leading "+" are
+// kept; past what the country's format knows it falls back to plain groups.
+// `formatPhone` still runs on blur to add the +code.
+
+function partialNanp(n: string): string {
+  if (n.length <= 3) return n
+  if (n.length <= 6) return `(${n.slice(0, 3)}) ${n.slice(3)}`
+  return `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}`
+}
+
+function partialBrazil(n: string): string {
+  if (n.length <= 2) return n
+  if (n.length <= 6) return `(${n.slice(0, 2)}) ${n.slice(2)}`
+  const cut = n[2] === '9' || n.length === 11 ? 7 : 6
+  return `(${n.slice(0, 2)}) ${n.slice(2, cut)}-${n.slice(cut)}`
+}
+
+function partialNational(cc: string, n: string): string {
+  if (cc === '1' && n.length <= 10) return partialNanp(n)
+  if (cc === '55' && n.length <= 11) return partialBrazil(n)
+  return groups(n)
+}
+
+/** Format what's in a phone field right now. `prev` is the field's previous
+ *  value: deleting a bracket, space or dash removes the digit before it, or
+ *  the reformat would put the separator straight back. */
+export function formatPhoneTyping(next: string, prev = '', region: string | null = null): string {
+  let digits = next.replace(/\D/g, '')
+  const plus = /^\s*(\+|00)/.test(next)
+  if (next.length < prev.length && digits === prev.replace(/\D/g, '')) digits = digits.slice(0, -1)
+  if (!digits) return plus ? '+' : ''
+  if (/[a-z]/i.test(next)) return next
+  if (plus) {
+    const d = next.trim().startsWith('00') ? digits.slice(2) : digits
+    if (!d) return '+'
+    const { cc, national: n } = splitCountry(d)
+    return n ? `+${cc} ${partialNational(cc, n)}` : `+${cc}`
+  }
+  const r = (region ?? '').toUpperCase()
+  if (r === 'BR') return digits[0] === '0' ? groups(digits) : partialBrazil(digits)
+  if (digits[0] === '1') return digits.length === 1 ? '1' : `1 ${partialNanp(digits.slice(1))}`
+  if (r === 'US' || r === 'CA' || r === '') return digits.length <= 10 ? partialNanp(digits) : groups(digits)
+  return groups(digits)
+}

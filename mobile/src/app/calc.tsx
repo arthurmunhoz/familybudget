@@ -4,8 +4,8 @@
 // height (flex), so the tiles grow on tall phones and shrink to a floor on
 // small ones (only below that floor does the page scroll). Icons are the
 // tools' own two-tone line art (ToolArt) on the bare card — no coloured
-// squares. A "Roof does this for you" card opens examples to ask Roof
-// (components/RoofExamples) — tap one and Roof opens with it typed in.
+// squares. The "✨ Roof" pill top right (same as every app) opens
+// examples to ask Roof (components/RoofExamples) — tap one and Roof opens with it typed in.
 // Each tool is its own route under app/calc/ (native back gesture).
 //
 // Order (owner, 2026-11): At home (photo frame) + Printables side by side on
@@ -70,6 +70,8 @@ const TAG: Tool = { id: 'tag', route: '/calc/tag', colors: TOOL_LOOK.tag.colors,
 const FRAME: Tool = { id: 'frame', route: '/calc/frame', colors: TOOL_LOOK.frame.colors, title: 'calc.tool.frame', sub: 'calc.tool.frameSub', order: 0 }
 const TOOL_COUNT = 6
 
+const CALC_EXAMPLES: TKey[] = [1, 2, 5, 3, 6, 4, 7, 8].map((n) => `roofEx.calc.${n}` as TKey)
+
 export default function UtilitiesScreen() {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -97,17 +99,15 @@ export default function UtilitiesScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
       <View style={{ paddingHorizontal: sp.lg }}>
-        <ToolTopBar title="" onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+        <ToolTopBar
+          title=""
+          onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          right={<RoofExamples variant="pill" examples={CALC_EXAMPLES} />}
+        />
       </View>
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: sp.lg, paddingBottom: bottomGap }}>
         <Txt style={styles.bigTitle}>{t('calc.title')}</Txt>
         <Txt style={[styles.count, { color: c.textFaint }]}>{t('calc.toolsCount', { n: TOOL_COUNT })}</Txt>
-
-        {/* Roof runs these too — say so where people come looking: a card
-            that opens examples to ask (owner, 2026-11). */}
-        <View style={{ marginTop: sp.md }}>
-          <RoofExamples examples={['roofEx.calc.1', 'roofEx.calc.2', 'roofEx.calc.3', 'roofEx.calc.4']} />
-        </View>
 
         <View style={styles.grid}>
           {/* one tool each: their labels sit side by side on the first row */}

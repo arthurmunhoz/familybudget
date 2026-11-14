@@ -18,6 +18,7 @@ import {
   ImageDown,
   Mail,
   PenLine,
+  StickyNote,
   Phone,
   Plane,
   Printer,
@@ -31,7 +32,7 @@ import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
 import { DICTS, type TKey } from '@/lib/i18n'
-import { formatPhone } from '@/lib/phone'
+import { formatPhone, formatPhoneTyping } from '@/lib/phone'
 import { fetchMemberPhones } from '@/lib/pings'
 import { pickOn } from '@/theme/contrast'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
@@ -54,6 +55,7 @@ const FIELD_ICON: Record<string, LucideIcon> = {
   address: House,
   destination: BedDouble,
   flight: Plane,
+  notes: StickyNote,
 }
 
 interface Draft {
@@ -284,7 +286,9 @@ export function PrintableEditor({ template }: { template: PrintableTemplate }) {
             icon={<RowIcon Icon={FIELD_ICON[f.key] ?? PenLine} tint={LOOK.tint} />}
             label={template.required.includes(f.key) ? `${t(f.label)} *` : t(f.label)}
             value={values[f.key] ?? ''}
-            onChangeText={(s) => set(f.key, s)}
+            onChangeText={(s) =>
+              set(f.key, f.keyboardType === 'phone-pad' ? formatPhoneTyping(s, values[f.key] ?? '', Localization.getLocales()[0]?.regionCode ?? null) : s)
+            }
             // Tidy a phone into its country's format on leaving the field, so
             // the field shows what the card will print.
             onBlur={

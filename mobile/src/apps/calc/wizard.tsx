@@ -170,16 +170,7 @@ export function WizardScreen({
             </View>
           ) : primary || secondary ? (
             <View style={[styles.column, styles.footer, { paddingBottom: bottom }]}>
-              {primary ? (
-                <TintButton
-                  tint={look.tint}
-                  colors={look.colors}
-                  title={primary.label}
-                  icon={primary.loading ? <ActivityIndicator color="#fff" /> : primary.icon}
-                  onPress={primary.onPress}
-                  disabled={primary.disabled || primary.loading}
-                />
-              ) : null}
+              {/* secondary above: the primary follows the screen's curve at the bottom */}
               {secondary ? (
                 <Pressable
                   accessibilityRole="button"
@@ -190,6 +181,16 @@ export function WizardScreen({
                   {secondary.icon}
                   <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: look.tint }}>{secondary.label}</Txt>
                 </Pressable>
+              ) : null}
+              {primary ? (
+                <TintButton
+                  tint={look.tint}
+                  colors={look.colors}
+                  title={primary.label}
+                  icon={primary.loading ? <ActivityIndicator color="#fff" /> : primary.icon}
+                  onPress={primary.onPress}
+                  disabled={primary.disabled || primary.loading}
+                />
               ) : null}
             </View>
           ) : null}

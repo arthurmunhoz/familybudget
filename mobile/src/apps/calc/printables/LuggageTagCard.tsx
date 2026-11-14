@@ -24,12 +24,15 @@ export function LuggageTagCard({ values, color, width, label }: PrintableCardPro
   const on = pickOn(color)
   const v = (k: string) => (values[k] ?? '').trim()
 
-  const rows: { key: string; lines: number }[] = [
+  // Notes (2026-11-14) take the room of the address's third line, so a full
+  // tag still fits; the body clips rather than ever covering the footer.
+  const rows: { key: string; lines: number; small?: boolean }[] = [
     { key: 'phone', lines: 1 },
     { key: 'email', lines: 1 },
-    { key: 'address', lines: 3 },
+    { key: 'address', lines: v('notes') ? 2 : 3 },
     { key: 'destination', lines: 2 },
     { key: 'flight', lines: 1 },
+    { key: 'notes', lines: 2, small: true },
   ].filter((r) => v(r.key))
 
   return (
@@ -73,7 +76,7 @@ export function LuggageTagCard({ values, color, width, label }: PrintableCardPro
         </View>
       </View>
 
-      <View style={{ flex: 1, paddingHorizontal: 22 * s, paddingTop: 18 * s }}>
+      <View style={{ flex: 1, paddingHorizontal: 22 * s, paddingTop: 18 * s, overflow: 'hidden' }}>
         <Text style={labelStyle(s)}>{label('tag.name')}</Text>
         <Text
           numberOfLines={2}
@@ -90,7 +93,7 @@ export function LuggageTagCard({ values, color, width, label }: PrintableCardPro
               <Text style={labelStyle(s)}>{label(`tag.${r.key}` as Parameters<typeof label>[0])}</Text>
               <Text
                 numberOfLines={r.lines}
-                style={{ color: INK, fontFamily: fonts.medium, fontSize: 14 * s, lineHeight: 18 * s, marginTop: 1 * s }}
+                style={{ color: INK, fontFamily: fonts.medium, fontSize: (r.small ? 12 : 14) * s, lineHeight: (r.small ? 15.5 : 18) * s, marginTop: 1 * s }}
               >
                 {/* Always printed formatted, with its +country code: whoever finds
                     the bag may be dialling from another country. */}

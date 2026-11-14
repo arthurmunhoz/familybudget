@@ -76,6 +76,7 @@ export const LUGGAGE_TAG: PrintableTemplate = {
     { key: 'address', label: 'tag.address', placeholder: 'tag.addressHint', multiline: true, autoCapitalize: 'words', textContentType: 'fullStreetAddress', autoComplete: 'street-address' },
     { key: 'destination', label: 'tag.destination', placeholder: 'tag.destinationHint', multiline: true },
     { key: 'flight', label: 'tag.flight', placeholder: 'tag.flightHint', autoCapitalize: 'characters' },
+    { key: 'notes', label: 'tag.notes', placeholder: 'tag.notesHint', multiline: true },
   ],
   Card: LuggageTagCard,
 }

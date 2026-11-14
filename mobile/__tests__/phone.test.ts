@@ -1,4 +1,4 @@
-import { formatPhone } from '../src/lib/phone'
+import { formatPhone, formatPhoneTyping as f } from '../src/lib/phone'
 
 describe('formatPhone', () => {
   it('formats US numbers however they were typed', () => {
@@ -39,5 +39,33 @@ describe('formatPhone', () => {
     expect(formatPhone('  ')).toBe('')
     expect(formatPhone('ask at the desk')).toBe('ask at the desk')
     expect(formatPhone('123')).toBe('123')
+  })
+})
+
+describe('formatPhoneTyping', () => {
+  it('groups a US number while typed', () => {
+    expect(f('415', '', 'US')).toBe('415')
+    expect(f('4151', '', 'US')).toBe('(415) 1')
+    expect(f('4151231', '', 'US')).toBe('(415) 123-1')
+    expect(f('4151231234', '', 'US')).toBe('(415) 123-1234')
+  })
+  it('groups a Brazilian mobile and landline', () => {
+    expect(f('11987', '', 'BR')).toBe('(11) 987')
+    expect(f('11987654', '', 'BR')).toBe('(11) 98765-4')
+    expect(f('11987654321', '', 'BR')).toBe('(11) 98765-4321')
+    expect(f('1134567890', '', 'BR')).toBe('(11) 3456-7890')
+  })
+  it('keeps a typed +code', () => {
+    expect(f('+', '', 'US')).toBe('+')
+    expect(f('+5511987', '', 'US')).toBe('+55 (11) 987')
+    expect(f('+1415123', '', 'BR')).toBe('+1 (415) 123')
+    expect(f('+44207946', '', 'US')).toBe('+44 207 946')
+  })
+  it('deleting a separator removes the digit before it', () => {
+    expect(f('(415) 123', '(415) 123-1', 'US')).toBe('(415) 123')
+    expect(f('(415 1', '(415) 1', 'US')).toBe('415')
+  })
+  it('re-formats an already formatted value', () => {
+    expect(f('+1 (415) 123-1234', '', 'US')).toBe('+1 (415) 123-1234')
   })
 })

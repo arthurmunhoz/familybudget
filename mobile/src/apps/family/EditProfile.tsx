@@ -31,7 +31,9 @@ import {
 
 import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
-import { formatPhone, formatDay } from '@/lib/format'
+import * as Localization from 'expo-localization'
+import { formatDay } from '@/lib/format'
+import { formatPhone, formatPhoneTyping } from '@/lib/phone'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
@@ -69,6 +71,8 @@ import {
   type ShoeSystem,
   type WeightUnit,
 } from './units'
+
+const REGION = Localization.getLocales()[0]?.regionCode ?? null
 
 type Form = {
   avatar_path: string
@@ -527,8 +531,8 @@ export function EditProfile({
                 icon={icon(Phone)}
                 label={t('family.phone')}
                 value={form.phone}
-                onChangeText={(v) => set('phone', v)}
-                onBlur={() => set('phone', formatPhone(form.phone))}
+                onChangeText={(v) => set('phone', formatPhoneTyping(v, form.phone, REGION))}
+                onBlur={() => set('phone', formatPhone(form.phone, REGION))}
                 keyboardType="phone-pad"
               />
             </FormSection>
