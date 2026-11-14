@@ -105,19 +105,19 @@ const ASSISTANT_SCHEMA = {
       type: 'string',
       enum: [...INTENTS],
       description: [
-        'add_items = put things on a list — the household\'s lists are for anything: groceries at a store, chores ("tarefas"), a trip, school ("prova"). "põe estudar o capítulo 3 na lista de tarefas" is add_items with store "Tarefas".',
+        'add_items = put things on a list — the household\'s lists are for anything: groceries at a store, chores ("tarefas"), a trip, school ("prova"). "põe estudar o capítulo 3 na lista de tarefas" is add_items with store "Tarefas". Running OUT of something is add_items: "acabou o leite", "o leite acabou", "we\'re out of milk", "se acabó la leche", "não tem mais café" → add it.',
         'move_items = move items that are already on a list to another list ("passa o leite pro Costco").',
         'clear_checked = clear / delete the done (checked) items from the lists or one list ("limpa os feitos", "limpa os comprados do Costco").',
         'uncheck_items = put a done item back as still to do ("desmarca o leite", "o leite eu não comprei ainda").',
         'list_items = asks what is on the lists (all of them, or one list).',
         'find_items = asks whether specific things are on the list ("is there coconut water on the list?", "tem leite na lista?").',
-        'check_items = STATES items were bought / done ("já comprei o leite", "terminei a redação"). A question is never check_items.',
+        'check_items = STATES items were bought / done ("já comprei o leite", "terminei a redação"). A question is never check_items, and "acabou o X" (ran out) is add_items, not check_items.',
         'remove_items = take items off the shopping list. ONLY shopping-list items: never when the user talks about a gasto / despesa / lançamento / expense / charge, or names a place that is not in KNOWN STORES but was just logged as an expense — that is remove_money.',
         'agenda = asks what is on the calendar for a day.',
         'add_event = schedule something on the calendar, including repeating events ("natação toda terça às 18h") and special dates (birthdays, anniversaries, renewals). A pet\'s vet / vaccine / grooming appointment on a FUTURE day (tomorrow or later: "agenda o veterinário da Lola sexta às 10") is add_event too, titled with the care and the pet ("Veterinário Lola"); the same thing TODAY or in the past is pet_log.',
         'edit_event = change an EXISTING event other than its day/time: rename it, set its place or a note, add or remove a reminder ("me lembra 1h antes do dentista", "põe o endereço na reunião").',
         'find_event = asks WHEN a named event is ("quando é o próximo dentista?", "when is Ana\'s recital?").',
-        'move_event = move / reschedule / postpone an EXISTING calendar event to another day or time ("muda o dentista para amanhã", "muda o dentista do Pedro para sexta", "move it to Friday at 3", "passa a reunião de hoje pra quinta"). Never add_event or agenda for these. Needs a move word (muda, passa, move, adia, remarca, reschedule): a name with a day/time and no such word ("dentista sexta às 15h") is add_event, even when an event with that name exists.',
+        'move_event = move / reschedule / postpone an EXISTING calendar event to another day or time ("muda o dentista para amanhã", "muda o dentista do Pedro para sexta", "move it to Friday at 3", "passa a reunião de hoje pra quinta"). Never add_event or agenda for these. The day it is moved TO goes in new_date; `date` is only the day it is on NOW and stays "" unless that day is said ("a reunião de hoje" → today; "o dentista para sexta" → date ""). Needs a move word (muda, passa, move, adia, remarca, reschedule): a name with a day/time and no such word ("dentista sexta às 15h") is add_event, even when an event with that name exists.',
         'remove_event = delete / cancel / take off an EXISTING calendar event ("remove unha do calendário", "cancela o dentista de amanhã", "cancela a consulta da Ana amanhã", "delete the meeting"). Never remove_items for these: remove_items is only for shopping-list items.',
         'add_money = record money spent or received ("gastei 50 no mercado", "recebi o salário 3000").',
         'money_summary = asks how much was spent / is left / the balance — in total or in ONE category or on one thing ("quanto gastei com mercado esse mês?").',
@@ -172,7 +172,7 @@ const ASSISTANT_SCHEMA = {
       description:
         'agenda (scope=person) / send_nudge (recipient) / family_info + family_update (whose detail) / add_event (whose event) / where_is (who) / open_document (whose document): a member name exactly as in MEMBERS. "" = the asker for family_info, family_update and add_event, everyone for send_nudge, any member for open_document. ' +
         'move_event / remove_event / edit_event / find_event: WHOSE event the request names ("o dentista do Pedro" → "Pedro", "Sam\'s dentist" → "Sam", "a consulta da Ana" → "Ana") — the MEMBERS spelling when it is a member, else the first name EXACTLY as said (a child may not be a member — "Dentista Pedro" owned by Arthur is still person "Pedro"); NEVER replace the named person with the event\'s owner shown after the last "·". That name then stays out of `title`. "" when no one is named. ' +
-        'money_summary / list_money (whose money): the ASKER\'s name for "meus gastos" / "quanto eu gastei" / "my expenses", the member named for "gastos da Ana" / "Ana\'s"; "" for the whole household ("nossos", "da casa", "quanto gastamos", or no owner said).',
+        'money_summary / list_money (whose money): the ASKER\'s name for "meus gastos" / "quanto eu gastei" / "my expenses", the member named (MEMBERS spelling) for "gastos da Ana" / "Ana\'s"; "" for the whole household ("nossos", "da casa", "quanto gastamos", or no owner said).',
     },
     date: {
       type: 'string',
@@ -183,7 +183,7 @@ const ASSISTANT_SCHEMA = {
         '"mês passado" / "last month" = the same day one month back (2026-11-09 → 2026-10-09); "semana passada" = TODAY − 7; ' +
         '"ontem" = TODAY − 1; "em setembro" = the 15th of that month. A follow-up like "e no mês anterior?" goes one period back from the period of the previous answer. ' +
         'edit_event / find_event: the day the event is on when said, else "". ' +
-        'move_event: the day the event is on NOW (from the request or the conversation); TODAY when not said. ' +
+        'move_event: the day the event is on NOW when the user said it (or it is clear from the conversation); "" when not said — never TODAY by default (the app finds the event itself). ' +
         'remove_event: the day the event is on when the user said one (or it is clear from the conversation); "" when not said.',
     },
     date_end: {
@@ -456,9 +456,17 @@ export function flattenGrouped(raw: any): Record<string, any> {
   const own = Object.entries(GROUPS).find(([, d]) => d.for.split(', ').includes(raw?.intent))?.[0]
   for (const g of Object.keys(GROUPS).filter((g) => g !== own).concat(own ? [own] : [])) {
     if (!raw?.[g] || typeof raw[g] !== 'object') continue
-    // An empty string never wipes a value already set (money.title "" vs a
-    // top-level title the model filled instead).
-    for (const [k, v] of Object.entries(raw[g])) if (v !== '' || flat[k] === undefined) flat[k] = v
+    // The model often fills groups that aren't the intent's: those only fill a
+    // gap and never overwrite (review 2026-11-14 — another group's title beat
+    // the top-level one). The intent's own group (merged last) wins, except an
+    // empty string never wipes a value already set (money.title "" vs a
+    // top-level title the model filled instead) — an empty value in the own
+    // group DOES clear what another group filled ("move_event date "" = not
+    // said" must beat an agenda group's today).
+    const mine = g === own
+    for (const [k, v] of Object.entries(raw[g])) {
+      if (mine ? v !== '' || !TOP.includes(k) || flat[k] === undefined : flat[k] === undefined || flat[k] === '') flat[k] = v
+    }
   }
   return flat
 }

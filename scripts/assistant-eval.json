@@ -1057,6 +1057,21 @@
           ]
         }
       }
+    },
+    {
+      "text": "acabou o leite",
+      "expect": {
+        "intent": "add_items",
+        "items": [
+          "Leite"
+        ]
+      }
+    },
+    {
+      "text": "we're out of eggs",
+      "expect": {
+        "intent": "add_items"
+      }
     }
   ]
 }
