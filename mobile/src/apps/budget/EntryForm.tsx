@@ -48,7 +48,6 @@ import {
   FormSection,
   RowIcon,
   RowValue,
-  SelectRow,
   TextRow,
   ToggleRow,
 } from '@/components/form'
@@ -262,7 +261,7 @@ function WhoChips({
   const { c } = useTheme()
   const emails = profiles.map((p) => p.email)
   return (
-    <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
       {profiles.map((p) => {
         const on = p.email === value
         const tint = memberColor(p.email, emails)
@@ -794,21 +793,19 @@ export default function EntryForm({
     }
   }
 
-  // Who: a segment for a small household, a picker beyond three members.
+  // Who: everyone visible at once (owner, 2026-11). The label sits on its own
+  // line and the people wrap below it as chips, so a big household never hides
+  // anyone off the edge (a single row cut the last chip and couldn't scroll).
   const who = profiles.find((p) => p.email === personEmail)
   const whoRow =
-    profiles.length > 4 ? (
-      <SelectRow
-        icon={ri(UserRound)}
-        label={t('entry.who')}
-        value={personEmail}
-        options={profiles.map((p) => ({ value: p.email, label: shortName(p.display_name) }))}
-        onChange={(v) => v && setPersonEmail(v)}
-      />
-    ) : profiles.length > 1 ? (
-      <FormRow label={t('entry.who')} icon={ri(UserRound)}>
+    profiles.length > 1 ? (
+      <View style={{ paddingHorizontal: sp.md, paddingTop: 12, paddingBottom: 12, gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+          {ri(UserRound)}
+          <Txt style={{ fontSize: 15, color: c.text }}>{t('entry.who')}</Txt>
+        </View>
         <WhoChips profiles={profiles} value={personEmail} onChange={setPersonEmail} />
-      </FormRow>
+      </View>
     ) : (
       <FormRow label={t('entry.who')} icon={ri(UserRound)}>
         <RowValue value={who ? shortName(who.display_name) : null} placeholder="—" />
