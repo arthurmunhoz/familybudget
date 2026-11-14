@@ -473,7 +473,7 @@ export default function Calendar() {
           </Pressable>
         ) : null}
         <View style={{ marginLeft: 'auto' }}>
-          <RoofExamples variant="pill" examples={['roofEx.cal.1', 'roofEx.cal.2', 'roofEx.cal.3', 'roofEx.cal.4']} />
+          <RoofExamples variant="pill" examples={['roofEx.cal.1', 'roofEx.cal.2', 'roofEx.cal.3', 'roofEx.cal.9', 'roofEx.cal.4']} />
         </View>
       </View>
 

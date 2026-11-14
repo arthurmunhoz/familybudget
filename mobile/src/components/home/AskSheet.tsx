@@ -104,7 +104,18 @@ import { HelpView } from './HelpView'
 import { CapabilitiesView } from './CapabilitiesView'
 import { isCapabilitiesAsk, nextTip, type Tip } from './roofTips'
 import { ListeningBars } from './ListeningBars'
-import { actMore, recurrenceLabel, recurringChoice, reminderLabel, type ActEnv, type ActionAnswer } from './askActions'
+import {
+  actMore,
+  eventWho,
+  moveAnswer,
+  recurrenceLabel,
+  recurringChoice,
+  reminderLabel,
+  removeAnswer,
+  whichEvent,
+  type ActEnv,
+  type ActionAnswer,
+} from './askActions'
 import { categoriesContext, documentsContext, petTasksContext } from '@/lib/assistantActions'
 import { fetchPingPresets, presetText, sendPing } from '@/lib/pings'
 import { usePlus } from '@/lib/plus'
@@ -177,6 +188,8 @@ interface Loaded {
   open: { lines: string[]; labels: string[] }
   budgets: string[]
   pets: string[]
+  /** "Lola = dog" — the model reads "as cachorras" as every dog. */
+  petKinds: string[]
   petTasks: string[]
   categories: string[]
   documents: string[]
@@ -294,7 +307,7 @@ export function AskSheet({
       const [stores, budgetRows, petRows, petTasks, categories, recent, documents] = await Promise.all([
         fetchStores(),
         supabase.from('budgets').select('name'),
-        supabase.from('pets').select('name'),
+        supabase.from('pets').select('name, species'),
         petTasksContext().catch(() => []),
         categoriesContext().catch(() => []),
         recentContext(today, firstName).catch(() => ({ entries: [], events: [] })),
@@ -306,6 +319,7 @@ export function AskSheet({
         open,
         budgets: ((budgetRows.data ?? []) as { name: string }[]).map((b) => b.name),
         pets: ((petRows.data ?? []) as { name: string }[]).map((x) => x.name),
+        petKinds: ((petRows.data ?? []) as { name: string; species: string | null }[]).filter((x) => x.species).map((x) => `${x.name} = ${x.species}`),
         petTasks,
         categories,
         documents,
@@ -669,6 +683,7 @@ export function AskSheet({
         members: profiles.map((p) => p.display_name),
         budgets: ctx.budgets,
         pets: ctx.pets,
+        petKinds: ctx.petKinds,
         petTasks: ctx.petTasks,
         categories: ctx.categories,
         documents: ctx.documents,
@@ -736,7 +751,8 @@ export function AskSheet({
         return { kind: 'event', ev, who: extras.length ? extras.join(' · ') : null, undone: false }
       }
       case 'move_event': {
-        const r = await moveEvent(intent.title, intent.date, intent.newDate, intent.time, today, intent.ref)
+        const who = eventWho(intent.person, profiles)
+        const r = await moveEvent(intent.title, intent.date, intent.newDate, intent.time, today, intent.ref, who)
         if (r.ok) {
           invalidateCache('hub:today')
           return { kind: 'moved', ev: r.ev, before: r.before, undone: false }
@@ -746,6 +762,10 @@ export function AskSheet({
         }
         if (r.reason === 'external') return { kind: 'say', text: t('ask.editExternal', { title: r.options[0]?.title ?? intent.title }) }
         reportGap('move_event', r.reason, lang)
+        // Several fit (two kids' dentists): ask which, as tappable rows.
+        if (r.reason === 'ambiguous' && r.occs?.length) {
+          return whichEvent(env, r.occs, (o) => moveAnswer(env, o, intent.newDate, intent.time), who)
+        }
         const day = dayWords(intent.date)
         const names = r.options.slice(0, 4).map((e) => e.title).join(', ')
         return {
@@ -759,13 +779,15 @@ export function AskSheet({
         }
       }
       case 'remove_event': {
-        const r = await removeEvent(intent.title, intent.date, today, intent.ref)
+        const who = eventWho(intent.person, profiles)
+        const r = await removeEvent(intent.title, intent.date, today, intent.ref, who)
         if (r.ok) {
           invalidateCache('hub:today')
           return { kind: 'removedEvent', ev: r.ev, undone: false }
         }
         if (r.reason === 'recurring') return recurringChoice(env, 'remove', r.occ.event, r.occ.start)
         reportGap('remove_event', r.reason, lang)
+        if (r.reason === 'ambiguous' && r.occs?.length) return whichEvent(env, r.occs, (o) => removeAnswer(env, o), who)
         const day = intent.date ? dayWords(intent.date) : ''
         const names = r.options.slice(0, 4).map((e) => (intent.date ? e.title : `${e.title} (${whenLabel(e)})`)).join(', ')
         const title = r.options[0]?.title ?? intent.title
@@ -828,7 +850,9 @@ export function AskSheet({
         }
       }
       case 'pets_due': {
-        return { kind: 'pets', p: await petsDue(today, intent.pet) }
+        // "quais são as rotinas da Lola?" — the whole routine (askActions).
+        if (intent.view === 'routine') return (await actMore(intent, env)) ?? { kind: 'error' }
+        return { kind: 'pets', p: await petsDue(today, intent.pet, intent.view === 'overdue' ? 'overdue' : undefined) }
       }
       case 'family_info': {
         if (!intent.field) return { kind: 'family', text: t('ask.familyWhat') }
@@ -1296,7 +1320,7 @@ export function AskSheet({
               <ActionView
                 headline={answer.undone && answer.undo ? answer.undo.headline : answer.headline}
                 sub={answer.undone ? null : answer.sub}
-                rows={answer.undone ? [] : answer.rows}
+                rows={answer.undone ? [] : answer.rows.map((r) => (r.pick ? { ...r, onPress: () => void runChoice(r.pick!) } : r))}
                 quiet={
                   answer.undo && !answer.undone
                     ? {

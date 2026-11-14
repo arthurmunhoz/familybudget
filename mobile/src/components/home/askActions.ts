@@ -9,16 +9,20 @@ import {
   findMember,
   locateEvent,
   isExternal,
+  moveOccurrence,
   moveSeries,
+  removeOccurrence,
   removeSeries,
   restoreEvent,
   restoreItems,
   unremoveEvent,
   agendaFor,
   petsDue,
+  type EventWho,
   type Intent,
   type MoneyRange,
 } from '@/lib/assistant'
+import type { Occurrence } from '@/lib/calendar'
 import {
   clearChecked,
   compareDeals,
@@ -34,6 +38,7 @@ import {
   moveItemsTo,
   periodEntries,
   petNextDue,
+  petRoutine,
   petTasksDone,
   recheck,
   reinsertEntry,
@@ -55,11 +60,14 @@ import { formatTime, KIND_EMOJI } from '@/lib/calendar'
 import type { TKey } from '@/lib/i18n'
 import type { CalendarEvent, EventRecurrence, PetEventType, Profile } from '@/lib/types'
 
+/** A row of the answer; `pick` makes it tappable ("which one?" lists). */
+export type PickRow = ActionRowData & { pick?: () => Promise<ActionAnswer> }
+
 export interface ActionAnswer {
   kind: 'action'
   headline: string
   sub?: string
-  rows: ActionRowData[]
+  rows: PickRow[]
   /** One line for the conversation history (and Claude's context). */
   summary: string
   undo?: { run: () => Promise<void>; headline: string }
@@ -121,6 +129,77 @@ function rangeLabel(r: MoneyRange, today: string, locale: string, t: ActEnv['t']
 const shortDay = (iso: string, locale: string) => {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/** Whose event a request named ("o dentista do Pedro"): a member when the name
+ *  is one (matched by owner), else just the name (matched in the title). */
+export function eventWho(person: string | undefined, profiles: Profile[]): EventWho | undefined {
+  const name = person?.trim()
+  if (!name) return undefined
+  const m = findMember(name, profiles)
+  return m ? { name: m.display_name.split(' ')[0], email: m.email } : { name }
+}
+
+/** "Which one?" — several events fit and nothing said tells them apart (two
+ *  kids' dentists). Each candidate is a row with WHO and WHEN; tapping one
+ *  carries the request out on exactly that occurrence (owner, 2026-11). */
+export function whichEvent(
+  env: ActEnv,
+  occs: Occurrence[],
+  act: (occ: Occurrence) => Promise<ActionAnswer>,
+  who?: EventWho,
+): ActionAnswer {
+  const { t, locale, profiles } = env
+  const rows: PickRow[] = occs.slice(0, 6).map((o) => {
+    const owner = profiles.find((p) => p.email === o.event.owner_email)
+    const time = o.event.start_time && !o.event.all_day ? formatTime(o.event.start_time.slice(0, 5), locale) : ''
+    return {
+      emoji: KIND_EMOJI[o.event.kind] ?? '🗓️',
+      title: o.event.title,
+      sub: [owner ? first(owner) : t('ask.everyone'), [shortDay(o.start, locale), time].filter(Boolean).join(', ')].join(' · '),
+      pick: () => act(o),
+    }
+  })
+  const head = who ? t('ask.whichEventFor', { name: who.name }) : t('ask.whichEvent')
+  return say(head, {
+    rows,
+    summary: `${head} ${rows.map((r) => `${r.title} (${r.sub})`).join('; ')}`,
+  })
+}
+
+/** Move one picked occurrence (a series asks first, as everywhere). */
+export async function moveAnswer(env: ActEnv, occ: Occurrence, to: string, time: string): Promise<ActionAnswer> {
+  const { t } = env
+  const r = await moveOccurrence(occ, to, time)
+  if (r.ok) {
+    env.invalidate('hub:today')
+    return say(t('ask.eventMoved'), {
+      rows: [{ emoji: KIND_EMOJI[r.ev.kind] ?? '🗓️', title: r.ev.title, sub: env.whenLabel(r.ev) }],
+      summary: t('ask.sumMoved', { title: r.ev.title, when: env.whenLabel(r.ev) }),
+      undo: { run: () => restoreEvent(r.before), headline: t('ask.moveUndone') },
+      open: { label: t('ask.openCalendar'), path: `/calendar?date=${r.ev.start_date}` },
+    })
+  }
+  if (r.reason === 'recurring') return recurringChoice(env, 'move', r.occ.event, r.occ.start, { to, time })
+  if (r.reason === 'external') return say(t('ask.editExternal', { title: occ.event.title }))
+  return say(t('ask.error'))
+}
+
+/** Remove one picked occurrence's event (a series asks first). */
+export async function removeAnswer(env: ActEnv, occ: Occurrence): Promise<ActionAnswer> {
+  const { t } = env
+  const r = await removeOccurrence(occ)
+  if (r.ok) {
+    env.invalidate('hub:today')
+    return say(t('ask.eventRemoved'), {
+      rows: [{ emoji: KIND_EMOJI[r.ev.kind] ?? '🗓️', title: r.ev.title, sub: env.whenLabel(r.ev) }],
+      summary: t('ask.sumRemovedEvent', { title: r.ev.title, when: env.whenLabel(r.ev) }),
+      undo: { run: () => unremoveEvent(r.ev), headline: t('ask.removeUndone') },
+    })
+  }
+  if (r.reason === 'recurring') return recurringChoice(env, 'remove', r.occ.event, r.occ.start)
+  if (r.reason === 'external') return say(t('ask.removeExternal', { title: occ.event.title }))
+  return say(t('ask.error'))
 }
 
 /** The answer for "remove/move a recurring event": confirm what to do with
@@ -193,35 +272,34 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
   switch (intent.intent) {
     // ── calendar ──────────────────────────────────────────────────────────────
     case 'edit_event': {
-      const r = await locateEvent(intent.title, intent.date, today, 92, intent.ref)
-      if (!r.ok) {
-        env.reportGap('edit_event', r.reason)
-        return say(
-          r.reason === 'ambiguous'
-            ? t('ask.removeWhich', { names: r.options.slice(0, 4).map((o) => `${o.event.title} (${shortDay(o.start, locale)})`).join(', ') })
-            : t('ask.eventNotFound', { title: intent.title }),
-        )
+      const who = eventWho(intent.person, profiles)
+      const r = await locateEvent(intent.title, intent.date, today, 92, intent.ref, who)
+      const edit = async (occ: Occurrence): Promise<ActionAnswer> => {
+        const before = occ.event
+        if (isExternal(before)) return say(t('ask.editExternal', { title: before.title }))
+        const ev = await editEvent(before, { newTitle: intent.newTitle, location: intent.location, notes: intent.notes, reminder: intent.reminder })
+        if (!ev) return say(t('ask.error'))
+        env.invalidate('hub:today')
+        const changes = [
+          intent.newTitle ? t('ask.editRenamed', { title: ev.title }) : '',
+          intent.location ? `📍 ${ev.location}` : '',
+          intent.notes ? `📝 ${intent.notes}` : '',
+          intent.reminder === -2 ? t('ask.editNoReminder') : intent.reminder >= 0 ? `⏰ ${reminderLabel(t, intent.reminder)}` : '',
+        ].filter(Boolean)
+        return say(t('ask.eventEdited'), {
+          rows: [{ emoji: KIND_EMOJI[ev.kind] ?? '🗓️', title: ev.title, sub: [shortDay(occ.start, locale), ...changes].join(' · ') }],
+          summary: t('ask.sumEventEdited', { title: ev.title, changes: changes.join(', ') }),
+          undo: { run: () => restoreEvent(before), headline: t('ask.moveUndone') },
+          open: { label: t('ask.openCalendar'), path: `/calendar?date=${occ.start}` },
+        })
       }
-      const before = r.occ.event
-      if (isExternal(before)) return say(t('ask.editExternal', { title: before.title }))
-      const ev = await editEvent(before, { newTitle: intent.newTitle, location: intent.location, notes: intent.notes, reminder: intent.reminder })
-      if (!ev) return say(t('ask.error'))
-      env.invalidate('hub:today')
-      const changes = [
-        intent.newTitle ? t('ask.editRenamed', { title: ev.title }) : '',
-        intent.location ? `📍 ${ev.location}` : '',
-        intent.notes ? `📝 ${intent.notes}` : '',
-        intent.reminder === -2 ? t('ask.editNoReminder') : intent.reminder >= 0 ? `⏰ ${reminderLabel(t, intent.reminder)}` : '',
-      ].filter(Boolean)
-      return say(t('ask.eventEdited'), {
-        rows: [{ emoji: KIND_EMOJI[ev.kind] ?? '🗓️', title: ev.title, sub: [shortDay(r.occ.start, locale), ...changes].join(' · ') }],
-        summary: t('ask.sumEventEdited', { title: ev.title, changes: changes.join(', ') }),
-        undo: { run: () => restoreEvent(before), headline: t('ask.moveUndone') },
-        open: { label: t('ask.openCalendar'), path: `/calendar?date=${r.occ.start}` },
-      })
+      if (r.ok) return edit(r.occ)
+      env.reportGap('edit_event', r.reason)
+      if (r.reason === 'ambiguous') return whichEvent(env, r.options, edit, who)
+      return say(t('ask.eventNotFound', { title: intent.title }))
     }
     case 'find_event': {
-      const r = await locateEvent(intent.title, intent.date, today, 366, intent.ref)
+      const r = await locateEvent(intent.title, intent.date, today, 366, intent.ref, eventWho(intent.person, profiles))
       if (!r.ok && r.reason === 'not_found') return say(t('ask.findNone', { title: intent.title }))
       const occs = r.ok ? [r.occ] : r.options.slice(0, 4)
       const o = occs[0]
@@ -404,18 +482,76 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
       if (!r.rows.length) return say(r.pet ? t('ask.petNextNoneFor', { pet: r.pet }) : t('ask.petNextNone'))
       const o = r.rows[0]
       const late = o.due < today
+      const shown = r.rows.slice(0, 8)
       return say(
         late ? t('ask.petNextLate', { title: o.title, pet: o.pet, day: shortDay(o.due, locale) }) : t('ask.petNextHead', { title: o.title, pet: o.pet, day: env.dayWords(o.due) }),
         {
-          rows: r.rows.slice(0, 6).map((x) => ({
-            emoji: PET_EMOJI[x.type] ?? '🐾',
+          sub: r.rows.length > 1 ? t('ask.petNextCount', { n: r.rows.length }) : undefined,
+          rows: shown.map((x) => ({
+            emoji: x.every ? '🔁' : (PET_EMOJI[x.type] ?? '🐾'),
             title: `${x.title} · ${x.pet}`,
-            sub: `${x.due < today ? t('ask.overdueSince', { day: shortDay(x.due, locale) }) : shortDay(x.due, locale)} · ${t('ask.lastOn', { day: shortDay(x.last, locale) })}`,
+            sub: [
+              x.due < today ? t('ask.overdueSince', { day: shortDay(x.due, locale) }) : x.due === today ? t('ask.today') : shortDay(x.due, locale),
+              x.every ? everyText(t, x.every) : '',
+              t('ask.lastOn', { day: shortDay(x.last, locale) }),
+            ]
+              .filter(Boolean)
+              .join(' · '),
           })),
-          summary: r.rows.slice(0, 6).map((x) => `${x.title} (${x.pet}) ${x.due}`).join(', '),
+          summary: shown.map((x) => `${x.title} (${x.pet}) ${x.due}`).join(', '),
           open: { label: t('ask.openPets'), path: '/pets' },
         },
       )
+    }
+    case 'pets_due': {
+      // Only the whole-routine view lands here (AskSheet shows the rest).
+      if (intent.view !== 'routine') return null
+      const list = await petRoutine(intent.pet, today)
+      const names = list.map((x) => x.pet).join(', ')
+      if (!list.length) {
+        return say(intent.pet ? t('ask.petRoutineNoneFor', { pet: intent.pet }) : t('ask.petRoutineNone'), {
+          open: { label: t('ask.openPets'), path: '/pets' },
+        })
+      }
+      const several = list.length > 1
+      const rows: PickRow[] = []
+      for (const p of list) {
+        for (const d of p.daily) {
+          rows.push({
+            emoji: d.done ? '✅' : '🐾',
+            title: `${d.time ? `${formatTime(d.time, locale)} · ` : ''}${d.task.title}`,
+            sub: [several ? p.pet : '', t('ask.repeat.daily'), d.done ? t('ask.petDoneToday') : ''].filter(Boolean).join(' · '),
+          })
+        }
+        for (const it of p.interval) {
+          rows.push({
+            emoji: '🔁',
+            title: it.task.title,
+            sub: [
+              several ? p.pet : '',
+              it.task.interval_days ? everyText(t, it.task.interval_days) : '',
+              it.due
+                ? it.due < today
+                  ? t('ask.overdueSince', { day: shortDay(it.due, locale) })
+                  : t('ask.nextDue', { day: shortDay(it.due, locale) })
+                : t('ask.petNeverDone'),
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          })
+        }
+      }
+      const daily = list.reduce((n, p) => n + p.daily.length, 0)
+      const interval = list.reduce((n, p) => n + p.interval.length, 0)
+      const head = several ? t('ask.petRoutinesHead') : t('ask.petRoutineFor', { pet: names })
+      return say(head, {
+        sub: t('ask.petRoutineCounts', { daily, interval }),
+        rows,
+        summary: `${head} ${list
+          .map((p) => `${p.pet}: ${[...p.daily.map((d) => `${d.time ? `${d.time} ` : ''}${d.task.title}`), ...p.interval.map((i) => i.task.title)].join(', ')}`)
+          .join('; ')}`,
+        open: { label: t('ask.openPets'), path: '/pets' },
+      })
     }
     case 'pet_weight': {
       const r = await logPetWeight(intent.pet, intent.weight, today)
@@ -606,6 +742,20 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
     default:
       return null
   }
+}
+
+/** "every 7 days" / "every month" / "every year" for an interval routine. */
+function everyText(t: T, days: number): string {
+  const years = days / 365
+  if (days >= 330 && Math.abs(years - Math.round(years)) < 0.08) {
+    const n = Math.round(years)
+    return n === 1 ? t('petcare.everyYear') : t('petcare.everyYears', { n })
+  }
+  if (days >= 28) {
+    const n = Math.round(days / 30.44)
+    return n <= 1 ? t('petcare.everyMonth') : t('petcare.everyMonths', { n })
+  }
+  return t('ask.everyDays', { n: days })
 }
 
 const FAMILY_KEY: Record<string, string> = {

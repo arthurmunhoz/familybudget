@@ -13,6 +13,7 @@ import { dailyChecklist, overdueCare, overdueEvents } from './petCare'
 import { suggestCategory } from './categories'
 import { addDaysISO, periodEndISO } from './format'
 import { notifyPetCareChange } from './petCareNotify'
+import { cutWrite } from './assistantGuard'
 import type {
   Budget,
   CalendarEvent,
@@ -52,11 +53,13 @@ export type Intent =
   | { intent: 'remove_items'; items: string[] }
   | { intent: 'agenda'; scope: Scope; person: string; date: string; end: string; label: string }
   | { intent: 'add_event'; title: string; date: string; time: string; person: string; opts?: EventOpts }
-  | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; ref?: string }
-  | { intent: 'find_event'; title: string; date: string; ref?: string }
-  | { intent: 'move_event'; title: string; date: string; newDate: string; time: string; ref?: string }
+  /** `person` (move / remove / edit / find): whose event was named ("o dentista
+   *  do Pedro") — narrows locateEvent; absent = anyone's. */
+  | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; ref?: string; person?: string }
+  | { intent: 'find_event'; title: string; date: string; ref?: string; person?: string }
+  | { intent: 'move_event'; title: string; date: string; newDate: string; time: string; ref?: string; person?: string }
   /** `date` is "" when no day was said: the coming weeks are searched. */
-  | { intent: 'remove_event'; title: string; date: string; ref?: string }
+  | { intent: 'remove_event'; title: string; date: string; ref?: string; person?: string }
   | { intent: 'add_money'; title: string; amount: number; type: 'expense' | 'income'; date: string; budget: string }
   /** `at`: a day inside an EARLIER period asked about ("last month"); absent = the current one. */
   /** `kind`: only expenses or only income ("meus gastos"); absent = both. */
@@ -87,7 +90,8 @@ export type Intent =
   | { intent: 'better_deal'; deals: Deal[] }
   | { intent: 'open_document'; title: string; person: string }
   | { intent: 'day_summary'; date: string }
-  | { intent: 'pets_due'; pet: string }
+  /** `view`: the whole routine, or only what's late; absent = what's left today. */
+  | { intent: 'pets_due'; pet: string; view?: 'routine' | 'overdue' }
   | { intent: 'family_info'; person: string; field: FamilyField | '' }
   | { intent: 'open_app'; app: string }
   | { intent: 'start_game'; game: string }
@@ -145,6 +149,8 @@ export interface AskContext {
   members: string[]
   budgets: string[]
   pets: string[]
+  /** Each pet's species, "Lola = dog" — "as cachorras" = every dog. */
+  petKinds?: string[]
   /** Each pet's routine, "Lola: Comida, Passeio". */
   petTasks?: string[]
   /** Spending categories, "groceries = Groceries". */
@@ -217,13 +223,21 @@ export async function understandWithSource(
     // A pet of THIS household named next to "need / next / routine…" is a
     // routine question, whatever an older server made of it ("what does Lola
     // need next today?" came back as family_info / unknown — owner, 2026-11).
-    const asked = petsAsked(text, ctx.pets, ctx.members)
+    // A request cut off mid-phrase ("marca uma consulta da") never writes:
+    // the recogniser stopped early and the guess filled the gap (owner, 2026-11).
+    if (remote && cutWrite(remote.intent, text)) return { intent: { intent: 'need_detail', about: remote.intent }, source: 'asked' }
+    // Only a READ answer may be swapped for the routine question — never a
+    // pet write ("a Chloe tomou a vacina hoje, próxima em 1 ano" says "próxima",
+    // and became a "what does Chloe need?" — owner, 2026-11).
+    const swappable = !remote || PET_SWAPPABLE.has(remote.intent)
+    const asked = swappable ? petsAsked(text, ctx.pets, ctx.members) : []
     // Several pets named: all of them, whatever single one the server kept.
-    if (asked.length > 1 && (!remote || remote.intent === 'pets_due' || remote.intent === 'unknown')) {
-      return { intent: { intent: 'pets_due', pet: asked.join(', ') }, source: remote ? 'server' : 'local' }
+    if (asked.length > 1) {
+      const view = remote?.intent === 'pets_due' && remote.view ? { view: remote.view } : {}
+      return { intent: { intent: 'pets_due', pet: asked.join(', '), ...view }, source: remote ? 'server' : 'local' }
     }
     const pet = asked[0] ?? ''
-    if (pet && (remote?.intent !== 'pets_due' || !remote.pet)) return { intent: { intent: 'pets_due', pet }, source: 'local' }
+    if (pet && (remote?.intent !== 'pets_due' || !remote.pet)) return { intent: { intent: 'pets_due', pet, ...(remote?.intent === 'pets_due' && remote.view ? { view: remote.view } : {}) }, source: 'local' }
     if (remote && remote.intent !== 'unknown') return { intent: remote, source: 'server' }
     // The server UNDERSTOOD the request but a detail was missing. The local
     // regexes are far dumber ("apaga o gasto do X" reads as a list item), so
@@ -235,6 +249,11 @@ export async function understandWithSource(
     return { intent: remote, source: remote ? 'server' : 'none' }
   }
 }
+
+/** Server answers the pet-routine override may replace: reads that an older
+ *  server filed a routine question under. Writes and the other pet intents
+ *  are never replaced. */
+const PET_SWAPPABLE = new Set(['pets_due', 'unknown', 'family_info', 'agenda', 'day_summary', 'find_items', 'list_items', 'app_help', 'where_is'])
 
 export async function understand(text: string, ctx: AskContext): Promise<Intent | null> {
   return (await understandWithSource(text, ctx)).intent
@@ -251,6 +270,8 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
   const num = (k: string) => (typeof j[k] === 'number' && isFinite(j[k] as number) ? (j[k] as number) : 0)
   /** The row the model pointed at ("e1", "v3") — only when given. */
   const ref = /^[ev]\d{1,2}$/.test(str('ref')) ? { ref: str('ref') } : {}
+  /** Whose event (move / remove / edit / find) — only when named. */
+  const whose = str('person').trim() ? { person: str('person').trim() } : {}
   switch (j.intent) {
     case 'add_items':
       return items.length ? { intent: 'add_items', items, store: str('store') } : null
@@ -298,21 +319,22 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
         notes: str('notes'),
         reminder,
         ...ref,
+        ...whose,
       }
     }
     case 'find_event':
-      return str('title') || ref.ref ? { intent: 'find_event', title: str('title'), date: isoOr('date'), ...ref } : null
+      return str('title') || ref.ref ? { intent: 'find_event', title: str('title'), date: isoOr('date'), ...ref, ...whose } : null
     case 'move_event': {
       const newDate = /^\d{4}-\d{2}-\d{2}$/.test(str('new_date')) ? str('new_date') : ''
       // Nowhere to go and no new time: not a usable move.
       if (!newDate && !str('time')) return null
-      return { intent: 'move_event', title: str('title'), date, newDate: newDate || date, time: str('time'), ...ref }
+      return { intent: 'move_event', title: str('title'), date, newDate: newDate || date, time: str('time'), ...ref, ...whose }
     }
     case 'remove_event': {
       const day = /^\d{4}-\d{2}-\d{2}$/.test(str('date')) ? str('date') : ''
       // Neither a name nor a day: nothing to go on.
       if (!str('title') && !day && !ref.ref) return null
-      return { intent: 'remove_event', title: str('title'), date: day, ...ref }
+      return { intent: 'remove_event', title: str('title'), date: day, ...ref, ...whose }
     }
     case 'add_money': {
       const amount = typeof j.amount === 'number' ? j.amount : 0
@@ -405,8 +427,10 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
       return str('title') ? { intent: 'open_document', title: str('title'), person: str('person') } : null
     case 'day_summary':
       return { intent: 'day_summary', date }
-    case 'pets_due':
-      return { intent: 'pets_due', pet: str('pet') }
+    case 'pets_due': {
+      const view = str('pet_view')
+      return { intent: 'pets_due', pet: str('pet'), ...(view === 'routine' || view === 'overdue' ? { view } : {}) }
+    }
     case 'family_info':
       return { intent: 'family_info', person: str('person'), field: str('field') as FamilyField | '' }
     case 'open_app':
@@ -945,31 +969,115 @@ export type Located =
   | { ok: true; occ: Occurrence }
   | { ok: false; reason: 'not_found' | 'ambiguous'; options: Occurrence[] }
 
+/** Whose event the request named: a first name, and their email when that
+ *  name is a member (a child without an account matches by title only). */
+export interface EventWho {
+  name: string
+  email?: string | null
+}
+
+const words = (s: string) => norm(s).split(/[^a-z0-9]+/).filter(Boolean)
+/** Words that only tie a title to a name ("dentista DO Pedro", "Sam'S dentist"). */
+const CONNECTORS = new Set(['o', 'a', 'do', 'da', 'de', 'dos', 'das', 'del', 'el', 'la', 'the', 'of', 'for', 's', 'para', 'pra'])
+
+/** The event is this person's: they own it, or their name is in its title
+ *  ("Dentista Pedro", "Pedro - dentista"). */
+export function isTheirs(ev: CalendarEvent, who: EventWho): boolean {
+  if (who.email && ev.owner_email === who.email) return true
+  const first = words(who.name)[0]
+  return !!first && words(ev.title).includes(first)
+}
+
+/** The title said, without the person's name and the "do/da/de/'s" that tied
+ *  it ("dentista do Pedro" → "dentista"). */
+function titleWithout(title: string, who: EventWho | undefined): string {
+  if (!who) return norm(title)
+  const name = words(who.name)[0]
+  if (!name) return norm(title)
+  return words(title)
+    .filter((w, i, all) => w !== name && !(all[i + 1] === name && ['do', 'da', 'de', 'dos', 'das', 'del', 'of', 'for'].includes(w)) && w !== 's')
+    .join(' ')
+}
+
+/** Pick the occurrence meant from `pool` (sorted soonest first) — pure, so it
+ *  can be tested. A person (owner, or a name in the title) and a day narrow
+ *  it; two DIFFERENT events still left (two kids' "Dentista") are ambiguous:
+ *  the caller asks which, never takes the first (owner 2026-11). */
+export function pickOccurrence(pool: Occurrence[], title: string, hasDate: boolean, who?: EventWho): Located {
+  const n = titleWithout(title, who)
+  const full = norm(title)
+  const exact = (o: Occurrence) => {
+    const t = norm(o.event.title)
+    return !!n && (t === n || t === full)
+  }
+  // Every word said is in the title ("Dentista Pedro" for "dentista", or for
+  // "dentista do Pedro"): as good as the exact name — both are asked about.
+  const said = words(n).filter((w) => !CONNECTORS.has(w))
+  const strong = (o: Occurrence) => {
+    if (exact(o)) return true
+    const tw = words(o.event.title)
+    return said.length > 0 && said.every((w) => tw.includes(w))
+  }
+  const weak = (o: Occurrence) => {
+    const t = norm(o.event.title)
+    return !!n && !!t && (t.includes(n) || n.includes(t))
+  }
+  let hits: Occurrence[]
+  if (!n) hits = hasDate || who ? pool : []
+  else {
+    hits = pool.filter(strong)
+    if (!hits.length) hits = pool.filter(weak)
+  }
+  if (who && hits.length) {
+    const theirs = hits.filter((o) => isTheirs(o.event, who))
+    // Named someone none of them belongs to: show what there is and ask.
+    if (!theirs.length) return { ok: false, reason: 'ambiguous', options: dedupe(hits) }
+    hits = theirs
+  }
+  if (!hits.length) return { ok: false, reason: 'not_found', options: hasDate ? pool : [] }
+  // Two different events fit (two kids' "Dentista", "Dentista" and "Dentista
+  // Pedro") and nothing said tells them apart: ask. The occurrences of ONE
+  // series are not a question — the soonest (the pool is sorted).
+  const options = dedupe(hits)
+  if (options.length > 1) return { ok: false, reason: 'ambiguous', options }
+  return { ok: true, occ: hits[0] }
+}
+
+/** One option per event (its soonest occurrence) — a weekly series must not
+ *  fill the "which one?" list on its own. */
+function dedupe(hits: Occurrence[]): Occurrence[] {
+  const seen = new Set<string>()
+  return hits.filter((o) => (seen.has(o.event.id) ? false : (seen.add(o.event.id), true)))
+}
+
 /** Find the event the user means, by (loose) title: on `date` when given, else
  *  its NEXT occurrence from `today` within `withinDays` ("remove unha" = the
  *  coming one). Recurring series are expanded, so "the swimming on Tuesday"
  *  finds that week's occurrence. With no title, the only event that day. */
-export async function locateEvent(title: string, date: string, today: string, withinDays = 92, ref?: string): Promise<Located> {
+export async function locateEvent(
+  title: string,
+  date: string,
+  today: string,
+  withinDays = 92,
+  ref?: string,
+  who?: EventWho,
+): Promise<Located> {
   const { data } = await supabase.from('calendar_events').select('*')
   const events = (data ?? []) as CalendarEvent[]
-  // The model pointed at a row it was shown: that exact occurrence.
+  const pool = date ? occurrencesInRange(events, date, date) : upcomingOccurrences(events, today, withinDays)
+  // The model pointed at a row it was shown: that exact occurrence — unless
+  // it isn't the person named, or the words fit several people's events and
+  // say nothing to tell them apart (the model picked one; the app asks).
   const r = refTo(ref)
   const byRef = r?.kind === 'event' ? events.find((ev) => ev.id === r.id) : undefined
-  if (byRef && r?.kind === 'event') {
-    const occ = occurrencesInRange([byRef], r.start, r.start)[0] ?? { event: byRef, start: byRef.start_date, end: byRef.end_date }
-    return { ok: true, occ }
+  if (byRef && r?.kind === 'event' && (!who || isTheirs(byRef, who))) {
+    const check = title && !who && !date ? pickOccurrence(pool, title, false) : null
+    if (!(check && !check.ok && check.reason === 'ambiguous' && check.options.some((o) => o.event.id === byRef.id))) {
+      const occ = occurrencesInRange([byRef], r.start, r.start)[0] ?? { event: byRef, start: byRef.start_date, end: byRef.end_date }
+      return { ok: true, occ }
+    }
   }
-  const pool = date ? occurrencesInRange(events, date, date) : upcomingOccurrences(events, today, withinDays)
-  const n = norm(title)
-  let hits = n ? pool.filter((o) => norm(o.event.title) === n) : date ? pool : []
-  if (n && !hits.length) hits = pool.filter((o) => norm(o.event.title).includes(n) || n.includes(norm(o.event.title)))
-  if (!hits.length) return { ok: false, reason: 'not_found', options: date ? pool : [] }
-  if (hits.length > 1) {
-    // No day said and every hit is the same name: the soonest (pool is sorted).
-    const same = hits.every((o) => norm(o.event.title) === norm(hits[0].event.title))
-    if (date || !same) return { ok: false, reason: 'ambiguous', options: hits }
-  }
-  return { ok: true, occ: hits[0] }
+  return pickOccurrence(pool, title, !!date, who)
 }
 
 /** Pulled from a connected Apple/Google calendar: read-only here (the next
@@ -978,7 +1086,8 @@ export const isExternal = (ev: CalendarEvent) => !!ev.source && ev.source !== 'o
 
 export type MoveResult =
   | { ok: true; ev: CalendarEvent; before: CalendarEvent }
-  | { ok: false; reason: 'not_found' | 'ambiguous' | 'external'; options: CalendarEvent[] }
+  /** `occs`: the occurrences behind `options` (when the search found any). */
+  | { ok: false; reason: 'not_found' | 'ambiguous' | 'external'; options: CalendarEvent[]; occs?: Occurrence[] }
   | { ok: false; reason: 'recurring'; options: CalendarEvent[]; occ: Occurrence }
 
 const toMin = (t: string | null) => (t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5)) : null)
@@ -1008,13 +1117,26 @@ function movePatch(ev: CalendarEvent, occStart: string, to: string, time: string
 /** Move an existing event on `from` to `to` (and to `time` when given),
  *  keeping its length. A recurring one is NOT moved here: the caller asks
  *  whether to move the whole series (moveSeries). */
-export async function moveEvent(title: string, from: string, to: string, time: string, today = from, ref?: string): Promise<MoveResult> {
-  const r = await locateEvent(title, from, today, 92, ref)
-  if (!r.ok) return { ok: false, reason: r.reason, options: r.options.map((o) => o.event) }
-  const before = r.occ.event
+export async function moveEvent(
+  title: string,
+  from: string,
+  to: string,
+  time: string,
+  today = from,
+  ref?: string,
+  who?: EventWho,
+): Promise<MoveResult> {
+  const r = await locateEvent(title, from, today, 92, ref, who)
+  if (!r.ok) return { ok: false, reason: r.reason, options: r.options.map((o) => o.event), occs: r.options }
+  return moveOccurrence(r.occ, to, time)
+}
+
+/** Move the occurrence the user picked (or locateEvent found). */
+export async function moveOccurrence(occ: Occurrence, to: string, time: string): Promise<MoveResult> {
+  const before = occ.event
   if (isExternal(before)) return { ok: false, reason: 'external', options: [before] }
-  if (before.recurrence && before.recurrence !== 'none') return { ok: false, reason: 'recurring', options: [before], occ: r.occ }
-  return applyMove(before, r.occ.start, to, time)
+  if (before.recurrence && before.recurrence !== 'none') return { ok: false, reason: 'recurring', options: [before], occ }
+  return applyMove(before, occ.start, to, time)
 }
 
 /** Shift a whole series so the occurrence on `occStart` lands on `to`. */
@@ -1047,19 +1169,24 @@ export async function restoreEvent(before: CalendarEvent): Promise<void> {
 
 export type RemoveResult =
   | { ok: true; ev: CalendarEvent }
-  | { ok: false; reason: 'not_found' | 'ambiguous' | 'external'; options: CalendarEvent[] }
+  | { ok: false; reason: 'not_found' | 'ambiguous' | 'external'; options: CalendarEvent[]; occs?: Occurrence[] }
   | { ok: false; reason: 'recurring'; options: CalendarEvent[]; occ: Occurrence }
 
 /** Delete an existing event by (loose) title — on `date` when given, else the
  *  NEXT one. Anyone in the household may delete any event (RLS), whoever owns
  *  it. A recurring series is left for the caller to confirm (removeSeries /
  *  endSeries); a connected-calendar event must be deleted at its source. */
-export async function removeEvent(title: string, date: string, today: string, ref?: string): Promise<RemoveResult> {
-  const r = await locateEvent(title, date, today, 92, ref)
-  if (!r.ok) return { ok: false, reason: r.reason, options: r.options.map((o) => o.event) }
-  const ev = r.occ.event
+export async function removeEvent(title: string, date: string, today: string, ref?: string, who?: EventWho): Promise<RemoveResult> {
+  const r = await locateEvent(title, date, today, 92, ref, who)
+  if (!r.ok) return { ok: false, reason: r.reason, options: r.options.map((o) => o.event), occs: r.options }
+  return removeOccurrence(r.occ)
+}
+
+/** Delete the occurrence's event (a series is left for the caller to confirm). */
+export async function removeOccurrence(occ: Occurrence): Promise<RemoveResult> {
+  const ev = occ.event
   if (isExternal(ev)) return { ok: false, reason: 'external', options: [ev] }
-  if (ev.recurrence && ev.recurrence !== 'none') return { ok: false, reason: 'recurring', options: [ev], occ: r.occ }
+  if (ev.recurrence && ev.recurrence !== 'none') return { ok: false, reason: 'recurring', options: [ev], occ }
   const { error } = await supabase.from('calendar_events').delete().eq('id', ev.id)
   if (error) return { ok: false, reason: 'not_found', options: [] }
   return { ok: true, ev }
@@ -1232,9 +1359,11 @@ export interface PetsAnswer {
   /** That pet's daily checklist today (0/0 when no pet was named). */
   routineDone: number
   routineTotal: number
+  /** Only overdue care was asked for. */
+  view?: 'overdue'
 }
 
-export async function petsDue(today: string, petName = ''): Promise<PetsAnswer> {
+export async function petsDue(today: string, petName = '', view?: 'overdue'): Promise<PetsAnswer> {
   const [pe, petRows, taskRows, doneRows] = await Promise.all([
     supabase.from('pet_events').select('*').order('event_date', { ascending: false }),
     supabase.from('pets').select('id, name'),
@@ -1265,8 +1394,15 @@ export async function petsDue(today: string, petName = ''): Promise<PetsAnswer> 
   const todayRows: PetDue[] = due
     .filter((d) => d.dueIn === 0)
     .map((d) => ({ id: d.key, title: d.title, pet: names[d.petId] ?? '', status: 'today', late: 0 }))
+  // Only what's late ("algum cuidado atrasado?"): no checklist, no progress.
+  if (view === 'overdue') return { rows: late, pet: wanted.map((w) => w.name).join(', '), routineDone: 0, routineTotal: 0, view }
+  // Every pet (or several): grouped by pet, in the household's pet order, so
+  // the answer reads pet by pet (owner, 2026-11).
+  const order = new Map(ids.map((id, i) => [names[id] ?? '', i]))
+  const all = [...late, ...routine, ...todayRows]
+  const rows = ids.length > 1 ? all.map((r, i) => ({ r, i })).sort((a, b) => (order.get(a.r.pet) ?? 0) - (order.get(b.r.pet) ?? 0) || a.i - b.i).map((x) => x.r) : all
   return {
-    rows: [...late, ...routine, ...todayRows],
+    rows,
     pet: wanted.map((w) => w.name).join(', '),
     routineDone: checklist.filter((r) => r.done).length,
     routineTotal: checklist.length,

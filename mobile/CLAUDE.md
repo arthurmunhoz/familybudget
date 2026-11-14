@@ -124,6 +124,41 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   — one occurrence can't be expressed. Events from a connected Apple/Google
   calendar are refused (the next sync would undo it). Calendar accepts
   `?date=YYYY-MM-DD`; Documents accepts `?open=<id>` (inside VaultGate).
+  **Whose event (2026-11-14):** move / remove / edit / find carry `person`
+  ("o dentista do Pedro", "Sam's dentist") → `eventWho()` (askActions: a
+  member → matched by `owner_email`; anyone else, e.g. a child without an
+  account → by the first name in the TITLE, "Dentista Pedro"). The matching is
+  the pure `pickOccurrence()` (tested): every title that has all the words
+  said counts ("dentista" fits "Dentista" AND "Dentista Pedro"); when two
+  DIFFERENT events are left and nothing said (person, day) tells them apart
+  it's `ambiguous` and the app answers `whichEvent()` — the candidates as
+  tappable rows (who · day, time) that carry the move/remove/edit out on that
+  exact occurrence (`moveAnswer` / `removeAnswer`). Never "the first one"
+  again. Occurrences of ONE series are not a question (the soonest). A
+  model `ref` is overridden when it isn't the person named, or when no
+  person/day was said and the title fits several people's events.
+  `ActionRowData.onPress` / `PickRow.pick` is the generic tappable row.
+- **Assistant, pets (2026-11-14):** the rule for vet visits — a pet of the
+  household named with TODAY, a past day or no day ("marca uma consulta da
+  Aninha hoje", "a Lola tomou vacina") is `pet_log` (a `pet_events` row);
+  only a FUTURE day ("agenda o veterinário da Lola sexta às 10") is
+  `add_event` on the calendar. `pets_due` has `pet_view`: `due` (what's left
+  today — with no pet named, every pet, the answer grouped per pet),
+  `routine` ("quais são as rotinas da Lola?": daily items with their time and
+  today's tick + interval routines with next due, `petRoutine()`), `overdue`
+  ("algum cuidado atrasado?"). `pet_next` takes one pet, several
+  ("Lola, Aninha") or all, and lists interval routines (last done +
+  interval) next to events with a `next_due`. The app sends `petKinds`
+  ("Lola = dog") so "as cachorras / the dogs / los gatos" = every pet of that
+  species. The old "pet name + routine word → pets_due" override in
+  `understandWithSource` only replaces READ answers (`PET_SWAPPABLE`) — it
+  turned "a Chloe tomou a vacina hoje, próxima em 1 ano" into a question.
+- **Cut-off requests never write** (`lib/assistantGuard.ts`, pure, also used
+  by the eval): a request ending on an article / preposition / "and" ("marca
+  uma consulta da", "add milk to the") that the server read as a WRITE becomes
+  `need_detail`. The system prompt also tells the model to leave a cut slot
+  empty. Eval cases with `"safe": true` pass only when the app wouldn't write;
+  cases can override the fixture with `context` and accept `{"anyOf": [...]}`.
 - **Assistant is Plus (migration 089):** free households get 5 requests per
   MEMBER per calendar month (UTC); Plus and the signup trial are unlimited.
   The server checks `assistant_quota` before the model call (402

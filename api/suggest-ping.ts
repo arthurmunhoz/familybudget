@@ -96,6 +96,7 @@ const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'plus', 'families', 'r
 const RECURRENCES = ['none', 'daily', 'weekly', 'monthly', 'yearly']
 const EVENT_KINDS = ['event', 'birthday', 'anniversary', 'renewal', 'other']
 const PET_EVENT_TYPES = ['vet', 'vaccine', 'medication', 'grooming', 'other', '']
+const PET_VIEWS = ['due', 'routine', 'overdue']
 const FIELDS = ['phone', 'blood_type', 'height', 'weight', 'shoe_size', 'pants_size', 'shirt_size', 'allergies', 'birthday', '']
 const ASSISTANT_SCHEMA = {
   type: 'object',
@@ -113,11 +114,11 @@ const ASSISTANT_SCHEMA = {
         'check_items = STATES items were bought / done ("já comprei o leite", "terminei a redação"). A question is never check_items.',
         'remove_items = take items off the shopping list. ONLY shopping-list items: never when the user talks about a gasto / despesa / lançamento / expense / charge, or names a place that is not in KNOWN STORES but was just logged as an expense — that is remove_money.',
         'agenda = asks what is on the calendar for a day.',
-        'add_event = schedule something on the calendar, including repeating events ("natação toda terça às 18h") and special dates (birthdays, anniversaries, renewals).',
+        'add_event = schedule something on the calendar, including repeating events ("natação toda terça às 18h") and special dates (birthdays, anniversaries, renewals). A pet\'s vet / vaccine / grooming appointment on a FUTURE day (tomorrow or later: "agenda o veterinário da Lola sexta às 10") is add_event too, titled with the care and the pet ("Veterinário Lola"); the same thing TODAY or in the past is pet_log.',
         'edit_event = change an EXISTING event other than its day/time: rename it, set its place or a note, add or remove a reminder ("me lembra 1h antes do dentista", "põe o endereço na reunião").',
         'find_event = asks WHEN a named event is ("quando é o próximo dentista?", "when is Ana\'s recital?").',
-        'move_event = move / reschedule / postpone an EXISTING calendar event to another day or time ("muda o dentista para amanhã", "move it to Friday at 3", "passa a reunião de hoje pra quinta"). Never add_event or agenda for these. Needs a move word (muda, passa, move, adia, remarca, reschedule): a name with a day/time and no such word ("dentista sexta às 15h") is add_event, even when an event with that name exists.',
-        'remove_event = delete / cancel / take off an EXISTING calendar event ("remove unha do calendário", "cancela o dentista de amanhã", "delete the meeting"). Never remove_items for these: remove_items is only for shopping-list items.',
+        'move_event = move / reschedule / postpone an EXISTING calendar event to another day or time ("muda o dentista para amanhã", "muda o dentista do Pedro para sexta", "move it to Friday at 3", "passa a reunião de hoje pra quinta"). Never add_event or agenda for these. Needs a move word (muda, passa, move, adia, remarca, reschedule): a name with a day/time and no such word ("dentista sexta às 15h") is add_event, even when an event with that name exists.',
+        'remove_event = delete / cancel / take off an EXISTING calendar event ("remove unha do calendário", "cancela o dentista de amanhã", "cancela a consulta da Ana amanhã", "delete the meeting"). Never remove_items for these: remove_items is only for shopping-list items.',
         'add_money = record money spent or received ("gastei 50 no mercado", "recebi o salário 3000").',
         'money_summary = asks how much was spent / is left / the balance — in total or in ONE category or on one thing ("quanto gastei com mercado esse mês?").',
         'list_money = asks to SEE the latest expenses/income ("quais foram os últimos gastos?").',
@@ -125,10 +126,10 @@ const ASSISTANT_SCHEMA = {
         'remove_money = delete an expense/income already logged ("apaga o último gasto", "remove o gasto do Uber", "apaga esse gasto do Ford\'s Garage"). Spoken "pagar/paga o gasto" is a transcription slip of "apagar": nobody pays an expense they already logged, so it is remove_money.',
         'send_nudge = send a message to family members ("avisa o Léo que chego 19h"); set urgent for help / emergency.',
         'nudge_seen = asks who has seen / read the asker\'s latest nudge ("quem viu meu aviso?").',
-        'pets_due = asks what a pet needs / what pet care is due or left today ("o que a Lola precisa hoje?", "what\'s next for Chloe?", "a Chloe já comeu?") — daily routine items not done yet count.',
+        'pets_due = asks about the pets\' CARE ROUTINE or what is left: what a pet needs / what is due or left today ("o que a Lola precisa hoje?", "o que falta para os pets hoje?", "what\'s next for Chloe?", "a Chloe já comeu?") — daily routine items not done yet count; the whole routine ("quais são as rotinas da Lola?", "what is Chloe\'s routine?") is pet_view routine; anything late / overdue ("algum cuidado atrasado?", "tem algo atrasado dos cachorros?") is pet_view overdue.',
         'pet_done = STATES a pet routine task was done ("já dei comida pra Lola", "passeei com a Chloe"). A question is pets_due.',
-        'pet_log = record a vet visit, vaccine, medication, grooming for a pet ("a Chloe tomou a antirrábica hoje, próxima em 1 ano").',
-        'pet_next = asks WHEN a pet\'s next vaccine / vet / medication / grooming is due ("quando é a próxima vacina da Lola?").',
+        'pet_log = RECORD a vet visit, vaccine, medication or grooming a pet of PETS had TODAY or on a past day — logging it, not scheduling it: "a Chloe tomou a antirrábica hoje, próxima em 1 ano", "a Lola tomou vacina hoje", "registra uma consulta da Lola", and also "marca uma consulta da Chloe (para) hoje" (said at the vet: marca = note it down). A pet named + today / a past day / no day → pet_log, never add_event; only a FUTURE day makes it add_event.',
+        'pet_next = asks WHEN a pet\'s next vaccine / vet / medication / grooming / care is due ("quando é a próxima vacina da Lola?", "quais os próximos cuidados das cachorras?", "what care is coming up for the pets?").',
         'pet_weight = record a pet\'s weight ("a Lola está com 8 kg").',
         'family_info = asks a stored detail about a family member (shoe size, blood type, allergies, phone, birthday...).',
         'family_update = CHANGE a stored detail of a family member ("o Léo agora calça 34", "meu telefone mudou para ...").',
@@ -170,6 +171,7 @@ const ASSISTANT_SCHEMA = {
       type: 'string',
       description:
         'agenda (scope=person) / send_nudge (recipient) / family_info + family_update (whose detail) / add_event (whose event) / where_is (who) / open_document (whose document): a member name exactly as in MEMBERS. "" = the asker for family_info, family_update and add_event, everyone for send_nudge, any member for open_document. ' +
+        'move_event / remove_event / edit_event / find_event: WHOSE event the request names ("o dentista do Pedro" → "Pedro", "Sam\'s dentist" → "Sam", "a consulta da Ana" → "Ana") — the MEMBERS spelling when it is a member, else the first name as said (a child may not be a member); that name then stays out of `title`. "" when no one is named. ' +
         'money_summary / list_money (whose money): the ASKER\'s name for "meus gastos" / "quanto eu gastei" / "my expenses", the member named for "gastos da Ana" / "Ana\'s"; "" for the whole household ("nossos", "da casa", "quanto gastamos", or no owner said).',
     },
     date: {
@@ -235,7 +237,7 @@ const ASSISTANT_SCHEMA = {
     ref: {
       type: 'string',
       description:
-        'move_event / remove_event / edit_event / find_event: the ref ("v3") of the event meant, from UPCOMING EVENTS — including one named earlier in the conversation. ' +
+        'move_event / remove_event / edit_event / find_event: the ref ("v3") of the event meant, from UPCOMING EVENTS (each line ends with whose it is) — including one named earlier in the conversation. When SEVERAL listed events fit (two "Dentista" for different people) and the request does not say whose or which day, "" (the app asks which). ' +
         'fix_money / remove_money: the ref ("e1") of the entry meant, from RECENT ENTRIES ("esse gasto" = the one just logged). "" when it is not listed or not sure.',
     },
     amount: {
@@ -308,8 +310,15 @@ const ASSISTANT_SCHEMA = {
     },
     pet: {
       type: 'string',
-      description: 'pets_due / pet_done / pet_log / pet_next / pet_weight: the pet named, exactly as in PETS (fix transcription slips: "Cloe" = "Chloe"). "" = all pets. ' +
-        'pets_due naming several pets ("a rotina da Lola e da Chloe"): all of them, comma-separated ("Lola, Chloe").',
+      description: 'pets_due / pet_done / pet_log / pet_next / pet_weight: the pet named, exactly as in PETS (fix transcription slips: "Cloe" = "Chloe"). "" = all pets ("os pets", "os bichos", "the pets"). ' +
+        'pets_due / pet_next naming several pets ("a rotina da Lola e da Chloe"): all of them, comma-separated ("Lola, Chloe"). ' +
+        'A species instead of a name ("as cachorras", "os cachorros", "the dogs", "los gatos"): every pet of that species in PETS, comma-separated, names only.',
+    },
+    pet_view: {
+      type: 'string',
+      enum: PET_VIEWS,
+      description:
+        'pets_due: due = what is still left / needed / next today (the default); routine = the whole routine asked for ("quais são as rotinas", "what is the routine", "cuál es la rutina"); overdue = only what is late ("atrasado", "overdue", "late", "vencido"). due for every other intent.',
     },
     field: { type: 'string', enum: FIELDS, description: 'family_info / family_update: which detail. "" otherwise.' },
     app: { type: 'string', enum: APPS, description: 'open_app: which part (budget = money, calc = utilities, frame = the photo frame / porta-retrato / slideshow, shopping = lists). "" otherwise.' },
@@ -374,6 +383,7 @@ const ASSISTANT_SCHEMA = {
     'urgent',
     'deals',
     'pet',
+    'pet_view',
     'field',
     'app',
     'topic',
@@ -405,7 +415,7 @@ const GROUPS: Record<string, { keys: string[]; for: string; note?: string }> = {
   },
   calc: { keys: ['amount', 'people', 'split_mode', 'tip_pct', 'percent', 'deals'], for: 'split_bill, discount, better_deal' },
   pet: {
-    keys: ['pet', 'items', 'pet_event_type', 'new_date', 'amount'],
+    keys: ['pet', 'pet_view', 'items', 'pet_event_type', 'new_date', 'amount'],
     for: 'pets_due, pet_done, pet_log, pet_next, pet_weight',
     note: 'Any shot (antirrábica, V10, rabies) is pet_event_type "vaccine", never "medication".',
   },
@@ -488,6 +498,18 @@ async function recordGap(
   }
 }
 
+/** "Lola (dog), Aninha (dog)": the names the model returns, with the species
+ *  when the app sent them (`petKinds`: "Lola = dog"). */
+function petsLine(body: any): string {
+  const names = strList(body?.pets, 15)
+  const kinds = new Map<string, string>()
+  for (const k of strList(body?.petKinds, 15)) {
+    const [name, kind] = k.split('=').map((x) => x.trim())
+    if (name && kind) kinds.set(name, kind)
+  }
+  return names.map((n) => (kinds.get(n) ? `${n} (${kinds.get(n)})` : n)).join(', ') || '(none)'
+}
+
 /** The request's context block (what the model may match against). */
 const LANG_NAME: Record<string, string> = { pt: 'Portuguese (Brazil)', en: 'English', es: 'Spanish' }
 
@@ -498,7 +520,8 @@ function buildContext(body: any, today: string): string {
     `KNOWN STORES (the household's lists — stores or any list): ${strList(body?.stores).join(', ') || '(none yet)'}`,
     `MEMBERS: ${strList(body?.members, 15).join(', ') || '(unknown)'}`,
     `KNOWN BUDGETS: ${strList(body?.budgets, 15).join(', ') || '(none)'}`,
-    `PETS: ${strList(body?.pets, 15).join(', ') || '(none)'}`,
+    // "Lola (dog)" when the app sends species — "as cachorras" = every dog.
+    `PETS: ${petsLine(body)}`,
     `DOCUMENTS: ${strList(body?.documents, 60, 120).join(' | ') || '(none)'}`,
     // Each pet's routine, "Lola: Comida, Passeio" — pet_done returns these names.
     `PET TASKS: ${strList(body?.petTasks, 20, 300).join(' | ') || '(none)'}`,
@@ -544,7 +567,9 @@ const SYSTEM =
   'scheduled or added stays in that same feature (an expense just logged is fixed/removed as money, never as a list item). ' +
   '"The user language" means the language the REQUEST is clearly written in; when the request is a word or two, a filler, ' +
   'a fragment, or could be either language, it means the APP LANGUAGE — and every reply is then in the APP LANGUAGE ' +
-  '(the answer is read aloud in that language\'s voice).\n\n' +
+  '(the answer is read aloud in that language\'s voice). ' +
+  'Spoken requests are sometimes CUT OFF mid-phrase ("marca uma consulta da", "add milk to the"): never fill the missing part ' +
+  'with a guess — keep the intent and leave the slot that was cut off empty ("" / []), so the app asks.\n\n' +
   APP_GUIDE
 
 export type SchemaVariant = 'flat' | 'grouped'
@@ -642,7 +667,8 @@ export async function parseAssistant(
       .filter((d: any) => typeof d?.price === 'number' && d.price > 0 && typeof d?.size === 'number' && d.size > 0)
       .slice(0, 6)
       .map((d: any) => ({ price: d.price, size: d.size, label: str(d.label, 40) })),
-    pet: str(p.pet, 40),
+    pet: str(p.pet, 120),
+    pet_view: PET_VIEWS.includes(p.pet_view) ? p.pet_view : 'due',
     field: FIELDS.includes(p.field) ? p.field : '',
     app: APPS.includes(p.app) ? p.app : '',
     topic: TOPICS.includes(p.topic) ? p.topic : '',
