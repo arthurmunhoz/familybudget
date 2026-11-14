@@ -24,6 +24,8 @@ import { useBottomGap } from '@/hooks/useBottomGap'
 import { taskTime, type EventSeries } from '@/lib/petCare'
 import { formatTime } from '@/lib/calendar'
 import { useI18n } from '@/hooks/useI18n'
+import { useAuth } from '@/lib/auth'
+import type { TKey } from '@/lib/i18n'
 import { formatDay } from '@/lib/format'
 import type { PetCareTask, PetEvent, PetTaskDone } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
@@ -441,6 +443,8 @@ function HistoryRow({
   const { c } = useTheme()
   const { t } = useI18n()
   const ref = useRef<Swipeable>(null)
+  const { profiles } = useAuth()
+  const by = profiles.find((p) => p.email === e.added_by)?.display_name?.split(' ')[0] ?? null
   return (
     <Swipeable
       ref={ref}
@@ -477,19 +481,41 @@ function HistoryRow({
       >
         {/* Inside one event's history the name is in the header already —
             each row is WHEN it was done (+ its notes, or the next date it set). */}
-        <View style={[s.iconTile, { backgroundColor: c.income + '1F' }]}>
+        <View style={[s.iconTile, { backgroundColor: c.income + '1F', alignSelf: 'flex-start' }]}>
           <Check size={16} color={c.income} strokeWidth={2.8} />
         </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt style={{ fontFamily: fonts.medium, fontSize: 15.5 }} numberOfLines={1}>
+        {/* Everything the event holds, in full — this sheet is the event's
+            preview, so nothing is cut (owner, 2026-11). */}
+        <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+          <Txt style={{ fontFamily: fonts.medium, fontSize: 15.5 }}>
             {formatDay(e.event_date)}
+            <Txt variant="faint" style={{ fontSize: 13 }}>
+              {'  ·  '}
+              {t(`pets.type.${e.type}` as TKey)}
+            </Txt>
           </Txt>
-          {e.notes || e.next_due ? (
-            <Txt variant="faint" style={{ fontSize: 12.5 }} numberOfLines={2}>
-              {e.notes || t('pets.nextOn', { date: formatDay(e.next_due!) })}
+          {e.notes ? <Txt style={{ fontSize: 14, lineHeight: 19, color: c.textMuted }}>{e.notes}</Txt> : null}
+          {e.next_due ? (
+            <Txt style={{ fontSize: 13, color: c.text, fontFamily: fonts.semibold }}>
+              {t('pets.evNext', { date: formatDay(e.next_due) })}
+            </Txt>
+          ) : null}
+          {by ? (
+            <Txt variant="faint" style={{ fontSize: 12.5 }}>
+              {t('pets.evBy', { name: by })}
             </Txt>
           ) : null}
         </View>
+        <Pressable
+          onPress={onOpen}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('pets.evEdit')}
+          style={[s.editPill, { backgroundColor: c.surface, borderColor: c.border }]}
+        >
+          <Pencil size={13} color={c.text} />
+          <Txt style={{ fontSize: 13, fontFamily: fonts.semibold }}>{t('pets.evEdit')}</Txt>
+        </Pressable>
       </Pressable>
     </Swipeable>
   )
@@ -670,6 +696,16 @@ const s = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
+  },
+  editPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   roundEdit: {
     width: 32,
