@@ -335,9 +335,9 @@ export default async function handler(req: any, res: any) {
       const l = lang === 'pt' || lang === 'es' ? lang : 'en'
       const game = GAME[l][room.game] ?? room.game
       if (room.mode === 'async') {
-        if (l === 'pt') return { title: `🎮 ${game}`, body: `${hostName} te mandou uma forca! Consegue adivinhar?` }
-        if (l === 'es') return { title: `🎮 ${game}`, body: `¡${hostName} te mandó un ahorcado! ¿Lo adivinas?` }
-        return { title: `🎮 ${game}`, body: `${hostName} sent you a hangman! Can you guess it?` }
+        if (l === 'pt') return { title: `🎮 ${game}`, body: `${hostName} te desafiou na forca! Consegue adivinhar?` }
+        if (l === 'es') return { title: `🎮 ${game}`, body: `¡${hostName} te desafió al ahorcado! ¿Lo adivinas?` }
+        return { title: `🎮 ${game}`, body: `${hostName} challenged you to hangman! Can you guess it?` }
       }
       if (l === 'pt') return { title: `🎮 ${game}`, body: `${hostName} abriu uma sala. Bora jogar?` }
       if (l === 'es') return { title: `🎮 ${game}`, body: `${hostName} abrió una sala. ¿Jugamos?` }
@@ -399,10 +399,10 @@ export default async function handler(req: any, res: any) {
     const word = (st.word ?? '').toUpperCase()
     const body =
       l === 'pt'
-        ? st.solved ? `${guesserName} acertou sua forca: ${word} 🎉` : `${guesserName} não acertou ${word}. A casa ficou pronta! 🏠`
+        ? st.solved ? `${guesserName} acertou seu desafio: ${word} 🎉` : `${guesserName} não acertou ${word}. A casa ficou pronta! 🏠`
         : l === 'es'
-          ? st.solved ? `${guesserName} adivinó tu ahorcado: ${word} 🎉` : `${guesserName} no adivinó ${word}. ¡La casa quedó terminada! 🏠`
-          : st.solved ? `${guesserName} guessed your hangman: ${word} 🎉` : `${guesserName} missed ${word}. The house got finished! 🏠`
+          ? st.solved ? `${guesserName} adivinó tu desafío: ${word} 🎉` : `${guesserName} no adivinó ${word}. ¡La casa quedó terminada! 🏠`
+          : st.solved ? `${guesserName} beat your challenge: ${word} 🎉` : `${guesserName} missed ${word}. The house got finished! 🏠`
     const title = l === 'pt' ? '🎮 Forca' : l === 'es' ? '🎮 Ahorcado' : '🎮 Hangman'
     const { data: hostTokens } = await db
       .from('expo_push_tokens')
