@@ -32,7 +32,6 @@ const TERMS_URL =
 // line is paywall-only. Every real Plus gate in the app must appear here.
 const BENEFIT_KEYS: TKey[] = [
   'settings.plusFeatureRoof',
-  'settings.plusFeatureVoice',
   'settings.plusFeatureScans',
   'settings.plusFeatureCalendar',
   'settings.plusFeatureSplit',
@@ -41,6 +40,7 @@ const BENEFIT_KEYS: TKey[] = [
   'settings.plusFeaturePrivate',
   'settings.plusFeatureVault',
   'settings.plusFeatureCasa',
+  'settings.plusFeatureFrame',
   'settings.plusFeatureSupport',
 ]
 
