@@ -957,7 +957,7 @@ export const pt: Record<keyof typeof en, string> = {
   'settings.keepPlus': 'Manter o One Roof Plus',
   'settings.plusFeatureRoof': "Roof ilimitado, falando em voz alta como alguém da família",
   'settings.plusFeatureCasa': "Modo Casa em quantos dispositivos quiser",
-  'settings.plusFeatureFrame': "Porta-retrato com até 500 fotos da família",
+  'settings.plusFeatureFrame': "Porta-retrato com até 500 fotos da família, contra apenas 30 no grátis",
   'settings.plusFeatureScans': 'Leituras de recibos e contas com IA ilimitadas',
   'settings.plusFeatureVault': 'Bloqueio Face ID para o cofre de documentos',
   'settings.plusFeatureVaultAndroid': 'Bloqueio por digital para o cofre de documentos',

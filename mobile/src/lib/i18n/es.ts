@@ -957,7 +957,7 @@ export const es: Record<keyof typeof en, string> = {
   'settings.keepPlus': 'Conservar One Roof Plus',
   'settings.plusFeatureRoof': "Roof ilimitado, hablando en voz alta como alguien de la familia",
   'settings.plusFeatureCasa': "Modo Casa en todos los dispositivos que quieras",
-  'settings.plusFeatureFrame': "Portarretratos con hasta 500 fotos de la familia",
+  'settings.plusFeatureFrame': "Portarretratos con hasta 500 fotos de la familia, frente a solo 30 en el plan gratis",
   'settings.plusFeatureScans': 'Escaneos de recibos y facturas con IA ilimitados',
   'settings.plusFeatureVault': 'Bloqueo Face ID para la bóveda de documentos',
   'settings.plusFeatureVaultAndroid': 'Bloqueo con huella para la bóveda de documentos',

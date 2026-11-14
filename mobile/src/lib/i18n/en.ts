@@ -966,7 +966,7 @@ export const en = {
   'settings.keepPlus': 'Keep One Roof Plus',
   'settings.plusFeatureRoof': "Unlimited Roof, talking out loud like one of the family",
   'settings.plusFeatureCasa': "Modo Casa on as many devices as you like",
-  'settings.plusFeatureFrame': "A photo frame with up to 500 family photos",
+  'settings.plusFeatureFrame': "A photo frame with up to 500 family photos, versus just 30 on free",
   'settings.plusFeatureScans': 'Unlimited AI receipt & bill scans',
   'settings.plusFeatureVault': 'Face ID lock for the Document Vault',
   'settings.plusFeatureVaultAndroid': 'Fingerprint lock for the Document Vault',
