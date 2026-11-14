@@ -839,6 +839,8 @@ export const en = {
   "casa.plan.displayOnly": "Display only — Plus to add",
   "casa.plan.lockedAction": "That needs Plus. The screen keeps showing the day.",
   "casa.settings.title": "This device",
+  "casa.fullscreen.enter": "Full screen",
+  "casa.fullscreen.exit": "Exit full screen",
   "casa.settings.weather": "Weather",
   "casa.settings.cityPlaceholder": "City (e.g. Curitiba)",
   "casa.settings.cityNotFound": "Couldn’t find that city.",

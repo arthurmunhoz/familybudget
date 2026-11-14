@@ -4,7 +4,8 @@
 // link, the photo frame (button or after N idle minutes), and Roof at the
 // bottom. Nothing navigates away: panels grow in place.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, ListChecks, PawPrint, Settings, Sparkles } from 'lucide-react'
+import { CalendarDays, ListChecks, Maximize, Minimize, PawPrint, Settings, Sparkles } from 'lucide-react'
+import { useFullscreen } from './fullscreen'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../hooks/useTheme'
 import { useI18n } from '../hooks/useI18n'
@@ -83,6 +84,7 @@ export default function Hub() {
   // ── panels ─────────────────────────────────────────────────────────────────
   const [panel, setPanel] = useState<{ id: HubPanel; origin: DOMRect | null; member?: string | null } | null>(null)
   const panelRef = useRef<GrowHandle>(null)
+  const fs = useFullscreen()
   const [sheet, setSheet] = useState<{ k: 'settings' | 'plan'; origin: DOMRect | null } | null>(null)
   const sheetRef = useRef<GrowHandle>(null)
   const [unlocked, setUnlocked] = useState(false)
@@ -242,6 +244,16 @@ export default function Hub() {
           </span>
           {plan.trialDays !== null && plan.full ? (
             <span className="casa-glass hidden shrink-0 rounded-full px-3.5 py-1.5 text-[0.95rem] font-semibold sm:inline">{t('casa.plan.trial', { count: plan.trialDays })}</span>
+          ) : null}
+          {fs.supported ? (
+            <button
+              onClick={() => void fs.toggle()}
+              aria-label={t(fs.on ? 'casa.fullscreen.exit' : 'casa.fullscreen.enter')}
+              title={t(fs.on ? 'casa.fullscreen.exit' : 'casa.fullscreen.enter')}
+              className="casa-press inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-(--text-muted)"
+            >
+              {fs.on ? <Minimize size={24} aria-hidden /> : <Maximize size={24} aria-hidden />}
+            </button>
           ) : null}
           <button
             onClick={(e) => setSheet({ k: 'settings', origin: e.currentTarget.getBoundingClientRect() })}

@@ -829,6 +829,8 @@ export const es: Record<keyof typeof en, string> = {
   "casa.plan.displayOnly": "Solo pantalla — Plus para añadir",
   "casa.plan.lockedAction": "Eso necesita Plus. La pantalla sigue mostrando el día.",
   "casa.settings.title": "Este dispositivo",
+  "casa.fullscreen.enter": "Pantalla completa",
+  "casa.fullscreen.exit": "Salir de pantalla completa",
   "casa.settings.weather": "Clima",
   "casa.settings.cityPlaceholder": "Ciudad (ej. Monterrey)",
   "casa.settings.cityNotFound": "No encontré esa ciudad.",
