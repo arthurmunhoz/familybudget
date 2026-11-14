@@ -35,6 +35,7 @@ export function FormSheet({
   icon,
   colors,
   kicker,
+  titleLines = 1,
 }: {
   /** 2026-11 head: a gradient tile with this icon, a tracked kicker above a
    *  display title. Pass icon + colors to opt in; without them the sheet keeps
@@ -42,6 +43,9 @@ export function FormSheet({
   icon?: LucideIcon
   colors?: Gradient
   kicker?: string
+  /** Lines the 2026-11 head's title may take (default 1; a title with a
+   *  count, like "12 itens das suas listas", needs 2 to never be cut). */
+  titleLines?: number
   visible?: boolean
   title: string
   onClose: () => void
@@ -99,7 +103,7 @@ export function FormSheet({
                       {kicker}
                     </Txt>
                   ) : null}
-                  <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, marginTop: 2 }} numberOfLines={1}>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 26, lineHeight: 31, color: c.text, marginTop: 2 }} numberOfLines={titleLines}>
                     {title}
                   </Txt>
                 </View>

@@ -57,15 +57,9 @@ export default function ReceiptListsSheet({
       onClose={onClose}
       onBackdropPress={onClose}
       maxShare={0.86}
+      titleLines={2}
       footer={
         <>
-          <TintButton
-            tint={LOOK[1]}
-            colors={LOOK}
-            title={t('receiptLists.confirm')}
-            disabled={busy || chosen.length === 0}
-            onPress={() => onConfirm(chosen)}
-          />
           <Pressable
             onPress={onClose}
             disabled={busy}
@@ -74,10 +68,17 @@ export default function ReceiptListsSheet({
           >
             <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: c.textMuted }}>{t('receiptLists.notNow')}</Txt>
           </Pressable>
+          <TintButton
+            tint={LOOK[1]}
+            colors={LOOK}
+            title={t('receiptLists.confirm')}
+            disabled={busy || chosen.length === 0}
+            onPress={() => onConfirm(chosen)}
+          />
         </>
       }
     >
-      <Txt style={{ fontSize: 15, lineHeight: 21, color: c.textMuted, marginTop: -sp.sm }}>{t('receiptLists.body')}</Txt>
+      <Txt style={{ fontSize: 15, lineHeight: 21, color: c.textMuted }}>{t('receiptLists.body')}</Txt>
       {groups.map((g) => {
         const name = g.store?.name ?? t('shopping.anywhere')
         return (
