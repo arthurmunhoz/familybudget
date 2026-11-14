@@ -31,6 +31,8 @@ const TERMS_URL =
 // keys with the Settings Plus card so both surfaces stay in sync; the support
 // line is paywall-only. Every real Plus gate in the app must appear here.
 const BENEFIT_KEYS: TKey[] = [
+  'settings.plusFeatureRoof',
+  'settings.plusFeatureVoice',
   'settings.plusFeatureScans',
   'settings.plusFeatureCalendar',
   'settings.plusFeatureSplit',
@@ -38,6 +40,7 @@ const BENEFIT_KEYS: TKey[] = [
   'settings.plusFeatureMembers',
   'settings.plusFeaturePrivate',
   'settings.plusFeatureVault',
+  'settings.plusFeatureCasa',
   'settings.plusFeatureSupport',
 ]
 

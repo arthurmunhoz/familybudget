@@ -33,6 +33,9 @@ import {
   GripVertical,
   LogOut,
   Mail,
+  Mic,
+  Tv,
+  Volume2,
   Trash2,
   CalendarDays,
   Check,
@@ -72,6 +75,8 @@ import { dark, fonts, light, radius, sp, useTheme } from '@/theme/theme'
 import { useThemePref } from '@/theme/theme-pref'
 
 const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
+  { icon: Mic, key: 'settings.plusFeatureRoof' },
+  { icon: Volume2, key: 'settings.plusFeatureVoice' },
   { icon: Sparkles, key: 'settings.plusFeatureScans' },
   { icon: CalendarDays, key: 'settings.plusFeatureCalendar' },
   { icon: ReceiptText, key: 'settings.plusFeatureSplit' },
@@ -79,6 +84,7 @@ const PLUS_FEATURES: { icon: LucideIcon; key: TKey }[] = [
   { icon: Users, key: 'settings.plusFeatureMembers' },
   { icon: Lock, key: 'settings.plusFeaturePrivate' },
   { icon: FolderLock, key: 'settings.plusFeatureVault' },
+  { icon: Tv, key: 'settings.plusFeatureCasa' },
 ]
 
 // Where "Manage subscription" goes when RevenueCat has no `managementUrl` for
