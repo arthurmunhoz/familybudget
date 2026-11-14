@@ -1,0 +1,228 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!--
+  App Store creative assets for One Roof 1.6.0 (App Store Connect › version ›
+  "Header and Search Results"). One page, three placements, picked by ?v=:
+
+    header     3840×1646 (21:9)  art safe area 1646×661 at (1097, 493)
+    search     3840×2560 (3:2)   art safe area 2168×1030 at (836, 765)
+    universal  5244×2950 (16:9)  art safe area 1402×962 at (1921, 660)
+               (one PNG used for BOTH the header and search results)
+
+  Safe areas are Apple's (App Store Connect Help › Creative assets
+  specifications). Everything that has to be seen — the Roof orb, "Hey Roof",
+  the line under it, the Modo Casa hub and the phone — is laid out in a
+  design box (#core) that is scaled to fit INSIDE the safe area. Outside it
+  is only "auxiliary art": the brand gradient, voice rings coming out of the
+  orb, and soft floating cards from the app that may be cropped on any device.
+  Rendered by render.sh (Chrome headless, 1×, then Pillow → RGB, no alpha).
+-->
+<style>
+@font-face { font-family:'Nunito'; src:url('fonts/nunito-800.ttf'); font-weight:800; }
+@font-face { font-family:'Nunito'; src:url('fonts/nunito-700.ttf'); font-weight:700; }
+@font-face { font-family:'Hanken'; src:url('fonts/hanken-400.ttf'); font-weight:400; }
+@font-face { font-family:'Hanken'; src:url('fonts/hanken-600.ttf'); font-weight:600; }
+@font-face { font-family:'Fraunces'; src:url('fonts/fraunces-600.ttf'); font-weight:600; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { overflow:hidden; }
+body { position:relative; font-family:'Hanken', sans-serif; color:#fff; -webkit-font-smoothing:antialiased;
+  background:linear-gradient(118deg, #FFB070 0%, #FF8A52 18%, #F2643F 40%, #D9446A 70%, #9B4FD6 100%); }
+.layer { position:absolute; inset:0; }
+.glow { position:absolute; border-radius:50%; }
+svg.rings { position:absolute; inset:0; width:100%; height:100%; }
+
+/* ---------- the core (inside the safe area) ---------- */
+#core { position:absolute; left:0; top:0; transform-origin:0 0; z-index:10; }
+.orb { position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 32% 28%, #A890FF 0%, #8B6CFF 35%, #3FB7B0 78%, #20C3A6 100%);
+  box-shadow:0 0 0 calc(var(--o) * .07) rgba(255,255,255,.22), 0 0 0 calc(var(--o) * .16) rgba(255,255,255,.10),
+             0 calc(var(--o) * .14) calc(var(--o) * .32) rgba(70,20,90,.45); }
+.orb svg { width:52%; height:52%; fill:none; stroke:#fff; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+.title { position:absolute; font:800 var(--fs)/1 'Nunito'; letter-spacing:-.02em; white-space:nowrap;
+  text-shadow:0 .04em .12em rgba(90,20,40,.18); }
+.sub { position:absolute; font:700 var(--fs)/1.16 'Nunito'; color:rgba(255,255,255,.95); white-space:nowrap; }
+.device { position:absolute; background:linear-gradient(145deg,#3a3633,#141211 40%,#26221f);
+  box-shadow:0 0 0 3px #5b5550 inset, 0 60px 110px -20px rgba(70,10,40,.55), 0 18px 40px rgba(70,10,40,.25); }
+.device img { display:block; width:100%; height:100%; object-fit:cover; object-position:top; }
+.pill { position:absolute; display:flex; align-items:center; gap:.45em; white-space:nowrap;
+  font:800 var(--fs)/1 'Nunito'; color:#8a3a1e; background:#fff; border-radius:999px; padding:.42em .8em .42em .5em;
+  box-shadow:0 18px 40px -8px rgba(80,20,30,.4); }
+.pill i { display:flex; width:1.5em; height:1.5em; border-radius:50%; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#F4A15D,#D9573A); }
+.pill svg { width:62%; height:62%; fill:none; stroke:#fff; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+.bubble { position:absolute; background:#fff; color:#241F1B; border-radius:.9em; padding:.5em .85em;
+  font:700 var(--fs)/1 'Nunito'; white-space:nowrap; box-shadow:0 24px 50px -10px rgba(70,10,40,.4); }
+.bubble b { display:inline-flex; vertical-align:-.12em; width:1em; height:1em; border-radius:50%; margin-right:.35em;
+  background:linear-gradient(135deg,#8B6CFF,#20C3A6); }
+
+/* ---------- auxiliary floating cards (may be cropped) ---------- */
+.card { position:absolute; width:560px; border-radius:40px; padding:30px 34px; transform-origin:50% 50%;
+  box-shadow:0 40px 80px -20px rgba(70,10,40,.45); font-family:'Hanken'; }
+.card .k { display:flex; align-items:center; gap:12px; font:600 24px 'Hanken'; letter-spacing:.06em; text-transform:uppercase; opacity:.9; }
+.card .k i { width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.22); }
+.card .k svg { width:28px; height:28px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.card .t { font:800 46px/1.12 'Nunito'; margin-top:16px; }
+.card .s { font:400 28px 'Hanken'; margin-top:8px; opacity:.85; }
+.card .tm { position:absolute; right:34px; top:36px; font:600 26px 'Hanken'; opacity:.9; }
+.g-pet { background:linear-gradient(135deg,#FF8A5B,#E4483A); }
+.g-sport { background:linear-gradient(135deg,#2FC98B,#11936B); }
+.g-bday { background:linear-gradient(135deg,#FF7AA8,#C2418E); }
+.g-nudge { background:linear-gradient(135deg,#7C8CFF,#5B4FE0); }
+.white { background:#FFFDF9; color:#241F1B; }
+.white .k { color:#8a7f76; }
+.white .k i { background:#FFE6C7; color:#C97409; }
+.row { display:flex; align-items:center; gap:18px; font:600 34px 'Hanken'; margin-top:18px; }
+.box { width:40px; height:40px; border-radius:50%; border:3px solid #d8cfc6; flex:none; display:flex; align-items:center; justify-content:center; }
+.box.on { background:#F08A3A; border-color:#F08A3A; }
+.box svg { width:24px; height:24px; fill:none; stroke:#fff; stroke-width:3.2; stroke-linecap:round; stroke-linejoin:round; }
+.row .n { margin-left:auto; font:600 22px 'Hanken'; color:#1F9E68; background:#E2F6EC; border-radius:999px; padding:6px 14px; }
+.row.done span { color:#a59a90; text-decoration:line-through; }
+</style></head>
+<body>
+<div class="layer" id="glows"></div>
+<svg class="rings" id="rings"></svg>
+<div class="layer" id="aux"></div>
+<div id="core"></div>
+
+<script>
+const ICON = {
+  spark: '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/>',
+  house: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  paw: '<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  cake: '<path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/>',
+  cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
+  ball: '<circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M2 12h20"/>',
+};
+const svg = (n) => `<svg viewBox="0 0 24 24">${ICON[n]}</svg>`;
+
+// Placements. S = Apple's art safe area [x, y, w, h].
+const V = {
+  header:    { W: 3840, H: 1646, S: [1097, 493, 1646, 661], core: 'wide',    card: 0.78 },
+  search:    { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'wide',    card: 1.0 },
+  universal: { W: 5244, H: 2950, S: [1921, 660, 1402, 962], core: 'compact', card: 0.72 },
+};
+const v = new URLSearchParams(location.search).get('v') || 'search';
+const P = V[v];
+document.documentElement.style.width = document.body.style.width = P.W + 'px';
+document.documentElement.style.height = document.body.style.height = P.H + 'px';
+if (new URLSearchParams(location.search).get('guide')) {
+  const g = document.createElement('div');
+  Object.assign(g.style, { position:'absolute', left:P.S[0]+'px', top:P.S[1]+'px', width:P.S[2]+'px', height:P.S[3]+'px',
+    outline:'6px dashed #00ffea', zIndex:99 });
+  document.body.appendChild(g);
+}
+
+// ---- core layouts (design px; scaled to fit the safe area) ----
+const casa = (x, y, w, rot, fs) => `
+  <div class="device" style="left:${x}px;top:${y}px;width:${w}px;height:${w * 0.625 + 2 * w * 0.022}px;border-radius:${w * 0.045}px;padding:${w * 0.022}px;transform:rotate(${rot}deg)">
+    <img src="casa.png" style="border-radius:${w * 0.026}px">
+    <div class="pill" style="--fs:${fs}px;left:${w * 0.05}px;top:${-fs * 1.25}px;transform:rotate(${-rot}deg)"><i>${svg('house')}</i>Modo Casa</div>
+  </div>`;
+const phone = (x, y, w, rot) => `
+  <div class="device" style="left:${x}px;top:${y}px;width:${w}px;height:${w * 2868 / 1320 + 2 * w * 0.035}px;border-radius:${w * 0.17}px;padding:${w * 0.035}px;transform:rotate(${rot}deg);z-index:3">
+    <img src="hero.png" style="border-radius:${w * 0.14}px">
+  </div>`;
+const orb = (x, y, d) => `<div class="orb" id="orb" style="--o:${d}px;left:${x}px;top:${y}px;width:${d}px;height:${d}px">${svg('spark')}</div>`;
+
+let CW, CH, html;
+if (P.core === 'wide') {
+  CW = 2200; CH = 960;
+  html = orb(0, 150, 180)
+    + `<div class="title" style="--fs:218px;left:-6px;top:372px">Hey Roof</div>`
+    + `<div class="sub" style="--fs:90px;left:0;top:630px">Your family’s home,<br>run by voice.</div>`
+    + casa(1100, 120, 860, -3, 46)
+    + phone(1840, 190, 318, 5)
+    + `<div class="bubble" style="--fs:56px;left:1020px;top:770px;transform:rotate(-2deg);z-index:4"><b></b>“What’s on today?”</div>`;
+} else {
+  CW = 1400; CH = 960;
+  html = orb(150, 18, 150)
+    + `<div class="title" style="--fs:182px;left:340px;top:6px">Hey Roof</div>`
+    + `<div class="sub" style="--fs:62px;left:0;width:1400px;text-align:center;top:228px">Your family’s home, run by voice.</div>`
+    + casa(120, 400, 860, -2.5, 40)
+    + phone(1000, 360, 262, 5)
+    + `<div class="bubble" style="--fs:46px;left:40px;top:858px;transform:rotate(-2deg);z-index:4"><b></b>“What’s on today?”</div>`;
+}
+const core = document.getElementById('core');
+core.style.width = CW + 'px'; core.style.height = CH + 'px';
+core.innerHTML = html;
+// Fit inside the safe area with a small inset (rotation + shadows stay in).
+const [sx, sy, sw, sh] = P.S;
+const inset = 0.03;
+const k = Math.min(sw * (1 - 2 * inset) / CW, sh * (1 - 2 * inset) / CH);
+const ox = sx + (sw - CW * k) / 2, oy = sy + (sh - CH * k) / 2;
+core.style.transform = `translate(${ox}px, ${oy}px) scale(${k})`;
+
+// ---- glows ----
+const glows = [
+  [0.02, 0.05, 0.55, '#FFD39A', .55], [0.70, 0.55, 0.60, '#7B5CFF', .45],
+  [0.38, 0.30, 0.45, '#FFB27A', .35], [0.85, 0.02, 0.40, '#FF6F8E', .35], [0.05, 0.75, 0.45, '#FF9D5C', .4],
+];
+const big = Math.max(P.W, P.H);
+document.getElementById('glows').innerHTML = glows.map(([x, y, s, c, o]) =>
+  `<div class="glow" style="left:${x * P.W - s * big / 2}px;top:${y * P.H - s * big / 2}px;width:${s * big}px;height:${s * big}px;background:radial-gradient(circle, ${c} 0%, transparent 65%);opacity:${o}"></div>`).join('');
+
+// ---- floating cards (auxiliary art) ----
+const CARDS = {
+  pet: `<div class="card g-pet"><div class="k"><i>${svg('paw')}</i>Pet · Lola</div><div class="tm">4:30 PM</div><div class="t">Vet checkup</div><div class="s">Bay Animal Clinic</div></div>`,
+  sport: `<div class="card g-sport"><div class="k"><i>${svg('ball')}</i>Sport · Alex</div><div class="tm">6:00 PM</div><div class="t">Soccer practice</div><div class="s">Today</div></div>`,
+  bday: `<div class="card g-bday"><div class="k"><i>${svg('cake')}</i>Birthday</div><div class="t">Grandma’s birthday</div><div class="s">Today · all day</div></div>`,
+  nudge: `<div class="card g-nudge"><div class="k"><i>${svg('bell')}</i>From Sam · now</div><div class="t">Dinner’s ready!</div><div class="s">Seen by Alex</div></div>`,
+  list: `<div class="card white"><div class="k"><i>${svg('cart')}</i>Groceries</div>
+    <div class="row"><div class="box"></div><span>Milk</span><em class="n">NEW</em></div>
+    <div class="row"><div class="box"></div><span>Eggs</span><em class="n">NEW</em></div>
+    <div class="row done"><div class="box on">${svg('check')}</div><span>Bananas</span></div></div>`,
+  routine: `<div class="card white"><div class="k" style="color:#8a7f76"><i style="background:#FFE0D2;color:#E2552F">${svg('paw')}</i>Lola · today</div>
+    <div class="row done"><div class="box on">${svg('check')}</div><span>Breakfast</span></div>
+    <div class="row"><div class="box"></div><span>Evening walk</span></div></div>`,
+};
+// [card, cx, cy (fractions of the canvas), scale, rotation, opacity, blur px]
+const AUX = {
+  header: [
+    ['pet', .135, .30, 1, -6, .95, 0], ['list', .17, .74, .95, 4, .9, 2],
+    ['sport', .865, .27, 1, 5, .95, 0], ['routine', .83, .76, .95, -4, .9, 2],
+    ['bday', .045, .52, .8, 3, .55, 7], ['nudge', .965, .52, .8, -3, .55, 7],
+  ],
+  search: [
+    ['pet', .11, .17, 1, -6, .95, 0], ['list', .10, .80, 1, 4, .92, 1],
+    ['sport', .89, .16, 1, 5, .95, 0], ['routine', .90, .82, 1, -4, .92, 1],
+    ['bday', .42, .08, .8, -3, .6, 5], ['nudge', .60, .93, .8, 3, .6, 5],
+  ],
+  universal: [
+    ['pet', .25, .22, 1.2, -6, .95, 0], ['list', .25, .62, 1.2, 4, .92, 1],
+    ['sport', .75, .21, 1.2, 5, .95, 0], ['routine', .76, .60, 1.2, -4, .92, 1],
+    ['bday', .07, .38, 1, 3, .55, 8], ['nudge', .93, .40, 1, -3, .55, 8],
+    ['nudge', .40, .88, .9, 4, .35, 10], ['bday', .62, .90, .9, -4, .35, 10],
+  ],
+};
+const aux = document.getElementById('aux');
+for (const [id, cx, cy, s, rot, op, blur] of AUX[v]) {
+  const w = document.createElement('div');
+  w.innerHTML = CARDS[id];
+  const el = w.firstElementChild;
+  const sc = s * P.card * (P.H / 1646) ** 0.5;
+  el.style.left = (cx * P.W - 280) + 'px';
+  el.style.top = (cy * P.H - 110) + 'px';
+  el.style.transform = `scale(${sc}) rotate(${rot}deg)`;
+  el.style.opacity = op;
+  if (blur) el.style.filter = `blur(${blur}px)`;
+  aux.appendChild(el);
+}
+
+// ---- voice rings out of the orb ----
+requestAnimationFrame(() => {
+  const r = document.getElementById('orb').getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const far = Math.hypot(Math.max(cx, P.W - cx), Math.max(cy, P.H - cy));
+  let out = '';
+  const step = r.width * 0.75;
+  for (let i = 1, rad = r.width * 0.85; rad < far; i++, rad += step * (1 + i * 0.06)) {
+    const o = Math.max(0.05, 0.30 - i * 0.03);
+    out += `<circle cx="${cx}" cy="${cy}" r="${rad}" fill="none" stroke="#fff" stroke-opacity="${o}" stroke-width="${Math.max(3, r.width * 0.018)}"/>`;
+  }
+  document.getElementById('rings').innerHTML = out;
+  document.title = 'ready';
+});
+</script>
+</body></html>

@@ -709,6 +709,17 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   hidden (the simulator mic always errors), the paired device's name shown as
   "Kitchen display". The demo account was switched to English and a home city
   for the shots, then put back (Portuguese, no city).
+- **App Store "Header and Search Results" creative assets (1.6.0):
+  `store/app-store-creative/`** — `creative.html?v=header|search|universal` +
+  `render.sh` → `out/header-3840x1646.png` (21:9), `out/search-3840x2560.png`
+  (3:2) and `out/universal-5244x2950.png` (16:9, one PNG for both; must be
+  PNG). Apple's ART SAFE AREAS are small (header 1646×661 @1097,493; search
+  2168×1030 @836,765; universal 1402×962 @1921,660 — App Store Connect Help ›
+  Creative assets specifications): orb + "Hey Roof" + line + Modo Casa hub +
+  phone are scaled into the safe area; outside it is only gradient, voice
+  rings and soft app cards that may be cropped. `out/crop-check/` = the safe
+  area outlined + the tightest crops that hold it. Check ASC's Preview before
+  uploading.
 - **`@/components/PhotoHero`** — the full-bleed, swipeable photo header used
   by Pet Care and Family (one page per pet / member; name + badge on the photo,
   side arrows with a tiny avatar of the neighbour, page dots, shrinks with a
