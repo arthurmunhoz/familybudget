@@ -77,7 +77,7 @@ import {
   type Scope,
 } from '@/lib/assistant'
 import type { TKey } from '@/lib/i18n'
-import { useVoice, voiceSupported } from '@/lib/voice'
+import { playChime, useVoice, voiceSupported } from '@/lib/voice'
 import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
 import { isGoodbye, meaningfulRequest } from '@/lib/roofWake'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
@@ -624,7 +624,11 @@ export function AskSheet({
       setAnswer({ kind: 'say', text: bye })
       const said = viaVoice.current && roof.speak && !isFree ? roofSay(bye, lang) : new Promise<void>((r) => setTimeout(r, 1200))
       void said.then(() => {
-        if (openRef.current && turn === turnSeq.current) closeSheet()
+        if (!openRef.current || turn !== turnSeq.current) return
+        // The conversation's end gets the stop chime too (owner, 2026-11-14):
+        // the mic is already off here, so cancel() wouldn't play it.
+        if (voice.state === 'idle') playChime('stop')
+        closeSheet()
       })
       return
     }

@@ -98,12 +98,12 @@ describe('soundsLikeCalling (the dock dots)', () => {
 
 describe('isGoodbye', () => {
   it('thanks and goodbyes end the conversation', () => {
-    for (const t of ['Fechou', 'Maravilha', 'maravilha, valeu', 'ok', 'Ok, obrigado', 'tá bom, brigadão', 'Obrigado!', 'obrigada, até mais', 'Valeu, Roof', 'tchau', 'é só isso, obrigado', 'Thanks!', 'thank you so much', "that's all, bye", 'gracias, adiós', 'eso es todo']) {
+    for (const t of ['Fechou', 'Maravilha', 'maravilha, valeu', 'ok', 'Ok, obrigado', 'tá bom, brigadão', 'Obrigado!', 'obrigada, até mais', 'Valeu, Roof', 'tchau', 'é só isso, obrigado', 'Thanks!', 'thank you so much', "that's all, bye", 'gracias, adiós', 'eso es todo', 'nada não, obrigado', 'Nada, não', 'não precisa, valeu', 'deixa pra lá', 'esquece', 'never mind, thanks', 'nothing, thanks', 'no thanks', 'nada, gracias', 'déjalo']) {
       expect([t, isGoodbye(t)]).toEqual([t, true])
     }
   })
   it('a real request with thanks in it is still a request', () => {
-    for (const t of ['ok, põe leite na lista', 'maravilha de dia hoje, vai chover?', 'obrigado, põe leite na lista', 'thanks, what is on tomorrow?', 'o que tem até amanhã?', 'tudo bem?', 'mais leite']) {
+    for (const t of ['ok, põe leite na lista', 'maravilha de dia hoje, vai chover?', 'obrigado, põe leite na lista', 'thanks, what is on tomorrow?', 'o que tem até amanhã?', 'tudo bem?', 'mais leite', 'não precisa comprar leite', 'esquece o dentista de amanhã', 'nada de leite hoje?', 'no milk today']) {
       expect([t, isGoodbye(t)]).toEqual([t, false])
     }
   })

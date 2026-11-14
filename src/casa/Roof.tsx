@@ -178,7 +178,11 @@ export default function Roof({
         await speak(o.kind === 'done' ? o.speak : o.text, lang)
         if (!openRef.current) return
         if (o.kind === 'bye') {
-          setTimeout(() => void close(), 600)
+          // The end of the conversation gets the closing chime (owner, 2026-11-14).
+          setTimeout(() => {
+            chime('done')
+            void close()
+          }, 600)
           return
         }
         // Keep listening for the next thing (its own 8 s → close when quiet).
@@ -189,7 +193,10 @@ export default function Roof({
         }
       }
       clearTimer()
-      timer.current = setTimeout(() => void close(), o.kind === 'bye' ? 1800 : answerMs(o))
+      timer.current = setTimeout(() => {
+        if (o.kind === 'bye') chime('done')
+        void close()
+      }, o.kind === 'bye' ? 1800 : answerMs(o))
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [close, lang, onOpenPanel, supported, full],
