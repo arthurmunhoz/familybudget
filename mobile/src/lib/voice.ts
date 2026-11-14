@@ -91,12 +91,16 @@ function chime(which: 'start' | 'stop') {
   // A player that finished sits at the END of the file. seekTo is async, and
   // calling play() before the rewind lands plays nothing — which is why the
   // chimes sounded only every other time (owner, 2026-11: open → bip, close →
-  // bip, then silence, then bip again…). Rewind first, THEN play. pause()
-  // first stays: on Android a finished player still reports "playing" and a
-  // bare seekTo(0) restarts it (see the games' sounds in CLAUDE.md); on iOS
-  // the start player keeps the session active, so the pause is harmless.
+  // bip, then silence, then bip again…). Rewind first, THEN play. On Android
+  // pause() first stays: a finished player still reports "playing" and a bare
+  // seekTo(0) restarts it (see the games' sounds in CLAUDE.md).
   try {
-    p.pause()
+    // iOS: no pause() — on a player without keepAudioSessionActive it
+    // schedules expo-audio's session switch-off 0.1 s later, and when the
+    // async rewind + play() hadn't flipped isPlaying by then the closing chime
+    // was cut to silence (owner, 2026-11-14: "sometimes no chime"). A finished
+    // AVPlayer rewinds and plays fine without it.
+    if (Platform.OS === 'android') p.pause()
     p.seekTo(0).then(
       () => p.play(),
       () => p.play(),

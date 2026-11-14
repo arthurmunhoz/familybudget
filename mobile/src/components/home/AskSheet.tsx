@@ -77,7 +77,7 @@ import {
   type Scope,
 } from '@/lib/assistant'
 import type { TKey } from '@/lib/i18n'
-import { playChime, useVoice, voiceSupported } from '@/lib/voice'
+import { CHIME_MS, playChime, useVoice, voiceSupported } from '@/lib/voice'
 import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
 import { isGoodbye, meaningfulRequest } from '@/lib/roofWake'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
@@ -623,12 +623,19 @@ export function AskSheet({
       const bye = t('ask.bye')
       setAnswer({ kind: 'say', text: bye })
       const said = viaVoice.current && roof.speak && !isFree ? roofSay(bye, lang) : new Promise<void>((r) => setTimeout(r, 1200))
-      void said.then(() => {
+      void said.then(async () => {
         if (!openRef.current || turn !== turnSeq.current) return
         // The conversation's end gets the stop chime too (owner, 2026-11-14):
-        // the mic is already off here, so cancel() wouldn't play it.
-        if (voice.state === 'idle') playChime('stop')
-        closeSheet()
+        // the mic is already off here, so cancel() wouldn't play it. Timing
+        // matters on iOS, or the chime is cut to silence some of the time:
+        // wait out the switch-off Roof's voice player schedules when it ends
+        // (expo-audio, +0.1 s), and close only AFTER the chime — closing
+        // re-arms the Home's wake listener, which reconfigures the session.
+        await new Promise((r) => setTimeout(r, 250))
+        if (!openRef.current || turn !== turnSeq.current) return
+        playChime('stop')
+        await new Promise((r) => setTimeout(r, CHIME_MS + 150))
+        if (openRef.current && turn === turnSeq.current) closeSheet()
       })
       return
     }
