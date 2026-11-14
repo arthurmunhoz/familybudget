@@ -374,46 +374,69 @@ save('tick', mix(marimba(hz(84), 0.07, 0.5), noise(0.008, 0.3, 0.003, 0.8)), UI 
 print('wrote', sorted(os.listdir(OUT)))
 
 # ── applause ───────────────────────────────────────────────────────────────
-# The results screen (owner, 2026-11: "palmas, não o chime"): a living room of
-# five or six people clapping, out of step, swelling in and dying away over
-# ~2.6 s. Each clap is a short band-passed noise burst (the slap ~1–2.5 kHz,
-# a 1 ms rise, ~14 ms decay) with a tiny "hand cavity" echo; every clapper has
-# their own pitch, pace and loudness, and claps jitter so it never machine-guns.
-def clap(center, vol):
-    dur = 0.06
-    out, lo, lo2 = [], 0.0, 0.0
-    a = min(0.95, center / RATE * TAU)       # low-pass coefficient
-    b = min(0.95, center * 0.45 / RATE * TAU)  # slower one → subtract = band-pass
+# The results screen. v1 (six clappers, sharp 14 ms clicks in a big room)
+# sounded like firecrackers popping on the floor (owner, 2026-11-13). Real
+# applause is a CROWD: ~30 people, each clap a soft slap whose colour comes
+# from the cupped hands — a resonance somewhere in 700 Hz–2 kHz (cupped =
+# lower, flat = higher) over some broadband noise, a ~0.5 ms rise and a
+# ~6–10 ms decay. So many of them overlap that they blur into a "rain"; a
+# quiet noise bed under it fills the gaps. Swell in, hold, die away, small
+# room only — a big reverb is what made v1 read as bangs.
+def biquad_bp(freq, q):
+    w = TAU * freq / RATE
+    alpha = math.sin(w) / (2 * q)
+    b0, b2 = alpha, -alpha
+    a0, a1, a2 = 1 + alpha, -2 * math.cos(w), 1 - alpha
+    return b0 / a0, b2 / a0, a1 / a0, a2 / a0
+
+
+def clap(rnd, res, vol):
+    dur = 0.045
+    b0, b2, a1, a2 = biquad_bp(res, rnd.uniform(2.0, 3.5))
+    x1 = x2 = y1 = y2 = 0.0
+    decay = rnd.uniform(0.006, 0.010)
+    out = []
     for i in range(int(RATE * dur)):
         t = i / RATE
-        x = random.uniform(-1, 1)
-        lo += a * (x - lo)
-        lo2 += b * (x - lo2)
-        y = lo - lo2
-        e = env_ad(t, 0.001, 0.014) + 0.35 * env_ad(max(0.0, t - 0.009), 0.001, 0.01) * (t > 0.009)
-        out.append(vol * y * e)
+        x = rnd.uniform(-1, 1) * (min(1.0, t / 0.0005)) * math.exp(-t / decay)
+        y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1 = x1, x
+        y2, y1 = y1, y
+        out.append(vol * (y * 2.2 + x * 0.35))   # the hand resonance + a little raw slap
     return out
 
 
-def applause(dur=2.6, people=6, seed=5):
+def applause(dur=3.0, people=30, seed=7):
     rnd = random.Random(seed)
     n = int(RATE * dur)
     buf = [0.0] * (n + RATE)
+
+    def swell(t):
+        return min(1.0, t / 0.35) ** 1.5 * (1.0 if t < dur - 1.3 else max(0.0, (dur - t) / 1.3) ** 1.6)
+
     for _ in range(people):
-        center = rnd.uniform(1100, 2400)
-        pace = rnd.uniform(4.2, 6.0)          # claps per second
-        loud = rnd.uniform(0.6, 1.0)
-        t = rnd.uniform(0.0, 0.25)            # some start a beat late
+        res = rnd.uniform(700, 2000)
+        pace = rnd.uniform(3.6, 5.2)          # claps per second
+        loud = rnd.uniform(0.35, 1.0) * (0.55 if rnd.random() < 0.5 else 1.0)  # near and far
+        t = rnd.uniform(0.0, 0.3)
         while t < dur:
-            # swell in over ~0.4 s, hold, then trail off over the last second
-            swell = min(1.0, t / 0.4) * (1.0 if t < dur - 1.1 else max(0.0, (dur - t) / 1.1))
-            if swell > 0.02:
-                c = clap(center * rnd.uniform(0.9, 1.1), loud * swell * rnd.uniform(0.7, 1.0))
+            g = swell(t)
+            if g > 0.02:
+                c = clap(rnd, res * rnd.uniform(0.94, 1.06), loud * g * rnd.uniform(0.75, 1.0))
                 k = int(t * RATE)
-                for i, s in enumerate(c):
-                    buf[k + i] += s
-            t += (1.0 / pace) * rnd.uniform(0.82, 1.18)
+                for i, v in enumerate(c):
+                    buf[k + i] += v
+            t += (1.0 / pace) * rnd.uniform(0.85, 1.15)
+    # the blur between claps: band-limited noise following the same swell
+    b0, b2, a1, a2 = biquad_bp(1300, 0.7)
+    x1 = x2 = y1 = y2 = 0.0
+    for i in range(n):
+        x = rnd.uniform(-1, 1)
+        y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1 = x1, x
+        y2, y1 = y1, y
+        buf[i] += 0.22 * y * swell(i / RATE)
     return buf
 
 
-save('applause', reverb(applause(), 0.2, room=0.7, tail=0.6), BIG * 0.9)
+save('applause', reverb(applause(), 0.08, room=0.5, tail=0.3), BIG * 0.85)
