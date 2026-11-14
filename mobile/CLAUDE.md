@@ -1679,6 +1679,19 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
     in the RECEIPT (the ticket says ok), and the app looks completely healthy
     because nudges still arrive over Realtime the moment it is opened. Diagnosed
     the hard way on 2026-08-30.
+- **The leash (2026-11-13, `placesTask.ts` `LEASH_ID`).** The background
+  location STREAM dies with the process (an app update, a reboot, a swipe-up)
+  and iOS never restarts it — a member's pin sat 34 h old with sharing on. iOS
+  DOES relaunch a terminated app on a region crossing, so `syncGeofences` adds
+  one extra fence (300 m, exit-only, one of the 20 iOS slots) around my latest
+  fix. Leaving it wakes the geofence task: fresh fix → upload → kick the stream
+  → re-centre the leash (`recenterLeash`). Never recorded as a place event. The
+  centre is rounded to ~100 m so small moves don't re-arm everything; a local
+  per-place state map (`PLACE_STATE_KEY`) skips the RPC for the Enter/Exit
+  every re-arm re-announces. Limits: after a REINSTALL the app must be opened
+  once; a phone that doesn't move doesn't report (its pin is right anyway);
+  Android doesn't relaunch on fences at all (Expo docs) — there it only helps
+  while the process lives.
 - **Watching a member follows them.** Opening a card arms `followRef` in
   Whereabouts and every position they report re-centres the camera (holding the
   watcher's zoom, offset by the roster height); a drag or pinch — detected via

@@ -23,6 +23,40 @@ export const GEOFENCE_TASK = 'oneroof-place-geofences'
 /** iOS caps monitored regions at 20 per app — stay at/under it. */
 const MAX_REGIONS = 20
 
+/** The "leash" (owner, 2026-11-13): one extra fence around where I last was.
+ *  iOS RELAUNCHES a terminated app on a region crossing — unlike the plain
+ *  background location stream, which dies with the process (an app update, a
+ *  reboot, a swipe-up) and never comes back on its own: Patricia's position
+ *  sat 34 h old with sharing on. Leaving the leash wakes the app, which sends
+ *  a fresh fix, restarts the stream and re-centres the leash on the new spot.
+ *  So a phone that MOVES always reports again, at roughly the leash's radius.
+ *  It is never a place: no place_event is recorded for it. */
+export const LEASH_ID = 'oneroof-leash'
+const LEASH_RADIUS_M = 300
+const LEASH_KEY = 'oneroof-leash-center'
+
+/** My last recorded state per place ('arrive' | 'leave'), so the Enter/Exit
+ *  re-announced by every re-arm (now also on each leash re-centre) doesn't
+ *  call the server again for nothing. record_place_event (071) still dedupes;
+ *  this only saves the round trips. Written only after a successful record. */
+const PLACE_STATE_KEY = 'oneroof-place-state'
+
+async function readLeash(): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LEASH_KEY)
+    const v = raw ? (JSON.parse(raw) as { lat: number; lng: number }) : null
+    return v && Number.isFinite(v.lat) && Number.isFinite(v.lng) ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** Put the leash around (lat, lng) and re-arm. */
+export async function recenterLeash(lat: number, lng: number): Promise<void> {
+  await AsyncStorage.setItem(LEASH_KEY, JSON.stringify({ lat, lng })).catch(() => {})
+  await syncGeofences().catch(() => {})
+}
+
 /** Which region set we last handed to the OS (see syncGeofences). */
 const SIGNATURE_KEY = 'oneroof-geofence-signature'
 
@@ -89,15 +123,24 @@ TaskManager.defineTask(GEOFENCE_TASK, async ({ data, error }) => {
   // Switched off on this platform (lib/features.ts): a fence an earlier build
   // armed must not record crossings. useGeofenceSync tears them down.
   if (!placeId || !WHEREABOUTS_ENABLED) return
+  const leash = placeId === LEASH_ID
+  // The leash only matters on the way OUT (see LEASH_ID).
+  if (leash && eventType !== Location.GeofencingEventType.Exit) return
   try {
     // Respect sharing: if I've turned location off or paused it, my crossings
     // are nobody's business.
     const mine = await fetchMyLocation()
     if (!isSharingEnabled(mine)) return
-    if (eventType === Location.GeofencingEventType.Enter) {
-      await recordPlaceEvent(placeId, 'arrive')
-    } else if (eventType === Location.GeofencingEventType.Exit) {
-      await recordPlaceEvent(placeId, 'leave')
+    if (!leash) {
+      const type = eventType === Location.GeofencingEventType.Enter ? 'arrive' : eventType === Location.GeofencingEventType.Exit ? 'leave' : null
+      if (type) {
+        const states = JSON.parse((await AsyncStorage.getItem(PLACE_STATE_KEY).catch(() => null)) || '{}') as Record<string, string>
+        if (states[placeId] !== type) {
+          await recordPlaceEvent(placeId, type)
+          states[placeId] = type
+          await AsyncStorage.setItem(PLACE_STATE_KEY, JSON.stringify(states)).catch(() => {})
+        }
+      }
     }
   } catch {
     // best-effort — a missed crossing must never crash the task
@@ -119,6 +162,8 @@ TaskManager.defineTask(GEOFENCE_TASK, async ({ data, error }) => {
         accuracy: pos.coords.accuracy ?? null,
         speed: pos.coords.speed ?? null,
       })
+      // Left the leash: put it around the new spot (re-arms the fences).
+      if (leash) await recenterLeash(pos.coords.latitude, pos.coords.longitude)
     }
   } catch {
     // best-effort
@@ -160,6 +205,7 @@ export async function syncGeofences(): Promise<void> {
     if (running) await Location.stopGeofencingAsync(GEOFENCE_TASK).catch(() => {})
     await AsyncStorage.removeItem(SIGNATURE_KEY).catch(() => {})
     await AsyncStorage.removeItem(ARMED_AT_KEY).catch(() => {})
+    await AsyncStorage.removeItem(LEASH_KEY).catch(() => {})
     armedThisProcess = false
     return
   }
@@ -168,7 +214,8 @@ export async function syncGeofences(): Promise<void> {
   // Monitor EVERY place: my device records the crossing regardless of who's
   // watching, and the push fan-out (place_watchers) decides who — if anyone —
   // actually hears about it.
-  const regions = places.slice(0, MAX_REGIONS).map((p) => ({
+  // One slot is the leash's (around my last known spot).
+  const regions = places.slice(0, MAX_REGIONS - 1).map((p) => ({
     identifier: p.id,
     latitude: p.lat,
     longitude: p.lng,
@@ -179,6 +226,21 @@ export async function syncGeofences(): Promise<void> {
     notifyOnEnter: true,
     notifyOnExit: true,
   }))
+  // Around my latest reported fix (every upload updates it — a foreground, a
+  // leash wake), else the last stored centre. Rounded to ~100 m so small moves
+  // don't change the signature and re-arm everything.
+  const fromRow = mine && mine.lat != null && mine.lng != null ? { lat: mine.lat, lng: mine.lng } : null
+  const center = fromRow ?? (await readLeash())
+  if (center) {
+    regions.push({
+      identifier: LEASH_ID,
+      latitude: Math.round(center.lat * 1000) / 1000,
+      longitude: Math.round(center.lng * 1000) / 1000,
+      radius: LEASH_RADIUS_M,
+      notifyOnEnter: false,
+      notifyOnExit: true,
+    })
+  }
 
   if (!regions.length) {
     if (running) await Location.stopGeofencingAsync(GEOFENCE_TASK).catch(() => {})
