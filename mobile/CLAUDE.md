@@ -337,8 +337,10 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   the row and a fade. A row the list doesn't show (person filter, future
   hidden) or a measure that never answers (1.2 s) → the ghost just fades.
   Saving itself is never delayed — the ghost starts after the insert, like the
-  old close. Edits, deletes, the receipt scan (it only prefills the form) and
-  the assistant's `add_money` (never opens the form) keep the plain path.
+  old close. Edits land the same way (2026-11-14: the update returns the row, and
+  `pending` swaps it in place of the old one until the refetch). Deletes, the
+  receipt scan (it only prefills the form) and the assistant's `add_money`
+  (never opens the form) keep the plain path.
   **Reanimated skips animations under Reduce Motion by default**
   (`ReduceMotion.System`: a `withTiming` jumps to its end value), so the glow
   and fade pass `reduceMotion: ReduceMotion.Never` — without it the reduced

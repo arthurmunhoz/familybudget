@@ -579,7 +579,7 @@ export default function EntryForm({
   /** Prefilled values for a new entry (e.g. from a scanned receipt). */
   initial?: EntryPrefill
   onClose: () => void
-  /** `landing` only for a new entry (edits and deletes just close). */
+  /** `landing` for a saved entry, new or edited (deletes just close). */
   onSaved: (landing?: EntryLanding) => void
 }) {
   const { c } = useTheme()
@@ -695,7 +695,7 @@ export default function EntryForm({
       recurring,
     }
     const result = entry
-      ? await supabase.from('entries').update(payload).eq('id', entry.id)
+      ? await supabase.from('entries').update(payload).eq('id', entry.id).select('*').single()
       : await supabase.from('entries').insert(payload).select('*').single()
     if (result.error) {
       setError(result.error.message)
@@ -717,7 +717,8 @@ export default function EntryForm({
           { onConflict: 'household_id,keyword' },
         )
     }
-    const created = !entry ? (result.data as Entry | null) : null
+    // New AND edited entries "shrink and land" on their row (owner, 2026-11).
+    const created = result.data as Entry | null
     const sheet = sheetRef.current
     if (!created || !sheet) {
       onSaved()

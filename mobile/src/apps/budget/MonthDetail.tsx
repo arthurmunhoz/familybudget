@@ -159,8 +159,11 @@ export default function MonthDetail({
 
   const allEntries = useMemo(
     () =>
-      pending && pending.base === entries && !entries.some((e) => e.id === pending.entry.id)
-        ? [...entries, pending.entry]
+      // The saved row shows at once: added if new, swapped in if edited.
+      pending && pending.base === entries
+        ? entries.some((e) => e.id === pending.entry.id)
+          ? entries.map((e) => (e.id === pending.entry.id ? pending.entry : e))
+          : [...entries, pending.entry]
         : entries,
     [entries, pending],
   )
