@@ -1072,6 +1072,18 @@
       "expect": {
         "intent": "add_items"
       }
+    },
+    {
+      "text": "desfaz isso",
+      "expect": {
+        "intent": "undo_last"
+      }
+    },
+    {
+      "text": "volta atrás o que você fez",
+      "expect": {
+        "intent": "undo_last"
+      }
     }
   ]
 }
