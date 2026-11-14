@@ -121,7 +121,7 @@ const ASSISTANT_SCHEMA = {
         'remove_event = delete / cancel / take off an EXISTING calendar event ("remove unha do calendário", "cancela o dentista de amanhã", "cancela a consulta da Ana amanhã", "delete the meeting"). Never remove_items for these: remove_items is only for shopping-list items.',
         'add_money = record money spent or received ("gastei 50 no mercado", "recebi o salário 3000").',
         'money_summary = asks how much was spent / is left / the balance — in total or in ONE category or on one thing ("quanto gastei com mercado esse mês?").',
-        'list_money = asks to SEE the latest expenses/income ("quais foram os últimos gastos?").',
+        'list_money = asks to SEE the expenses/income themselves, as a list — "quais foram os últimos gastos?", "quais foram meus gastos esse mês?", "mostra os gastos de hoje", "what did I spend on this week?". "Quais foram / quais são / mostra / lista" = list_money; "quanto" = money_summary.',
         'fix_money = correct an expense/income already logged: a new total ("era 45, não 54", "muda o último gasto para 30"), or something to add or take off ("esqueci a gorjeta, foram mais 12", "põe 10% de gorjeta no gasto do restaurante", "faltou somar 8 reais", "tira 5 do último gasto"). Corrections usually follow an add_money earlier in the conversation: that entry is the one meant.',
         'remove_money = delete an expense/income already logged ("apaga o último gasto", "remove o gasto do Uber", "apaga esse gasto do Ford\'s Garage"). Spoken "pagar/paga o gasto" is a transcription slip of "apagar": nobody pays an expense they already logged, so it is remove_money.',
         'send_nudge = send a message to family members ("avisa o Léo que chego 19h"); set urgent for help / emergency.',
@@ -171,7 +171,7 @@ const ASSISTANT_SCHEMA = {
       type: 'string',
       description:
         'agenda (scope=person) / send_nudge (recipient) / family_info + family_update (whose detail) / add_event (whose event) / where_is (who) / open_document (whose document): a member name exactly as in MEMBERS. "" = the asker for family_info, family_update and add_event, everyone for send_nudge, any member for open_document. ' +
-        'move_event / remove_event / edit_event / find_event: WHOSE event the request names ("o dentista do Pedro" → "Pedro", "Sam\'s dentist" → "Sam", "a consulta da Ana" → "Ana") — the MEMBERS spelling when it is a member, else the first name as said (a child may not be a member); that name then stays out of `title`. "" when no one is named. ' +
+        'move_event / remove_event / edit_event / find_event: WHOSE event the request names ("o dentista do Pedro" → "Pedro", "Sam\'s dentist" → "Sam", "a consulta da Ana" → "Ana") — the MEMBERS spelling when it is a member, else the first name EXACTLY as said (a child may not be a member — "Dentista Pedro" owned by Arthur is still person "Pedro"); NEVER replace the named person with the event\'s owner shown after the last "·". That name then stays out of `title`. "" when no one is named. ' +
         'money_summary / list_money (whose money): the ASKER\'s name for "meus gastos" / "quanto eu gastei" / "my expenses", the member named for "gastos da Ana" / "Ana\'s"; "" for the whole household ("nossos", "da casa", "quanto gastamos", or no owner said).',
     },
     date: {
@@ -386,6 +386,7 @@ const ASSISTANT_SCHEMA = {
     'pet_view',
     'field',
     'app',
+    'game',
     'topic',
     'gap',
     'reply',
@@ -671,6 +672,7 @@ export async function parseAssistant(
     pet_view: PET_VIEWS.includes(p.pet_view) ? p.pet_view : 'due',
     field: FIELDS.includes(p.field) ? p.field : '',
     app: APPS.includes(p.app) ? p.app : '',
+    game: GAMES.includes(p.game) ? p.game : '',
     topic: TOPICS.includes(p.topic) ? p.topic : '',
     reply: str(p.reply, intent === 'app_help' ? 420 : 240),
     ref: typeof p.ref === 'string' && /^[ev]\d{1,2}$/.test(p.ref) ? p.ref : '',
