@@ -272,7 +272,7 @@ export default async function handler(req: any, res: any) {
                   'This is a photo of a purchase receipt. Extract:',
                   '- label: the merchant name',
                   '- amount: the final total paid, in dollars',
-                  '- date: the purchase/transaction date, converted to YYYY-MM-DD with zero-padded month and day (e.g. a receipt showing 6/9/26 becomes 2026-06-09). Null only if no date is visible.',
+                  `- date: the purchase/transaction date, converted to YYYY-MM-DD with zero-padded month and day. Read it in the RECEIPT'S OWN convention: a Brazilian or other Portuguese/Spanish-language receipt (R$, CNPJ, CUPOM FISCAL, NF-e, CFE, IVA, RUT, €) writes DD/MM — "12/11/2026" there is 2026-11-12; a US receipt writes MM/DD — "6/9/26" is 2026-06-09. When the convention is unclear, pick the reading that is not after today (${new Date().toISOString().slice(0, 10)}). Null only if no date is visible.`,
                   '- category: the best-fitting spending category',
                   "- subcategory: a short, specific subcategory inferred from the line items when they clearly point to one (e.g. 'Produce' for groceries, 'Gas' for fuel, 'Pharmacy' for a drugstore), otherwise null.",
                 ].join('\n') + (listItems.length ? matchPrompt(listItems) : ''),
