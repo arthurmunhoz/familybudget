@@ -53,3 +53,12 @@ PY
     echo "wrote $lang/$name"
   done
 done
+
+# Slide 5 is the approved v3 "Snap a receipt. AI does the rest." illustration
+# (owner, 2026-11-14: the store shows scan → expense; ticking list items off is
+# for people to discover). It replaces the rendered receipt slide.
+for lang in "${LANGS[@]:-en}"; do
+  [ -f "$here/../app-store-v3/out/$lang/03-ai.png" ] || continue
+  cp "$here/../app-store-v3/out/$lang/03-ai.png" "$here/out-6.9/$lang/05-receipt.png"
+  cp "$here/../app-store-v3/out-6.3/$lang/03-ai.png" "$here/out-6.3/$lang/05-receipt.png"
+done

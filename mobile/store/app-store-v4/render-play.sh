@@ -48,3 +48,8 @@ PY
     echo "wrote $out"
   done
 done
+
+# Slide 5 = the approved v3 receipt illustration (see render.sh).
+for lang in "${LANGS[@]:-en}"; do
+  [ -f "$here/../app-store-v3/out-play/$lang/03-ai.png" ] && cp "$here/../app-store-v3/out-play/$lang/03-ai.png" "$here/out-play/$lang/05-receipt.png"
+done
