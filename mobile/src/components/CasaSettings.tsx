@@ -62,6 +62,7 @@ export function CasaSettings({ pairCode, onCount }: { pairCode?: string; onCount
     onCount?.(d.length)
   }, [onCount])
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch
     void load()
   }, [load, profile?.household_id])
   // Opened from the device's QR (oneroof://casa?code=…): straight to pairing.
@@ -69,7 +70,6 @@ export function CasaSettings({ pairCode, onCount }: { pairCode?: string; onCount
   useEffect(() => {
     if (!pairCode || handled.current === pairCode) return
     handled.current = pairCode
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- deep link
     setPairing(normalizeCode(pairCode))
   }, [pairCode])
 
