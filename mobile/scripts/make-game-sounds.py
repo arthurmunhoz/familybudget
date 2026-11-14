@@ -439,4 +439,9 @@ def applause(dur=3.0, people=30, seed=7):
     return buf
 
 
-save('applause', reverb(applause(), 0.08, room=0.5, tail=0.3), BIG * 0.85)
+# NOT written any more: synthesised claps kept sounding like firecrackers
+# (owner, 2026-11-13), so assets/sounds/games/applause.wav is a REAL recording
+# — "Shouts and Applauses of Teens #1" by Joseph Sardin, BigSoundBank (#0236),
+# CC0 — trimmed to 3.5 s, faded, mono, loudness-matched. Keep it; don't
+# re-enable this line without the owner hearing the result.
+# save('applause', reverb(applause(), 0.08, room=0.5, tail=0.3), BIG * 0.85)

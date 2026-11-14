@@ -1084,6 +1084,9 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   - **Pushes you're already looking at:** `lib/onScreen` — the Games screens
     mark `'games'` while focused and the foreground handler drops `/games`
     pushes then.
+  - **Applause is a real CC0 recording** (BigSoundBank #0236, teens shouting
+    and clapping), not synthesised — see the note at the end of
+    `scripts/make-game-sounds.py`.
   - **Sounds:** quick UI sounds play from a small pool of players, each paused
     + rewound when it finishes. Pause FIRST: on Android a finished player is
     still "playing", so a bare seekTo(0) restarted it — an endless chime.
