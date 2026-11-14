@@ -19,6 +19,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { useSheetLift } from '@/hooks/useSheetLift'
 import { useAuth } from '@/lib/auth'
 import {
+  CASA_LOOK as CASA,
   CASA_URL,
   claimHomeDevice,
   fetchHomeDevices,
@@ -35,7 +36,6 @@ import {
 import type { TKey } from '@/lib/i18n'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
-const CASA: Gradient = ['#E58A63', '#B9532F']
 const PIN_LOOK: Gradient = ['#22C58B', '#0F9D6C']
 
 const CLAIM_ERROR: Record<ClaimError, TKey> = {
@@ -47,7 +47,7 @@ const CLAIM_ERROR: Record<ClaimError, TKey> = {
   generic: 'casa.errGeneric',
 }
 
-export function CasaSettings({ pairCode }: { pairCode?: string }) {
+export function CasaSettings({ pairCode, onCount }: { pairCode?: string; onCount?: (n: number) => void }) {
   const { c } = useTheme()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
@@ -62,9 +62,9 @@ export function CasaSettings({ pairCode }: { pairCode?: string }) {
     setDevices(d)
     setPlan(p)
     setPin(hp)
-  }, [])
+    onCount?.(d.length)
+  }, [onCount])
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch
     void load()
   }, [load, profile?.household_id])
   // Opened from the device's QR (oneroof://casa?code=…): straight to pairing.
@@ -102,14 +102,8 @@ export function CasaSettings({ pairCode }: { pairCode?: string }) {
 
   return (
     <View style={{ gap: sp.md }}>
-      {/* What it is — plain text, not a row: the rows below are the actions
-          (owner, 2026-11: a tile here read as one more item). */}
-      <Txt variant="muted" style={{ fontSize: 14.5, lineHeight: 20 }}>
-        {t('casa.what')}
-      </Txt>
-
-      {devices.map((d) => (
-        <View key={d.id} style={[s.row, { borderTopColor: c.border }]}>
+      {devices.map((d, i) => (
+        <View key={d.id} style={[s.row, { borderTopColor: c.border }, i === 0 ? s.first : null]}>
           <View style={[s.devIcon, { backgroundColor: c.surface }]}>
             <MonitorSmartphone size={18} color={c.textMuted} />
           </View>
@@ -133,7 +127,7 @@ export function CasaSettings({ pairCode }: { pairCode?: string }) {
         </View>
       ))}
 
-      <Row icon={<Plus size={18} color="#fff" strokeWidth={2.5} />} colors={CASA} title={t('casa.pair')} sub={status} onPress={() => setPairing('')} />
+      <Row icon={<Plus size={18} color="#fff" strokeWidth={2.5} />} colors={CASA} title={t('casa.pair')} sub={status} onPress={() => setPairing('')} first={devices.length === 0} />
       <Row
         icon={<KeyRound size={17} color="#fff" />}
         colors={PIN_LOOK}
@@ -166,10 +160,41 @@ export function CasaSettings({ pairCode }: { pairCode?: string }) {
   )
 }
 
-function Row({ icon, colors, title, sub, onPress }: { icon: ReactNode; colors: Gradient; title: string; sub: string; onPress: () => void }) {
+/** Settings' one row for Modo Casa: tile, "Modo Casa", how many devices are
+ *  paired (or what it is), chevron → the Modo Casa screen. */
+export function CasaEntryRow() {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const { profile } = useAuth()
+  const [n, setN] = useState<number | null>(null)
+  useEffect(() => {
+    let live = true
+    void fetchHomeDevices().then((d) => live && setN(d.length))
+    return () => {
+      live = false
+    }
+  }, [profile?.household_id])
+  const sub = n ? (n === 1 ? t('casa.pairedOne') : t('casa.pairedMany', { n })) : t('casa.entrySub')
+  return (
+    <Pressable onPress={() => router.push('/casa-mode')} accessibilityRole="button" style={({ pressed }) => [s.row, s.first, { opacity: pressed ? 0.6 : 1 }]}>
+      <GradientBox colors={CASA} radius={12} style={s.tile}>
+        <MonitorSmartphone size={19} color="#fff" />
+      </GradientBox>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt style={{ fontFamily: fonts.semibold }}>{t('casa.title')}</Txt>
+        <Txt variant="faint" style={{ fontSize: 12.5 }} numberOfLines={2}>
+          {sub}
+        </Txt>
+      </View>
+      <ChevronRight size={18} color={c.textFaint} />
+    </Pressable>
+  )
+}
+
+function Row({ icon, colors, title, sub, onPress, first = false }: { icon: ReactNode; colors: Gradient; title: string; sub: string; onPress: () => void; first?: boolean }) {
   const { c } = useTheme()
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [s.row, { borderTopColor: c.border, opacity: pressed ? 0.6 : 1 }]}>
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [s.row, { borderTopColor: c.border, opacity: pressed ? 0.6 : 1 }, first ? s.first : null]}>
       <GradientBox colors={colors} radius={12} style={s.tile}>
         {icon}
       </GradientBox>
@@ -351,6 +376,7 @@ function PinSheet({ household, onClose, onSaved }: { household: string; onClose:
 
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingTop: sp.md, borderTopWidth: StyleSheet.hairlineWidth },
+  first: { paddingTop: 0, borderTopWidth: 0 },
   tile: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   devIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   round: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

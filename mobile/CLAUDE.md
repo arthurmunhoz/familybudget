@@ -434,7 +434,7 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   magic-link token for its OWN session as that member). Unpair sets
   `home_devices.revoked_at`; the device signs out on its next check (load,
   focus/visibility, every 5 min). Money PIN = sha256("<household>:<pin>")
-  (`lib/sha256.ts`, tested against node). Limits: 1 device free, 5 Plus
+  (`lib/sha256.ts`, tested against node). Limits: 1 device free, "unlimited" on Plus (50 abuse ceiling, CASA_DEVICES_PLUS)
   (server); trial 30 days from the first device (`home_plan()`); other free-tier
   locks are on the device's screen only (by design). Never say "tablet" in UI
   copy — "dispositivo". Vercel: deploy with `--force` after adding an action to
@@ -445,6 +445,11 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   `home/HelpView`: the games with their REAL rules from i18n (`games.how.*`,
   `games.bs.how*`, `games.quiz.how*`) and "Open Games"; Plus / families / Roof
   get a button to their screen.
+- **Settings › Modo Casa → `/casa-mode`** (2026-11-14): one row in Settings
+  (`CasaEntryRow`) opens its own screen in the `/families` shape: animated
+  hero art (`components/CasaDevicesArt`: old phone + tablet + laptop, "any
+  device with internet will do"), the devices card (`CasaSettings`: pair,
+  unpair, Money PIN) and the rules. `oneroof://casa?code=` lands there.
 - **Settings › Casa → "Add another family" → `/families`** (2026-11-12): join
   by code / create, with the rules spelled out (3 per account, create needs a
   paid Plus as owner, the new family rides on it, what happens when Plus ends).

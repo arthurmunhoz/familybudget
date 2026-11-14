@@ -410,7 +410,9 @@ function tr(lang: string, key: string, vars?: Record<string, string | number>): 
 //                                      session.
 const CASA_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no 0/O, 1/I/L
 const CASA_DEVICES_FREE = 1
-const CASA_DEVICES_PLUS = 5
+// Plus is sold as "as many devices as you like" (owner, 2026-11); this is only
+// an abuse ceiling no real family reaches.
+const CASA_DEVICES_PLUS = 50
 function casaCode(): string {
   let s = ''
   for (let i = 0; i < 6; i++) s += CASA_ALPHABET[Math.floor(Math.random() * CASA_ALPHABET.length)]

@@ -7,6 +7,8 @@ import { loadHomeLocation } from '@/lib/weather'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 export const CASA_URL = 'one-roof-app.vercel.app'
+/** Modo Casa's gradient (Settings row, its screen, the pairing sheet). */
+export const CASA_LOOK: [string, string] = ['#E58A63', '#B9532F']
 
 export interface HomeDevice {
   id: string
