@@ -412,8 +412,31 @@ export function AskSheet({
   // ALWAYS, also for a hand-off from "Ei Roof" and a conversation's next turn.
   const wakeLive = wakeHeard !== undefined
   const voiceOn = voice.state === 'listening' || voice.state === 'starting'
-  const hearing = voiceOn || wakeLive
-  const warming = voice.state === 'starting' && !wakeLive
+  // Opened BY VOICE (the Home's mic, "Oi Casa", a spoken request on its way):
+  // the listening layout from the first frame. Without this the sheet showed
+  // the example requests for the moment before its mic started (the Home
+  // mic's 0.7 s wait, the wake listener's hand-off) and then swapped to the
+  // listening view — a jarring layout jump (owner, 2026-11-14). The examples
+  // are only for a sheet that isn't listening.
+  const [voicePending, setVoicePending] = useState(() => listen || wakeHeard !== undefined || (!!autoSend && spoken))
+  const sawStart = useRef(false)
+  useEffect(() => {
+    if (voice.state !== 'idle') sawStart.current = true
+    // Done waiting: the mic is live, a request is on screen, or a start ended.
+    if (voice.state === 'listening' || query || answer || (voice.state === 'idle' && sawStart.current)) {
+      sawStart.current = false
+      setVoicePending(false)
+    }
+  }, [voice.state, query, answer])
+  useEffect(() => {
+    if (!voicePending) return
+    // A start that never comes (no permission, an error) must not leave the
+    // sheet stuck on "one moment".
+    const id = setTimeout(() => setVoicePending(false), 8000)
+    return () => clearTimeout(id)
+  }, [voicePending])
+  const hearing = voiceOn || wakeLive || voicePending
+  const warming = (voice.state === 'starting' && !wakeLive) || (voicePending && !voiceOn && !wakeLive)
   const heardText = wakeLive ? wakeHeard : voice.transcript
   // A conversation by voice keeps listening after each answer (owner,
   // 2026-11): the answer stays on screen and a small "listening" strip sits
@@ -470,6 +493,7 @@ export function AskSheet({
     lastContinue.current = continueListening
     if (!openRef.current) return
     viaVoice.current = true
+    setVoicePending(true)
     void startVoice()
   }, [continueListening, startVoice])
 
