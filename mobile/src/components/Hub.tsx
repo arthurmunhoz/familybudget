@@ -70,10 +70,12 @@ export default function Hub() {
   )
   // A wake opens the sheet at once, already "listening": the wake recogniser
   // keeps capturing (one chime) and streams what it hears into the sheet.
+  // Remounting the sheet (new key) is safe for that capture: the old sheet's
+  // useVoice only aborts a session IT started (mic owner token, lib/voice).
   const [wakeCapture, setWakeCapture] = useState(false)
   const [wakeHeard, setWakeHeard] = useState('')
   const [wakeEpoch, setWakeEpoch] = useState(0)
-  const [askContinue, setAskContinue] = useState({ n: 0, quiet: true })
+  const [askContinue, setAskContinue] = useState(0)
   const [wakeHold, setWakeHold] = useState(false)
   const wakeHandlers = useMemo(
     () => ({
@@ -88,13 +90,12 @@ export default function Hub() {
         setAsking(true)
       },
       onHeard: setWakeHeard,
-      onDone: (request: string, handOff: false | 'quiet' | 'chime') => {
+      onDone: (request: string, handOff: boolean) => {
         setWakeCapture(false)
         if (request) setAskSeed(request)
-        // Just "Ei Roof" and the recogniser stopped at the pause: the sheet
-        // keeps listening with its own mic — quietly, unless the wake chime
-        // may have been cut off (then the sheet's mic chimes as it goes live).
-        else if (handOff) setAskContinue((x) => ({ n: x.n + 1, quiet: handOff === 'quiet' }))
+        // Just the call and the recogniser ended: the sheet listens with its
+        // own mic — "one moment", then its chime when it's really live.
+        else if (handOff) setAskContinue((n) => n + 1)
       },
     }),
     [],
@@ -298,8 +299,7 @@ export default function Hub() {
         autoSend={askSeed}
         spoken={askVoice}
         typeToo={askType}
-        continueListening={askContinue.n}
-        continueQuiet={askContinue.quiet}
+        continueListening={askContinue}
         wakeHeard={wakeCapture ? wakeHeard : undefined}
         onWakeStop={() => {
           // Stop tapped while the wake capture runs: send what was heard.

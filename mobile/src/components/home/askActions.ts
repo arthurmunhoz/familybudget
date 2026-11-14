@@ -228,7 +228,7 @@ export function recurringChoice(
               rows: [{ emoji: '🗓️', title: r.ev.title, sub: [label, env.whenLabel(r.ev)].filter(Boolean).join(' · ') }],
               summary: t('ask.sumSeriesMoved', { title: ev.title, when: env.whenLabel(r.ev) }),
               undo: { run: () => restoreEvent(r.before), headline: t('ask.moveUndone') },
-              open: { label: t('ask.openCalendar'), path: `/calendar?date=${move.to}` },
+              open: { label: t('ask.openCalendar'), path: `/calendar?date=${move.to || occStart}` },
             })
           },
         },
@@ -408,7 +408,7 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
       const hit = await lastEntry(intent.title, myEmail, intent.ref)
       if (!hit) {
         env.reportGap(intent.intent, 'not_found')
-        return say(intent.title ? t('ask.entryNotFound', { title: intent.title }) : t('ask.moneyNoneYet'))
+        return say(intent.title ? t('ask.entryNotFound', { title: intent.title }) : t('ask.noOwnEntry'))
       }
       const before = hit.entry
       const where = `${hit.budget.name} · ${shortDay(before.entry_date, locale)}`
@@ -451,18 +451,23 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
     // ── pets ──────────────────────────────────────────────────────────────────
     case 'pet_done': {
       const r = await petTasksDone(intent.pet, intent.tasks, today)
-      if (!r.done.length) return say(r.needPet ? t('ask.petWhich') : t('ask.petTaskNotFound', { items: intent.tasks.join(', ') }))
+      if (!r.done.length) {
+        if (r.unknownPet) return say(t('ask.petUnknown', { pet: r.unknownPet }))
+        return say(r.needPet ? t('ask.petWhich') : t('ask.petTaskNotFound', { items: intent.tasks.join(', ') }))
+      }
+      const notFound = [...r.missing, ...(r.unknownPet ? [r.unknownPet] : [])]
       return say(t('ask.petDoneHead'), {
-        sub: r.missing.length ? t('ask.notFoundList', { items: r.missing.join(', ') }) : undefined,
+        sub: notFound.length ? t('ask.notFoundList', { items: notFound.join(', ') }) : undefined,
         rows: r.done.map((d) => ({ emoji: '✅', title: d.task.title, sub: d.pet })),
         summary: t('ask.sumPetDone', { items: r.done.map((d) => `${d.task.title} (${d.pet})`).join(', ') }),
-        undo: { run: () => undoPetTasksDone(r.done, today), headline: t('ask.petDoneUndone') },
+        // Nothing new written (all already ticked): no Undo to offer.
+        undo: r.done.some((d) => d.inserted) ? { run: () => undoPetTasksDone(r.done, today), headline: t('ask.petDoneUndone') } : undefined,
         open: { label: t('ask.openPets'), path: '/pets' },
       })
     }
     case 'pet_log': {
       const r = await logPetEvent(intent.pet, intent.type, intent.title || t(`ask.petType.${intent.type}` as TKey), intent.date, intent.next, myEmail)
-      if (!r.ok) return say(t('ask.petWhich'))
+      if (!r.ok) return say(r.reason === 'error' ? t('ask.error') : t('ask.petWhich'))
       const ev = r.ev
       return say(t('ask.petLogged', { pet: r.pet }), {
         rows: [

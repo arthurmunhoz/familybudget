@@ -57,6 +57,7 @@ export type Intent =
    *  do Pedro") — narrows locateEvent; absent = anyone's. */
   | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; ref?: string; person?: string }
   | { intent: 'find_event'; title: string; date: string; ref?: string; person?: string }
+  /** `date` / `newDate` are "" when not said: the coming occurrence / its own day. */
   | { intent: 'move_event'; title: string; date: string; newDate: string; time: string; ref?: string; person?: string }
   /** `date` is "" when no day was said: the coming weeks are searched. */
   | { intent: 'remove_event'; title: string; date: string; ref?: string; person?: string }
@@ -99,6 +100,10 @@ export type Intent =
   | { intent: 'discount'; amount: number; percent: number }
   /** About One Roof itself (what it does, the games and their rules). */
   | { intent: 'app_help'; topic: string; reply: string }
+  /** "desfaz isso" / "undo that": undo the previous answer's change (its
+   *  Undo button, by voice). Recognised on the phone (localParse) and from a
+   *  server that knows it; an older server never sends it. */
+  | { intent: 'undo_last' }
   | { intent: 'unknown'; reply: string }
 
 /** add_event's extras beyond title/day/time (all optional). */
@@ -180,7 +185,7 @@ const KNOWN_INTENTS = new Set([
   'agenda', 'add_event', 'edit_event', 'find_event', 'move_event', 'remove_event', 'birthdays', 'day_summary',
   'add_money', 'money_summary', 'list_money', 'fix_money', 'remove_money', 'split_bill', 'discount', 'better_deal',
   'send_nudge', 'nudge_seen', 'pets_due', 'pet_done', 'pet_log', 'pet_next', 'pet_weight',
-  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'start_game', 'app_help', 'unknown',
+  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'start_game', 'app_help', 'undo_last', 'unknown',
 ])
 
 /** What the server said: an intent, an intent with a detail missing, an
@@ -202,6 +207,9 @@ export async function understandWithSource(
   text: string,
   ctx: AskContext,
 ): Promise<{ intent: Intent | null; source: Source; quota?: Quota }> {
+  // "Desfaz isso" is answered here, before the server: an older server filed
+  // it as remove_items — a WRITE (review M9). Instant and nothing spent.
+  if (isUndoAsk(text)) return { intent: { intent: 'undo_last' }, source: 'local' }
   const r = await askServer(text, ctx)
   // Out of free requests this month: say so (with the way to Plus) — the
   // local regexes don't stand in for the assistant.
@@ -244,7 +252,10 @@ export async function understandWithSource(
     // never let them guess here: ask for what's missing (owner, 2026-11).
     if (r.kind === 'incomplete') return { intent: { intent: 'need_detail', about: r.name }, source: 'asked' }
     if (r.kind === 'unsupported') return { intent: { intent: 'needs_update', about: r.name }, source: 'asked' }
-    // Offline, or the server said "unknown": the local parser is the fallback.
+    // Offline, or the server said "unknown": the local parser is the fallback
+    // — with the same cut-off guard (it would write "marca o dentista amanhã
+    // às" just as readily).
+    if (local && cutWrite(local.intent, text)) return { intent: { intent: 'need_detail', about: local.intent }, source: 'asked' }
     if (local) return { intent: local, source: 'local' }
     return { intent: remote, source: remote ? 'server' : 'none' }
   }
@@ -325,11 +336,16 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     case 'find_event':
       return str('title') || ref.ref ? { intent: 'find_event', title: str('title'), date: isoOr('date'), ...ref, ...whose } : null
     case 'move_event': {
-      const newDate = /^\d{4}-\d{2}-\d{2}$/.test(str('new_date')) ? str('new_date') : ''
+      const newDate = isoOr('new_date')
       // Nowhere to go and no new time: not a usable move.
       if (!newDate && !str('time')) return null
-      return { intent: 'move_event', title: str('title'), date, newDate: newDate || date, time: str('time'), ...ref, ...whose }
+      // No day said = NOT today: locateEvent finds the coming one (or the
+      // ref'd row, or asks which). No new day = only the time changes, on the
+      // occurrence's own day (moveOccurrence fills it in). Review H3.
+      return { intent: 'move_event', title: str('title'), date: isoOr('date'), newDate, time: str('time'), ...ref, ...whose }
     }
+    case 'undo_last':
+      return { intent: 'undo_last' }
     case 'remove_event': {
       const day = /^\d{4}-\d{2}-\d{2}$/.test(str('date')) ? str('date') : ''
       // Neither a name nor a day: nothing to go on.
@@ -583,6 +599,14 @@ function oneSlip(a: string, b: string): boolean {
  *  list ("apaga o gasto do Ford's Garage" is not a list item, owner 2026-11). */
 const NOT_LIST = /\b(gastos?|despesas?|lan[cç]amentos?|expenses?|charges?|gast[eé]|calend[aá]rio|calendar|eventos?|events?|compromissos?|agenda|or[cç]amento|budget|presupuesto)\b/i
 const LIST_INTENTS = new Set(['add_items', 'check_items', 'remove_items', 'move_items', 'uncheck_items'])
+
+/** The WHOLE request is "undo that" (pt / en / es) — never a request that
+ *  merely contains "volta" or "undo" ("volta a lista do Walmart"). */
+const UNDO_ASK =
+  /^(?:(?:ei|hey|oi|ok|roof|casa|por favor|please|porfa)[\s,]+)*(?:desfa(?:z|ça|zer|ca)|desfazer|undo|deshaz|deshacer)(?:\s+(?:isso|isto|o que (?:voc[eê] )?fez|a [uú]ltima|o [uú]ltimo|that|it|this|the last one|what you did|eso|esto|lo [uú]ltimo|la [uú]ltima))?(?:[\s,]+(?:por favor|please|porfa))?[\s.!?]*$/i
+export function isUndoAsk(text: string): boolean {
+  return UNDO_ASK.test(text.trim().toLowerCase())
+}
 
 export function localParse(raw: string, today: string): Intent | null {
   const r = parseLocal(raw, today)
@@ -1064,17 +1088,59 @@ export async function locateEvent(
 ): Promise<Located> {
   const { data } = await supabase.from('calendar_events').select('*')
   const events = (data ?? []) as CalendarEvent[]
-  const pool = date ? occurrencesInRange(events, date, date) : upcomingOccurrences(events, today, withinDays)
   // The model pointed at a row it was shown: that exact occurrence — unless
   // it isn't the person named, or the words fit several people's events and
   // say nothing to tell them apart (the model picked one; the app asks).
   const r = refTo(ref)
   const byRef = r?.kind === 'event' ? events.find((ev) => ev.id === r.id) : undefined
-  if (byRef && r?.kind === 'event' && (!who || isTheirs(byRef, who))) {
+  return locateIn(events, title, date, today, withinDays, byRef && r?.kind === 'event' ? { event: byRef, start: r.start } : undefined, who)
+}
+
+/** locateEvent over loaded events, pure (tested). A day that has nothing
+ *  matching falls back to the coming weeks, as if no day were said: the
+ *  model still sends date = TODAY for "muda o dentista para sexta" (the
+ *  day it's moving TO is the only day said — verified live, 2026-11-14), and
+ *  "nothing on today" must not end the search. The forward result still
+ *  goes through the person / "which one?" checks. */
+export function locateIn(
+  events: CalendarEvent[],
+  title: string,
+  date: string,
+  today: string,
+  withinDays: number,
+  ref?: { event: CalendarEvent; start: string },
+  who?: EventWho,
+): Located {
+  const pool = date ? occurrencesInRange(events, date, date) : upcomingOccurrences(events, today, withinDays)
+  const onDay = pickWithRef(pool, ref, title, date, who)
+  if (!date || onDay.ok || onDay.reason !== 'not_found' || !(title.trim() || who)) return onDay
+  const ahead = pickWithRef(upcomingOccurrences(events, today, withinDays), ref, title, '', who)
+  return ahead.ok || ahead.reason === 'ambiguous' ? ahead : onDay
+}
+
+/** locateEvent's choice, pure (tested): the row the model pointed at, unless
+ *  it isn't the person named or the words fit several people's events; on
+ *  the DAY said when one was said — the context lists only a series' next
+ *  occurrence, so "cancela a natação do dia 17" pointed at the 10th (review
+ *  M4). A ref'd series that doesn't happen that day is ignored. */
+export function pickWithRef(
+  pool: Occurrence[],
+  ref: { event: CalendarEvent; start: string } | undefined,
+  title: string,
+  date: string,
+  who?: EventWho,
+): Located {
+  if (ref && (!who || isTheirs(ref.event, who))) {
+    const byRef = ref.event
     const check = title && !who && !date ? pickOccurrence(pool, title, false) : null
     if (!(check && !check.ok && check.reason === 'ambiguous' && check.options.some((o) => o.event.id === byRef.id))) {
-      const occ = occurrencesInRange([byRef], r.start, r.start)[0] ?? { event: byRef, start: byRef.start_date, end: byRef.end_date }
-      return { ok: true, occ }
+      if (date) {
+        const onDay = occurrencesInRange([byRef], date, date)[0]
+        if (onDay) return { ok: true, occ: onDay }
+      } else {
+        const occ = occurrencesInRange([byRef], ref.start, ref.start)[0] ?? { event: byRef, start: byRef.start_date, end: byRef.end_date }
+        return { ok: true, occ }
+      }
     }
   }
   return pickOccurrence(pool, title, !!date, who)
@@ -1147,7 +1213,8 @@ export async function moveSeries(ev: CalendarEvent, occStart: string, to: string
 async function applyMove(before: CalendarEvent, occStart: string, to: string, time: string): Promise<MoveResult> {
   const { data: updated, error } = await supabase
     .from('calendar_events')
-    .update(movePatch(before, occStart, to, time))
+    // No new day said ("muda pra 15h"): it stays on the occurrence's day.
+    .update(movePatch(before, occStart, to || occStart, time))
     .eq('id', before.id)
     .select('*')
     .single()

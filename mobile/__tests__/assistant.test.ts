@@ -461,3 +461,164 @@ describe('a request cut off mid-phrase never writes (owner report 2026-11)', () 
     expect(cutWrite('pets_due', 'o que falta para a')).toBe(false)
   })
 })
+
+// ── review 2026-11-14 (Roof losing the start of a request, and friends) ─────
+
+describe('voice: stitch banks a stretch on every (pause-)final — iOS 18', () => {
+  it('"Marca" final, then " uma", " uma consulta…" keeps "Marca"', () => {
+    const seg = { done: '', current: '' }
+    stitch(seg, 'Marca')
+    stitch(seg, 'Marca', true)
+    stitch(seg, ' uma')
+    expect(stitch(seg, ' uma consulta da Aninha para hoje')).toBe('Marca uma consulta da Aninha para hoje')
+  })
+  it('a same-length reset after a final is a new stretch, not a revision', () => {
+    const seg = { done: '', current: '' }
+    stitch(seg, 'põe leite', true)
+    expect(stitch(seg, 'no Walmart')).toBe('põe leite no Walmart')
+  })
+  it('a final that repeats the stretch just banked is dropped', () => {
+    const seg = { done: '', current: '' }
+    stitch(seg, 'add milk', true)
+    expect(stitch(seg, 'add milk', true)).toBe('add milk')
+    expect(stitch(seg, 'and bread')).toBe('add milk and bread')
+  })
+  it('several pauses in a row', () => {
+    const seg = { done: '', current: '' }
+    stitch(seg, 'marca', true)
+    stitch(seg, 'uma consulta', true)
+    stitch(seg, 'da Aninha')
+    expect(stitch(seg, 'da Aninha para hoje', true)).toBe('marca uma consulta da Aninha para hoje')
+    // The empty final-final after stop() changes nothing.
+    expect(stitch(seg, '', true)).toBe('marca uma consulta da Aninha para hoje')
+  })
+  it('revisions without a final still replace, as before', () => {
+    const seg = { done: '', current: '' }
+    stitch(seg, "What's on")
+    expect(stitch(seg, 'What is on my list')).toBe('What is on my list')
+  })
+})
+
+describe('guard: more dangling endings (review M1)', () => {
+  it.each(['marca o dentista amanhã às', 'põe na lista até', 'marca reunião numa', 'leva os cachorros aos', 'add a note about', 'cita hasta'])('%s', (text) => {
+    expect(looksCut(text)).toBe(true)
+  })
+  it.each(['Lola ate', 'marca o dentista amanhã às 3', 'põe café sem açúcar'])('%s is whole', (text) => {
+    expect(looksCut(text)).toBe(false)
+  })
+})
+
+describe('move_event without a day (review H3)', () => {
+  it('no day said stays "" — not today', () => {
+    expect(fromServer({ intent: 'move_event', title: 'Natação', time: '15:00' }, TODAY)).toEqual({
+      intent: 'move_event',
+      title: 'Natação',
+      date: '',
+      newDate: '',
+      time: '15:00',
+    })
+  })
+  it('a day said still comes through (older servers too)', () => {
+    expect(fromServer({ intent: 'move_event', title: 'Dentista', date: TODAY, new_date: '2026-11-07' }, TODAY)).toMatchObject({
+      date: TODAY,
+      newDate: '2026-11-07',
+    })
+  })
+})
+
+import { isUndoAsk, locateIn, pickWithRef } from '@/lib/assistant'
+
+describe('undo by voice (review M9)', () => {
+  it.each(['desfaz isso', 'Desfaz', 'desfazer', 'undo that', 'Undo.', 'deshaz eso', 'oi casa, desfaz isso por favor', 'desfaz o que você fez'])('%s', (text) => {
+    expect(isUndoAsk(text)).toBe(true)
+  })
+  it.each(['desfaz a lista do Walmart', 'volta a lista do Walmart', 'undo the milk and add eggs', 'cancela a natação'])('%s is not', (text) => {
+    expect(isUndoAsk(text)).toBe(false)
+  })
+  it('fromServer knows undo_last', () => {
+    expect(fromServer({ intent: 'undo_last' }, TODAY)).toEqual({ intent: 'undo_last' })
+  })
+})
+
+describe('a ref and a day said (review M4)', () => {
+  const swim = {
+    id: 'swim',
+    title: 'Natação',
+    owner_email: 'leo@x',
+    start_date: '2026-11-10',
+    end_date: '2026-11-10',
+    recurrence: 'weekly',
+    recurrence_until: null,
+  } as unknown as CalendarEvent
+  const dentist = { id: 'd', title: 'Dentista', owner_email: null, start_date: '2026-11-17', end_date: '2026-11-17', recurrence: 'none', recurrence_until: null } as unknown as CalendarEvent
+  // The context lists the series once, on its NEXT occurrence (the 10th).
+  const ref = { event: swim, start: '2026-11-10' }
+  it('the day said wins over the occurrence the ref was listed at', () => {
+    const pool = [{ event: swim, start: '2026-11-17', end: '2026-11-17' }, { event: dentist, start: '2026-11-17', end: '2026-11-17' }]
+    expect(pickWithRef(pool, ref, 'natação', '2026-11-17')).toMatchObject({ ok: true, occ: { event: { id: 'swim' }, start: '2026-11-17' } })
+  })
+  it('no day said: the ref\'s own occurrence', () => {
+    expect(pickWithRef([], ref, 'natação', '')).toMatchObject({ ok: true, occ: { start: '2026-11-10' } })
+  })
+  it('a ref\'d series that doesn\'t happen that day is ignored: the day\'s events decide', () => {
+    // Nothing on the 18th: not the swim on another day.
+    expect(pickWithRef([], ref, '', '2026-11-18')).toMatchObject({ ok: false, reason: 'not_found' })
+    // A one-off on the 17th is what's there (the 17th's pool, sans series).
+    const pool = [{ event: dentist, start: '2026-11-17', end: '2026-11-17' }]
+    const wrongRef = { event: { ...swim, start_date: '2026-11-11', end_date: '2026-11-11' } as CalendarEvent, start: '2026-11-11' }
+    expect(pickWithRef(pool, wrongRef, 'dentista', '2026-11-17')).toMatchObject({ ok: true, occ: { event: { id: 'd' } } })
+  })
+})
+
+import { matchPetTasks, namedPets } from '@/lib/assistantActions'
+import type { PetCareTask } from '@/lib/types'
+
+describe('pet_done with several or unknown pets (review M5)', () => {
+  const pets = [
+    { id: 'l', name: 'Lola' },
+    { id: 'c', name: 'Chloe' },
+  ]
+  const task = (id: string, pet: string, title: string) => ({ id, pet_id: pet, title }) as unknown as PetCareTask
+  const tasks = [task('lf', 'l', 'Comida'), task('cf', 'c', 'Comida'), task('lw', 'l', 'Passeio')]
+  it('"Lola, Chloe" / "Lola e Chloe" names both', () => {
+    expect(namedPets(pets, 'Lola, Chloe').pets.map((p) => p.id)).toEqual(['l', 'c'])
+    expect(namedPets(pets, 'Lola e Chloe').pets.map((p) => p.id)).toEqual(['l', 'c'])
+    expect(namedPets(pets, 'lola and chloe').pets.map((p) => p.id)).toEqual(['l', 'c'])
+  })
+  it('a name that is not a pet here is reported, not matched to another', () => {
+    expect(namedPets(pets, 'Rex')).toEqual({ pets: [], unknown: ['Rex'] })
+    expect(namedPets(pets, 'Lola, Rex')).toEqual({ pets: [pets[0]], unknown: ['Rex'] })
+  })
+  it('each pet named gets its own task', () => {
+    expect(matchPetTasks(tasks, pets, ['comida']).hits.map((t) => t.id)).toEqual(['lf', 'cf'])
+  })
+  it('one pet named: only hers', () => {
+    expect(matchPetTasks(tasks, [pets[1]], ['comida']).hits.map((t) => t.id)).toEqual(['cf'])
+    expect(matchPetTasks(tasks, [pets[1]], ['passeio'])).toMatchObject({ hits: [], missing: ['passeio'] })
+  })
+  it('no pet named: the only pet with it, else "which pet?"', () => {
+    expect(matchPetTasks(tasks, [], ['passeio']).hits.map((t) => t.id)).toEqual(['lw'])
+    expect(matchPetTasks(tasks, [], ['comida'])).toMatchObject({ hits: [], needPet: true })
+  })
+})
+
+describe('a day with nothing matching falls back to the coming weeks (H3, live model sends date=today)', () => {
+  const one = (id: string, title: string, day: string, owner: string | null = null) =>
+    ({ id, title, owner_email: owner, start_date: day, end_date: day, recurrence: 'none', recurrence_until: null }) as unknown as CalendarEvent
+  const events = [one('d', 'Dentista', '2026-11-09', 'ana@x'), one('u', 'Unha', TODAY)]
+  it('"muda o dentista para sexta" with date=today finds the coming dentist', () => {
+    expect(locateIn(events, 'dentista', TODAY, TODAY, 92)).toMatchObject({ ok: true, occ: { event: { id: 'd' }, start: '2026-11-09' } })
+  })
+  it('the match on the day said still wins', () => {
+    const more = [...events, one('d2', 'Dentista', TODAY)]
+    expect(locateIn(more, 'dentista', TODAY, TODAY, 92)).toMatchObject({ ok: true, occ: { event: { id: 'd2' } } })
+  })
+  it('two coming matches: asks which (person-aware flow)', () => {
+    const two = [...events, one('p', 'Dentista Pedro', '2026-11-12')]
+    expect(locateIn(two, 'dentista', TODAY, TODAY, 92)).toMatchObject({ ok: false, reason: 'ambiguous' })
+    expect(locateIn(two, 'dentista', TODAY, TODAY, 92, undefined, { name: 'Pedro' })).toMatchObject({ ok: true, occ: { event: { id: 'p' } } })
+  })
+  it('nothing anywhere: the day\'s not_found (with what IS that day)', () => {
+    expect(locateIn(events, 'natação', TODAY, TODAY, 92)).toMatchObject({ ok: false, reason: 'not_found' })
+  })
+})

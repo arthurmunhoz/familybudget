@@ -5,8 +5,12 @@
 // chime and `onWake` (the Home opens the ask sheet already showing
 // "listening"), and this same recogniser keeps going — no second start, no
 // second chime (owner, 2026-11: two chimes left people unsure when to talk).
-// What follows streams to `onHeard`; a pause after words (or ~7 s of nothing)
-// ends it with `onDone(request)`.
+// What follows streams to `onHeard`; SPEECH_SETTLE_MS of unchanged words (or
+// ~7 s of nothing) ends it with `onDone(request)`. A "final" result is NOT
+// the end: iOS 18 flags every pause as final (see voice.ts stitch()).
+// The mic is shared with useVoice: this listener starts / aborts it only
+// through the owner token (micStart / micAbort), so nobody else's abort
+// kills the capture and our late aborts never kill theirs.
 //
 // Never runs in the background (iOS/Android forbid the mic there) and never
 // where on-device recognition isn't available — then the switch says so.
@@ -14,7 +18,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AppState, Platform } from 'react-native'
 
 import { setRoofPref } from '@/lib/roof'
-import { playChime, speechModule, stitch } from '@/lib/voice'
+import { micAbort, micOwns, micStart, micStop, playChime, SPEECH_SETTLE_MS, speechModule, stitch } from '@/lib/voice'
 
 /** The start chime's length (assets/sounds/listen-start.wav, 0.24 s) + a beat. */
 const CHIME_MS = 300
@@ -175,13 +179,12 @@ export interface WakeHandlers {
   /** What has been said after the call so far. */
   onHeard: (text: string) => void
   /** Finished: the request ('' = nothing came after the call). `handOff`:
-   *  the recogniser stopped on its own right after a bare call (iOS ends a
-   *  session at the pause after "Ei Roof") — the sheet should keep listening
-   *  with its own mic — 'quiet' when the wake chime surely played, 'chime'
-   *  when the session ended so soon after it that iOS may have cut it off
-   *  (then the sheet's mic chimes as it goes live, so the user always hears
-   *  exactly one "talk now"). */
-  onDone: (request: string, handOff: false | 'quiet' | 'chime') => void
+   *  the recogniser ended on its own right after a bare call — the sheet
+   *  should listen with its own mic, NOT quietly: there's a gap while it
+   *  starts, so it says "one moment" and chimes when it's really live (the
+   *  honest "talk now"; review 2026-11-14 H2). Called only once the wake
+   *  chime has finished, so the new session can't cut it off. */
+  onDone: (request: string, handOff: boolean) => void
 }
 
 /** Listens for "Ei Roof" while `enabled`. Bump `epoch` to re-arm it after a
@@ -201,6 +204,8 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
     let fails = 0
     // Woke and finished: the caller turns this off; never restart in between.
     let held = false
+    // This listener's claim on the shared recogniser (see voice.ts).
+    const me = {}
     let woke: { req: string; seg: { done: string; current: string } } | null = null
     let settle: ReturnType<typeof setTimeout> | null = null
     let restart: ReturnType<typeof setTimeout> | null = null
@@ -223,17 +228,14 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
       held = true
       clear()
       const left = CHIME_MS - (Date.now() - chimeAt)
-      const abort = () => {
-        try {
-          m.abort()
-        } catch {
-          /* already stopped */
-        }
-      }
-      // Let the chime finish before tearing the session down.
+      const abort = () => micAbort(me)
+      // Let the chime finish before tearing the session down (and before the
+      // sheet's own mic starts on a hand-off).
       if (left > 0 && !handOff) setTimeout(abort, left)
       else abort()
-      handRef.current.onDone(req, handOff && !req ? 'quiet' : false)
+      const done = () => handRef.current.onDone(req, handOff && !req)
+      if (handOff && !req && left > 0) setTimeout(() => alive && done(), left)
+      else done()
     }
     const begin = async () => {
       if (!alive || held || running || AppState.currentState !== 'active') return
@@ -246,7 +248,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
       running = true
       woke = null
       try {
-        m.start({
+        micStart(me, {
           lang: LOCALE[lang] ?? 'pt-BR',
           interimResults: true,
           continuous: true,
@@ -258,18 +260,14 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
           ...(Platform.OS === 'android'
             ? { androidIntentOptions: { EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 60000, EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 60000 } }
             : {}),
-        } as Parameters<typeof m.start>[0])
+        } as Parameters<typeof micStart>[1])
         setState('waiting')
         // A long continuous session keeps a growing transcript; start fresh
         // every minute so it stays light and a missed "end" can't stall it.
         refresh = setTimeout(() => {
           if (running && !woke) {
             running = false
-            try {
-              m.stop()
-            } catch {
-              /* noop */
-            }
+            micStop(me)
           }
         }, 60000)
       } catch {
@@ -289,7 +287,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
 
     const subs = [
       m.addListener('result', (e: { results?: { transcript: string }[]; isFinal?: boolean }) => {
-        if (!running) return
+        if (!running || !micOwns(me)) return
         fails = 0
         const heard = e.results?.[0]?.transcript ?? ''
         noteHeard(heard)
@@ -310,26 +308,30 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
           }
           if (hearingOff) clearTimeout(hearingOff)
           hearingOff = null
-          woke = { req: after, seg: { done: '', current: heard } }
+          // The call's own result may already be a pause-final ("Oi Casa
+          // marca" [pause]): bank it, so the next stretch adds to it.
+          const seg = { done: '', current: '' }
+          stitch(seg, heard, !!e.isFinal)
+          woke = { req: after, seg }
           playChime('start')
           chimeAt = Date.now()
           handRef.current.onWake()
         } else {
           // iOS restarts its transcript after a pause: join the stretches,
           // and a stretch without the call in it is all request.
-          const full = stitch(woke.seg, heard)
+          const full = stitch(woke.seg, heard, !!e.isFinal)
           woke.req = afterWake(full) ?? meaningfulRequest(full)
         }
         handRef.current.onHeard(woke.req)
         if (settle) clearTimeout(settle)
-        if (e.isFinal && woke.req) return fire()
-        // A pause after words = done. Just the call: keep this session (no gap,
-        // no lost words) and wait a while; if iOS ends it at the pause, 'end'
-        // hands the listening over to the sheet instead (fire(true)).
-        settle = setTimeout(() => fire(false), woke.req ? 1300 : 7000)
+        // Words that stop changing = done (a "final" is only a pause on iOS
+        // 18 — firing on it sent "marca uma" without the rest). Just the call:
+        // keep this session (no gap, no lost words) and wait a while; if the
+        // recogniser ends anyway, 'end' hands over to the sheet (fire(true)).
+        settle = setTimeout(() => fire(false), woke.req ? SPEECH_SETTLE_MS : 7000)
       }),
       m.addListener('error', (e: { error?: string }) => {
-        if (!running) return
+        if (!running || !micOwns(me)) return
         running = false
         if (woke) return fire(true)
         if (e.error === 'not-allowed') {
@@ -341,6 +343,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
         schedule()
       }),
       m.addListener('end', () => {
+        if (!micOwns(me)) return
         if (!running) {
           if (alive && !woke) schedule()
           return
@@ -357,11 +360,7 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
       } else if (running) {
         running = false
         clear()
-        try {
-          m.abort()
-        } catch {
-          /* noop */
-        }
+        micAbort(me)
       }
     })
     void begin()
@@ -377,13 +376,8 @@ export function useRoofWake(enabled: boolean, lang: string, handlers: WakeHandle
         // Off a beat later: closing the sheet mid-capture plays the stop
         // chime right now, and tearing the session down at once cut it off.
         // The listeners are already gone, so nothing it hears meanwhile counts.
-        setTimeout(() => {
-          try {
-            m.abort()
-          } catch {
-            /* noop */
-          }
-        }, CHIME_MS)
+        // A no-op if the sheet's mic has started meanwhile (owner token).
+        setTimeout(() => micAbort(me), CHIME_MS)
       }
       setState('off')
     }

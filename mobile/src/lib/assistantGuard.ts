@@ -30,11 +30,12 @@ export const WRITE_INTENTS = new Set([
 const DANGLING = new Set([
   // pt
   'o', 'a', 'os', 'as', 'um', 'uma', 'uns', 'umas', 'de', 'da', 'do', 'das', 'dos', 'para', 'pra', 'pro', 'na', 'no', 'nas', 'nos',
-  'em', 'com', 'e', 'ou', 'que', 'pela', 'pelo', 'ao', 'à', 'meu', 'minha', 'seu', 'sua',
-  // en
-  'the', 'an', 'to', 'for', 'of', 'on', 'in', 'at', 'with', 'and', 'or', 'my', 'our', 'his', 'her', 'their', 'from',
+  'em', 'com', 'e', 'ou', 'que', 'pela', 'pelo', 'pelas', 'pelos', 'ao', 'aos', 'à', 'às', 'num', 'numa', 'até', 'sem', 'sobre',
+  'entre', 'meu', 'minha', 'seu', 'sua',
+  // en ("ate" is NOT here: "Lola ate" is a whole sentence)
+  'the', 'an', 'to', 'for', 'of', 'on', 'in', 'at', 'with', 'and', 'or', 'my', 'our', 'his', 'her', 'their', 'from', 'about', 'until',
   // es
-  'el', 'la', 'los', 'las', 'un', 'una', 'del', 'al', 'en', 'con', 'y', 'mi', 'su', 'por',
+  'el', 'la', 'los', 'las', 'un', 'una', 'del', 'al', 'en', 'con', 'y', 'mi', 'su', 'por', 'hasta', 'sin', 'sobre', 'entre',
 ])
 
 /** True when the request ends mid-phrase (on an article / preposition / "and"). */

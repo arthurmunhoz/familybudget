@@ -183,7 +183,11 @@ export async function lastEntry(thing: string, me: string, ref?: string): Promis
   // The model pointed at an entry it was shown ("e2"): exactly that one.
   const r = refTo(ref)
   const byRef = r?.kind === 'entry' ? all.find((e) => e.id === r.id) : undefined
-  const hit = byRef ?? (thing.trim() ? all.find((e) => matchesThing(e, thing)) : (all.find((e) => e.person_email === me) ?? all[0]))
+  // Nothing named: the asker's own latest — never someone else's just because
+  // it's newer ("apaga o último gasto"). Their match first when a thing IS
+  // named, too (review LOW).
+  const named = thing.trim() ? all.filter((e) => matchesThing(e, thing)) : []
+  const hit = byRef ?? (thing.trim() ? (named.find((e) => e.person_email === me) ?? named[0]) : all.find((e) => e.person_email === me))
   if (!hit) return null
   const { budgets, months } = await budgetsWithMonths()
   const month = months.find((m) => m.id === hit.month_id)
@@ -215,7 +219,7 @@ export async function reinsertEntry(e: Entry): Promise<void> {
 
 // ── pets ─────────────────────────────────────────────────────────────────────
 
-interface PetLite {
+export interface PetLite {
   id: string
   name: string
 }
@@ -242,55 +246,106 @@ export async function petTasksContext(): Promise<string[]> {
     .filter(Boolean)
 }
 
-export interface PetDoneResult {
-  /** The completions written (Undo deletes these task/day pairs). */
-  done: { task: PetCareTask; pet: string }[]
-  missing: string[]
-  /** No pet named and several have that task. */
-  needPet: boolean
+/** The pets a request named — "Lola", "Lola, Chloe", "Lola e Chloe" — and
+ *  any name said that isn't a pet here. No name = `pets: []` (any pet).
+ *  Pure (tested). */
+export function namedPets(pets: PetLite[], petName: string): { pets: PetLite[]; unknown: string[] } {
+  const said = petName
+    .split(/\s*(?:,|&|\+|\s(?:e|and|y)\s)\s*/i)
+    .map((x) => x.trim())
+    .filter(Boolean)
+  const found: PetLite[] = []
+  const unknown: string[] = []
+  for (const n of said) {
+    const p = findPet(pets, n)
+    if (!p) unknown.push(n)
+    else if (!found.some((f) => f.id === p.id)) found.push(p)
+  }
+  return { pets: found, unknown }
 }
 
-/** Mark routine tasks done today, for the pet named (or the only pet that has
- *  a task by that name). */
-export async function petTasksDone(petName: string, said: string[], today: string): Promise<PetDoneResult> {
-  const { pets, tasks } = await petsAndTasks()
-  const pet = findPet(pets, petName)
-  const done: PetDoneResult['done'] = []
+/** Which routine task each said thing means — for every pet named, or, with
+ *  none named, the only pet that has it (several = "which pet?"). Pure. */
+export function matchPetTasks(
+  tasks: PetCareTask[],
+  scope: PetLite[],
+  said: string[],
+): { hits: PetCareTask[]; missing: string[]; needPet: boolean } {
+  const hits: PetCareTask[] = []
   const missing: string[] = []
   let needPet = false
+  const find = (pool: PetCareTask[], n: string) => {
+    const exact = pool.filter((t) => norm(t.title) === n)
+    return exact.length ? exact : pool.filter((t) => norm(t.title).includes(n) || n.includes(norm(t.title)))
+  }
   for (const s of said) {
     const n = norm(s)
-    const pool = tasks.filter((t) => !pet || t.pet_id === pet.id)
-    let hits = pool.filter((t) => norm(t.title) === n)
-    if (!hits.length) hits = pool.filter((t) => norm(t.title).includes(n) || n.includes(norm(t.title)))
-    if (!hits.length) {
+    if (!n) continue
+    if (scope.length) {
+      // Each pet named, its own task ("Lola e Chloe comeram" = both fed).
+      const per = scope.map((p) => find(tasks.filter((t) => t.pet_id === p.id), n)[0]).filter((t): t is PetCareTask => !!t)
+      if (!per.length) missing.push(s)
+      else hits.push(...per)
+      continue
+    }
+    const pool = find(tasks, n)
+    if (!pool.length) {
       missing.push(s)
       continue
     }
-    // No pet named: only when one pet has it (else "which pet?").
-    const owners = new Set(hits.map((t) => t.pet_id))
-    if (!pet && owners.size > 1) {
+    if (new Set(pool.map((t) => t.pet_id)).size > 1) {
       needPet = true
       continue
     }
-    const task = hits[0]
+    hits.push(pool[0])
+  }
+  return { hits, missing, needPet }
+}
+
+export interface PetDoneResult {
+  /** The completions now on record. `inserted`: written by THIS action —
+   *  Undo removes only those, never a tick someone made before (review M6). */
+  done: { task: PetCareTask; pet: string; inserted: boolean }[]
+  missing: string[]
+  /** No pet named and several have that task. */
+  needPet: boolean
+  /** A name was said that isn't one of this household's pets: nothing is
+   *  ticked for it (never another pet's task instead — review M5). */
+  unknownPet: string
+}
+
+/** Mark routine tasks done today, for each pet named (or the only pet that
+ *  has a task by that name). */
+export async function petTasksDone(petName: string, said: string[], today: string): Promise<PetDoneResult> {
+  const { pets, tasks } = await petsAndTasks()
+  const named = namedPets(pets, petName)
+  const unknownPet = named.unknown.join(', ')
+  // Only names that aren't pets: refuse rather than search every pet.
+  if (named.unknown.length && !named.pets.length) return { done: [], missing: [], needPet: false, unknownPet }
+  const plan = matchPetTasks(tasks, named.pets, said)
+  const done: PetDoneResult['done'] = []
+  const missing = [...plan.missing]
+  for (const task of plan.hits) {
     const { error } = await supabase.from('pet_task_done').insert({ task_id: task.id, done_on: today })
+    // 23505 = already ticked today (someone else, or earlier): it IS done,
+    // but not by us — Undo must leave it.
     if (error && error.code !== '23505') {
-      missing.push(s)
+      missing.push(task.title)
       continue
     }
-    done.push({ task, pet: pets.find((p) => p.id === task.pet_id)?.name ?? '' })
+    done.push({ task, pet: pets.find((p) => p.id === task.pet_id)?.name ?? '', inserted: !error })
   }
-  if (done.length) notifyPetCareChange()
-  return { done, missing, needPet }
+  if (done.some((d) => d.inserted)) notifyPetCareChange()
+  return { done, missing, needPet: plan.needPet, unknownPet }
 }
 
 export async function undoPetTasksDone(done: PetDoneResult['done'], today: string): Promise<void> {
-  for (const d of done) await supabase.from('pet_task_done').delete().eq('task_id', d.task.id).eq('done_on', today)
-  if (done.length) notifyPetCareChange()
+  const mine = done.filter((d) => d.inserted)
+  for (const d of mine) await supabase.from('pet_task_done').delete().eq('task_id', d.task.id).eq('done_on', today)
+  if (mine.length) notifyPetCareChange()
 }
 
-export type PetLogResult = { ok: true; ev: PetEvent; pet: string } | { ok: false; reason: 'no_pet' }
+export type PetLogResult = { ok: true; ev: PetEvent; pet: string } | { ok: false; reason: 'no_pet' | 'error' }
 
 export async function logPetEvent(
   petName: string,
@@ -316,7 +371,8 @@ export async function logPetEvent(
     })
     .select('*')
     .single()
-  if (error || !data) return { ok: false, reason: 'no_pet' }
+  // A failed write is an error, not "which pet?" (review LOW).
+  if (error || !data) return { ok: false, reason: 'error' }
   notifyPetCareChange()
   return { ok: true, ev: data as PetEvent, pet: pet.name }
 }

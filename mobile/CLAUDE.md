@@ -449,18 +449,49 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   - **One chime** (owner, 2026-11-12): on the call the wake recogniser chimes,
     calls `onWake` (the Hub opens AskSheet at once with `wakeHeard`, shown as
     "listening") and KEEPS capturing — no second recogniser, no second chime.
-    `onHeard` streams the text; a pause after words (or ~7 s of nothing) ends
-    it with `onDone(request)` → `autoSend`. The Hub keeps the hook enabled
-    while `wakeCapture` and bumps `wakeEpoch` on close to re-arm it.
-  - **Bare "Ei Roof"**: iOS often ENDS the session at the pause after the
-    call. Then `onDone('', handOff=true)` → Hub bumps `continueListening` →
-    AskSheet starts its own mic with `start({ quiet: true })` (no second
-    chime, shown as "listening" at once). While listening the sheet's button
-    shows `ListeningBars` (tap still stops). Settings › Roof shows the last
-    thing the wake listener heard (memory only, never stored) to tune spellings.
-  - **Keeps listening**: after an answer to a SPOKEN request (and after Roof
-    finished saying it), AskSheet starts its own mic again; the answer stays
-    on screen with a small "listening" strip under it (`follow`). Silence ends it.
+    `onHeard` streams the text; `SPEECH_SETTLE_MS` (1.5 s) of unchanged words
+    (or ~7 s of nothing) ends it with `onDone(request)` → `autoSend`. A
+    "final" result is NOT the end (iOS 18, below). The Hub keeps the hook
+    enabled while `wakeCapture` and bumps `wakeEpoch` on close to re-arm it.
+  - **ONE recogniser, one owner (review 2026-11-14).** The wake listener and
+    every `useVoice` share the native module. Start / stop / abort ONLY via
+    `micStart(me)` / `micStop(me)` / `micAbort(me)` in lib/voice — the token
+    makes a stop/abort from anyone but the current owner a no-op, and the
+    listeners ignore events while they don't own the mic. Never call
+    `speechModule().abort()` directly. Why: the Hub remounts AskSheet on a
+    wake (new key) and the old sheet's unmount abort killed the wake capture
+    mid-request (that, plus the session deactivation below, is what looked
+    like "iOS ends the session at the pause after the call"); the delayed
+    aborts that let a chime finish (roofWake cleanup, `cancel()`) used to kill
+    the NEXT session. useVoice also ignores an 'end' that arrives before its
+    own session's 'start' (an abort's 'end' lands late).
+  - **Bare call, recogniser ended anyway** (rare now): `onDone('', true)`,
+    sent only once the wake chime has finished → Hub bumps `continueListening`
+    → AskSheet starts its own mic NORMALLY: "one moment" until audio flows,
+    then the start chime + "listening". (It used to start `quiet` and show
+    "listening" over the ~0.5–1 s deaf gap — the first words were lost.)
+    While listening the sheet's button shows `ListeningBars` (tap still
+    stops). Settings › Roof shows the last thing the wake listener heard
+    (memory only, never stored) to tune spellings.
+  - **Keeps listening** (Plus only): after an answer to a SPOKEN request (and
+    after Roof finished saying it, +350 ms), AskSheet starts its own mic again,
+    quietly (no chime; "one moment" until live); the answer stays on screen
+    with a small "listening" strip under it (`follow`). It STOPS after 10 s
+    without a word (`FOLLOW_IDLE_MS`, stop chime) — the TV in the room must
+    not become requests. Free households: answer on screen, mic off.
+  - **"Desfaz isso" / "undo that" / "deshaz eso"** (`isUndoAsk`, the whole
+    request only) → `undo_last`, decided on the phone before the server (an
+    older server filed it as remove_items): runs the previous answer's Undo
+    (`undoOf` in AskSheet — the same code as the Undo buttons) and shows it
+    undone. A server may also send `undo_last` (KNOWN_INTENTS has it).
+  - **Finding the event to move / remove / edit** (`locateIn`, pure + tested):
+    move_event's `date` / `newDate` are "" when not said (not today; a
+    time-only move stays on the occurrence's day). A ref'd series lands on
+    the DAY said, not the occurrence the context listed. A day said with
+    nothing matching falls back to the coming weeks (the model still sends
+    date = today for "muda o dentista para sexta"), through the same
+    person / "which one?" checks. The cut-off guard (`assistantGuard`) also
+    covers the offline local fallback.
   - The Home's bottom dock IS Roof (`home/RoofDock`, compact by the owner's
     call): orb with a status dot (green breathing = listening, grey = not), a
     mute button (pause / resume, or turns "Ei Roof" on via `turnOnRoofWake`)
@@ -556,9 +587,30 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   turns output down — faint, late-sounding chimes). Every way out of the
   sheet goes through `closeSheet` → `voice.cancel()`, which plays the stop
   chime and aborts.
+  **iOS 18 flags EVERY pause as a final result** (expo-speech-recognition's
+  `speechDuration > 0` hack) and then restarts the transcript; in one-shot
+  (`continuous: false`) mode the module ENDS the session at that first
+  pause — "marca uma… consulta" was sent as "marca uma". So on iOS the
+  request mic runs `continuous: true` and the APP ends it: 1.5 s of
+  unchanged words (`SPEECH_SETTLE_MS`) → `micStop` → 'end' sends the text;
+  6 s with no word at all ends a one-shot listen. Android keeps one-shot
+  (its recogniser ends on its own silence; isFinal there is the real end).
+  `stitch(seg, text, isFinal)` banks a stretch on every final (a same-length
+  reset after a pause used to drop the first stretch) and drops a final
+  that only repeats it — keep `__tests__/assistant.test.ts` green.
+  **The START chime player has `keepAudioSessionActive: true`.** expo-audio
+  otherwise deactivates the shared iOS session ~0.1 s after a player pauses
+  or finishes (`AudioModule.deactivateSession`) — which lands while the mic
+  records, right as the user starts talking. The STOP chime and Roof's voice
+  keep the default (they play when no mic runs; their deactivation is what
+  lets other apps' music resume) — so never start a mic within ~0.35 s of
+  either ending. Games / vault sounds use default players too: a sound that
+  ENDS during a voice answer could still deactivate the session (not seen
+  yet; give it keepAudioSessionActive if the quiz mic starts dropping).
   A chime REWINDS then plays (`await seekTo(0)` → `play()`): a finished
   expo-audio player sits at the end, and play() before the async seek lands
-  is silent — the chimes sounded only every other time.
+  is silent — the chimes sounded only every other time. pause() first stays
+  (Android: a finished player still "plays" and a bare seek restarts it).
   The sheet closes by DRAGGING its top strip down (PanResponder on the handle
   zone: >110pt or a flick closes via closeSheet, less springs back) and is
   capped at 84% of the room so some backdrop always shows to tap.

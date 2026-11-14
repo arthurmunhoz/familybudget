@@ -121,3 +121,14 @@ describe('"Oi Casa" / "Oye Casa" (2026-11-13)', () => {
     expect(afterWake('a casa está limpa')).toBeNull()
   })
 })
+
+import { stitch } from '@/lib/voice'
+
+describe('wake capture across iOS 18 pause-finals (review H4/H5)', () => {
+  it('"Oi Casa marca" [pause] "uma consulta da Aninha" keeps "marca"', () => {
+    const seg = { done: '', current: '' }
+    stitch(seg, 'Oi Casa marca', true)
+    const full = stitch(seg, 'uma consulta da Aninha para hoje')
+    expect(afterWake(full)).toBe('marca uma consulta da Aninha para hoje')
+  })
+})

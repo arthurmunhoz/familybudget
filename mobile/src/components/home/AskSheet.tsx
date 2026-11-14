@@ -222,7 +222,6 @@ export function AskSheet({
   onWakeStop,
   typeToo = false,
   continueListening = 0,
-  continueQuiet = true,
 }: {
   visible: boolean
   onClose: () => void
@@ -241,11 +240,10 @@ export function AskSheet({
   /** Opened from the dock's arrow: listening AND the keyboard up — typing
    *  stops the mic. */
   typeToo?: boolean
-  /** Bumped when "Ei Roof" handed the listening over: start the mic quietly
-   *  (the wake chime already said "talk now"). */
+  /** Bumped when "Ei Roof" handed the listening over: start the mic — not
+   *  quietly: it says "one moment" and chimes once it's really live (the gap
+   *  while it starts used to look like "listening" and lost the first words). */
   continueListening?: number
-  /** false = the wake chime may have been cut off: chime when going live. */
-  continueQuiet?: boolean
 }) {
   const { c } = useTheme()
   const { t, lang } = useI18n()
@@ -410,13 +408,12 @@ export function AskSheet({
     }),
   )
   // `starting` counts as hearing for the layout (stop button, no answer), but
-  // the label says "one moment" until the mic is live and the chime plays.
-  // Listening carried on from "Ei Roof" (see continueListening below).
-  const [quiet, setQuiet] = useState(false)
+  // the label says "one moment" until the mic is live and the chime plays —
+  // ALWAYS, also for a hand-off from "Ei Roof" and a conversation's next turn.
   const wakeLive = wakeHeard !== undefined
   const voiceOn = voice.state === 'listening' || voice.state === 'starting'
   const hearing = voiceOn || wakeLive
-  const warming = voice.state === 'starting' && !wakeLive && !quiet
+  const warming = voice.state === 'starting' && !wakeLive
   const heardText = wakeLive ? wakeHeard : voice.transcript
   // A conversation by voice keeps listening after each answer (owner,
   // 2026-11): the answer stays on screen and a small "listening" strip sits
@@ -463,23 +460,18 @@ export function AskSheet({
     roofHush()
   }, [visible, cancelVoice])
 
-  // A bare "Ei Roof" whose recogniser stopped at the pause: keep listening
-  // here, without a second chime, and show it as listening from the start.
+  // A bare "Ei Roof" whose recogniser ended: listen here with the sheet's
+  // own mic, at once (roofWake only hands over once its chime is done).
+  // Not quiet: "one moment" until the mic is live, then the start chime —
+  // a quiet start showed "listening" over a deaf gap (review 2026-11-14 H2).
   const lastContinue = useRef(continueListening)
   useEffect(() => {
     if (!continueListening || continueListening === lastContinue.current) return
     lastContinue.current = continueListening
     if (!openRef.current) return
     viaVoice.current = true
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the Home's hand-off
-    setQuiet(true)
-    // Let the wake chime (0.24 s) finish before the mic restarts — a restart
-    // mid-chime cut it off. One chime, always (the wake's).
-    const id = setTimeout(() => {
-      if (openRef.current) void startVoice({ quiet: continueQuiet })
-    }, 260)
-    return () => clearTimeout(id)
-  }, [continueListening, continueQuiet, startVoice])
+    void startVoice()
+  }, [continueListening, startVoice])
 
   // "Ei Roof, …": send what was said once the sheet is up.
   const autoSent = useRef(false)
@@ -616,7 +608,6 @@ export function AskSheet({
     if (!q || busy) return
     turnSeq.current++
     setFollow(false)
-    setQuiet(false)
     // Typed (no raw text passed) → answer on screen only.
     if (raw === undefined) viaVoice.current = false
     roofHush()
@@ -644,11 +635,15 @@ export function AskSheet({
       // nothing sent or spent).
       const a: Answer = isCapabilitiesAsk(q) ? { kind: 'capabilities' } : await understandAndAct(q)
       setAnswer(a)
-      if (viaVoice.current) {
+      // Plus only (review 2026-11-14 M10): a free household's spoken request
+      // gets its answer on screen and the mic stays off until tapped.
+      if (viaVoice.current && !isFree) {
         const turn = ++turnSeq.current
-        const said = roof.speak && !isFree ? roofSay(summarize(a), lang) : Promise.resolve()
+        const said = roof.speak ? roofSay(summarize(a), lang) : Promise.resolve()
         // Then listen for the next thing — unless the sheet closed, something
-        // newer started, or the person is typing.
+        // newer started, or the person is typing. 350 ms: Roof's voice player
+        // lets expo-audio deactivate the iOS session ~0.1 s after it ends;
+        // the new mic must start after that, not under it.
         void said.then(() => {
           setTimeout(() => {
             if (!openRef.current || turn !== turnSeq.current || textRef.current.trim()) return
@@ -657,8 +652,9 @@ export function AskSheet({
             // it's the same conversation carrying on, so no new chime (a
             // second chime read as a glitch / a restart — owner, 2026-11-13);
             // the "listening" strip under the answer says it.
+            // It ends after ~10 s without a word (useVoice FOLLOW_IDLE_MS).
             void voice.start({ quiet: true, untilCancel: true })
-          }, 250)
+          }, 350)
         })
       }
       // The answer may have changed what the model should see next turn.
@@ -704,12 +700,89 @@ export function AskSheet({
     submitRef.current = submit
   })
 
+  // The latest answer shown — kept after it moves up into the conversation —
+  // so "desfaz isso" can press its Undo by voice (undo_last, review M9).
+  const lastAnswer = useRef<Answer | null>(null)
+  useEffect(() => {
+    if (answer) lastAnswer.current = answer
+  }, [answer])
+
+  /** The Undo behind an answer's button, or null (none, or already undone).
+   *  The answer views' Undo buttons and "desfaz isso" both run this. */
+  function undoOf(a: Answer): (() => Promise<void>) | null {
+    if (!('undone' in a) || a.undone) return null
+    switch (a.kind) {
+      case 'added':
+        if (!a.res.added.length) return null
+        return async () => {
+          await undoAdd(a.res.added.map((i) => i.id), a.res.createdStore ? a.res.store?.id : undefined)
+          invalidateCache('hub:shopping')
+        }
+      case 'marked':
+        if (!a.hits.length) return null
+        return async () => {
+          const ids = a.hits.map((i) => i.id)
+          if (a.mode === 'check') await uncheckItems(ids)
+          else await restoreItems(a.hits)
+          invalidateCache('hub:shopping')
+        }
+      case 'event':
+        return async () => {
+          await deleteEvent(a.ev.id)
+          invalidateCache('hub:today')
+        }
+      case 'moved':
+        return async () => {
+          await restoreEvent(a.before)
+          invalidateCache('hub:today')
+        }
+      case 'removedEvent':
+        return async () => {
+          await unremoveEvent(a.ev)
+          invalidateCache('hub:today')
+        }
+      case 'money':
+        return () => deleteEntry(a.res.entryId)
+      case 'action': {
+        const u = a.undo
+        if (!u) return null
+        return async () => {
+          await u.run()
+          invalidateCache('hub:today')
+          invalidateCache('hub:shopping')
+        }
+      }
+      default:
+        return null
+    }
+  }
+
+  /** Run an answer's Undo and show it undone (a failure says so). */
+  async function undoAnswer(a: Answer) {
+    const run = undoOf(a)
+    if (!run) return
+    try {
+      await run()
+      setAnswer({ ...a, undone: true } as Answer)
+    } catch {
+      setAnswer({ kind: 'error' })
+    }
+  }
+
   /** Carry one understood request out and say what happened. */
   async function act(intent: Intent | null, stores: ShoppingStore[]): Promise<Answer> {
     const me = profile ?? null
     switch (intent?.intent) {
       case undefined:
         return { kind: 'say', text: t('ask.unknown') }
+      case 'undo_last': {
+        // The previous answer's own Undo — shown again, undone.
+        const last = lastAnswer.current
+        const run = last ? undoOf(last) : null
+        if (!last || !run) return { kind: 'say', text: t('ask.nothingToUndo') }
+        await run()
+        return { ...last, undone: true } as Answer
+      }
       case 'unknown':
         return { kind: 'say', text: intent.reply || t('ask.unknown') }
       case 'add_items': {
@@ -765,6 +838,11 @@ export function AskSheet({
         // Several fit (two kids' dentists): ask which, as tappable rows.
         if (r.reason === 'ambiguous' && r.occs?.length) {
           return whichEvent(env, r.occs, (o) => moveAnswer(env, o, intent.newDate, intent.time), who)
+        }
+        // No day said: the coming weeks were searched (same words as remove).
+        if (!intent.date) {
+          const names = r.options.slice(0, 4).map((e) => `${e.title} (${whenLabel(e)})`).join(', ')
+          return { kind: 'say', text: r.reason === 'ambiguous' ? t('ask.removeWhich', { names }) : t('ask.removeNotFoundSoon', { title: intent.title }) }
         }
         const day = dayWords(intent.date)
         const names = r.options.slice(0, 4).map((e) => e.title).join(', ')
@@ -940,13 +1018,19 @@ export function AskSheet({
     reportGap: (intent, reason) => reportGap(intent, reason, lang),
   }
 
+  // A second tap on a choice row while the first is still running would run
+  // it twice (two moves, two deletions) — `busy` state lags a render behind.
+  const choosing = useRef(false)
   async function runChoice(run: () => Promise<ActionAnswer>) {
+    if (choosing.current) return
+    choosing.current = true
     setBusy(true)
     try {
       setAnswer(await run())
     } catch {
       setAnswer({ kind: 'error' })
     } finally {
+      choosing.current = false
       setBusy(false)
     }
   }
@@ -954,16 +1038,6 @@ export function AskSheet({
   async function rescope(a: AgendaAnswer, scope: Scope) {
     try {
       setAnswer({ kind: 'agenda', a: await agendaFor(a.date, a.end, a.label, scope, '', profile ?? null, profiles, today) })
-    } catch {
-      setAnswer({ kind: 'error' })
-    }
-  }
-
-  async function undo(res: AddResult) {
-    try {
-      await undoAdd(res.added.map((i) => i.id), res.createdStore ? res.store?.id : undefined)
-      invalidateCache('hub:shopping')
-      setAnswer({ kind: 'added', res, undone: true })
     } catch {
       setAnswer({ kind: 'error' })
     }
@@ -1196,7 +1270,7 @@ export function AskSheet({
               <AddedView
                 res={answer.res}
                 undone={answer.undone}
-                onUndo={() => undo(answer.res)}
+                onUndo={() => undoAnswer(answer)}
                 onOpen={() => go('/shopping')}
               />
             ) : answer?.kind === 'agenda' ? (
@@ -1235,13 +1309,7 @@ export function AskSheet({
                 hits={answer.hits}
                 missing={answer.missing}
                 undone={answer.undone}
-                onUndo={async () => {
-                  const ids = answer.hits.map((i) => i.id)
-                  if (answer.mode === 'check') await uncheckItems(ids)
-                  else await restoreItems(answer.hits)
-                  invalidateCache('hub:shopping')
-                  setAnswer({ ...answer, undone: true })
-                }}
+                onUndo={() => undoAnswer(answer)}
                 onOpen={() => go('/shopping')}
               />
             ) : answer?.kind === 'event' ? (
@@ -1250,11 +1318,7 @@ export function AskSheet({
                 when={whenLabel(answer.ev)}
                 who={answer.who}
                 undone={answer.undone}
-                onUndo={async () => {
-                  await deleteEvent(answer.ev.id)
-                  invalidateCache('hub:today')
-                  setAnswer({ ...answer, undone: true })
-                }}
+                onUndo={() => undoAnswer(answer)}
                 onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
               />
             ) : answer?.kind === 'moved' ? (
@@ -1264,11 +1328,7 @@ export function AskSheet({
                 when={whenLabel(answer.ev)}
                 who={null}
                 undone={answer.undone}
-                onUndo={async () => {
-                  await restoreEvent(answer.before)
-                  invalidateCache('hub:today')
-                  setAnswer({ ...answer, undone: true })
-                }}
+                onUndo={() => undoAnswer(answer)}
                 onOpen={() => go(`/calendar?date=${answer.undone ? answer.before.start_date : answer.ev.start_date}`)}
               />
             ) : answer?.kind === 'removedEvent' ? (
@@ -1278,11 +1338,7 @@ export function AskSheet({
                 when={whenLabel(answer.ev)}
                 who={null}
                 undone={answer.undone}
-                onUndo={async () => {
-                  await unremoveEvent(answer.ev)
-                  invalidateCache('hub:today')
-                  setAnswer({ ...answer, undone: true })
-                }}
+                onUndo={() => undoAnswer(answer)}
                 onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
               />
             ) : answer?.kind === 'money' ? (
@@ -1293,10 +1349,7 @@ export function AskSheet({
                 where={`${answer.res.budget.name} · ${periodLabel(answer.res.budget.period, answer.res.month.start_date)}`}
                 icon={answer.type === 'income' ? '💵' : categoryById(answer.res.category, [], []).icon}
                 undone={answer.undone}
-                onUndo={async () => {
-                  await deleteEntry(answer.res.entryId)
-                  setAnswer({ ...answer, undone: true })
-                }}
+                onUndo={() => undoAnswer(answer)}
                 onOpen={() => go(`/budget/${answer.res.budget.id}/${answer.res.month.id}`)}
               />
             ) : answer?.kind === 'summary' ? (
@@ -1326,12 +1379,7 @@ export function AskSheet({
                     ? {
                         label: t('ask.undo'),
                         undo: true,
-                        onPress: async () => {
-                          await answer.undo?.run()
-                          invalidateCache('hub:today')
-                          invalidateCache('hub:shopping')
-                          setAnswer({ ...answer, undone: true })
-                        },
+                        onPress: () => undoAnswer(answer),
                       }
                     : answer.choices?.[1]
                       ? { label: answer.choices[1].label, onPress: () => runChoice(answer.choices![1].run) }
@@ -1442,7 +1490,6 @@ export function AskSheet({
                   // moves up as context instead of vanishing under "listening".
                   commitTurn()
                   setFollow(false)
-                  setQuiet(false)
                   void voice.start()
                 }}
                 style={[s.send, { backgroundColor: c.action, borderBottomRightRadius: innerCurve }]}
