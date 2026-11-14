@@ -392,3 +392,72 @@ describe('routine questions naming several pets (owner report 2026-11)', () => {
     expect(petQuestion('como está a rotina da Lola e da Aninha hoje?', ['Lola', 'Aninha'])).toBe('Lola')
   })
 })
+
+import { pickOccurrence, type EventWho } from '@/lib/assistant'
+import { cutWrite, looksCut } from '@/lib/assistantGuard'
+import type { CalendarEvent } from '@/lib/types'
+
+describe('events tied to a person (owner report 2026-11)', () => {
+  const ev = (id: string, title: string, start: string, owner: string | null = null) => ({
+    event: { id, title, owner_email: owner, start_date: start, end_date: start } as CalendarEvent,
+    start,
+    end: start,
+  })
+  const ana: EventWho = { name: 'Ana', email: 'ana@x' }
+  const pedro: EventWho = { name: 'Pedro' } // a child without an account
+  const pool = [
+    ev('a', 'Dentista', '2026-11-10', 'ana@x'),
+    ev('n', 'Natação', '2026-11-11', 'leo@x'),
+    ev('p', 'Dentista Pedro', '2026-11-12', 'arthur@x'),
+    ev('n', 'Natação', '2026-11-18', 'leo@x'),
+  ]
+
+  it("two people's dentists and no one named: asks, never the first", () => {
+    const r = pickOccurrence(pool, 'dentista', false)
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.reason).toBe('ambiguous')
+    expect(!r.ok && r.options.map((o) => o.event.id)).toEqual(['a', 'p'])
+  })
+  it('the person named picks theirs — by owner, or by the name in the title', () => {
+    expect(pickOccurrence(pool, 'Dentista', false, pedro)).toMatchObject({ ok: true, occ: { event: { id: 'p' } } })
+    expect(pickOccurrence(pool, 'Dentista', false, ana)).toMatchObject({ ok: true, occ: { event: { id: 'a' } } })
+    // The model left the name in the title as well.
+    expect(pickOccurrence(pool, 'dentista do Pedro', false, pedro)).toMatchObject({ ok: true, occ: { event: { id: 'p' } } })
+  })
+  it('"dentista do Pedro" with no person slot never lands on Ana\'s', () => {
+    expect(pickOccurrence(pool, 'dentista do Pedro', false)).toMatchObject({ ok: true, occ: { event: { id: 'p' } } })
+  })
+  it('a person none of them belongs to: asks with what there is', () => {
+    const r = pickOccurrence(pool, 'dentista', false, { name: 'Sam', email: 'sam@x' })
+    expect(!r.ok && r.reason).toBe('ambiguous')
+  })
+  it('the occurrences of one series are not a question: the soonest', () => {
+    expect(pickOccurrence(pool, 'natação', false)).toMatchObject({ ok: true, occ: { start: '2026-11-11' } })
+  })
+  it('fromServer keeps whose event it is', () => {
+    expect(fromServer({ intent: 'move_event', title: 'Dentista', person: 'Pedro', date: TODAY, new_date: '2026-11-06' }, TODAY)).toMatchObject({ person: 'Pedro' })
+    expect(fromServer({ intent: 'remove_event', title: 'Consulta', person: 'Ana', date: '' }, TODAY)).toMatchObject({ person: 'Ana' })
+    expect(fromServer({ intent: 'move_event', title: 'Dentista', person: '', date: TODAY, new_date: '2026-11-06' }, TODAY)).not.toHaveProperty('person')
+  })
+})
+
+describe('pets: routine and overdue views', () => {
+  it('pet_view comes through on pets_due', () => {
+    expect(fromServer({ intent: 'pets_due', pet: 'Lola', pet_view: 'routine' }, TODAY)).toEqual({ intent: 'pets_due', pet: 'Lola', view: 'routine' })
+    expect(fromServer({ intent: 'pets_due', pet: '', pet_view: 'overdue' }, TODAY)).toEqual({ intent: 'pets_due', pet: '', view: 'overdue' })
+    expect(fromServer({ intent: 'pets_due', pet: '', pet_view: 'due' }, TODAY)).toEqual({ intent: 'pets_due', pet: '' })
+  })
+})
+
+describe('a request cut off mid-phrase never writes (owner report 2026-11)', () => {
+  it.each(['marca uma consulta da', 'add milk to the', 'muda o dentista para', 'põe leite e', 'cancela la cita de'])('%s', (text) => {
+    expect(looksCut(text)).toBe(true)
+  })
+  it.each(['marca uma consulta da Aninha hoje', 'a Lola tomou vacina hoje', 'add milk', 'o que falta para os pets hoje?'])('%s is whole', (text) => {
+    expect(looksCut(text)).toBe(false)
+  })
+  it('only writes are stopped', () => {
+    expect(cutWrite('add_event', 'marca uma consulta da')).toBe(true)
+    expect(cutWrite('pets_due', 'o que falta para a')).toBe(false)
+  })
+})

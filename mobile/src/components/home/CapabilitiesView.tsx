@@ -35,9 +35,9 @@ import { APP_GRADIENT } from './palette'
 const k = (area: string, ns: number[]) => ns.map((n) => `roofEx.${area}.${n}` as TKey)
 const AREAS: { app: string; icon: LucideIcon; ex: TKey[]; more: TKey[] }[] = [
   { app: 'shopping', icon: ListChecks, ex: k('shop', [1, 3]), more: k('shop', [5, 6, 7, 2, 4]) },
-  { app: 'calendar', icon: CalendarDays, ex: k('cal', [2, 1]), more: k('cal', [5, 6, 3, 7, 8, 4]) },
+  { app: 'calendar', icon: CalendarDays, ex: k('cal', [2, 1]), more: k('cal', [5, 6, 3, 9, 7, 10, 8, 4]) },
   { app: 'budget', icon: Wallet, ex: k('money', [1, 2]), more: k('money', [6, 5, 7, 3, 8, 4]) },
-  { app: 'pets', icon: PawPrint, ex: k('pets', [1, 3]), more: k('pets', [4, 2, 5, 6]) },
+  { app: 'pets', icon: PawPrint, ex: k('pets', [1, 3]), more: k('pets', [7, 8, 4, 2, 10, 9, 5, 6]) },
   { app: 'family', icon: Users, ex: k('family', [2, 1]), more: k('family', [4, 3, 6, 5]) },
   { app: 'pings', icon: Bell, ex: k('nudge', [1, 3]), more: k('nudge', [2, 5, 4]) },
   { app: 'docs', icon: FolderLock, ex: k('docs', [2]), more: k('docs', [1, 3, 4]) },

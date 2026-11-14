@@ -645,7 +645,7 @@ export default function PetCare() {
       ) : (
         <>
           <PhotoHero
-            extra={<RoofExamples variant="pill" examples={['roofEx.pets.1', 'roofEx.pets.2', 'roofEx.pets.3']} />}
+            extra={<RoofExamples variant="pill" examples={['roofEx.pets.7', 'roofEx.pets.8', 'roofEx.pets.10', 'roofEx.pets.9', 'roofEx.pets.3']} />}
             items={heroItems}
             selectedId={selectedPet}
             collapse={collapse}

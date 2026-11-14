@@ -20,11 +20,13 @@
     ],
     "pets": [
       "Lola",
-      "Chloe"
+      "Chloe",
+      "Aninha"
     ],
     "petTasks": [
       "Lola: Comida, Passeio, Remédio",
-      "Chloe: Comida, Escovar"
+      "Chloe: Comida, Escovar",
+      "Aninha: Comida, Passeio"
     ],
     "categories": [
       "groceries = Mercado",
@@ -57,6 +59,11 @@
       "Insurance card (motorcycle) - back",
       "Car insurance - 2026/2027",
       "Passaporte do Léo"
+    ],
+    "petKinds": [
+      "Lola = dog",
+      "Chloe = cat",
+      "Aninha = dog"
     ]
   },
   "cases": [
@@ -723,6 +730,332 @@
       "expect": {
         "intent": "app_help",
         "topic": "quiz"
+      }
+    },
+    {
+      "text": "muda o dentista do Pedro para sexta",
+      "context": {
+        "members": [
+          "Arthur Munhoz",
+          "Ana Munhoz",
+          "Léo Munhoz",
+          "Sam Munhoz"
+        ],
+        "events": [
+          "v1 = Dentista · 2026-11-12 15:00 · Léo",
+          "v2 = Dentista Pedro · 2026-11-13 09:00 · Arthur",
+          "v3 = Dentista · 2026-11-11 10:00 · Sam",
+          "v4 = Consulta · 2026-11-10 10:00 · Ana",
+          "v5 = Consulta · 2026-11-10 16:00 · Léo",
+          "v6 = Natação · 2026-11-10 18:00 · Léo"
+        ]
+      },
+      "expect": {
+        "intent": "move_event",
+        "person": "Pedro",
+        "new_date": "2026-11-13"
+      }
+    },
+    {
+      "text": "move Sam's dentist to Friday",
+      "context": {
+        "members": [
+          "Arthur Munhoz",
+          "Ana Munhoz",
+          "Léo Munhoz",
+          "Sam Munhoz"
+        ],
+        "events": [
+          "v1 = Dentista · 2026-11-12 15:00 · Léo",
+          "v2 = Dentista Pedro · 2026-11-13 09:00 · Arthur",
+          "v3 = Dentista · 2026-11-11 10:00 · Sam",
+          "v4 = Consulta · 2026-11-10 10:00 · Ana",
+          "v5 = Consulta · 2026-11-10 16:00 · Léo",
+          "v6 = Natação · 2026-11-10 18:00 · Léo"
+        ]
+      },
+      "expect": {
+        "intent": "move_event",
+        "person": {
+          "anyOf": [
+            "Sam",
+            "Sam Munhoz"
+          ]
+        },
+        "new_date": "2026-11-13"
+      }
+    },
+    {
+      "text": "cancela a consulta da Ana amanhã",
+      "context": {
+        "members": [
+          "Arthur Munhoz",
+          "Ana Munhoz",
+          "Léo Munhoz",
+          "Sam Munhoz"
+        ],
+        "events": [
+          "v1 = Dentista · 2026-11-12 15:00 · Léo",
+          "v2 = Dentista Pedro · 2026-11-13 09:00 · Arthur",
+          "v3 = Dentista · 2026-11-11 10:00 · Sam",
+          "v4 = Consulta · 2026-11-10 10:00 · Ana",
+          "v5 = Consulta · 2026-11-10 16:00 · Léo",
+          "v6 = Natação · 2026-11-10 18:00 · Léo"
+        ]
+      },
+      "expect": {
+        "intent": "remove_event",
+        "person": {
+          "anyOf": [
+            "Ana",
+            "Ana Munhoz"
+          ]
+        },
+        "date": "2026-11-10"
+      }
+    },
+    {
+      "text": "muda o dentista para sexta",
+      "context": {
+        "members": [
+          "Arthur Munhoz",
+          "Ana Munhoz",
+          "Léo Munhoz",
+          "Sam Munhoz"
+        ],
+        "events": [
+          "v1 = Dentista · 2026-11-12 15:00 · Léo",
+          "v2 = Dentista Pedro · 2026-11-13 09:00 · Arthur",
+          "v3 = Dentista · 2026-11-11 10:00 · Sam",
+          "v4 = Consulta · 2026-11-10 10:00 · Ana",
+          "v5 = Consulta · 2026-11-10 16:00 · Léo",
+          "v6 = Natação · 2026-11-10 18:00 · Léo"
+        ]
+      },
+      "expect": {
+        "intent": "move_event",
+        "ref": "",
+        "new_date": "2026-11-13"
+      }
+    },
+    {
+      "text": "cancela la cita de Léo mañana",
+      "context": {
+        "members": [
+          "Arthur Munhoz",
+          "Ana Munhoz",
+          "Léo Munhoz",
+          "Sam Munhoz"
+        ],
+        "events": [
+          "v1 = Dentista · 2026-11-12 15:00 · Léo",
+          "v2 = Dentista Pedro · 2026-11-13 09:00 · Arthur",
+          "v3 = Dentista · 2026-11-11 10:00 · Sam",
+          "v4 = Consulta · 2026-11-10 10:00 · Ana",
+          "v5 = Consulta · 2026-11-10 16:00 · Léo",
+          "v6 = Natação · 2026-11-10 18:00 · Léo"
+        ]
+      },
+      "expect": {
+        "intent": "remove_event",
+        "person": {
+          "anyOf": [
+            "Léo",
+            "Léo Munhoz"
+          ]
+        }
+      }
+    },
+    {
+      "text": "muda o dentista do",
+      "context": {
+        "members": [
+          "Arthur Munhoz",
+          "Ana Munhoz",
+          "Léo Munhoz",
+          "Sam Munhoz"
+        ],
+        "events": [
+          "v1 = Dentista · 2026-11-12 15:00 · Léo",
+          "v2 = Dentista Pedro · 2026-11-13 09:00 · Arthur",
+          "v3 = Dentista · 2026-11-11 10:00 · Sam",
+          "v4 = Consulta · 2026-11-10 10:00 · Ana",
+          "v5 = Consulta · 2026-11-10 16:00 · Léo",
+          "v6 = Natação · 2026-11-10 18:00 · Léo"
+        ]
+      },
+      "safe": true,
+      "expect": {}
+    },
+    {
+      "text": "marca uma consulta da Aninha para hoje",
+      "expect": {
+        "intent": "pet_log",
+        "pet": "Aninha",
+        "pet_event_type": "vet",
+        "date": "2026-11-09"
+      }
+    },
+    {
+      "text": "registra uma consulta da Aninha hoje",
+      "expect": {
+        "intent": "pet_log",
+        "pet": "Aninha",
+        "pet_event_type": "vet",
+        "date": "2026-11-09"
+      }
+    },
+    {
+      "text": "a Lola tomou vacina hoje",
+      "expect": {
+        "intent": "pet_log",
+        "pet": "Lola",
+        "pet_event_type": "vaccine",
+        "date": "2026-11-09"
+      }
+    },
+    {
+      "text": "a Aninha tomou o vermífugo ontem",
+      "expect": {
+        "intent": "pet_log",
+        "pet": "Aninha",
+        "pet_event_type": "medication",
+        "date": "2026-11-08"
+      }
+    },
+    {
+      "text": "Chloe saw the vet today",
+      "expect": {
+        "intent": "pet_log",
+        "pet": "Chloe",
+        "pet_event_type": "vet",
+        "date": "2026-11-09"
+      }
+    },
+    {
+      "text": "Lola recibió la vacuna hoy",
+      "expect": {
+        "intent": "pet_log",
+        "pet": "Lola",
+        "pet_event_type": "vaccine"
+      }
+    },
+    {
+      "text": "agenda o veterinário da Lola sexta às 10",
+      "expect": {
+        "intent": "add_event",
+        "date": "2026-11-13",
+        "time": "10:00"
+      }
+    },
+    {
+      "text": "marca uma consulta da",
+      "safe": true,
+      "expect": {}
+    },
+    {
+      "text": "quais são as rotinas da Lola",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Lola",
+        "pet_view": "routine"
+      }
+    },
+    {
+      "text": "quais são as rotinas da Aninha?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Aninha",
+        "pet_view": "routine"
+      }
+    },
+    {
+      "text": "what is Chloe's routine?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Chloe",
+        "pet_view": "routine"
+      }
+    },
+    {
+      "text": "o que falta para a Lola hoje",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Lola",
+        "pet_view": "due"
+      }
+    },
+    {
+      "text": "o que falta para os pets hoje",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "",
+        "pet_view": "due"
+      }
+    },
+    {
+      "text": "algum cuidado atrasado?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "",
+        "pet_view": "overdue"
+      }
+    },
+    {
+      "text": "tem algo atrasado das cachorras?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": {
+          "anyOf": [
+            "Lola, Aninha",
+            "Aninha, Lola"
+          ]
+        },
+        "pet_view": "overdue"
+      }
+    },
+    {
+      "text": "any overdue care for the dogs?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": {
+          "anyOf": [
+            "Lola, Aninha",
+            "Aninha, Lola"
+          ]
+        },
+        "pet_view": "overdue"
+      }
+    },
+    {
+      "text": "quais os próximos cuidados das cachorras",
+      "expect": {
+        "intent": "pet_next",
+        "pet": {
+          "anyOf": [
+            "Lola, Aninha",
+            "Aninha, Lola"
+          ]
+        }
+      }
+    },
+    {
+      "text": "quais os próximos cuidados dos pets",
+      "expect": {
+        "intent": "pet_next",
+        "pet": ""
+      }
+    },
+    {
+      "text": "¿cuáles son los próximos cuidados de los perros?",
+      "expect": {
+        "intent": "pet_next",
+        "pet": {
+          "anyOf": [
+            "Lola, Aninha",
+            "Aninha, Lola"
+          ]
+        }
       }
     }
   ]

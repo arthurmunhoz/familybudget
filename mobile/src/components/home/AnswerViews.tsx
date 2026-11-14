@@ -88,6 +88,8 @@ export interface ActionRowData {
   sub?: string
   /** Highlighted (e.g. the cheaper option). */
   strong?: boolean
+  /** A tappable option ("which one?"): the row is a button with a chevron. */
+  onPress?: () => void
 }
 
 /** The shape every newer action shares (components/home/askActions.ts): the
@@ -112,20 +114,38 @@ export function ActionView({
       <Headline text={headline} sub={sub} />
       {rows.length ? (
         <Panel>
-          {rows.map((r, i) => (
-            <View key={i} style={v.item}>
-              {r.emoji ? (
-                <View style={[v.tile, { backgroundColor: r.strong ? c.income + '22' : c.accentSoft }]}>
-                  <Txt style={{ fontSize: 19 }}>{r.emoji}</Txt>
+          {rows.map((r, i) => {
+            const body = (
+              <>
+                {r.emoji ? (
+                  <View style={[v.tile, { backgroundColor: r.strong ? c.income + '22' : c.accentSoft }]}>
+                    <Txt style={{ fontSize: 19 }}>{r.emoji}</Txt>
+                  </View>
+                ) : null}
+                <View style={{ flex: 1 }}>
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }}>{r.title}</Txt>
+                  {r.sub ? <Txt variant="muted">{r.sub}</Txt> : null}
                 </View>
-              ) : null}
-              <View style={{ flex: 1 }}>
-                <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }}>{r.title}</Txt>
-                {r.sub ? <Txt variant="muted">{r.sub}</Txt> : null}
+                {r.strong ? <Check size={20} color={c.income} strokeWidth={3} /> : null}
+                {r.onPress ? <ChevronRight size={20} color={c.textMuted} /> : null}
+              </>
+            )
+            return r.onPress ? (
+              <Pressable
+                key={i}
+                onPress={r.onPress}
+                accessibilityRole="button"
+                accessibilityLabel={[r.title, r.sub].filter(Boolean).join(', ')}
+                style={({ pressed }) => [v.item, { opacity: pressed ? 0.6 : 1 }]}
+              >
+                {body}
+              </Pressable>
+            ) : (
+              <View key={i} style={v.item}>
+                {body}
               </View>
-              {r.strong ? <Check size={20} color={c.income} strokeWidth={3} /> : null}
-            </View>
-          ))}
+            )
+          })}
         </Panel>
       ) : null}
       {quiet || main ? (
@@ -701,8 +721,18 @@ export function PetsView({
   // Several pets asked about ("Lola, Aninha"): the all-pets headline, and
   // each row says whose it is.
   const several = pet.includes(',')
+  // Every pet (or several) with something left: one section per pet, in the
+  // household's order (petsDue sorts by it) — owner, 2026-11.
+  const petOrder = [...new Set(rows.map((r) => r.pet).filter(Boolean))]
+  const byPet = (!pet || several) && petOrder.length > 1
+  // Only what's late was asked ("algum cuidado atrasado?").
+  const overdueOnly = p.view === 'overdue'
   // The headline follows what's still to do as items get ticked here.
-  const head = pet && !several
+  const head = overdueOnly
+    ? late
+      ? t('ask.petsLateN', { n: late })
+      : t('ask.petsLateNone')
+    : pet && !several
     ? nextUp
       ? t('ask.petsNext', { pet, title: nextUp.title })
       : routineTotal
@@ -716,7 +746,7 @@ export function PetsView({
   const sub =
     [
       pet && routineTotal ? t('ask.petProgress', { done: routineDone + tickedNow, total: routineTotal }) : '',
-      late ? t('ask.petsCareLate', { n: late }) : '',
+      late && !overdueOnly ? t('ask.petsCareLate', { n: late }) : '',
     ]
       .filter(Boolean)
       .join(' · ') || null
@@ -741,7 +771,7 @@ export function PetsView({
         </View>
         <View style={{ flex: 1 }}>
           <Txt style={{ fontFamily: fonts.semibold, fontSize: 15.5, textDecorationLine: done ? 'line-through' : 'none' }}>{r.title}</Txt>
-          {r.pet && (!pet || several) ? <Txt variant="muted">{r.pet}</Txt> : null}
+          {r.pet && (!pet || several) && !byPet ? <Txt variant="muted">{r.pet}</Txt> : null}
         </View>
         {isRoutine && onToggle ? (
           // the same big round tick as Pet Care's Today card
@@ -779,8 +809,9 @@ export function PetsView({
       <Headline text={head} sub={sub} />
       {rows.length ? (
         <Panel>
-          {section(t('ask.petRoutineHead'), routine)}
-          {section(t('ask.petCareHead'), care)}
+          {byPet
+            ? petOrder.map((name) => section(name, rows.filter((r) => r.pet === name)))
+            : [section(t('ask.petRoutineHead'), routine), section(t('ask.petCareHead'), care)]}
         </Panel>
       ) : null}
       <Actions main={{ label: t('ask.openPets'), onPress: onOpen }} />

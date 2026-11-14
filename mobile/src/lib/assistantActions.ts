@@ -18,6 +18,7 @@ import { fetchPlaces, placeAt } from './places'
 import { fetchActivePings } from './pings'
 import { loadHomeLocation } from './weather'
 import { notifyPetCareChange } from './petCareNotify'
+import { routineOrder, taskTime } from './petCare'
 import type {
   Budget,
   CalendarEvent,
@@ -331,25 +332,108 @@ export interface PetNextRow {
   type: PetEventType
   due: string
   last: string
+  /** An interval routine (bath every 7 days), not a logged event. */
+  every?: number
 }
 
-/** When each kind of care is next due: the LATEST event per pet+title that
- *  has a next due date, soonest first. */
+/** The pets named — one, several ("Lola, Aninha") — or every pet for "". */
+function petsNamed(pets: PetLite[], petName: string): PetLite[] {
+  const said = petName.split(',').map((x) => x.trim()).filter(Boolean)
+  if (!said.length) return pets
+  const hit = said.map((n) => findPet(pets, n)).filter((p): p is PetLite => !!p)
+  return pets.filter((p) => hit.some((h) => h.id === p.id))
+}
+
+/** When each kind of care is next due, soonest first: the LATEST event per
+ *  pet+title that has a next due date, and — when no type was asked — each
+ *  interval routine done at least once (last done + its interval), for the
+ *  pet(s) named or every pet. `pet` is "" when none matched a name said. */
 export async function petNextDue(petName: string, type: PetEventType | ''): Promise<{ rows: PetNextRow[]; pet: string }> {
-  const [{ pets }, { data }] = await Promise.all([petsAndTasks(), supabase.from('pet_events').select('*').order('event_date', { ascending: false })])
-  const pet = petName ? findPet(pets, petName) : null
+  const [{ pets, tasks }, { data }] = await Promise.all([petsAndTasks(), supabase.from('pet_events').select('*').order('event_date', { ascending: false })])
+  const chosen = petsNamed(pets, petName)
+  const ids = new Set(chosen.map((p) => p.id))
+  const nameOf = (id: string) => pets.find((p) => p.id === id)?.name ?? ''
   const latest = new Map<string, PetEvent>()
   for (const e of (data ?? []) as PetEvent[]) {
-    if (pet && e.pet_id !== pet.id) continue
+    if (!ids.has(e.pet_id)) continue
     if (type && e.type !== type) continue
     const key = `${e.pet_id}:${norm(e.title)}`
     if (!latest.has(key)) latest.set(key, e)
   }
-  const rows = [...latest.values()]
+  const rows: PetNextRow[] = [...latest.values()]
     .filter((e) => !!e.next_due)
-    .map((e) => ({ pet: pets.find((p) => p.id === e.pet_id)?.name ?? '', title: e.title, type: e.type, due: e.next_due!, last: e.event_date }))
-    .sort((a, b) => a.due.localeCompare(b.due))
-  return { rows, pet: pet?.name ?? '' }
+    .map((e) => ({ pet: nameOf(e.pet_id), title: e.title, type: e.type, due: e.next_due!, last: e.event_date }))
+  if (!type) {
+    const routines = tasks.filter((t) => t.kind === 'interval' && ids.has(t.pet_id) && (t.interval_days ?? 0) > 0)
+    if (routines.length) {
+      const { data: done } = await supabase
+        .from('pet_task_done')
+        .select('task_id, done_on')
+        .in('task_id', routines.map((t) => t.id))
+        .order('done_on', { ascending: false })
+      const last = new Map<string, string>()
+      for (const d of (done ?? []) as { task_id: string; done_on: string }[]) if (!last.has(d.task_id)) last.set(d.task_id, d.done_on)
+      for (const t of routines) {
+        const at = last.get(t.id)
+        // Never done: no date to count from (the screen asks for a first log).
+        if (!at) continue
+        // The same name already comes from an event: the one due sooner stays.
+        const due = addDaysIso(at, t.interval_days ?? 0)
+        const twin = rows.findIndex((r) => r.pet === nameOf(t.pet_id) && norm(r.title) === norm(t.title))
+        if (twin >= 0) {
+          if (due < rows[twin].due) rows[twin] = { ...rows[twin], due, last: at, every: t.interval_days ?? undefined }
+          continue
+        }
+        rows.push({ pet: nameOf(t.pet_id), title: t.title, type: 'other', due, last: at, every: t.interval_days ?? undefined })
+      }
+    }
+  }
+  rows.sort((a, b) => a.due.localeCompare(b.due))
+  const named = petName.trim() ? chosen.map((p) => p.name).join(', ') : ''
+  return { rows, pet: named }
+}
+
+function addDaysIso(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d + n))
+  return dt.toISOString().slice(0, 10)
+}
+
+export interface PetRoutine {
+  pet: string
+  daily: { task: PetCareTask; time: string | null; done: boolean }[]
+  interval: { task: PetCareTask; last: string | null; due: string | null }[]
+}
+
+/** Each pet's whole routine ("quais são as rotinas da Lola?"): the daily items
+ *  in the day's order with their time and today's tick, then the interval
+ *  routines with when they were last done and are next due. */
+export async function petRoutine(petName: string, today: string): Promise<PetRoutine[]> {
+  const { pets, tasks } = await petsAndTasks()
+  const chosen = petsNamed(pets, petName)
+  const mine = tasks.filter((t) => chosen.some((p) => p.id === t.pet_id))
+  const { data: done } = mine.length
+    ? await supabase.from('pet_task_done').select('task_id, done_on').in('task_id', mine.map((t) => t.id)).order('done_on', { ascending: false })
+    : { data: [] }
+  const rows = (done ?? []) as { task_id: string; done_on: string }[]
+  const last = new Map<string, string>()
+  for (const d of rows) if (!last.has(d.task_id)) last.set(d.task_id, d.done_on)
+  return chosen
+    .map((p) => ({
+      pet: p.name,
+      daily: mine
+        .filter((t) => t.pet_id === p.id && t.kind === 'daily')
+        .sort(routineOrder)
+        .map((task) => ({ task, time: taskTime(task), done: rows.some((d) => d.task_id === task.id && d.done_on === today) })),
+      interval: mine
+        .filter((t) => t.pet_id === p.id && t.kind === 'interval')
+        .map((task) => {
+          const at = last.get(task.id) ?? null
+          return { task, last: at, due: at && task.interval_days ? addDaysIso(at, task.interval_days) : null }
+        })
+        .sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999')),
+    }))
+    .filter((r) => r.daily.length || r.interval.length)
 }
 
 export type WeightResult = { ok: true; id: string; pet: string; previous: number | null } | { ok: false }

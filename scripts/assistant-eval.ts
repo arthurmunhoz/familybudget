@@ -9,11 +9,18 @@
 // latency per schema variant. Cost: ~60 Haiku calls, a fraction of a cent.
 import { readFileSync } from 'node:fs'
 import { parseAssistant, type SchemaVariant } from '../api/suggest-ping'
+import { cutWrite, WRITE_INTENTS } from '../mobile/src/lib/assistantGuard'
 
 interface Case {
   text: string
   history?: { q: string; a: string }[]
+  /** Overrides on the household fixture for this case (e.g. two dentists). */
+  context?: Record<string, unknown>
+  /** A value, or {anyOf: [...]} for answers that are equally right. */
   expect: Record<string, unknown>
+  /** A cut-off / partial request: passes only when the APP would not write
+   *  (the server answered a read, or the app's cut-off guard stops it). */
+  safe?: boolean
 }
 const suite = JSON.parse(readFileSync(new URL('./assistant-eval.json', import.meta.url), 'utf8')) as {
   context: Record<string, unknown>
@@ -22,6 +29,9 @@ const suite = JSON.parse(readFileSync(new URL('./assistant-eval.json', import.me
 
 const norm = (v: unknown) => (typeof v === 'string' ? v.trim().toLowerCase() : v)
 function same(got: unknown, want: unknown): boolean {
+  if (want && typeof want === 'object' && !Array.isArray(want) && Array.isArray((want as { anyOf?: unknown[] }).anyOf)) {
+    return (want as { anyOf: unknown[] }).anyOf.some((w) => same(got, w))
+  }
   if (Array.isArray(want)) {
     if (!Array.isArray(got) || got.length !== want.length) return false
     const g = got.map(norm).sort()
@@ -44,10 +54,11 @@ async function run(variant: SchemaVariant) {
       const { c, i } = next
       const t0 = Date.now()
       try {
-        const { out, usage } = await parseAssistant({ ...suite.context, text: c.text, history: c.history ?? [] }, variant)
+        const { out, usage } = await parseAssistant({ ...suite.context, ...(c.context ?? {}), text: c.text, history: c.history ?? [] }, variant)
         ms += Date.now() - t0
         outTokens += usage?.output_tokens ?? 0
         const wrong = Object.entries(c.expect).filter(([k, v]) => !same(out[k], v))
+        if (c.safe && WRITE_INTENTS.has(out.intent) && !cutWrite(out.intent, c.text)) wrong.push(['safe', `no write, not ${out.intent}`])
         results[i] = wrong.length
           ? { ok: false, line: `✗ "${c.text}"\n    ${wrong.map(([k, v]) => `${k}: want ${JSON.stringify(v)}, got ${JSON.stringify(out[k])}`).join('\n    ')}` }
           : { ok: true, line: '' }
