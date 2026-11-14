@@ -5,9 +5,9 @@
 // confirmation card (✓, the sentence, Desfazer / Ver) that fades after ~8 s.
 // After answering a spoken request it keeps listening, like the phone.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowUp, Eye, Keyboard, Mic, MicOff, SendHorizontal, Undo2, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronRight, Eye, Keyboard, Mic, MicOff, SendHorizontal, Undo2, X } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
-import { act, localClose, localOpen, summarize, understand, type AskEnv, type OpenTarget, type Outcome, type PanelId, type Tone } from './assistant'
+import { act, localClose, localOpen, summarize, understand, type AnswerRow, type AskEnv, type Done, type OpenTarget, type Outcome, type Tone } from './assistant'
 import type { HubData } from './data'
 import { chime, speak, stopSpeaking, tick } from './sound'
 import { CheckMark, Grow, Orb, PlusTag, type GrowHandle } from './ui'
@@ -19,6 +19,12 @@ import { GRAD, grad, lsGet, lsSet } from './util'
 const WAKE_KEY = 'casa.wake'
 const GREEN = '#3f8f6a'
 const ANSWER_MS = 8000
+/** A longer read (many rows) or something to tap (which one? / send?). */
+function answerMs(o: Done | { kind: 'bye'; text: string }): number {
+  if (o.kind !== 'done') return ANSWER_MS
+  if (o.choices?.length || o.rows?.some((r) => r.pick)) return 30_000
+  return (o.rows?.length ?? 0) > 3 ? 15_000 : ANSWER_MS
+}
 
 const TONE: Record<Tone, readonly string[]> = {
   lists: GRAD.lists,
@@ -27,13 +33,18 @@ const TONE: Record<Tone, readonly string[]> = {
   pets: GRAD.pet,
   money: GRAD.money,
   orb: ['#7B5CF0', '#169C8C'],
+  birthday: GRAD.birthday,
+  family: GRAD.family,
+  nudge: GRAD.nudge,
+  weather: GRAD.weather,
+  calc: GRAD.calc,
 }
 
 type Stage =
   | { k: 'listen' }
   | { k: 'type' }
   | { k: 'think'; q: string }
-  | { k: 'answer'; o: Extract<Outcome, { kind: 'done' }> | { kind: 'bye'; text: string }; follow: boolean }
+  | { k: 'answer'; o: Done | { kind: 'bye'; text: string }; follow: boolean }
   | { k: 'pick'; o: Extract<Outcome, { kind: 'pick' }> }
   | { k: 'undone' }
   | { k: 'caps' }
@@ -129,13 +140,23 @@ export default function Roof({
 
   // ── answering ──────────────────────────────────────────────────────────────
 
+  /** "What can you do?" — the capabilities screen, right here. */
+  const showCaps = async () => {
+    clearTimer()
+    setStage({ k: 'caps' })
+    if (viaVoice.current) {
+      earsRef.current?.pause()
+      await speak(t('casa.roof.capsSay'), lang)
+      if (openRef.current && supported && full) earsRef.current?.capture()
+    }
+  }
+
   const show = useCallback(
     async (o: Outcome, q: string) => {
       if (!openRef.current) return
       history.current = [...history.current, { q, a: summarize(o) }].slice(-6)
-      if (o.kind === 'pin') {
-        await close()
-        onOpenPanel('money')
+      if (o.kind === 'caps') {
+        await showCaps()
         return
       }
       if (o.kind === 'open') {
@@ -168,8 +189,9 @@ export default function Roof({
         }
       }
       clearTimer()
-      timer.current = setTimeout(() => void close(), o.kind === 'bye' ? 1800 : ANSWER_MS)
+      timer.current = setTimeout(() => void close(), o.kind === 'bye' ? 1800 : answerMs(o))
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [close, lang, onOpenPanel, supported, full],
   )
 
@@ -184,12 +206,7 @@ export default function Roof({
       // "What can you do?" — the capabilities screen, right here (nothing spent).
       if (isCapabilitiesAsk(q)) {
         history.current = [...history.current, { q, a: 'capabilities' }].slice(-6)
-        setStage({ k: 'caps' })
-        if (viaVoice.current) {
-          earsRef.current?.pause()
-          await speak(t('casa.roof.capsSay'), lang)
-          if (openRef.current && supported && full) earsRef.current?.capture()
-        }
+        await showCaps()
         return
       }
       if (localClose(q)) {
@@ -212,7 +229,7 @@ export default function Roof({
         o = { kind: 'done', tone: 'orb', title: msg, speak: msg, check: false }
       } else {
         try {
-          o = await act(env, u.raw, full)
+          o = await act(env, u.intent, full)
         } catch {
           o = { kind: 'done', tone: 'orb', title: t('casa.roof.failed'), speak: t('casa.roof.failed'), check: false }
         }
@@ -338,7 +355,7 @@ export default function Roof({
     void ask(q)
   }
 
-  async function undo(o: Extract<Outcome, { kind: 'done' }>) {
+  async function undo(o: Done) {
     clearTimer()
     stopSpeaking()
     earsRef.current?.pause()
@@ -351,7 +368,7 @@ export default function Roof({
     timer.current = setTimeout(() => void close(), 2200)
   }
 
-  async function view(id: PanelId) {
+  async function view(id: OpenTarget) {
     await close()
     onOpenPanel(id)
   }
@@ -463,7 +480,20 @@ export default function Roof({
                 await show({ kind: 'done', tone: 'orb', title: t('casa.roof.failed'), speak: t('casa.roof.failed'), check: false }, '')
               }
             }}
+            onRun={async (label, run) => {
+              // A tapped row ("which one?") or choice ("Send", "the whole series").
+              tick()
+              clearTimer()
+              stopSpeaking()
+              setStage({ k: 'think', q: label })
+              try {
+                await show(await run(), label)
+              } catch {
+                await show({ kind: 'done', tone: 'orb', title: t('casa.roof.failed'), speak: t('casa.roof.failed'), check: false }, label)
+              }
+            }}
             canListen={supported && ears !== 'denied'}
+            otherName={(data.members.find((m) => m.email !== me.email) ?? data.members[0])?.first || 'Ana'}
           />
         </Grow>
       ) : null}
@@ -485,7 +515,9 @@ function RoofStage({
   onUndo,
   onView,
   onPick,
+  onRun,
   canListen,
+  otherName,
 }: {
   stage: Stage
   tip: Tip
@@ -497,10 +529,13 @@ function RoofStage({
   onSubmit: () => void
   onListen: () => void
   onClose: () => void
-  onUndo: (o: Extract<Outcome, { kind: 'done' }>) => void
-  onView: (id: PanelId) => void
+  onUndo: (o: Done) => void
+  onView: (id: OpenTarget) => void
   onPick: (o: Extract<Outcome, { kind: 'pick' }>, id: string) => void
+  onRun: (label: string, run: () => Promise<Outcome>) => void
   canListen: boolean
+  /** Another member's first name for the "{name}" examples. */
+  otherName: string
 }) {
   const { t } = useI18n()
   const listening = stage.k === 'listen' || (stage.k === 'answer' && stage.follow)
@@ -568,7 +603,7 @@ function RoofStage({
             </span>
           </div>
         ) : stage.k === 'caps' ? (
-          <Capabilities onTry={onTry} />
+          <Capabilities onTry={onTry} name={otherName} />
         ) : stage.k === 'pick' ? (
           <WhoPicker dark question={stage.o.question} options={stage.o.options} onPick={(id) => onPick(stage.o, id)} onTimeout={onClose} />
         ) : stage.k === 'undone' ? (
@@ -584,6 +619,7 @@ function RoofStage({
             follow={stage.follow}
             onUndo={onUndo}
             onView={onView}
+            onRun={onRun}
           />
         )}
         </div>
@@ -603,7 +639,11 @@ function RoofStage({
               ref={input}
               value={text}
               onFocus={onType}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                // Typing after an answer keeps Roof open (stops the close timer).
+                if (!text) onType()
+                setText(e.target.value)
+              }}
               placeholder={t('casa.roof.typePlaceholder')}
               className="h-14 w-full rounded-[22px] border border-white/10 bg-white/8 pr-5 pl-14 sm:h-16 text-[1.3rem] text-white placeholder:text-white/40 outline-none focus:border-white/30"
               style={{ fontSize: '1.3rem' }}
@@ -640,39 +680,86 @@ function AnswerCard({
   follow,
   onUndo,
   onView,
+  onRun,
 }: {
-  o: Extract<Outcome, { kind: 'done' }> | { kind: 'bye'; text: string }
+  o: Done | { kind: 'bye'; text: string }
   follow: boolean
-  onUndo: (o: Extract<Outcome, { kind: 'done' }>) => void
-  onView: (id: PanelId) => void
+  onUndo: (o: Done) => void
+  onView: (id: OpenTarget) => void
+  onRun: (label: string, run: () => Promise<Outcome>) => void
 }) {
   const { t } = useI18n()
   const done = o.kind === 'done' ? o : null
   const g = TONE[done?.tone ?? 'orb']
   const dark = done?.tone === 'lists'
   const ink = dark ? '#3b2400' : '#fff'
+  const soft = dark ? 'rgb(59 36 0 / .1)' : 'rgb(255 255 255 / .14)'
+  const rows = done?.rows ?? []
+  // Many rows: two columns on a wide screen, so a list reads across the room.
+  const twoCol = rows.length > 5 && !rows.some((r) => r.pick)
+  const ms = answerMs(o)
   return (
     <div
-      className="casa-pop relative w-full max-w-[57.5rem] overflow-hidden rounded-[clamp(28px,5vmin,44px)] p-[clamp(18px,4.5vmin,3rem)] text-left"
+      className="casa-pop relative w-full max-w-[62rem] overflow-hidden rounded-[clamp(28px,5vmin,44px)] p-[clamp(18px,4.5vmin,3rem)] text-left"
       style={{ background: grad(g), color: ink, boxShadow: `0 40px 90px -30px ${g[1]}` }}
     >
       <div className="flex items-start gap-[clamp(12px,3vmin,1.75rem)]">
-        {done?.check ? <CheckMark size={92} color={ink} max="15vmin" /> : <span className="text-[clamp(2.6rem,9vmin,4.2rem)] leading-none" aria-hidden>{o.kind === 'bye' ? '👋' : ''}</span>}
+        {done?.check ? <CheckMark size={92} color={ink} max="15vmin" /> : o.kind === 'bye' ? <span className="text-[clamp(2.6rem,9vmin,4.2rem)] leading-none" aria-hidden>👋</span> : null}
         <div className="min-w-0 flex-1">
           <p className="font-display text-[clamp(1.5rem,min(4.2vw,6.5dvh),3.6rem)] leading-[1.06]">{done ? done.title : o.kind === 'bye' ? o.text : ''}</p>
-          {done?.lines?.length ? (
-            <ul className="mt-[clamp(8px,2dvh,1.25rem)] space-y-1 text-[clamp(1.05rem,3.2dvh,1.45rem)] opacity-90">
-              {done.lines.map((l, i) => (
-                <li key={i} className="casa-rise" style={{ ['--i' as string]: i + 2 }}>
-                  {l}
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          {done?.sub ? <p className="mt-[clamp(6px,1.4dvh,0.9rem)] text-[clamp(1.05rem,3dvh,1.45rem)] opacity-85">{done.sub}</p> : null}
         </div>
       </div>
-      {done && (done.undo || done.view) ? (
+      {rows.length ? (
+        <ul className={`mt-[clamp(12px,3dvh,1.75rem)] grid gap-[clamp(6px,1.2dvh,10px)] ${twoCol ? 'sm:grid-cols-2' : ''}`}>
+          {rows.map((r: AnswerRow, i) => {
+            const body = (
+              <>
+                {r.emoji ? (
+                  <span className="inline-flex h-[clamp(2.4rem,6.5dvh,3.2rem)] w-[clamp(2.4rem,6.5dvh,3.2rem)] shrink-0 items-center justify-center rounded-[14px] text-[clamp(1.25rem,3.4dvh,1.7rem)]" style={{ background: soft }} aria-hidden>
+                    {r.emoji}
+                  </span>
+                ) : null}
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-[clamp(1.1rem,3.2dvh,1.55rem)] leading-tight ${r.strong || r.pick ? 'font-bold' : 'font-semibold'}`}>{r.title}</span>
+                  {r.sub ? <span className="mt-0.5 line-clamp-2 block text-[clamp(0.95rem,2.5dvh,1.2rem)] opacity-80">{r.sub}</span> : null}
+                </span>
+                {r.pick ? <ChevronRight size={26} className="shrink-0 opacity-80" aria-hidden /> : null}
+              </>
+            )
+            return (
+              <li key={i} className="casa-rise" style={{ ['--i' as string]: Math.min(i, 8) + 2 }}>
+                {r.pick ? (
+                  <button
+                    onClick={() => onRun(r.title, r.pick!)}
+                    className="casa-press flex w-full items-center gap-4 rounded-[22px] px-4 py-3 text-left sm:px-5"
+                    style={{ background: dark ? 'rgb(255 255 255 / .55)' : 'rgb(255 255 255 / .2)', outline: r.strong ? `2px solid ${ink}` : undefined }}
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-4 rounded-[20px] px-3 py-2 sm:px-4" style={{ background: r.strong ? soft : undefined }}>
+                    {body}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+      {done && (done.undo || done.view || done.choices?.length) ? (
         <div className="mt-[clamp(14px,4dvh,2.25rem)] flex flex-wrap gap-3">
+          {done.choices?.map((c, i) => (
+            <button
+              key={c.label}
+              onClick={() => onRun(c.label, c.run)}
+              className="casa-press inline-flex h-14 items-center gap-2.5 rounded-full px-6 text-[1.15rem] font-semibold sm:h-16 sm:px-7"
+              style={i === 0 ? { background: '#fff', color: g[1] } : { background: dark ? 'rgb(59 36 0 / .12)' : 'rgb(255 255 255 / .2)' }}
+            >
+              {i === 0 ? <Check size={24} aria-hidden /> : null}
+              {c.label}
+            </button>
+          ))}
           {done.undo ? (
             <button
               onClick={() => onUndo(done)}
@@ -686,8 +773,8 @@ function AnswerCard({
           {done.view ? (
             <button
               onClick={() => onView(done.view!)}
-              className="casa-press inline-flex h-14 items-center gap-2.5 rounded-full bg-white px-6 text-[1.15rem] font-semibold sm:h-16 sm:px-7"
-              style={{ color: g[1] }}
+              className="casa-press inline-flex h-14 items-center gap-2.5 rounded-full px-6 text-[1.15rem] font-semibold sm:h-16 sm:px-7"
+              style={done.choices?.length ? { background: dark ? 'rgb(59 36 0 / .12)' : 'rgb(255 255 255 / .2)' } : { background: '#fff', color: g[1] }}
             >
               <Eye size={24} aria-hidden />
               {t('casa.roof.view')}
@@ -697,7 +784,7 @@ function AnswerCard({
       ) : null}
       {!follow ? (
         <div className="absolute right-0 bottom-0 left-0 h-1.5" style={{ background: dark ? 'rgb(59 36 0 / .12)' : 'rgb(255 255 255 / .18)' }}>
-          <div className="casa-countdown h-full" style={{ animationDuration: `${ANSWER_MS}ms`, background: dark ? 'rgb(59 36 0 / .45)' : 'rgb(255 255 255 / .7)' }} />
+          <div key={ms + (done?.title ?? '')} className="casa-countdown h-full" style={{ animationDuration: `${ms}ms`, background: dark ? 'rgb(59 36 0 / .45)' : 'rgb(255 255 255 / .7)' }} />
         </div>
       ) : null}
     </div>

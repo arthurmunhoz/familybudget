@@ -494,6 +494,21 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   locks are on the device's screen only (by design). Never say "tablet" in UI
   copy — "dispositivo". Vercel: deploy with `--force` after adding an action to
   an existing function (a cached build served the old widget.ts once).
+  **Roof on Modo Casa (2026-11-14)** does everything the phone's Roof does
+  EXCEPT money (add/summary/list/fix → "money is on the phone", with a button
+  to the PIN-locked Money panel), games ("played on everyone's phone") and
+  documents (a kitchen screen never opens the vault). Same server, same
+  request shape (no `surface` field — the server is unchanged); the device
+  sends no money entries/categories/documents as context. Executors live in
+  `src/casa/`: `intent.ts` (COPY of the phone's pure `Intent`/`fromServer`/
+  `petsAsked`/`assistantGuard` — keep in step), `roofData.ts` (web port of
+  `lib/assistant` event locate/move/remove/series + `lib/assistantActions`),
+  `assistant.ts` (`act()` → answers with rows / tappable "which one?" rows /
+  choices / Undo), `Roof.tsx` (`AnswerCard`), `roofTips.tsx` (capabilities
+  per area with "Ver mais", like `CapabilitiesView`; `app_help` topic `roof`
+  opens it). Wording reuses the phone's `ask.*` / `roofEx.*` keys, copied into
+  the web dicts, plus `casa.ra.*`. A new phone intent needs its Casa
+  executor too (or a deliberate refusal).
 - **Assistant knows the app** (`app_help`, 2026-11-12): `APP_GUIDE` in
   api/suggest-ping.ts is the only source it may answer from (keep it TRUE when
   features change); `topic` picks what the app shows under the reply —

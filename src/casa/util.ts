@@ -20,6 +20,10 @@ export const GRAD = {
   pet: ['#F98345', '#DD4B3D'],
   orb: ['#8B6CFF', '#20C3A6'],
   frame: ['#FF8A5B', '#E2507E'],
+  family: ['#C083FF', '#8B4DF2'],
+  nudge: ['#6E8BFF', '#4A5BF5'],
+  weather: ['#3E7BFA', '#5B4CF0'],
+  calc: ['#5AD1C8', '#2A9D9F'],
 } as const
 
 export const BUDGET_GRADIENTS: readonly (readonly [string, string])[] = [
