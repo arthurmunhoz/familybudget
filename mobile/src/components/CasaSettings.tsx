@@ -53,15 +53,12 @@ export function CasaSettings({ pairCode, onCount }: { pairCode?: string; onCount
   const { profile, profiles } = useAuth()
   const [devices, setDevices] = useState<HomeDevice[]>([])
   const [plan, setPlan] = useState<HomePlan | null>(null)
-  const [pin, setPin] = useState(false)
   const [pairing, setPairing] = useState<string | null>(null)
-  const [pinOpen, setPinOpen] = useState(false)
 
   const load = useCallback(async () => {
-    const [d, p, hp] = await Promise.all([fetchHomeDevices(), fetchHomePlan(), hasCasaPin().catch(() => false)])
+    const [d, p] = await Promise.all([fetchHomeDevices(), fetchHomePlan()])
     setDevices(d)
     setPlan(p)
-    setPin(hp)
     onCount?.(d.length)
   }, [onCount])
   useEffect(() => {
@@ -128,13 +125,6 @@ export function CasaSettings({ pairCode, onCount }: { pairCode?: string; onCount
       ))}
 
       <Row icon={<Plus size={18} color="#fff" strokeWidth={2.5} />} colors={CASA} title={t('casa.pair')} sub={status} onPress={() => setPairing('')} first={devices.length === 0} />
-      <Row
-        icon={<KeyRound size={17} color="#fff" />}
-        colors={PIN_LOOK}
-        title={t('casa.pin')}
-        sub={pin ? t('casa.pinSet') : t('casa.pinNone')}
-        onPress={() => setPinOpen(true)}
-      />
 
       {pairing !== null ? (
         <PairSheet
@@ -146,6 +136,37 @@ export function CasaSettings({ pairCode, onCount }: { pairCode?: string; onCount
           }}
         />
       ) : null}
+    </View>
+  )
+}
+
+/** Modo Casa's Money PIN, on its own (owner, 2026-11: it isn't a device). */
+export function CasaPinCard() {
+  const { t } = useI18n()
+  const { profile } = useAuth()
+  const [pin, setPin] = useState(false)
+  const [pinOpen, setPinOpen] = useState(false)
+  useEffect(() => {
+    let live = true
+    void hasCasaPin()
+      .catch(() => false)
+      .then((v) => live && setPin(v))
+    return () => {
+      live = false
+    }
+  }, [profile?.household_id])
+  return (
+    <View style={{ gap: sp.md }}>
+      <Txt variant="muted" style={{ fontSize: 14.5, lineHeight: 20 }}>
+        {t('casa.moneyBody')}
+      </Txt>
+      <Row
+        icon={<KeyRound size={17} color="#fff" />}
+        colors={PIN_LOOK}
+        title={pin ? t('casa.pinChange') : t('casa.pinCreate')}
+        sub={pin ? t('casa.pinSet') : t('casa.pinNone')}
+        onPress={() => setPinOpen(true)}
+      />
       {pinOpen && profile?.household_id ? (
         <PinSheet
           household={profile.household_id}

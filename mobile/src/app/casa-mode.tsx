@@ -8,12 +8,12 @@
 import { useState, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
-import { ChevronLeft, Globe, KeyRound, QrCode, Smartphone, Sparkles, Timer, Unlink } from 'lucide-react-native'
+import { ChevronLeft, Globe, QrCode, Smartphone, Sparkles, Timer, Unlink } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Card, Screen, Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
-import { CasaSettings } from '@/components/CasaSettings'
+import { CasaPinCard, CasaSettings } from '@/components/CasaSettings'
 import { CasaDevicesArt } from '@/components/CasaDevicesArt'
 import { useI18n } from '@/hooks/useI18n'
 import { CASA_LOOK as CASA, CASA_URL } from '@/lib/casa'
@@ -25,7 +25,6 @@ const RULES: { icon: typeof Globe; title: TKey; body: TKey }[] = [
   { icon: QrCode, title: 'casa.rule2Title', body: 'casa.rule2Body' },
   { icon: Timer, title: 'casa.rule3Title', body: 'casa.rule3Body' },
   { icon: Sparkles, title: 'casa.rule4Title', body: 'casa.rule4Body' },
-  { icon: KeyRound, title: 'casa.rule5Title', body: 'casa.rule5Body' },
   { icon: Unlink, title: 'casa.rule6Title', body: 'casa.rule6Body' },
 ]
 
@@ -78,6 +77,13 @@ export default function CasaModeScreen() {
           <Label>{t('casa.devicesTitle')}</Label>
           <Card>
             <CasaSettings pairCode={pair} onCount={setCount} />
+          </Card>
+        </View>
+
+        <View style={{ gap: sp.sm }}>
+          <Label>{t('casa.moneyTitle')}</Label>
+          <Card>
+            <CasaPinCard />
           </Card>
         </View>
 
