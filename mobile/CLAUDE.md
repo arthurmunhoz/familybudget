@@ -690,6 +690,25 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   name/description/keywords before a localization can be added. The Play AAB
   (~120 MB) must be dragged in by hand — the browser upload tool caps at 10 MB
   and `eas submit` has no service-account key yet.
+- **Store screenshots for 1.6.0: `store/app-store-v4/`** (2026-11-14) — same
+  pipeline and look as v3, re-cut to lead with Roof: hero, roof, calendar
+  (Week), lists, receipt → lists (dark slide), money, games, casa (Modo Casa
+  web hub in a landscape device frame + the /casa-mode phone screen), pets,
+  utilities + a nudge. `render.sh` writes BOTH `out-6.9/<lang>` (1320×2868)
+  and `out-6.3/<lang>` (1206×2622, the primary App Store slot);
+  `render-play.sh` → `out-play/<lang>` (8 at 1080×1920; Play's max is 8, so
+  money and utilities drop out). No Android capture session for 1.6.0: Play
+  frames reuse the iOS captures, with `hero-play.png` (Whereabouts tile turned
+  off for the shot) and `playPops` in `copy.js` (Google Calendar only).
+  `casa-web.png` came from the web app (`npm run dev`, dev login) through
+  headless Chrome over CDP at 1440×900 @2x. English captures only; pt/es copy
+  is kept in step. `contact-sheet-*.png` are the overviews. The Play feature
+  graphic (`store/play-feature-graphic.html` + `render-feature-graphic.sh`)
+  is Roof-forward and uses the same captures. Temporary overrides used for the
+  shots (then reverted): partly-sunny `sceneFor`, the AskSheet mic-error row
+  hidden (the simulator mic always errors), the paired device's name shown as
+  "Kitchen display". The demo account was switched to English and a home city
+  for the shots, then put back (Portuguese, no city).
 - **`@/components/PhotoHero`** — the full-bleed, swipeable photo header used
   by Pet Care and Family (one page per pet / member; name + badge on the photo,
   side arrows with a tiny avatar of the neighbour, page dots, shrinks with a

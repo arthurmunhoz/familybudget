@@ -1,0 +1,245 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!--
+  Store screenshots, v4 (One Roof 1.6.0). Same visual language as v3 (warm
+  wash, straight phone cropped at the bottom, 1–2 pop-outs breaking out of the
+  frame), re-cut for 1.6.0: Roof leads, then calendar, lists, receipt → lists,
+  money, games, Modo Casa, pets, utilities + nudges. One page renders ONE
+  slide: slides.html?slide=<id>&lang=<en|es|pt>[&play=1]. CSS canvas 660×1434,
+  shot at 2x = 1320×2868 (6.9"); render.sh also writes 1206×2622 (6.3", the
+  App Store's primary slot). Copy lives in copy.js; real captures in
+  shots/<lang>/<name>.png (1320×2868, iPhone 17 Pro Max simulator, Preview
+  Family demo household) + casa-web.png (the Modo Casa web hub, 2880×1800).
+-->
+<style>
+@font-face { font-family:'Nunito'; src:url('fonts/nunito-800.ttf'); font-weight:800; }
+@font-face { font-family:'Nunito'; src:url('fonts/nunito-700.ttf'); font-weight:700; }
+@font-face { font-family:'Hanken'; src:url('fonts/hanken-400.ttf'); font-weight:400; }
+@font-face { font-family:'Hanken'; src:url('fonts/hanken-600.ttf'); font-weight:600; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:660px; height:1434px; overflow:hidden; }
+/* Play mode (?play=1): Google wants 16:9–9:16, so the same slide on a 9:16
+   canvas (660×1174, rendered and resized to 1080×1920 by render-play.sh),
+   Android captures, no Dynamic Island, and the phone + pop-outs scaled down
+   as ONE group so every pop-out keeps its place relative to the screen. */
+html.play, html.play body, html.play .stage { height:1174px; }
+html.play .body { position:absolute; inset:0; transform-origin:50% 388px; transform:translateY(-92px) scale(.8); z-index:2; }
+html.play .copy { top:64px; }
+html.play .island { display:none; }
+html.play .screen { aspect-ratio:1440/2960; }
+body { font-family:'Hanken', system-ui, sans-serif; color:#241F1B; -webkit-font-smoothing:antialiased; }
+
+.stage { position:relative; width:660px; height:1434px; overflow:hidden; background:var(--base); }
+.blob { position:absolute; border-radius:50%; filter:blur(70px); }
+
+/* ---- headline ---- */
+.copy { position:absolute; top:96px; left:44px; right:44px; text-align:center; z-index:5; }
+.eyebrow { display:inline-flex; align-items:center; gap:8px; font:600 17px/1 'Hanken'; letter-spacing:2.6px;
+  text-transform:uppercase; color:var(--accent); padding:9px 16px; border-radius:999px; background:var(--chip); }
+.eyebrow svg { width:18px; height:18px; }
+h1 { margin-top:22px; font:800 62px/1.06 'Nunito'; letter-spacing:-1.2px; color:var(--ink); text-wrap:balance; }
+.ai h1 mark { background:linear-gradient(90deg,#FFC48A,#FF8A4C); -webkit-background-clip:text; color:transparent; padding:0; margin:0; }
+h1 mark { color:inherit; background:linear-gradient(transparent 60%, var(--hl) 60%, var(--hl) 90%, transparent 90%);
+  padding:0 4px; margin:0 -4px; border-radius:4px; }
+
+/* ---- phone ---- */
+.phone { position:absolute; left:50%; top:388px; width:548px; transform:translateX(-50%);
+  border-radius:84px; padding:13px; background:linear-gradient(145deg,#3a3633,#141211 40%,#26221f);
+  box-shadow:0 0 0 2px #5b5550 inset, 0 40px 80px -20px rgba(60,30,10,.45), 0 12px 30px rgba(60,30,10,.18); z-index:2; }
+.screen { position:relative; border-radius:71px; overflow:hidden; aspect-ratio:1320/2868; background:#F7EFE6; }
+.screen img { display:block; width:100%; height:100%; object-fit:cover; }
+.island { position:absolute; top:19px; left:50%; transform:translateX(-50%); width:128px; height:37px;
+  border-radius:20px; background:#000; z-index:3; }
+
+/* ---- pop-outs ---- */
+.pop { position:absolute; z-index:6; background:rgba(255,255,255,.96); border-radius:24px;
+  box-shadow:0 22px 50px -12px rgba(70,35,15,.32), 0 4px 12px rgba(70,35,15,.10); }
+.icon { display:inline-flex; align-items:center; justify-content:center; flex:none; }
+.icon svg { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+/* notification (iOS banner look) */
+.notif { display:flex; gap:14px; align-items:center; padding:16px 18px; border-radius:30px;
+  background:rgba(250,246,242,.94); backdrop-filter:blur(20px); width:520px; }
+.notif .appic { width:52px; height:52px; border-radius:13px; flex:none; background:url('assets/icon.png') center/cover; }
+.notif .meta { display:flex; justify-content:space-between; font:600 17px 'Hanken'; color:#241F1B; }
+.notif .meta span { font-weight:400; color:#8a8078; }
+.notif .msg { font:400 19px/1.3 'Hanken'; color:#241F1B; margin-top:3px; }
+
+.chip { display:inline-flex; align-items:center; gap:9px; padding:12px 18px; border-radius:999px;
+  font:600 18px 'Hanken'; background:#fff; box-shadow:0 14px 30px -10px rgba(70,35,15,.3); }
+
+/* ---- 1.6.0 additions ---- */
+html.play.ios .screen { aspect-ratio:1320/2868; }
+.orb { width:56px; height:56px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; color:#fff;
+  background:linear-gradient(135deg,#8B6CFF,#20C3A6); box-shadow:0 0 0 6px rgba(139,108,255,.16); }
+.row { display:flex; gap:14px; align-items:center; }
+.t1 { font:800 21px 'Nunito'; }
+.t2 { font:400 17px 'Hanken'; color:#73695F; }
+/* receipt slide (dark, like v3's AI slide) */
+.receipt-sl .scan { position:absolute; left:22px; top:860px; width:206px; height:350px; z-index:7; transform:rotate(-6deg); }
+.receipt-sl .corner { position:absolute; width:36px; height:36px; border:5px solid #FFC23D; }
+.receipt-sl .corner.tl { top:-12px; left:-12px; border-right:0; border-bottom:0; border-radius:12px 0 0 0; }
+.receipt-sl .corner.tr { top:-12px; right:-12px; border-left:0; border-bottom:0; border-radius:0 12px 0 0; }
+.receipt-sl .corner.bl { bottom:-12px; left:-12px; border-right:0; border-top:0; border-radius:0 0 0 12px; }
+.receipt-sl .corner.br { bottom:-12px; right:-12px; border-left:0; border-top:0; border-radius:0 0 12px 0; }
+.paper { position:absolute; inset:0; background:#FFFDF8; padding:20px 15px 0; font:500 11px/1 'Courier New', monospace; color:#3b332d;
+  -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 18px 100%; box-shadow:0 30px 60px rgba(0,0,0,.45); }
+.paper .rh { text-align:center; font-weight:700; font-size:17px; letter-spacing:2px; }
+.paper .rs { text-align:center; font-size:11px; color:#8b8077; margin-top:6px; }
+.paper hr { border:0; border-top:2px dashed #cfc6bd; margin:13px 0; }
+.paper .ln { display:flex; justify-content:space-between; margin:9px 0; }
+.paper .ln.hit span:first-child { color:#C27A00; font-weight:700; }
+.paper .tot { font-weight:700; font-size:17px; }
+.beam { position:absolute; left:-24px; right:-24px; top:42%; height:7px; border-radius:7px; z-index:3;
+  background:linear-gradient(90deg,transparent,#FFD36B 15%,#FFF6DD 50%,#FFD36B 85%,transparent);
+  box-shadow:0 0 26px 9px rgba(255,190,60,.6), 0 0 80px 26px rgba(255,170,40,.3); }
+/* Modo Casa: a landscape device above a phone */
+.device { position:absolute; z-index:3; left:30px; top:356px; width:600px; border-radius:30px; padding:14px;
+  background:linear-gradient(145deg,#3a3633,#141211 40%,#26221f); transform:rotate(-2deg);
+  box-shadow:0 0 0 2px #5b5550 inset, 0 40px 80px -20px rgba(60,30,10,.5), 0 12px 30px rgba(60,30,10,.2); }
+.device .scr { border-radius:18px; overflow:hidden; aspect-ratio:2880/1800; }
+.device .scr img { display:block; width:100%; height:100%; object-fit:cover; }
+.casa .phone { left:auto; right:-40px; top:690px; width:380px; transform:rotate(4deg); border-radius:60px; padding:10px; }
+.casa .phone .screen { border-radius:51px; }
+.casa .phone .island { top:14px; width:90px; height:26px; }
+</style></head>
+<body>
+<div class="stage" id="stage"></div>
+<script src="icons.js"></script>
+<script src="copy.js"></script>
+<script>
+const q = new URLSearchParams(location.search)
+const lang = q.get('lang') || 'en'
+const id = q.get('slide') || 'hero'
+const play = q.get('play') === '1'
+// Play renders reuse the iOS captures (shots/) unless ?android=1 and a
+// shots-android/ folder exist — no Android device for 1.6.0 yet.
+const androidShots = q.get('android') === '1'
+if (play) document.documentElement.classList.add('play')
+if (play && !androidShots) document.documentElement.classList.add('ios')
+const C = (window.COPY[lang] || window.COPY.en).slides.find((s) => s.id === id)
+document.documentElement.lang = lang
+const P = Object.assign({}, C.pops || {}, play ? C.playPops || {} : {})
+
+// Per-slide palette: a light wash in the app's own language (warm paper base,
+// three soft blobs) with one feature hue doing the accent. `receipt` is the one
+// dark slide on purpose — it's the differentiator and should stop the scroll.
+const THEMES = {
+  hero:      { base:'#FBF1E8', blobs:['#FFC489','#FF9C80','#FFD98C'], accent:'#D2582F', hl:'rgba(255,156,128,.55)' },
+  roof:      { base:'#F2F0FD', blobs:['#C9C2FF','#B5F0E4','#E4DCFF'], accent:'#6A4FE0', hl:'rgba(139,108,255,.42)' },
+  receipt:   { base:'#1E1714', blobs:['#7A5216','#5A2A18','#8A6A1C'], accent:'#FFC23D', hl:'rgba(255,194,61,.5)', ink:'#FBF1E8', chip:'rgba(255,194,61,.14)' },
+  calendar:  { base:'#FDF0F2', blobs:['#FFB8C2','#FFD0B8','#FFD6DE'], accent:'#E0284F', hl:'rgba(255,95,109,.4)' },
+  lists:     { base:'#FDF6E6', blobs:['#FFE08A','#FFC27A','#FFEDB8'], accent:'#C97409', hl:'rgba(255,201,60,.6)' },
+  money:     { base:'#EEF9F4', blobs:['#AEEFD6','#C8E6FF','#CDF3E4'], accent:'#0B8C6C', hl:'rgba(43,217,154,.45)' },
+  games:     { base:'#FDF0F0', blobs:['#FFB8A8','#B9D8FF','#FFC9DD'], accent:'#D9455F', hl:'rgba(255,120,140,.42)' },
+  casa:      { base:'#FBF0EA', blobs:['#FFC7A8','#E9C9B8','#FFD9C2'], accent:'#B8572F', hl:'rgba(230,130,90,.45)' },
+  pets:      { base:'#FDF2EC', blobs:['#FFC7A8','#FFE0B8','#FFD3C2'], accent:'#E2552F', hl:'rgba(255,155,106,.5)' },
+  utilities: { base:'#EDF8F7', blobs:['#B4EAE5','#C8E2FF','#CFF1EE'], accent:'#1F8C8E', hl:'rgba(90,209,200,.5)' },
+}
+const ICON_FOR = { hero:'heart', roof:'sparkles', receipt:'scan-line', calendar:'calendar-days', lists:'list-checks', money:'wallet',
+  games:'gamepad-2', casa:'monitor-smartphone', pets:'paw-print', utilities:'toolbox' }
+const SHOT = { hero: play ? 'hero-play' : 'hero', receipt:'receipt-lists' }
+const T = THEMES[id]
+const stage = document.getElementById('stage')
+stage.className = 'stage ' + id + (id === 'receipt' ? ' receipt-sl' : '')
+stage.style.setProperty('--base', T.base)
+stage.style.setProperty('--accent', T.accent)
+stage.style.setProperty('--hl', T.hl)
+stage.style.setProperty('--ink', T.ink || '#241F1B')
+stage.style.setProperty('--chip', T.chip || 'rgba(255,255,255,.7)')
+
+const icon = (n, size = 22, color) =>
+  `<span class="icon" style="${color ? 'color:' + color : ''}"><svg viewBox="0 0 24 24" width="${size}" height="${size}">${ICONS[n] || ''}</svg></span>`
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+const title = esc(C.title).replace(/\*([^*]+)\*/g, '<mark>$1</mark>')
+
+const BLOB_POS = [
+  { l: -180, t: -160, s: 620 }, { l: 280, t: 520, s: 640 }, { l: -120, t: 980, s: 600 },
+]
+let html = T.blobs.map((c, i) => {
+  const b = BLOB_POS[i]
+  return `<div class="blob" style="left:${b.l}px;top:${b.t}px;width:${b.s}px;height:${b.s}px;background:${c};opacity:${id === 'receipt' ? .5 : .75}"></div>`
+}).join('')
+
+html += `<div class="copy"><span class="eyebrow">${icon(ICON_FOR[id], 18)}${esc(C.eyebrow)}</span><h1>${title}</h1></div>`
+
+const shotSrc = (shot) => `${play && androidShots ? 'shots-android' : 'shots'}/${lang}/${shot}.png`
+const phone = (shot, extra = '') =>
+  `<div class="phone" style="${extra}"><div class="screen"><div class="island"></div><img src="${shotSrc(shot)}"></div></div>`
+
+const notif = (top, rot, msg, sub) => `<div class="pop notif" style="left:70px;top:${top}px;transform:rotate(${rot}deg)">
+  <div class="appic"></div><div style="flex:1;min-width:0"><div class="meta">${esc(P.app)}<span>${esc(P.when)}</span></div>
+  <div class="msg">${esc(msg)}${sub ? `<br><span style="color:#8a8078;font-size:16px">${esc(sub)}</span>` : ''}</div></div></div>`
+
+const orbChip = (top, side, rot, a, b) => `<div class="pop row" style="${side};top:${top}px;padding:16px 24px 16px 16px;transform:rotate(${rot}deg)">
+  <span class="orb">${icon('sparkles', 28)}</span><div><div class="t1">${esc(a)}</div><div class="t2">${esc(b)}</div></div></div>`
+
+const LAYOUT = {
+  hero() {
+    // The Home already shows every app; the pop-out says the new thing: Roof.
+    return phone(SHOT.hero) + orbChip(1290, 'right:22px', 3, P.say, P.sub)
+  },
+  roof() {
+    return phone('roof') + `<div class="pop row" style="left:24px;top:1318px;padding:16px 22px 16px 16px;transform:rotate(-2deg)">
+      <span class="orb">${icon('mic', 26)}</span>
+      <div><div class="t1">${esc(P.voice)}</div><div class="t2">${esc(P.lang)}</div></div></div>`
+      + `<div class="pop chip" style="right:18px;top:560px;transform:rotate(3deg)">${icon('sparkles', 20, T.accent)}“${esc(P.examples[0])}”</div>`
+  },
+  calendar() {
+    return phone('calendar') + `<div class="pop row" style="left:22px;top:1250px;padding:18px 22px;transform:rotate(-3deg)">
+      <span class="icon" style="width:52px;height:52px;border-radius:16px;background:#FFE4E9;color:${T.accent}">${icon('refresh-cw', 26)}</span>
+      <div><div class="t1">${esc(P.sync)}</div><div class="t2">${esc(P.with)}</div></div></div>`
+  },
+  lists() {
+    return phone('lists') + `<div class="pop row" style="left:20px;top:1300px;padding:16px 22px 16px 16px;transform:rotate(-3deg)">
+      <span style="width:56px;height:56px;border-radius:50%;background:#D9F1E4;color:#178A59;display:flex;align-items:center;justify-content:center;font:800 22px Nunito">${esc(P.who[0])}</span>
+      <div><div style="font:400 18px Hanken"><b style="font-weight:600">${esc(P.who)}</b> ${esc(P.did)}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;font:800 21px Nunito;color:${T.accent}">${icon('list-checks', 22)}${esc(P.item)} <span style="font:400 15px Hanken;color:#8a8078">· ${esc(P.when)}</span></div></div></div>`
+      + `<div class="pop chip" style="right:18px;top:570px;transform:rotate(3deg)">${icon('sparkles', 20, T.accent)}${esc(P.kinds)}</div>`
+  },
+  receipt() {
+    const prices = ['4.99', '5.49', '8.99', '6.29', '1.47', '9.99']
+    const lines = P.items.map((it, i) => `<div class="ln${i < 4 ? ' hit' : ''}"><span>${esc(it.toUpperCase())}</span><span>${prices[i]}</span></div>`).join('')
+    return phone('receipt-lists', 'left:auto;right:-56px;transform:none;width:480px')
+      + `<div class="scan"><div class="paper"><div class="rh">${esc(P.merchant.toUpperCase())}</div><div class="rs">${esc(P.date)} · 10:42</div><hr>${lines}<hr>
+          <div class="ln tot"><span>TOTAL</span><span>${esc(P.total)}</span></div></div>
+        <div class="beam"></div><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div></div>`
+      + `<div class="pop row" style="left:22px;top:1250px;padding:14px 20px;transform:rotate(-2deg)">
+        <span class="icon" style="width:40px;height:40px;border-radius:50%;background:#1F9E68;color:#fff">${icon('check', 22)}</span>
+        <div><div style="font:600 16px Hanken;color:#73695F">${esc(P.logged)}</div><div style="font:800 22px Nunito;color:#E4554A">${esc(P.amount)}</div></div></div>`
+  },
+  money() {
+    return phone('money') + `<div class="pop" style="right:18px;top:1150px;padding:18px 22px;transform:rotate(3deg);width:320px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 18px Hanken">🛒 ${esc(P.label)}</span><span style="font:800 24px Nunito;color:#E4554A">${esc(P.amount)}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px;font:600 15px Hanken;color:${T.accent}">${icon('receipt-text', 16)}${esc(P.note)}</div></div>`
+  },
+  games() {
+    return phone('games') + P.chips.map((b, i) => `<div class="pop chip" style="${i % 2 ? 'left:20px' : 'right:20px'};top:${1140 + i * 86}px;transform:rotate(${i % 2 ? -3 : 3}deg)">${icon(['swords', 'target', 'trophy'][i], 22, T.accent)}${esc(b)}</div>`).join('')
+  },
+  casa() {
+    return `<div class="device"><div class="scr"><img src="shots/${lang}/casa-web.png"></div></div>`
+      + phone('casa')
+      + orbChip(1090, 'left:24px', -3, P.line, P.sub)
+  },
+  pets() {
+    return phone('pets') + `<div class="pop row" style="left:18px;top:1290px;padding:16px 22px 16px 16px;transform:rotate(-3deg)">
+      <span class="icon" style="width:52px;height:52px;border-radius:16px;background:#FFE6DA;color:${T.accent}">${icon('stethoscope', 26)}</span>
+      <div><div class="t1">${esc(P.title)}</div><div style="font:600 16px Hanken;color:#D2582F">${esc(P.due)}</div></div></div>`
+  },
+  utilities() { return phone('utilities') + notif(1190, 2, P.msg, P.from) },
+}
+stage.innerHTML = html + `<div class="body">${LAYOUT[id]()}</div>`
+
+// Translations run longer than English: shrink the headline until it fits in
+// two lines (≈140px at 62px/1.06) rather than letting a third line collide
+// with the phone. Waits for the fonts so the measurement is the real one.
+document.fonts.ready.then(() => {
+  const h = document.querySelector('h1')
+  let size = 62
+  while (h.offsetHeight > 2 * size * 1.06 + 4 && size > 44) {
+    size -= 2
+    h.style.fontSize = size + 'px'
+  }
+})
+</script>
+</body></html>
