@@ -16,6 +16,7 @@ export const APP_GRADIENT: Record<string, Gradient> = {
   docs: ['#8E9AAF', '#5B667A'],
   calc: ['#5AD1C8', '#2A9D9F'],
   games: ['#FF8A5B', '#D9466F'],
+  casa: ['#E58A63', '#B9532F'],
   admin: ['#7C7C86', '#45454D'],
 }
 

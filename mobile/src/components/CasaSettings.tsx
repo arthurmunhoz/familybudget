@@ -181,37 +181,6 @@ export function CasaPinCard() {
   )
 }
 
-/** Settings' one row for Modo Casa: tile, "Modo Casa", how many devices are
- *  paired (or what it is), chevron → the Modo Casa screen. */
-export function CasaEntryRow() {
-  const { c } = useTheme()
-  const { t } = useI18n()
-  const { profile } = useAuth()
-  const [n, setN] = useState<number | null>(null)
-  useEffect(() => {
-    let live = true
-    void fetchHomeDevices().then((d) => live && setN(d.length))
-    return () => {
-      live = false
-    }
-  }, [profile?.household_id])
-  const sub = n ? (n === 1 ? t('casa.pairedOne') : t('casa.pairedMany', { n })) : t('casa.entrySub')
-  return (
-    <Pressable onPress={() => router.push('/casa-mode')} accessibilityRole="button" style={({ pressed }) => [s.row, s.first, { opacity: pressed ? 0.6 : 1 }]}>
-      <GradientBox colors={CASA} radius={12} style={s.tile}>
-        <MonitorSmartphone size={19} color="#fff" />
-      </GradientBox>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt style={{ fontFamily: fonts.semibold }}>{t('casa.title')}</Txt>
-        <Txt variant="faint" style={{ fontSize: 12.5 }} numberOfLines={2}>
-          {sub}
-        </Txt>
-      </View>
-      <ChevronRight size={18} color={c.textFaint} />
-    </Pressable>
-  )
-}
-
 function Row({ icon, colors, title, sub, onPress, first = false }: { icon: ReactNode; colors: Gradient; title: string; sub: string; onPress: () => void; first?: boolean }) {
   const { c } = useTheme()
   return (

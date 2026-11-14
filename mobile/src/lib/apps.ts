@@ -14,6 +14,7 @@ import {
   Toolbox,
   Gamepad2,
   Wrench,
+  MonitorSmartphone,
 } from 'lucide-react-native'
 
 import { WHEREABOUTS_ENABLED } from './features'
@@ -37,6 +38,9 @@ const ALL_APPS: HubApp[] = [
   { id: 'family', name: 'Family', icon: Users, route: '/family', description: 'Everyone’s info at a glance' },
   { id: 'games', name: 'Games', icon: Gamepad2, route: '/games', description: 'Play together, each on their own phone' },
   { id: 'calc', name: 'Utilities', icon: Toolbox, route: '/calc', description: 'Split bills, deals & printable tags' },
+  // Modo Casa: a spare device becomes the family hub (owner, 2026-11-14: a
+  // tile on the Home, not a row in Settings, so people find it).
+  { id: 'casa', name: 'Modo Casa', icon: MonitorSmartphone, route: '/casa-mode', description: 'Any device becomes the family hub' },
 ]
 
 /** The hub's apps for THIS build. Whereabouts drops out where it's switched off

@@ -4,7 +4,6 @@
 // list when active, and notifications shows a live on/off status.
 import { ExportSheet } from '@/components/ExportSheet'
 import { RoofSettings } from '@/components/RoofSettings'
-import { CasaEntryRow } from '@/components/CasaSettings'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AccessibilityInfo,
@@ -653,14 +652,6 @@ export default function Settings() {
         </View>
 
 
-
-        {/* Modo Casa — a spare device at home as the family hub */}
-        <View style={{ gap: sp.sm }} onLayout={registerSection('casa')}>
-          <SectionLabel>{t('settings.casa')}</SectionLabel>
-          <Card style={highlighted === 'casa' ? { borderWidth: 2, borderColor: c.accent } : undefined}>
-            <CasaEntryRow />
-          </Card>
-        </View>
 
         {/* Roof — the assistant's voice: "Ei Roof" + spoken answers */}
         <View style={{ gap: sp.sm }} onLayout={registerSection('roof')}>

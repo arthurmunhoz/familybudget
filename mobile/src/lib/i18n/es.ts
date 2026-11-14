@@ -2165,6 +2165,8 @@ export const es: Record<keyof typeof en, string> = {
 
   // Games (hub app, migration 090)
   'app.games.name': "Juegos",
+  'app.casa.name': "Modo Casa",
+  'app.casa.desc': "Cualquier aparato se vuelve la central de la familia",
   'app.games.desc': "Jueguen juntos, cada uno en su móvil",
   'games.title': "Juegos",
   'games.tagline': "Jueguen juntos.",

@@ -2175,6 +2175,8 @@ export const en = {
 
   // Games (hub app, migration 090)
   'app.games.name': "Games",
+  'app.casa.name': "Modo Casa",
+  'app.casa.desc': "Any device becomes the family hub",
   'app.games.desc': "Play together, each on their own phone",
   'games.title': "Games",
   'games.tagline': "Play together.",

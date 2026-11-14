@@ -500,8 +500,8 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   `home/HelpView`: the games with their REAL rules from i18n (`games.how.*`,
   `games.bs.how*`, `games.quiz.how*`) and "Open Games"; Plus / families / Roof
   get a button to their screen.
-- **Settings › Modo Casa → `/casa-mode`** (2026-11-14): one row in Settings
-  (`CasaEntryRow`) opens its own screen in the `/families` shape: animated
+- **Modo Casa → `/casa-mode`** (2026-11-14): a HOME TILE (`casa` in `lib/apps.ts`, not in Settings — owner: people rarely open Settings)
+  opens its own screen in the `/families` shape: animated
   hero art (`components/CasaDevicesArt`: old phone + tablet + laptop, "any
   device with internet will do"), the devices card (`CasaSettings`: pair,
   unpair, Money PIN) and the rules. `oneroof://casa?code=` lands there.
