@@ -1,0 +1,224 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!--
+  Tablet store screenshots, v4 (One Roof 1.6.0) — the iPad cut of slides.html:
+  same warm washes, eyebrow + Nunito headline, pop-outs breaking out of the
+  frame, but an iPad frame (large, cropped at the bottom on the App Store
+  canvas) instead of the iPhone, and Modo Casa promoted to slide 2 as the
+  hub running full-screen on a landscape iPad.
+  slides-ipad.html?slide=<id>&lang=<en|es|pt>[&fmt=ipad|tab][&play=1]
+    fmt=ipad  CSS 1032×1376, shot at 2x = 2064×2752 (App Store iPad 13")
+    fmt=tab   CSS 1000×1600, shot at 1.6x = 1600×2560 (Play 10" tablet;
+              render-ipad.sh also resizes it to 1200×1920 for Play 7")
+    play=1    Play wording (playPops) + the hero without the Whereabouts tile.
+  Captures: shots-ipad/<lang>/*.png (2064×2752 portrait, iPad Pro 13" M5
+  simulator, Preview Family demo household) + casa-hub.png (the Modo Casa web
+  hub, 1376×1032 @2x = the iPad's landscape screen). The receipt slide reuses
+  the v3 "Snap a receipt" illustration (receipt-v3.png, copied in by
+  render-ipad.sh from app-store-v3/out/<lang>/03-ai.png).
+-->
+<style>
+@font-face { font-family:'Nunito'; src:url('fonts/nunito-800.ttf'); font-weight:800; }
+@font-face { font-family:'Nunito'; src:url('fonts/nunito-700.ttf'); font-weight:700; }
+@font-face { font-family:'Hanken'; src:url('fonts/hanken-400.ttf'); font-weight:400; }
+@font-face { font-family:'Hanken'; src:url('fonts/hanken-600.ttf'); font-weight:600; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:var(--W); height:var(--H); overflow:hidden; }
+body { font-family:'Hanken', system-ui, sans-serif; color:#241F1B; -webkit-font-smoothing:antialiased; }
+.stage { position:relative; width:var(--W); height:var(--H); overflow:hidden; background:var(--base); }
+.blob { position:absolute; border-radius:50%; filter:blur(90px); }
+
+/* ---- headline ---- */
+.copy { position:absolute; top:80px; left:60px; right:60px; text-align:center; z-index:5; }
+.eyebrow { display:inline-flex; align-items:center; gap:10px; font:600 22px/1 'Hanken'; letter-spacing:3.4px;
+  text-transform:uppercase; color:var(--accent); padding:12px 22px; border-radius:999px; background:var(--chip); }
+h1 { margin:26px auto 0; max-width:900px; font:800 82px/1.05 'Nunito'; letter-spacing:-1.6px; color:var(--ink); text-wrap:balance; }
+h1 mark { color:inherit; background:linear-gradient(transparent 60%, var(--hl) 60%, var(--hl) 90%, transparent 90%);
+  padding:0 6px; margin:0 -6px; border-radius:6px; }
+.receipt h1 mark { background:linear-gradient(90deg,#FFC48A,#FF8A4C); -webkit-background-clip:text; color:transparent; padding:0; margin:0; }
+
+/* ---- iPad (portrait) ---- */
+.ipad { position:absolute; left:50%; transform:translateX(-50%); z-index:2;
+  border-radius:66px; padding:22px; background:linear-gradient(145deg,#3a3633,#141211 40%,#26221f);
+  box-shadow:0 0 0 2px #5b5550 inset, 0 50px 100px -24px rgba(60,30,10,.45), 0 14px 36px rgba(60,30,10,.18); }
+.ipad .cam { position:absolute; top:9px; left:50%; width:7px; height:7px; margin-left:-3.5px; border-radius:50%; background:#0b0a09; box-shadow:0 0 0 1.5px #2c2825; }
+.scr { position:relative; border-radius:44px; overflow:hidden; background:#F2F2F3; }
+.scr img { display:block; width:100%; height:100%; object-fit:cover; }
+/* landscape iPad (Modo Casa) */
+.ipad.land { left:auto; transform:rotate(-2deg); border-radius:56px; padding:20px; }
+.ipad.land .cam { top:50%; left:8px; margin:-3.5px 0 0; }
+.ipad.land .scr { border-radius:38px; }
+
+/* phone (only on the Modo Casa slide: the phone that paired it) */
+.phone { position:absolute; z-index:4; border-radius:62px; padding:10px; background:linear-gradient(145deg,#3a3633,#141211 40%,#26221f);
+  box-shadow:0 0 0 2px #5b5550 inset, 0 40px 80px -20px rgba(60,30,10,.5), 0 12px 30px rgba(60,30,10,.2); }
+.phone .scr { border-radius:53px; aspect-ratio:1320/2868; }
+.phone .island { position:absolute; top:24px; left:50%; transform:translateX(-50%); width:92px; height:27px; border-radius:16px; background:#000; z-index:3; }
+
+/* ---- pop-outs (the iPhone pop-outs, zoomed up as one piece) ---- */
+.anchor { position:absolute; z-index:6; }
+.anchor > * { zoom:1.42; }
+.pop { position:relative; background:rgba(255,255,255,.96); border-radius:24px;
+  box-shadow:0 22px 50px -12px rgba(70,35,15,.32), 0 4px 12px rgba(70,35,15,.10); }
+.icon { display:inline-flex; align-items:center; justify-content:center; flex:none; }
+.icon svg { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.chip { display:inline-flex; align-items:center; gap:9px; padding:12px 18px; border-radius:999px; white-space:nowrap;
+  font:600 18px 'Hanken'; background:#fff; box-shadow:0 14px 30px -10px rgba(70,35,15,.3); }
+.notif { display:flex; gap:14px; align-items:center; padding:16px 18px; border-radius:30px;
+  background:rgba(250,246,242,.96); width:520px; }
+.notif .appic { width:52px; height:52px; border-radius:13px; flex:none; background:url('assets/icon.png') center/cover; }
+.notif .meta { display:flex; justify-content:space-between; font:600 17px 'Hanken'; color:#241F1B; }
+.notif .meta span { font-weight:400; color:#8a8078; }
+.notif .msg { font:400 19px/1.3 'Hanken'; color:#241F1B; margin-top:3px; }
+.orb { width:56px; height:56px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; color:#fff;
+  background:linear-gradient(135deg,#8B6CFF,#20C3A6); box-shadow:0 0 0 6px rgba(139,108,255,.16); }
+.row { display:flex; gap:14px; align-items:center; }
+.t1 { font:800 21px 'Nunito'; white-space:nowrap; }
+.t2 { font:400 17px 'Hanken'; color:#73695F; white-space:nowrap; }
+
+/* receipt: the v3 illustration, faded into this slide's own wash */
+.illo { position:absolute; left:50%; transform:translateX(-50%); z-index:3;
+  -webkit-mask: linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%), linear-gradient(transparent 0,#000 6%,#000 94%,transparent 100%);
+  -webkit-mask-composite: source-in; }
+</style></head>
+<body>
+<div class="stage" id="stage"></div>
+<script src="icons.js"></script>
+<script src="copy.js"></script>
+<script>
+const q = new URLSearchParams(location.search)
+const lang = q.get('lang') || 'en'
+const id = q.get('slide') || 'hero'
+const fmt = q.get('fmt') === 'tab' ? 'tab' : 'ipad'
+const play = q.get('play') === '1'
+const W = fmt === 'tab' ? 1000 : 1032
+const H = fmt === 'tab' ? 1600 : 1376
+document.documentElement.style.setProperty('--W', W + 'px')
+document.documentElement.style.setProperty('--H', H + 'px')
+document.documentElement.lang = lang
+const C = (window.COPY[lang] || window.COPY.en).slides.find((s) => s.id === id)
+const P = Object.assign({}, C.pops || {}, C.ipadPops || {}, play ? C.playPops || {} : {}, play ? C.ipadPlayPops || {} : {})
+const TXT = C.ipad || C
+
+const THEMES = {
+  hero:      { base:'#FBF1E8', blobs:['#FFC489','#FF9C80','#FFD98C'], accent:'#D2582F', hl:'rgba(255,156,128,.55)' },
+  roof:      { base:'#F2F0FD', blobs:['#C9C2FF','#B5F0E4','#E4DCFF'], accent:'#6A4FE0', hl:'rgba(139,108,255,.42)' },
+  receipt:   { base:'#1E1714', blobs:['#7A3216','#5A2A18','#8A4A1C'], accent:'#FFB37A', hl:'rgba(242,136,79,.55)', ink:'#FBF1E8', chip:'rgba(255,179,122,.14)' },
+  calendar:  { base:'#FDF0F2', blobs:['#FFB8C2','#FFD0B8','#FFD6DE'], accent:'#E0284F', hl:'rgba(255,95,109,.4)' },
+  lists:     { base:'#FDF6E6', blobs:['#FFE08A','#FFC27A','#FFEDB8'], accent:'#C97409', hl:'rgba(255,201,60,.6)' },
+  money:     { base:'#EEF9F4', blobs:['#AEEFD6','#C8E6FF','#CDF3E4'], accent:'#0B8C6C', hl:'rgba(43,217,154,.45)' },
+  games:     { base:'#FDF0F0', blobs:['#FFB8A8','#B9D8FF','#FFC9DD'], accent:'#D9455F', hl:'rgba(255,120,140,.42)' },
+  casa:      { base:'#FBF0EA', blobs:['#FFC7A8','#BFDDF5','#FFD9C2'], accent:'#B8572F', hl:'rgba(230,130,90,.45)' },
+  pets:      { base:'#FDF2EC', blobs:['#FFC7A8','#FFE0B8','#FFD3C2'], accent:'#E2552F', hl:'rgba(255,155,106,.5)' },
+  utilities: { base:'#EDF8F7', blobs:['#B4EAE5','#C8E2FF','#CFF1EE'], accent:'#1F8C8E', hl:'rgba(90,209,200,.5)' },
+}
+const ICON_FOR = { hero:'heart', roof:'sparkles', receipt:'sparkles', calendar:'calendar-days', lists:'list-checks', money:'wallet',
+  games:'gamepad-2', casa:'monitor-smartphone', pets:'paw-print', utilities:'toolbox' }
+const T = THEMES[id]
+const stage = document.getElementById('stage')
+stage.className = 'stage ' + id
+for (const [k, v] of Object.entries({ '--base': T.base, '--accent': T.accent, '--hl': T.hl, '--ink': T.ink || '#241F1B', '--chip': T.chip || 'rgba(255,255,255,.7)' }))
+  stage.style.setProperty(k, v)
+
+const icon = (n, size = 22, color) =>
+  `<span class="icon" style="${color ? 'color:' + color : ''}"><svg viewBox="0 0 24 24" width="${size}" height="${size}">${ICONS[n] || ''}</svg></span>`
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+const title = esc(TXT.title).replace(/\*([^*]+)\*/g, '<mark>$1</mark>')
+
+const BLOBS = [{ l: -240, t: -200, s: 860 }, { l: W - 520, t: 560, s: 880 }, { l: -180, t: H - 640, s: 820 }]
+let html = T.blobs.map((c, i) => {
+  const b = BLOBS[i]
+  return `<div class="blob" style="left:${b.l}px;top:${b.t}px;width:${b.s}px;height:${b.s}px;background:${c};opacity:${id === 'receipt' ? .5 : .75}"></div>`
+}).join('')
+html += `<div class="copy"><span class="eyebrow">${icon(ICON_FOR[id], 22)}${esc(TXT.eyebrow)}</span><h1>${title}</h1></div>`
+
+// The portrait iPad: big, starting under the headline; on the 13" canvas it
+// runs off the bottom (like the iPhone set), on the taller Play canvas it
+// shows whole. Pop-outs are placed by FRACTION of the screen height so they
+// sit on the same part of the UI in both formats.
+const DEV = { top: 372, w: fmt === 'tab' ? 860 : 880, pad: 22 }
+DEV.sw = DEV.w - 2 * DEV.pad
+DEV.sh = Math.round(DEV.sw * 2752 / 2064)
+const Y = (f) => Math.round(DEV.top + DEV.pad + f * DEV.sh)
+const shot = (name) => `shots-ipad/${lang}/${name}.png`
+const ipad = (name) => `<div class="ipad" style="top:${DEV.top}px;width:${DEV.w}px"><div class="cam"></div>
+  <div class="scr" style="height:${DEV.sh}px"><img src="${shot(name)}"></div></div>`
+const at = (pos, inner) => `<div class="anchor" style="${pos}">${inner}</div>`
+
+const orbChip = (rot, a, b, ic = 'sparkles') => `<div class="pop row" style="padding:16px 26px 16px 16px;transform:rotate(${rot}deg)">
+  <span class="orb">${icon(ic, 28)}</span><div><div class="t1">${esc(a)}</div><div class="t2">${esc(b)}</div></div></div>`
+
+const LAYOUT = {
+  hero() {
+    return ipad(play ? 'hero-play' : 'hero') + at(`right:44px;top:${Y(.74)}px`, orbChip(3, P.say, P.sub))
+      + at(`left:60px;top:${Y(.635)}px`, `<div class="pop chip" style="transform:rotate(-3deg)">${icon('monitor-smartphone', 22, T.accent)}${esc(P.tablet)}</div>`)
+  },
+  roof() {
+    return ipad('roof')
+      + at(`right:30px;top:${Y(.135)}px`, `<div class="pop chip" style="transform:rotate(3deg)">${icon('sparkles', 20, T.accent)}“${esc(P.examples[0])}”</div>`)
+      + at(`left:34px;top:${Y(.71)}px`, `<div class="pop row" style="padding:16px 22px 16px 16px;transform:rotate(-2deg)">
+        <span class="orb">${icon('mic', 26)}</span><div><div class="t1">${esc(P.voice)}</div><div class="t2">${esc(P.lang)}</div></div></div>`)
+  },
+  calendar() {
+    return ipad('calendar') + at(`left:36px;top:${Y(.66)}px`, `<div class="pop row" style="padding:18px 24px;transform:rotate(-3deg)">
+      <span class="icon" style="width:52px;height:52px;border-radius:16px;background:#FFE4E9;color:${T.accent}">${icon('refresh-cw', 26)}</span>
+      <div><div class="t1">${esc(P.sync)}</div><div class="t2">${esc(P.with)}</div></div></div>`)
+  },
+  lists() {
+    return ipad('lists')
+      + at(`right:34px;top:${Y(.215)}px`, `<div class="pop chip" style="transform:rotate(3deg)">${icon('sparkles', 20, T.accent)}${esc(P.kinds)}</div>`)
+      + at(`left:34px;top:${Y(.70)}px`, `<div class="pop row" style="padding:16px 24px 16px 16px;transform:rotate(-3deg)">
+      <span style="width:56px;height:56px;border-radius:50%;background:#D9F1E4;color:#178A59;display:flex;align-items:center;justify-content:center;font:800 22px Nunito">${esc(P.who[0])}</span>
+      <div><div style="font:400 18px Hanken;white-space:nowrap"><b style="font-weight:600">${esc(P.who)}</b> ${esc(P.did)}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;font:800 21px Nunito;color:${T.accent};white-space:nowrap">${icon('list-checks', 22)}${esc(P.item)} <span style="font:400 15px Hanken;color:#8a8078">· ${esc(P.when)}</span></div></div></div>`)
+  },
+  receipt() {
+    const w = fmt === 'tab' ? 740 : 650
+    return `<img class="illo" src="shots-ipad/${lang}/receipt-v3.png" style="top:${fmt === 'tab' ? 340 : 316}px;width:${w}px">`
+  },
+  money() {
+    return ipad('money') + at(`right:34px;top:${Y(.40)}px`, `<div class="pop" style="padding:18px 22px;transform:rotate(3deg);width:330px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 18px Hanken">🛒 ${esc(P.label)}</span><span style="font:800 24px Nunito;color:#E4554A">${esc(P.amount)}</span></div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px;font:600 15px Hanken;color:${T.accent}">${icon('receipt-text', 16)}${esc(P.note)}</div></div>`)
+  },
+  games() {
+    return ipad('games') + P.chips.map((b, i) => at(`${i % 2 ? 'left:70px' : 'right:70px'};top:${Y(.585 + i * .085)}px`,
+      `<div class="pop chip" style="transform:rotate(${i % 2 ? -3 : 3}deg)">${icon(['swords', 'target', 'trophy'][i], 22, T.accent)}${esc(b)}</div>`)).join('')
+  },
+  casa() {
+    // The hub IS the iPad's natural job: full-screen, landscape, the warm
+    // light theme — with the phone that paired it leaning in.
+    const lw = fmt === 'tab' ? 960 : 990, lp = 20
+    const sw = lw - 2 * lp, sh = Math.round(sw * 2064 / 2752)
+    const top = fmt === 'tab' ? 392 : 380
+    const ph = fmt === 'tab' ? { w: 300, top: 1000 } : { w: 290, top: 930 }
+    return `<div class="ipad land" style="left:${(W - lw) / 2}px;top:${top}px;width:${lw}px"><div class="cam"></div>
+        <div class="scr" style="height:${sh}px"><img src="${shot('casa-hub')}"></div></div>`
+      + `<div class="phone" style="right:${fmt === 'tab' ? 44 : 40}px;top:${ph.top}px;width:${ph.w}px;transform:rotate(5deg)"><div class="scr"><div class="island"></div><img src="shots/${lang}/casa.png"></div></div>`
+      + at(`left:40px;top:${top + sh + 2 * lp + (fmt === 'tab' ? 70 : 24)}px`, orbChip(-3, P.line, P.sub))
+      + at(`left:86px;top:${top + sh + 2 * lp + (fmt === 'tab' ? 206 : 160)}px`, `<div class="pop chip" style="transform:rotate(2deg)">${icon('globe', 22, T.accent)}${esc(P.browser)}</div>`)
+  },
+  pets() {
+    return ipad('pets') + at(`left:30px;top:${Y(.70)}px`, `<div class="pop row" style="padding:16px 24px 16px 16px;transform:rotate(-3deg)">
+      <span class="icon" style="width:52px;height:52px;border-radius:16px;background:#FFE6DA;color:${T.accent}">${icon('stethoscope', 26)}</span>
+      <div><div class="t1">${esc(P.title)}</div><div style="font:600 16px Hanken;color:#D2582F;white-space:nowrap">${esc(P.due)}</div></div></div>`)
+  },
+  utilities() {
+    return ipad('utilities') + at(`left:${Math.round((W - 520 * 1.42) / 2)}px;top:${Y(.64)}px`, `<div class="pop notif" style="transform:rotate(2deg)">
+      <div class="appic"></div><div style="flex:1;min-width:0"><div class="meta">${esc(P.app)}<span>${esc(P.when)}</span></div>
+      <div class="msg">${esc(P.msg)}<br><span style="color:#8a8078;font-size:16px">${esc(P.from)}</span></div></div></div>`)
+  },
+}
+stage.innerHTML = html + LAYOUT[id]()
+
+// Longer translations: shrink the headline until it fits in two lines.
+document.fonts.ready.then(() => {
+  const h = document.querySelector('h1')
+  let size = 82
+  while (h.offsetHeight > 2 * size * 1.05 + 6 && size > 58) {
+    size -= 2
+    h.style.fontSize = size + 'px'
+  }
+})
+</script>
+</body></html>

@@ -3,12 +3,15 @@
 // here too, so a translation is this file only. Keep titles SHORT: two lines
 // at 62px is the budget (~26 chars a line). `playPops` overrides `pops` on
 // the Google Play render (no Apple Calendar / Whereabouts on Android).
+// `ipad` / `ipadPops` / `ipadPlayPops` are the tablet cut (slides-ipad.html):
+// the receipt slide keeps v3's "Snap a receipt" headline there.
 // Only English has captures today (shots/en); pt/es are kept in step so a
 // localization is a capture session away.
 window.COPY = {
   en: {
     slides: [
       { id: 'hero', eyebrow: 'One Roof', title: 'Your whole family, *one* app',
+        ipadPops: { tablet: 'On iPhone and iPad' }, ipadPlayPops: { tablet: 'On phones and tablets' },
         pops: { say: 'Just say “Hey Roof”', sub: 'and ask for anything' } },
       { id: 'roof', eyebrow: 'Meet Roof', title: 'Say *“Hey\u00a0Roof”* and it’s done',
         pops: { voice: 'Talk or type', lang: 'in your own words', examples: ['Move the dentist to Monday', 'Tell everyone dinner’s ready'] } },
@@ -18,6 +21,7 @@ window.COPY = {
       { id: 'lists', eyebrow: 'Lists', title: 'Lists for *anything*',
         pops: { who: 'Sam', did: 'added to Chores', item: 'Fold the laundry', when: 'just now', kinds: 'Groceries · Chores · Trips · School' } },
       { id: 'receipt', eyebrow: 'Receipt scan', title: 'Scan a receipt. *Lists tick* themselves.',
+        ipad: { eyebrow: 'AI receipt scan', title: 'Snap a receipt. *AI* does the rest.' },
         pops: { merchant: 'Corner Market', date: '11/14', total: '54.46', items: ['Strawberries', 'Sourdough bread', 'Dog treats', 'Ice cream', 'Bananas', 'Ground coffee'],
                 logged: 'Expense logged', amount: '−$54.46' } },
       { id: 'money', eyebrow: 'Family budget', title: 'See where the *money* goes',
@@ -25,6 +29,7 @@ window.COPY = {
       { id: 'games', eyebrow: 'Family games', title: 'Game night, *on every phone*',
         pops: { chips: ['Hangman challenges', 'Battleship, team vs team', 'Buzzer quiz'] } },
       { id: 'casa', eyebrow: 'Modo Casa', title: 'Any device becomes the *family hub*',
+        ipadPops: { browser: 'Just a browser, nothing to install' },
         pops: { line: 'Agenda, lists, pets and Roof', sub: 'on a spare screen at home' } },
       { id: 'pets', eyebrow: 'Pet care', title: 'Walks, meals and *vet dates*',
         pops: { title: 'Vet checkup · Lola', due: 'Today · 4:30 PM' } },
@@ -35,6 +40,7 @@ window.COPY = {
   pt: {
     slides: [
       { id: 'hero', eyebrow: 'One Roof', title: 'Sua família inteira em *um só* app',
+        ipadPops: { tablet: 'No iPhone e no iPad' }, ipadPlayPops: { tablet: 'No celular e no tablet' },
         pops: { say: 'É só dizer “Oi Casa”', sub: 'e pedir o que quiser' } },
       { id: 'roof', eyebrow: 'Conheça o Roof', title: 'Diga *“Oi\u00a0Casa”* e está feito',
         pops: { voice: 'Fale ou digite', lang: 'do seu jeito', examples: ['Muda o dentista pra segunda', 'Avisa que o jantar está pronto'] } },
@@ -44,6 +50,7 @@ window.COPY = {
       { id: 'lists', eyebrow: 'Listas', title: 'Listas de *qualquer coisa*',
         pops: { who: 'Sam', did: 'adicionou em Tarefas', item: 'Dobrar a roupa', when: 'agora', kinds: 'Mercado · Tarefas · Viagens · Escola' } },
       { id: 'receipt', eyebrow: 'Notas fiscais', title: 'Escaneie a nota. *As listas* se atualizam.',
+        ipad: { eyebrow: 'Recibos com IA', title: 'Tire foto do recibo. A *IA* faz o resto.' },
         pops: { merchant: 'Corner Market', date: '14/11', total: '54,46', items: ['Morangos', 'Pão de fermentação', 'Petisco de cachorro', 'Sorvete', 'Bananas', 'Café moído'],
                 logged: 'Gasto lançado', amount: '−R$ 54,46' } },
       { id: 'money', eyebrow: 'Orçamento', title: 'Veja para onde vai o *dinheiro*',
@@ -51,6 +58,7 @@ window.COPY = {
       { id: 'games', eyebrow: 'Jogos em família', title: 'Noite de jogos, *em cada celular*',
         pops: { chips: ['Desafios de Forca', 'Batalha naval em times', 'Perguntas & Tortadas'] } },
       { id: 'casa', eyebrow: 'Modo Casa', title: 'Qualquer aparelho vira a *central da casa*',
+        ipadPops: { browser: 'Só um navegador, nada pra instalar' },
         pops: { line: 'Agenda, listas, pets e Roof', sub: 'numa tela que fica em casa' } },
       { id: 'pets', eyebrow: 'Pets', title: 'Passeios, comida e *veterinário*',
         pops: { title: 'Veterinário · Lola', due: 'Hoje · 16:30' } },
@@ -61,6 +69,7 @@ window.COPY = {
   es: {
     slides: [
       { id: 'hero', eyebrow: 'One Roof', title: 'Toda tu familia en *una* app',
+        ipadPops: { tablet: 'En iPhone y iPad' }, ipadPlayPops: { tablet: 'En móvil y tablet' },
         pops: { say: 'Solo di “Oye Casa”', sub: 'y pide lo que quieras' } },
       { id: 'roof', eyebrow: 'Conoce a Roof', title: 'Di *“Oye\u00a0Casa”* y está hecho',
         pops: { voice: 'Habla o escribe', lang: 'con tus palabras', examples: ['Mueve el dentista al lunes', 'Avisa que la cena está lista'] } },
@@ -70,6 +79,7 @@ window.COPY = {
       { id: 'lists', eyebrow: 'Listas', title: 'Listas para *todo*',
         pops: { who: 'Sam', did: 'añadió a Tareas', item: 'Doblar la ropa', when: 'ahora', kinds: 'Súper · Tareas · Viajes · Escuela' } },
       { id: 'receipt', eyebrow: 'Recibos', title: 'Escanea el recibo. *Las listas* se marcan solas.',
+        ipad: { eyebrow: 'Recibos con IA', title: 'Fotografía el recibo. La *IA* hace el resto.' },
         pops: { merchant: 'Corner Market', date: '14/11', total: '54.46', items: ['Fresas', 'Pan de masa madre', 'Premios para perro', 'Helado', 'Plátanos', 'Café molido'],
                 logged: 'Gasto registrado', amount: '−$54.46' } },
       { id: 'money', eyebrow: 'Presupuesto', title: 'Mira a dónde va el *dinero*',
@@ -77,6 +87,7 @@ window.COPY = {
       { id: 'games', eyebrow: 'Juegos en familia', title: 'Noche de juegos, *en cada móvil*',
         pops: { chips: ['Retos de Ahorcado', 'Batalla naval por equipos', 'Preguntas con pulsador'] } },
       { id: 'casa', eyebrow: 'Modo Casa', title: 'Cualquier aparato es el *centro de casa*',
+        ipadPops: { browser: 'Solo un navegador, nada que instalar' },
         pops: { line: 'Agenda, listas, mascotas y Roof', sub: 'en una pantalla en casa' } },
       { id: 'pets', eyebrow: 'Mascotas', title: 'Paseos, comidas y *veterinario*',
         pops: { title: 'Veterinario · Lola', due: 'Hoy · 16:30' } },

@@ -709,6 +709,25 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   hidden (the simulator mic always errors), the paired device's name shown as
   "Kitchen display". The demo account was switched to English and a home city
   for the shots, then put back (Portuguese, no city).
+  **Tablets (2026-11-14): `slides-ipad.html` + `render-ipad.sh`** → `out-ipad13/<lang>`
+  (10 at 2064×2752, App Store "iPad 13-inch display"), `out-play-tablet10/<lang>`
+  (8 at 1600×2560) and `out-play-tablet7/<lang>` (same 8 at 1200×1920; no money /
+  utilities, Play wording). Modo Casa is SLIDE 2 on tablets (owner: an iPad is
+  the Modo Casa device) — the web hub full-screen on a landscape iPad (light
+  theme, weather sky, 9:41 AM) + the phone's Home Mode screen. Captures in
+  `shots-ipad/<lang>/` from the iPad Pro 13" (M5) simulator (real ≥760 pt
+  layouts: Calendar Week, Lists, Money, Pets…); `hero-play.png` = hero with the
+  Whereabouts tile painted out. `casa-hub.png` = headless Chrome over CDP at
+  1376×1032 @2x with `casa.prefs` theme light/panel, `weather-home` set in
+  localStorage, and a page-injected Date shim (9:41) + open-meteo stub (partly
+  sunny) — nothing in the app code. Slide 6 crops the v3 "Snap a receipt"
+  illustration (`app-store-v3/out/<lang>/03-ai.png`); its headline comes from
+  `ipad` in `copy.js` (`ipadPops` / `ipadPlayPops` hold the tablet-only pop-outs).
+  Same temporary overrides as the phone set (sunny `sceneFor`, mic row hidden,
+  "Kitchen display"), reverted; the simulator's home city is per device
+  (AsyncStorage), removed after. The dev client's floating "Tools" button is
+  switched off in the dev menu for captures. Hardware-keyboard typing into the
+  dev client: an "r" reloads JS — paste via `simctl pbcopy` + long-press Paste.
 - **App Store "Header and Search Results" creative assets (1.6.0):
   `store/app-store-creative/`** — `creative.html?v=header|search|universal` +
   `render.sh` → `out/header-3840x1646.png` (21:9), `out/search-3840x2560.png`
