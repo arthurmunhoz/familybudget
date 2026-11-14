@@ -3,7 +3,7 @@
 // and the entry list (grouped by day when sorting by date). The bottom bar adds
 // an entry or scans a receipt photo. RN port of budget/MonthDetail.tsx.
 import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react'
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -36,6 +36,7 @@ import { useBottomGap } from '@/hooks/useBottomGap'
 import { budgetLook } from '@/components/home/palette'
 import { GradientBox } from '@/components/home/GradientBox'
 import { CameraArt } from './CameraArt'
+import { ScanBeam, ScanLabel } from './ScanBeam'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? ''
 
@@ -534,7 +535,8 @@ export default function MonthDetail({
         <Pressable
           onPress={startScan}
           disabled={scanning}
-          accessibilityLabel={t('detail.scanAria')}
+          accessibilityLabel={scanning ? t('detail.scanning1') : t('detail.scanAria')}
+          accessibilityState={{ busy: scanning }}
           style={({ pressed }) => ({
             flex: 0.9,
             height: 56,
@@ -548,12 +550,18 @@ export default function MonthDetail({
             alignItems: 'center',
             justifyContent: 'center',
             gap: 6,
-            opacity: scanning ? 0.5 : pressed ? 0.7 : 1,
+            opacity: pressed && !scanning ? 0.7 : 1,
           })}
         >
           <CameraArt opacity={dark ? 0.55 : 0.24} />
-          {scanning ? <ActivityIndicator color={c.text} /> : null}
-          <Txt style={{ fontFamily: fonts.display, fontSize: 15.5, color: c.text }}>{t('detail.scanReceipt')}</Txt>
+          {scanning ? (
+            <>
+              <ScanBeam color={look[1]} />
+              <ScanLabel color={c.text} style={{ fontFamily: fonts.display, fontSize: 15.5 }} />
+            </>
+          ) : (
+            <Txt style={{ fontFamily: fonts.display, fontSize: 15.5, color: c.text }}>{t('detail.scanReceipt')}</Txt>
+          )}
           {/* The AI mark sits on the button's corner, so the label stays centred. */}
           <Sparkles size={15} color={look[1]} style={{ position: 'absolute', top: 8, right: 10 }} />
         </Pressable>
