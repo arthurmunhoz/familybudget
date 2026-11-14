@@ -27,6 +27,27 @@ export const CARD_GRADIENT = {
   weather: ['#3E7BFA', '#5B4CF0'] as Gradient,
 }
 
+/** Today cards by WHAT they are (`lib/agendaKind`). Identity colours, the same
+ *  in both themes. White text: every first stop is ≥3:1 (the 19pt bold title
+ *  is large text) and every second stop ≥5:1 (the small lines sit lower-right,
+ *  where the diagonal is darkest). Checked 2026-11. */
+export const AGENDA_GRADIENT: Record<
+  'pet' | 'birthday' | 'anniversary' | 'renewal' | 'health' | 'school' | 'sport' | 'travel' | 'meal' | 'work' | 'event',
+  Gradient
+> = {
+  event: CARD_GRADIENT.event,
+  birthday: CARD_GRADIENT.birthday,
+  pet: ['#E66A38', '#C2412E'],
+  anniversary: ['#E2508C', '#A82A66'],
+  renewal: ['#4F7FA0', '#34536E'],
+  health: ['#1A9DB0', '#0F6F85'],
+  school: ['#5A6CF0', '#3A3FC4'],
+  sport: ['#1E9E6A', '#11734F'],
+  travel: ['#2E8FE8', '#1D5DC0'],
+  meal: ['#E07224', '#B4481A'],
+  work: ['#5D6E92', '#38425E'],
+}
+
 /** Money: each budget card gets its own deep gradient (by position), so two
  *  budgets read as two things at a glance. Deep enough for white text. The
  *  third stop is the ink used for text on a white button sitting on it. */

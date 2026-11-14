@@ -11,9 +11,6 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import {
-  Cake,
-  CalendarDays,
-  PawPrint,
   CloudLightning,
   CloudRain,
   CloudSnow,
@@ -24,8 +21,8 @@ import {
 } from 'lucide-react-native'
 
 import { Txt } from './ui'
-import { CARD_GRADIENT } from './home/palette'
-import { GradientBox } from './home/GradientBox'
+import { AGENDA_GRADIENT } from './home/palette'
+import { AgendaCard, CARD_H, CARD_W, type AgendaFace } from './home/AgendaCard'
 import { Skeleton } from './Skeleton'
 import { CityPickerSheet } from './CityPickerSheet'
 import { useCachedQuery, useRevalidateOnForeground } from '../hooks/useCachedQuery'
@@ -36,9 +33,13 @@ import {
   KIND_EMOJI,
   compareOccurrences,
   formatTime,
+  memberColor,
   occurrencesByDay,
   yearsAt,
 } from '../lib/calendar'
+import { classifyAgenda, petTypeIcon } from '../lib/agendaKind'
+import { useAuth } from '../lib/auth'
+import { speciesEmoji } from '../apps/pets/petMeta'
 import { overdueEvents } from '../lib/petCare'
 import type { CalendarEvent, PetEvent } from '../lib/types'
 import { useHomeWeather, weatherIcon, type WeatherAlertKind } from '../lib/weather'
@@ -50,7 +51,6 @@ import { fonts, sp, useTheme } from '../theme/theme'
 
 const LOCALE: Record<string, string> = { en: 'en-US', es: 'es', pt: 'pt-BR' }
 const MAX_CARDS = 8
-const CARD_W = 236
 /** How far the weather sky reaches below the status bar. */
 const SCENE_H = 280
 
@@ -64,7 +64,23 @@ const WEATHER_ALERT: Record<WeatherAlertKind, { icon: LucideIcon; key: TKey }> =
   rain: { icon: CloudRain, key: 'home.weatherRain' },
 }
 
-type PetLite = { id: string; name: string; emoji: string }
+type PetLite = {
+  id: string
+  name: string
+  emoji: string
+  species: string | null
+  photo_path: string | null
+  tag_color: string | null
+  birthday: string | null
+}
+type MemberLite = { email: string; avatar_path: string | null; birthday: string | null }
+
+/** Whole years from an ISO birth date to an occurrence date (0 = unknown). */
+function yearsFrom(birth: string | null | undefined, onISO: string): number {
+  if (!birth) return 0
+  const n = Number(onISO.slice(0, 4)) - Number(birth.slice(0, 4))
+  return n > 0 ? n : 0
+}
 
 // Placeholders (shared Skeleton) hold the weather/alert area while the
 // forecast loads, so the card doesn't jump when the value lands.
@@ -122,20 +138,24 @@ export default function TodaySection({
   // removing it.
   const [pickingCity, setPickingCity] = useState(false)
 
-  type TodayData = { events: CalendarEvent[]; petEvents: PetEvent[]; pets: PetLite[] }
-  const { data = { events: [], petEvents: [], pets: [] }, revalidate } =
+  type TodayData = { events: CalendarEvent[]; petEvents: PetEvent[]; pets: PetLite[]; members: MemberLite[] }
+  const { data = { events: [], petEvents: [], pets: [], members: [] }, revalidate } =
     useCachedQuery<TodayData>('hub:today', async () => {
-      const [ev, pe, pt] = await Promise.all([
+      const [ev, pe, pt, mp] = await Promise.all([
         supabase.from('calendar_events').select('*'),
         supabase.from('pet_events').select('*').order('event_date', { ascending: false }),
-        supabase.from('pets').select('id, name, emoji'),
+        supabase.from('pets').select('id, name, emoji, species, photo_path, tag_color, birthday'),
+        // Faces + ages for the cards; a failure just means initials, no "turns N".
+        supabase.from('member_profiles').select('email, avatar_path, birthday'),
       ])
       return {
         events: (ev.data ?? []) as CalendarEvent[],
         petEvents: (pe.data ?? []) as PetEvent[],
         pets: (pt.data ?? []) as PetLite[],
+        members: (mp.data ?? []) as MemberLite[],
       }
     })
+  const { profiles } = useAuth()
 
   // Keep it fresh when returning to the Hub (e.g. after adding an event or
   // setting the home city in Settings).
@@ -155,6 +175,32 @@ export default function TodaySection({
     () => Object.fromEntries(data.pets.map((p) => [p.id, p])) as Record<string, PetLite>,
     [data.pets],
   )
+  const memberEmails = useMemo(() => profiles.map((p) => p.email), [profiles])
+  const memberNames = useMemo(
+    () => profiles.map((p) => ({ email: p.email, name: p.display_name || '' })),
+    [profiles],
+  )
+  const memberMeta = useMemo(
+    () => Object.fromEntries((data.members ?? []).map((m) => [m.email, m])) as Record<string, MemberLite>,
+    [data.members],
+  )
+  const petFace = (pet: PetLite): AgendaFace => ({
+    type: 'pet',
+    name: pet.name,
+    photoPath: pet.photo_path ?? null,
+    emoji: pet.emoji || speciesEmoji(pet.species ?? null),
+    color: pet.tag_color ?? null,
+  })
+  const memberFace = (email: string): AgendaFace | null => {
+    const p = profiles.find((x) => x.email === email)
+    if (!p) return null
+    return {
+      type: 'member',
+      name: p.display_name || email,
+      avatarPath: memberMeta[email]?.avatar_path ?? null,
+      color: memberColor(email, memberEmails),
+    }
+  }
   const todaysOcc = useMemo(
     () => [...(occurrencesByDay(data.events, today, today).get(today) ?? [])].sort(compareOccurrences),
     [data.events, today],
@@ -338,42 +384,59 @@ export default function TodaySection({
             style={{ marginHorizontal: -sp.lg }}
             contentContainerStyle={{ paddingHorizontal: sp.lg, gap: 10 }}
           >
-            {shownOcc.map((o) => {
+            {shownOcc.map((o, i) => {
               const ev = o.event
               const time = ev.all_day ? t('home.allDay') : ev.start_time ? formatTime(ev.start_time, locale) : ''
-              const years = ev.kind === 'birthday' || ev.kind === 'anniversary' ? yearsAt(ev, o.start) : 0
+              const cls = classifyAgenda(ev, data.pets, memberNames)
+              const pet = cls.petId ? petById[cls.petId] : undefined
+              const special = cls.kind === 'birthday' || cls.kind === 'anniversary'
+              // Whose card: the pet it names; for a birthday the person it names
+              // (else its owner); otherwise the member the event belongs to.
+              const faceEmail = pet ? null : special ? (cls.memberEmail ?? ev.owner_email) : ev.owner_email
+              const face = pet ? petFace(pet) : faceEmail ? memberFace(faceEmail) : null
+              // "turns N": from the event's own start year, else the person's /
+              // pet's birthday on file.
+              let years = special ? yearsAt(ev, o.start) : 0
+              if (cls.kind === 'birthday' && years <= 0) {
+                years = pet ? yearsFrom(pet.birthday, o.start) : faceEmail ? yearsFrom(memberMeta[faceEmail]?.birthday, o.start) : 0
+              }
               const sub =
-                ev.kind === 'birthday' && years > 0
+                cls.kind === 'birthday' && years > 0
                   ? t('home.turns', { n: years })
-                  : ev.kind === 'anniversary' && years > 0
+                  : cls.kind === 'anniversary' && years > 0
                     ? t('home.years', { n: years })
                     : (ev.location ?? '')
-              const special = ev.kind === 'birthday' || ev.kind === 'anniversary'
+              const kindLabel = t(`home.kind.${cls.kind}` as TKey)
+              const who = face ? face.name.trim().split(/\s+/)[0] : ''
               return (
                 <AgendaCard
                   key={`${ev.id}:${o.start}`}
-                  colors={special ? CARD_GRADIENT.birthday : CARD_GRADIENT.event}
-                  icon={special ? <Cake size={15} color="#fff" /> : <CalendarDays size={15} color="#fff" />}
-                  label={KIND_EMOJI[ev.kind] ? `${KIND_EMOJI[ev.kind]}` : ''}
+                  index={i}
+                  colors={AGENDA_GRADIENT[cls.kind]}
+                  icon={cls.icon}
+                  label={who ? t('home.kindWho', { kind: kindLabel, name: who }) : kindLabel}
                   time={time}
                   title={ev.title}
                   sub={sub}
+                  face={face}
                   onPress={() => router.push('/calendar')}
                 />
               )
             })}
-            {shownPet.map((e) => {
+            {shownPet.map((e, i) => {
               const pet = petById[e.pet_id]
               const isOverdue = (e.next_due ?? '') < today
               return (
                 <AgendaCard
                   key={e.id}
-                  colors={CARD_GRADIENT.pet}
-                  icon={<PawPrint size={15} color="#fff" />}
-                  label={pet?.name ?? ''}
+                  index={shownOcc.length + i}
+                  colors={AGENDA_GRADIENT.pet}
+                  icon={petTypeIcon(e.type)}
+                  label={pet ? t('home.kindWho', { kind: t('home.kind.pet'), name: pet.name }) : t('home.kind.pet')}
                   time={isOverdue ? t('home.overdue') : t('home.dueToday')}
                   title={e.title}
                   sub=""
+                  face={pet ? petFace(pet) : null}
                   onPress={() => router.push('/pets')}
                 />
               )
@@ -383,7 +446,7 @@ export default function TodaySection({
                 onPress={() => router.push('/calendar')}
                 style={{
                   width: 110,
-                  height: 132,
+                  height: CARD_H,
                   borderRadius: 24,
                   backgroundColor: c.card,
                   borderWidth: 1,
@@ -429,50 +492,5 @@ export function SectionLabel({ text }: { text: string }) {
     >
       {text}
     </Txt>
-  )
-}
-
-/** One of today's things as a bold gradient card. */
-function AgendaCard({
-  colors,
-  icon,
-  label,
-  time,
-  title,
-  sub,
-  onPress,
-}: {
-  colors: readonly [string, string]
-  icon: ReactNode
-  label: string
-  time: string
-  title: string
-  sub: string
-  onPress: () => void
-}) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
-      <GradientBox colors={colors} radius={24} style={{ width: CARD_W, height: 132, padding: 16, justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {icon}
-          <Txt style={{ flex: 1, color: 'rgba(255,255,255,0.85)', fontSize: 12.5, fontFamily: fonts.semibold }} numberOfLines={1}>
-            {label}
-          </Txt>
-          <Txt style={{ color: 'rgba(255,255,255,0.92)', fontSize: 12.5, fontFamily: fonts.semibold, fontVariant: ['tabular-nums'] }}>
-            {time}
-          </Txt>
-        </View>
-        <View>
-          <Txt style={{ color: '#fff', fontFamily: fonts.display, fontSize: 19, lineHeight: 23 }} numberOfLines={2}>
-            {title}
-          </Txt>
-          {sub ? (
-            <Txt style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 2 }} numberOfLines={1}>
-              {sub}
-            </Txt>
-          ) : null}
-        </View>
-      </GradientBox>
-    </Pressable>
   )
 }

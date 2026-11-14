@@ -198,6 +198,24 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   the input as a floating capsule (Shopping is the reference).
   Shopping orders its store tiles AND sections by open items, most first
   (ties keep the household's order; `storesByCount`).
+- **Today cards are styled by WHAT they are (2026-11, `home/AgendaCard`).**
+  `lib/agendaKind.ts` `classifyAgenda(ev, pets, members)` (pure, pinned by
+  `__tests__/agendaKind.test.ts`; pt/en/es keywords, accent-insensitive, whole
+  words, `stem*` = prefix) → kind + icon + petId/memberEmail. Order: the
+  event's `kind` (birthday/anniversary/renewal) → a household pet NAMED in
+  title/notes/place, or a pet-care word (vet, tosa, groom…) → pet → health →
+  school (before work: "reunião de pais") → travel → sport → meal → work →
+  event. A vaccine word with no pet named is health. Each kind has its gradient
+  in `AGENDA_GRADIENT` (palette.ts; white-text contrast checked) and a lucide
+  glyph in a frosted chip + the same glyph large and faint as the card's art.
+  The face bottom-right: the named pet's photo (else species emoji), else for
+  birthdays the member named in the title (else the owner), else the event's
+  owner (photo or initial in `memberColor`); household events have none.
+  Birthday "turns N" falls back to `member_profiles.birthday` / the pet's
+  birthday when the event's start year isn't the birth year. Pet care due
+  cards use the pet look (`petTypeIcon(type)`). Same 236×132 footprint; a
+  one-shot staggered fade/rise + glyph settle (timing, no springs, off under
+  Reduce Motion). The widget payload is unchanged.
 - **Weather sky (2026-11):** the Hub's header has the current weather drawn
   behind it (`home/WeatherScene`, pure SVG; `sceneFor(code, isDay)` in
   `home/sceneKind.ts` — open-meteo now also returns `is_day`): sun, partly,
