@@ -6,9 +6,11 @@ import { Alert, BackHandler, StyleSheet, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
 import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated'
-import { Crown, DoorOpen, Trophy, WifiOff } from 'lucide-react-native'
+import { Crown, DoorOpen, Play, Trophy, WifiOff } from 'lucide-react-native'
 
 import { Loader, Txt } from '@/components/ui'
+import { Pressable } from '@/components/Pressable'
+import { Avatar } from '@/apps/family/Avatar'
 import { GradientBox } from '@/components/home/GradientBox'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useOnScreen } from '@/lib/onScreen'
@@ -196,7 +198,7 @@ const AWAY_GRACE_MS = 8000
 
 function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | null }) {
   const { t, lang } = useI18n()
-  const { name } = useMembers()
+  const { name, avatar } = useMembers()
   const leftBy = session.state.ended === 'abandoned' ? session.state.left_by : undefined
   const gap = useBottomGap(sp.lg)
   const scores = session.state.scores ?? { A: 0, B: 0 }
@@ -211,8 +213,57 @@ function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // "Play again" (migration 110): the first tap opens ONE room for this
+  // game's players; everyone else sees who wants a rematch and joins it.
+  const { session: auth } = useAuth()
+  const me = auth?.user.email ?? ''
+  const rematch = session.state.rematch
+  const rematchBy = rematch && rematch.by !== me ? rematch.by : undefined
+  const [busy, setBusy] = useState(false)
+  const announced = useRef(rematch?.id)
+  useEffect(() => {
+    if (rematchBy && announced.current !== rematch?.id) {
+      announced.current = rematch?.id
+      feedback('pop')
+    }
+  }, [rematchBy, rematch?.id])
+  const playAgain = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      let id: string
+      try {
+        id = await games.rematch(session.id)
+      } catch {
+        // A server without migration 110: a room of your own, as before.
+        id = await games.create(session.game, lang, session.settings, true)
+      }
+      feedback('pop')
+      router.replace(`/games/${id}`)
+    } catch {
+      setBusy(false)
+      Alert.alert(t('games.err.network'))
+    }
+  }
+
   return (
     <View style={{ flex: 1 }}>
+      {rematchBy ? (
+        <Animated.View entering={FadeInUp.duration(260)} style={{ paddingHorizontal: sp.lg, paddingTop: sp.md }}>
+          <Pressable accessibilityRole="button" onPress={() => void playAgain()}>
+            <GradientBox colors={GAMES_GRADIENT} radius={20} style={styles.rematch}>
+              <Avatar name={name(rematchBy)} avatarPath={avatar(rematchBy)} size={40} />
+              <View style={{ flex: 1 }}>
+                <Txt style={{ color: '#fff', fontFamily: fonts.display, fontSize: 18 }} numberOfLines={1}>
+                  {t('games.over.wantsAgain', { name: name(rematchBy) })}
+                </Txt>
+                <Txt style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{t('games.over.tapToJoin')}</Txt>
+              </View>
+              <Play size={22} color="#fff" fill="#fff" />
+            </GradientBox>
+          </Pressable>
+        </Animated.View>
+      ) : null}
       <View style={{ flex: 1, padding: sp.lg, gap: sp.lg, justifyContent: 'center' }}>
         <Animated.View entering={ZoomIn.duration(240)} style={{ alignItems: 'center' }}>
           <GradientBox colors={tie || abandoned ? GAMES_GRADIENT : TEAM_GRADIENT[winner]} radius={60} style={styles.trophy}>
@@ -249,16 +300,8 @@ function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | n
       </View>
       <View style={{ paddingHorizontal: sp.lg, paddingBottom: gap, gap: sp.sm }}>
         <GameBtn
-          title={t('games.over.again')}
-          onPress={async () => {
-            try {
-              const id = await games.create(session.game, lang, session.settings)
-              feedback('pop')
-              router.replace(`/games/${id}`)
-            } catch {
-              Alert.alert(t('games.err.network'))
-            }
-          }}
+          title={rematchBy ? t('games.over.joinAgain', { name: name(rematchBy) }) : t('games.over.again')}
+          onPress={playAgain}
         />
         <GameBtn title={t('games.backToGames')} variant="secondary" onPress={() => router.replace('/games')} curveBottom />
       </View>
@@ -268,6 +311,7 @@ function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | n
 }
 
 const styles = StyleSheet.create({
+  rematch: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   away: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: sp.lg, marginBottom: sp.sm, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
   final: { height: 132, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   finalBlob: { position: 'absolute', width: 140, height: 140, borderRadius: 70, right: -50, top: -60, backgroundColor: 'rgba(255,255,255,0.14)' },

@@ -274,3 +274,5 @@ create policy documents_storage_rw on storage.objects
 --   migration-106-casa-home-loc.sql (home_pair_codes.home_loc: the phone's home city handed to the device at pairing)
 --   migration-107-pet-task-time.sql (pet_care_tasks.at_time: a routine item's time of day, orders the day)
 --   migration-108-budget-icon.sql (budgets.icon: an emoji per budget)
+--   migration-109-quiz-synced-start.sql (quiz: state.opens_at lead-in per question — question 1 waits for every phone's quiz_ready (max 12 s) then opens 3 s later; quiz_buzz refuses before it; game_server_now() for round-trip clock sync)
+--   migration-110-game-rematch.sql (game_rematch: "Play again" — the first tap creates the room and stores it in the finished game's state.rematch; everyone else joins THAT room on their old team)

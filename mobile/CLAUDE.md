@@ -1087,6 +1087,19 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   - **Sounds:** quick UI sounds play from a small pool of players, each paused
     + rewound when it finishes. Pause FIRST: on Android a finished player is
     still "playing", so a bare seekTo(0) restarted it — an endless chime.
+  - **Same moment on every phone (migration 109, 2026-11-13):** each question
+    has `state.opens_at` — a "3, 2, 1" (`GetReady`) before the text shows and
+    the buzzer opens; `quiz_buzz` refuses earlier presses. Question 1 waits
+    (max 12 s) for every player's `quiz_ready` (sent when Quiz mounts), then
+    opens 3 s later. Phones take their clock offset from a round trip to
+    `game_server_now()` (best of 3), not from `state.now`, which arrives late on
+    a slow phone. The spoken answer is sent once the words stop changing for
+    1.3 s whatever state the recogniser reports (Android never left
+    "starting"/never ended after stop()).
+  - **Play again = one room (migration 110):** `game_rematch` — the first tap
+    creates the room and stores it in the finished game's `state.rematch`;
+    the others see "X wants to play again" on the results screen and join
+    THAT room on their old team.
   - **Quiz UI:** `QuestionCard` (category header with its icon, question in
     large type — never `adjustsFontSizeToFit`, iOS shrank it unreadable), the
     mic opens by itself when you hold the buzzer (`AnswerPanel`), and every

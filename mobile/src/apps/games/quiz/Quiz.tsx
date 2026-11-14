@@ -35,14 +35,46 @@ import { AttemptFlash } from './AttemptFlash'
 import { PieSplat } from './PieSplat'
 import { QuestionCard } from './QuestionCard'
 
-/** Seconds left on the server's clock for `deadline`, ticking every 100 ms. */
-function useCountdown(deadline: string | undefined, serverNow: string | undefined) {
+/** This phone's offset from the server clock. Starts from `state.now` (which
+ *  may have arrived late — a slow phone then ran seconds behind, owner
+ *  2026-11-13) and is replaced by a round-trip measurement: the best of three
+ *  `game_server_now` calls, taking the midpoint of the fastest. */
+function useServerOffset(serverNow: string | undefined) {
   const offset = useRef(0)
+  const measured = useRef(false)
   useEffect(() => {
-    if (serverNow) offset.current = Date.parse(serverNow) - Date.now()
+    if (serverNow && !measured.current) offset.current = Date.parse(serverNow) - Date.now()
   }, [serverNow])
-  const calc = useCallback(() => (deadline ? Math.max(0, (Date.parse(deadline) - (Date.now() + offset.current)) / 1000) : 0), [deadline])
-  const [left, setLeft] = useState(25)
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      let best = Infinity
+      for (let i = 0; i < 3 && alive; i++) {
+        try {
+          const t0 = Date.now()
+          const iso = await games.serverNow()
+          const t1 = Date.now()
+          if (t1 - t0 < best) {
+            best = t1 - t0
+            offset.current = Date.parse(iso) - (t0 + t1) / 2
+            measured.current = true
+          }
+        } catch {
+          /* keep the state-based guess */
+        }
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+  return offset
+}
+
+/** Seconds left on the server's clock until `at`, ticking every 100 ms. */
+function useCountdown(at: string | undefined, offset: React.RefObject<number>) {
+  const calc = useCallback(() => (at ? Math.max(0, (Date.parse(at) - (Date.now() + offset.current)) / 1000) : 0), [at, offset])
+  const [left, setLeft] = useState(calc)
   useEffect(() => {
     const id = setInterval(() => setLeft(calc()), 100)
     return () => clearInterval(id)
@@ -59,7 +91,12 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
   const st = session.state as unknown as QuizState
   const myTeam = (players.find((p) => p.email === me)?.team ?? 'A') as Team
   const teamOf = (email: string) => (players.find((p) => p.email === email)?.team ?? null) as Team | null
-  const { left, now: secondsLeftNow } = useCountdown(st.deadline, st.now)
+  const offset = useServerOffset(st.now)
+  const { left, now: secondsLeftNow } = useCountdown(st.deadline, offset)
+  // The lead-in: every phone shows "3, 2, 1" against the same server time,
+  // then the question and the buzzer together.
+  const { left: opensIn } = useCountdown(st.opens_at, offset)
+  const waiting = st.phase === 'question' && !!st.opens_at && opensIn > 0
   const phase = st.phase
   const locked = (st.locked ?? []).includes(me)
   const iAnswer = phase === 'answering' && st.buzz?.email === me
@@ -81,6 +118,28 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
     return () => clearTimeout(id)
   }, [left, st.deadline, session.id, secondsLeftNow])
 
+  // Tell the server this phone has the game up — question 1 opens for
+  // everyone once every player's phone has (or after 12 s).
+  useEffect(() => {
+    void games.quiz.ready(session.id).catch(() => undefined)
+  }, [session.id])
+
+  // The lead-in counts down out loud on every phone at once, then the
+  // question "lands" (the ready sound) as the buzzer opens.
+  const leadSec = useRef(-1)
+  const leadQ = useRef(0)
+  useEffect(() => {
+    if (!st.opens_at || phase !== 'question') return
+    const n = Math.ceil(opensIn)
+    if (n === leadSec.current) return
+    leadSec.current = n
+    if (n > 0 && n <= 3) feedback('tick')
+    if (n === 0 && leadQ.current !== st.q) {
+      leadQ.current = st.q
+      feedback('ready')
+    }
+  }, [opensIn, st.opens_at, st.q, phase])
+
   // Last-seconds ticks while the clock matters to you.
   const lastSec = useRef(-1)
   useEffect(() => {
@@ -94,8 +153,9 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
   const seen = useRef({ q: st.q, buzz: st.buzz?.at, last: st.last?.at, phase })
   useEffect(() => {
     const s = seen.current
-    if (st.q !== s.q) feedback('ready')
-    else if (st.buzz?.at && st.buzz.at !== s.buzz) feedback('buzzer')
+    if (st.q !== s.q) {
+      if (!st.opens_at) feedback('ready')
+    } else if (st.buzz?.at && st.buzz.at !== s.buzz) feedback('buzzer')
     if (st.last?.at && st.last.at !== s.last && !st.last.correct) feedback('wrong')
     if (phase === 'reveal' && s.phase !== 'reveal') {
       if (st.reveal?.winner) {
@@ -103,7 +163,7 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
       } else feedback('miss')
     }
     seen.current = { q: st.q, buzz: st.buzz?.at, last: st.last?.at, phase }
-  }, [st.q, st.buzz?.at, st.last, phase, st.reveal, myTeam])
+  }, [st.q, st.opens_at, st.buzz?.at, st.last, phase, st.reveal, myTeam])
 
   // Derived: confetti on a question your team scored.
   const confetti = phase === 'reveal' && st.reveal?.winner === myTeam ? st.q : 0
@@ -121,7 +181,9 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
   const buzzSize = Math.min(width - sp.lg * 2, height * 0.26, 280)
 
   let body: React.ReactNode = null
-  if (phase === 'question') {
+  if (waiting) {
+    body = <GetReady n={Math.ceil(opensIn)} first={st.q === 1} team={myTeam} />
+  } else if (phase === 'question') {
     body = (
       <View style={styles.center}>
         <CountdownRing left={left} total={total} size={58} color={TEAM_SOLID[myTeam]} track={c.surface2} />
@@ -190,7 +252,7 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.fit, { paddingBottom: gap }]}>
         <ScoreBoard scores={st.scores ?? { A: 0, B: 0 }} myTeam={myTeam} compact />
-        {st.question ? (
+        {st.question && !waiting ? (
           <QuestionCard id={st.question.id} category={st.question.category} text={st.question.text} q={st.q} total={st.total} />
         ) : null}
         {body}
@@ -205,6 +267,29 @@ export function Quiz({ session, players, me }: { session: GameSession; players: 
         <DelayedPie key={`pie-${st.last.at}`} />
       ) : null}
     </KeyboardAvoidingView>
+  )
+}
+
+/** "Get ready… 3" — the same second on every phone. Question 1 may wait a
+ *  bit longer for a slow phone to load; then it says so. */
+function GetReady({ n, first, team }: { n: number; first: boolean; team: Team }) {
+  const { c } = useTheme()
+  const { t } = useI18n()
+  const big = n <= 3
+  return (
+    <View style={styles.center}>
+      <Txt style={{ fontFamily: fonts.display, fontSize: 24, textAlign: 'center' }}>{t('games.quiz.getReady')}</Txt>
+      {big ? (
+        <Animated.View key={n} entering={ZoomIn.duration(240)}>
+          <Txt style={{ fontFamily: fonts.display, fontSize: 120, lineHeight: 132, color: TEAM_SOLID[team], textAlign: 'center' }}>{n}</Txt>
+        </Animated.View>
+      ) : (
+        <ActivityIndicator size="large" color={TEAM_SOLID[team]} style={{ marginVertical: 40 }} />
+      )}
+      <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, textAlign: 'center', color: c.textMuted }}>
+        {big ? t('games.quiz.sameTime') : first ? t('games.quiz.waitingPhones') : t('games.quiz.sameTime')}
+      </Txt>
+    </View>
   )
 }
 
@@ -263,11 +348,28 @@ function AnswerPanel({ sessionId, lang, team, left, total }: { sessionId: string
   const [typing, setTyping] = useState(false)
   // The answer is complete once the words stop changing for a moment — then
   // send it (stop → the hook hands over what it heard).
+  // Whatever state the recogniser claims: Android (owner, 2026-11-13) showed
+  // the heard answer and then sat until time ran out — its listen never
+  // reported "listening", or never ended after stop(). So: words unchanged
+  // for a moment → stop, and if the hook hasn't handed them over a beat
+  // later, send what's on screen ourselves.
   useEffect(() => {
-    if (voice.state !== 'listening' || !voice.transcript.trim() || sent) return
-    const id = setTimeout(() => stop(), SPOKEN_DONE_MS)
-    return () => clearTimeout(id)
-  }, [voice.transcript, voice.state, sent, stop])
+    const heard = voice.transcript.trim()
+    if (!heard || sent || typing) return
+    let late: ReturnType<typeof setTimeout> | undefined
+    const id = setTimeout(() => {
+      stop()
+      late = setTimeout(() => {
+        if (sentRef.current) return
+        void submit(heard)
+        cancel()
+      }, 700)
+    }, SPOKEN_DONE_MS)
+    return () => {
+      clearTimeout(id)
+      if (late) clearTimeout(late)
+    }
+  }, [voice.transcript, sent, typing, stop, cancel, submit])
   // Safety net: the listen ended (any way at all) with words on screen and
   // nothing sent — send what's shown. What you see is what gets answered.
   const lastState = useRef(voice.state)

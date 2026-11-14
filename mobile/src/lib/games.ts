@@ -36,6 +36,8 @@ export interface HangmanState {
   ended?: "finished" | "abandoned" | "cancelled" | "expired";
   /** Who left when a team emptied (migration 102). */
   left_by?: string;
+  /** A finished game's "play again" room (migration 110) — on every game. */
+  rematch?: { id: string; by: string; at: string };
 }
 
 /** A ship on an 8×8 board: top-left cell, length, horizontal/vertical. */
@@ -84,6 +86,9 @@ export interface BattleshipState {
   ended?: "finished" | "abandoned" | "cancelled" | "expired";
   /** Who left when a team emptied (migration 102). */
   left_by?: string;
+  /** A finished game's "play again" room — everyone joins this one
+   *  (migration 110). */
+  rematch?: { id: string; by: string; at: string };
 }
 
 /** Buzzer quiz public state (migration 094). Accepted answers stay on the
@@ -95,6 +100,9 @@ export interface QuizState {
   question: { id: number; text: string; category: string };
   /** Current phase's deadline (server clock). */
   deadline: string;
+  /** When the question shows and the buzzer opens — a "3, 2, 1" before it
+   *  (migration 109; absent on older rooms). */
+  opens_at?: string;
   /** Server time at the last change — used to correct this phone's clock. */
   now: string;
   buzz: { email: string; team: Team; at: string } | null;
@@ -206,6 +214,8 @@ export const games = {
       () => undefined,
     ),
   join: (id: string) => rpc("game_join", { p_session: id }),
+  /** "Play again": the room everyone from this finished game joins. */
+  rematch: (id: string) => rpc<string>("game_rematch", { p_session: id }),
   setTeam: (id: string, team: Team) =>
     rpc("game_set_team", { p_session: id, p_team: team }),
   setReady: (id: string, ready: boolean) =>
@@ -239,7 +249,11 @@ export const games = {
       ),
     tick: (id: string) => rpc("quiz_tick", { p_session: id }),
     next: (id: string) => rpc("quiz_next", { p_session: id }),
+    /** This phone has the game on screen (question 1 waits for everyone). */
+    ready: (id: string) => rpc("quiz_ready", { p_session: id }),
   },
+  /** The server's clock, for a round-trip offset (migration 109). */
+  serverNow: () => rpc<string>("game_server_now", {}),
   hangman: {
     setWord: (id: string, category: string | null, word: string) =>
       rpc("hangman_set_word", {

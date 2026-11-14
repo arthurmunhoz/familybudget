@@ -282,6 +282,9 @@ export function useVoice(
         }
         latest.current = text
         setTranscript(text)
+        // Words arriving prove the mic is live (some Android recognisers never
+        // report volume or 'start' the way iOS does).
+        if (text.trim() && listening.current && !live.current) goLive()
         if (e.isFinal && text.trim() && listening.current) {
           listening.current = false
           // Mid-conversation the request just flows on — no chime (the stop
