@@ -103,7 +103,12 @@ export default function Pairing() {
           void start()
           return
         }
-        if (j.device_id) lsSet(DEVICE_KEY, j.device_id)
+        if (j.device_id) {
+          lsSet(DEVICE_KEY, j.device_id)
+          // Tie this session to the device row (migration 111): unpairing then
+          // ends it on the server, and it stays out of documents/location.
+          await supabase.rpc('casa_bind_session', { p_device: j.device_id })
+        }
         // The phone's home city came with the pairing: the weather and its sky
         // show right away, no setup (owner, 2026-11).
         const hl = j.home_loc

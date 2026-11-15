@@ -10,6 +10,14 @@
 // KNOWN LIMIT: push copy is English-only (same as the daily digest).
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
+import { timingSafeEqual } from 'node:crypto'
+
+/** Constant-time compare for shared secrets (length is not secret). */
+function secretEquals(a: string, b: string): boolean {
+  const ab = Buffer.from(a, 'utf8')
+  const bb = Buffer.from(b, 'utf8')
+  return ab.length === bb.length && timingSafeEqual(ab, bb)
+}
 
 // Expo push, INLINE and self-contained — like ack-ping.ts, send-digest.ts and
 // widget.ts. This was briefly extracted to a file outside api/ to avoid adding
@@ -268,7 +276,7 @@ export default async function handler(req: any, res: any) {
   // server-side, exactly as for a user call. The one-shot `pushed_at` claim
   // below is what keeps a trigger and the sweeper from double-pushing.
   const internalSecret = process.env.INTERNAL_PUSH_SECRET
-  const internal = !!internalSecret && token === internalSecret
+  const internal = !!internalSecret && secretEquals(String(token ?? ''), internalSecret)
 
   let callerEmail = ''
   if (!internal) {

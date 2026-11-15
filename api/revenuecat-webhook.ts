@@ -21,6 +21,7 @@ function secretEquals(a: string, b: string): boolean {
 }
 
 const PLUS_ENTITLEMENT = 'plus'
+const SANDBOX_GRANT_MS = 7 * 24 * 60 * 60 * 1000
 
 // A well-formed UUID (our household_id). RevenueCat anonymous ids look like
 // "$RCAnonymousID:..." and are ignored (no household to attach to yet).
@@ -100,7 +101,31 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ ok: true, ignored: `unhandled:${type}` })
   }
 
+  // Sandbox purchases (TestFlight, store review, license testers) are real
+  // enough to unlock Plus for testing, but never for good: a sandbox event
+  // with no expiry gets a week, and one may never touch a family that has a
+  // live PRODUCTION subscription.
+  const sandbox = String(event.environment ?? '').toUpperCase() === 'SANDBOX'
+  if (sandbox && plan === 'plus' && !expires) expires = new Date(Date.now() + SANDBOX_GRANT_MS).toISOString()
+  const eventMs = typeof event.event_timestamp_ms === 'number' ? event.event_timestamp_ms : null
+
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const { data: current } = await db
+    .from('household_subscriptions')
+    .select('plan, expires_at, environment, last_event_ms')
+    .eq('household_id', householdId)
+    .maybeSingle()
+  // Webhooks can arrive late or be retried: never let an older event
+  // overwrite what a newer one already set.
+  if (eventMs !== null && typeof current?.last_event_ms === 'number' && eventMs < current.last_event_ms) {
+    return res.status(200).json({ ok: true, ignored: 'stale' })
+  }
+  const liveProduction =
+    current?.environment === 'PRODUCTION' &&
+    current.plan === 'plus' &&
+    (!current.expires_at || new Date(current.expires_at).getTime() > Date.now())
+  if (sandbox && liveProduction) return res.status(200).json({ ok: true, ignored: 'sandbox-over-production' })
+
   const { error } = await db.from('household_subscriptions').upsert(
     {
       household_id: householdId,
@@ -108,6 +133,8 @@ export default async function handler(req: any, res: any) {
       product: event.product_id ?? null,
       store: event.store ?? null,
       expires_at: expires,
+      environment: sandbox ? 'SANDBOX' : 'PRODUCTION',
+      last_event_ms: eventMs,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'household_id' },

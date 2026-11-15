@@ -18,6 +18,7 @@
 // VITE_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY.
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
+import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto'
 
 // ── Self-contained calendar / pet-care logic ─────────────────────────────────
 // COPIED from src/lib/calendar.ts + src/lib/petCare.ts rather than imported.
@@ -413,13 +414,67 @@ const CASA_DEVICES_FREE = 1
 // Plus is sold as "as many devices as you like" (owner, 2026-11); this is only
 // an abuse ceiling no real family reaches.
 const CASA_DEVICES_PLUS = 50
+// Pairing codes live 5 minutes (the tablet asks for a fresh one on its own).
+const CASA_CODE_TTL_MS = 5 * 60 * 1000
+// Wrong codes a signed-in member may type in 10 minutes before casa-claim /
+// casa-peek stop answering (blunts guessing a pending tablet's code).
+const CASA_MAX_MISSES = 10
 function casaCode(): string {
   let s = ''
-  for (let i = 0; i < 6; i++) s += CASA_ALPHABET[Math.floor(Math.random() * CASA_ALPHABET.length)]
+  for (let i = 0; i < 6; i++) s += CASA_ALPHABET[randomInt(CASA_ALPHABET.length)]
   return s
 }
 function casaSecret(): string {
-  return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
+  return randomBytes(16).toString('hex')
+}
+function sameSecret(a: unknown, b: unknown): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  const ab = Buffer.from(a, 'utf8')
+  const bb = Buffer.from(b, 'utf8')
+  return ab.length === bb.length && timingSafeEqual(ab, bb)
+}
+
+/** Where the pairing request came from, shown on the phone before it pairs
+ *  ("Chrome · Android · Tampa, FL") so a code read out by a stranger is
+ *  spotted. Vercel's geo headers; best effort, never blocks. */
+function casaRequester(req: any): { city: string | null; device: string | null } {
+  const h = req.headers ?? {}
+  const dec = (v: unknown) => {
+    if (typeof v !== 'string' || !v) return ''
+    try {
+      return decodeURIComponent(v)
+    } catch {
+      return v
+    }
+  }
+  const city = [dec(h['x-vercel-ip-city']), dec(h['x-vercel-ip-country-region']) || dec(h['x-vercel-ip-country'])]
+    .filter(Boolean)
+    .join(', ')
+  const ua = String(h['user-agent'] ?? '')
+  const browser = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : ''
+  const os = /iPad/.test(ua) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : ''
+  const device = [browser, os].filter(Boolean).join(' · ')
+  return { city: city.slice(0, 80) || null, device: device || null }
+}
+
+/** The signed-in caller's email from their JWT, or null. */
+async function jwtEmail(url: string, req: any): Promise<string | null> {
+  const anon = process.env.VITE_SUPABASE_ANON_KEY
+  const jwt = String(req.headers?.authorization ?? '').replace(/^Bearer /, '')
+  if (!anon || !jwt) return null
+  const who = await fetch(`${url}/auth/v1/user`, { headers: { apikey: anon, Authorization: `Bearer ${jwt}` } })
+  return who.ok ? ((await who.json())?.email ?? null) : null
+}
+
+/** Too many wrong codes from this member lately? Records a miss when `miss`. */
+async function casaMisses(db: any, email: string, miss: boolean): Promise<boolean> {
+  if (miss) await db.from('pair_attempts').insert({ email })
+  const { count, error } = await db
+    .from('pair_attempts')
+    .select('id', { count: 'exact', head: true })
+    .eq('email', email)
+    .gt('attempted_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+  return !error && (count ?? 0) >= CASA_MAX_MISSES
 }
 
 async function casaPair(action: string, req: any, res: any, url: string, serviceKey: string) {
@@ -427,10 +482,17 @@ async function casaPair(action: string, req: any, res: any, url: string, service
   const body = req.body ?? {}
 
   if (action === 'casa-start') {
+    const from = casaRequester(req)
     for (let tries = 0; tries < 5; tries++) {
       const code = casaCode()
       const secret = casaSecret()
-      const { error } = await db.from('home_pair_codes').insert({ code, secret })
+      const { error } = await db.from('home_pair_codes').insert({
+        code,
+        secret,
+        expires_at: new Date(Date.now() + CASA_CODE_TTL_MS).toISOString(),
+        req_city: from.city,
+        req_device: from.device,
+      })
       if (!error) return res.status(200).json({ code, secret })
     }
     return res.status(500).json({ error: 'no_code' })
@@ -439,28 +501,38 @@ async function casaPair(action: string, req: any, res: any, url: string, service
   if (action === 'casa-poll') {
     const code = String(body.code ?? '').toUpperCase()
     const { data: row } = await db.from('home_pair_codes').select('*').eq('code', code).maybeSingle()
-    if (!row || row.secret !== body.secret) return res.status(404).json({ error: 'unknown' })
+    if (!row || !sameSecret(row.secret, body.secret)) return res.status(404).json({ error: 'unknown' })
     if (row.collected_at) return res.status(410).json({ error: 'used' })
     if (!row.token_hash) {
       if (new Date(row.expires_at).getTime() < Date.now()) return res.status(410).json({ error: 'expired' })
       return res.status(200).json({ pending: true })
     }
-    await db.from('home_pair_codes').update({ collected_at: new Date().toISOString() }).eq('code', code)
+    // One collection only, even if two polls race.
+    const { data: took } = await db
+      .from('home_pair_codes')
+      .update({ collected_at: new Date().toISOString() })
+      .eq('code', code)
+      .is('collected_at', null)
+      .select('code')
+    if (!took?.length) return res.status(410).json({ error: 'used' })
     return res.status(200).json({ token_hash: row.token_hash, device_id: row.device_id, household_id: row.household_id, home_loc: row.home_loc ?? null })
   }
 
-  if (action === 'casa-claim') {
-    const anon = process.env.VITE_SUPABASE_ANON_KEY
-    const jwt = String(req.headers?.authorization ?? '').replace(/^Bearer /, '')
-    if (!anon || !jwt) return res.status(401).json({ error: 'auth' })
-    const who = await fetch(`${url}/auth/v1/user`, { headers: { apikey: anon, Authorization: `Bearer ${jwt}` } })
-    const email: string | undefined = who.ok ? (await who.json())?.email : undefined
+  if (action === 'casa-peek' || action === 'casa-claim') {
+    const email = await jwtEmail(url, req)
     if (!email) return res.status(401).json({ error: 'auth' })
+    if (await casaMisses(db, email, false)) return res.status(429).json({ error: 'too_many' })
 
     const code = String(body.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
     const { data: row } = await db.from('home_pair_codes').select('*').eq('code', code).maybeSingle()
-    if (!row || new Date(row.expires_at).getTime() < Date.now()) return res.status(404).json({ error: 'invalid_code' })
+    if (!row || new Date(row.expires_at).getTime() < Date.now()) {
+      await casaMisses(db, email, true)
+      return res.status(404).json({ error: 'invalid_code' })
+    }
     if (row.claimed_at) return res.status(409).json({ error: 'already_claimed' })
+    if (action === 'casa-peek') {
+      return res.status(200).json({ city: row.req_city ?? null, device: row.req_device ?? null, expires_at: row.expires_at })
+    }
 
     // The caller's ACTIVE household, and they must still belong to it.
     const { data: me } = await db.from('allowed_users').select('household_id').eq('email', email).maybeSingle()
@@ -479,6 +551,17 @@ async function casaPair(action: string, req: any, res: any, url: string, service
     const limit = plus === true ? CASA_DEVICES_PLUS : CASA_DEVICES_FREE
     if ((count ?? 0) >= limit) return res.status(402).json({ error: plus === true ? 'device_limit' : 'plus_required' })
 
+    // Claim the code FIRST, atomically: of two phones racing on one code only
+    // one wins, and the loser can't overwrite the winner's token.
+    const { data: claimed } = await db
+      .from('home_pair_codes')
+      .update({ claimed_by: email, claimed_at: new Date().toISOString() })
+      .eq('code', code)
+      .is('claimed_at', null)
+      .select('code')
+    if (!claimed?.length) return res.status(409).json({ error: 'already_claimed' })
+    const release = () => db.from('home_pair_codes').update({ claimed_by: null, claimed_at: null }).eq('code', code)
+
     const name = String(body.name ?? '').trim().slice(0, 40) || 'Dispositivo'
     // The phone's home city (for the device's weather), if it has one.
     const hl = body.home_loc
@@ -491,19 +574,25 @@ async function casaPair(action: string, req: any, res: any, url: string, service
       .insert({ household_id: household, paired_by: email, name })
       .select('id')
       .single()
-    if (devErr || !dev) return res.status(500).json({ error: 'device' })
+    if (devErr || !dev) {
+      await release()
+      return res.status(500).json({ error: 'device' })
+    }
 
     // The tablet's own session for this member (a fresh one — the phone's
-    // session is untouched). generateLink sends no email.
+    // session is untouched). generateLink sends no email. The tablet binds
+    // that session to its device row (casa_bind_session), which is what lets
+    // the server end it on unpair and keep it out of documents and location.
     const { data: link, error: linkErr } = await (db.auth as any).admin.generateLink({ type: 'magiclink', email })
     const tokenHash: string | undefined = link?.properties?.hashed_token
     if (linkErr || !tokenHash) {
       await db.from('home_devices').delete().eq('id', dev.id)
+      await release()
       return res.status(500).json({ error: 'session' })
     }
     await db
       .from('home_pair_codes')
-      .update({ household_id: household, device_id: dev.id, claimed_by: email, claimed_at: new Date().toISOString(), token_hash: tokenHash, home_loc: homeLoc })
+      .update({ household_id: household, device_id: dev.id, token_hash: tokenHash, home_loc: homeLoc })
       .eq('code', code)
     return res.status(200).json({ ok: true, device_id: dev.id })
   }

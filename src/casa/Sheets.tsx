@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase'
 import { geocodeCity, saveHomeLocation, loadHomeLocation, type TempUnit } from '../lib/weather'
 import { setPrefs, usePrefs, type FrameIdle, type LayoutPref, type ThemePref } from './prefs'
 import { Grow, IconChip, type GrowHandle } from './ui'
-import { DEVICE_KEY, GRAD, grad, lsSet } from './util'
+import { DEVICE_KEY, GRAD, grad, lsGet, lsSet } from './util'
 
 export const SettingsSheet = forwardRef<
   GrowHandle,
@@ -40,6 +40,10 @@ export const SettingsSheet = forwardRef<
   }
 
   async function unpair() {
+    // Mark the device unpaired on the server first: that also ends this
+    // session there (migration 111), not just on this screen.
+    const id = lsGet(DEVICE_KEY)
+    if (id) await supabase.from('home_devices').update({ revoked_at: new Date().toISOString() }).eq('id', id)
     lsSet(DEVICE_KEY, null)
     await supabase.auth.signOut({ scope: 'local' })
   }

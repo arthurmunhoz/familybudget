@@ -35,14 +35,11 @@ export default function AuthCallback() {
   // until the user pressed the system Back button.
   const params = useLocalSearchParams<{
     code?: string
-    access_token?: string
-    refresh_token?: string
     error?: string
     error_description?: string
   }>()
-  const { code, access_token, refresh_token, error, error_description } = params
-  // Kept only for the legacy implicit flow, where the tokens arrive in the URL
-  // FRAGMENT and never become route params.
+  const { code, error, error_description } = params
+  // Fallback for a cold start where the router hasn't parsed the params yet.
   const url = Linking.useURL()
   const handled = useRef(false)
 
@@ -51,8 +48,6 @@ export default function AuthCallback() {
     const query = new URLSearchParams()
     for (const [k, v] of Object.entries({
       code,
-      access_token,
-      refresh_token,
       error,
       error_description,
     })) {
@@ -70,7 +65,7 @@ export default function AuthCallback() {
       }
       leave()
     })()
-  }, [code, access_token, refresh_token, error, error_description, url])
+  }, [code, error, error_description, url])
 
   // This screen must never be terminal. If no code ever arrives — a malformed
   // redirect, or a warm start where the params didn't survive — go home rather

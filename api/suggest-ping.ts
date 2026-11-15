@@ -765,7 +765,9 @@ async function speak(body: any, supabaseUrl: string, email: string, res: any) {
   if (!household) return res.status(403).json({ error: 'no_household' })
   // Plus gate: an explicit "no" blocks; spoken replies cost real money per call.
   const { data: plus, error: plusErr } = await db.rpc('household_is_plus', { p_household: household })
-  if (!plusErr && plus === false) return res.status(402).json({ error: 'plus_required' })
+  // Fails CLOSED: the voice is a paid Azure call, so a broken plan check
+  // must not hand it to everyone.
+  if (plusErr || plus !== true) return res.status(plusErr ? 503 : 402).json({ error: plusErr ? 'plan_check' : 'plus_required' })
   const { data: gate, error: gateErr } = await db.rpc('ai_light_allowed', { p_household: household, p_kind: 'voice', p_cap: VOICE_DAILY_CAP })
   if (!gateErr && gate && gate.allowed === false) return res.status(429).json({ error: 'paused' })
 

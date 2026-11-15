@@ -17,6 +17,7 @@ import { FrameMode, FrameWidget } from './FrameShow'
 import CalendarPanel from './panels/CalendarPanel'
 import FamilyPanel from './panels/FamilyPanel'
 import ListsPanel from './panels/ListsPanel'
+import { lockMoney } from './money'
 import MoneyPanel from './panels/MoneyPanel'
 import PetsPanel from './panels/PetsPanel'
 import { usePrefs } from './prefs'
@@ -131,6 +132,7 @@ export default function Hub() {
     const id = setInterval(() => {
       if (Date.now() - lastTouch.current < IDLE_LOCK_MS) return
       setUnlocked(false)
+      void lockMoney()
       if (panel?.id === 'money') void closePanel()
     }, 5000)
     return () => clearInterval(id)

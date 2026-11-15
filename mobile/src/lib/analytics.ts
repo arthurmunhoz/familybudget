@@ -162,8 +162,24 @@ function push(type: string, fields: Partial<EventInsert> = {}): void {
 }
 
 /** Log a semantic or behavioral event. No-op until initAnalytics sets the user. */
+/** Fields that carry what the family TYPED (document titles, event names,
+ *  pet names, list items, amounts, emails). `web_events` is readable by the
+ *  global super-admin, so those never leave the phone: the event keeps its
+ *  shape (kind, category, from…) and the content becomes a length. */
+const CONTENT_KEYS = new Set(['title', 'name', 'label', 'item', 'email', 'amount', 'weight', 'text', 'pet'])
+
+function scrubMeta(meta?: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!meta) return meta
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(meta)) {
+    if (!CONTENT_KEYS.has(k)) out[k] = v
+    else if (typeof v === 'string') out[`${k}_len`] = v.length
+  }
+  return out
+}
+
 export function track(type: EventName, meta?: Record<string, unknown>): void {
-  push(type, { meta })
+  push(type, { meta: scrubMeta(meta) })
   if (buffer.length >= 20) void flush()
   else scheduleFlush()
 }

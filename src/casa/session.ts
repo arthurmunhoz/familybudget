@@ -51,6 +51,7 @@ export function usePlan(): Plan {
 }
 
 const SEEN_KEY = 'casa.seen'
+const BOUND_KEY = 'casa.bound'
 
 /** Watches this device's `home_devices` row: if it's gone or revoked (a member
  *  unpaired it from the phone), sign out and forget it → back to pairing.
@@ -69,8 +70,15 @@ export function useDeviceWatch(signedIn: boolean) {
       if (!row || row.revoked_at) {
         lsSet(DEVICE_KEY, null)
         lsSet(SEEN_KEY, null)
+        lsSet(BOUND_KEY, null)
         await supabase.auth.signOut({ scope: 'local' })
         return
+      }
+      // Devices paired before migration 111 bind their session on the next
+      // check (idempotent on the server; remembered here to skip the call).
+      if (lsGet(BOUND_KEY) !== id) {
+        const { data: bound } = await supabase.rpc('casa_bind_session', { p_device: id })
+        if (bound === true) lsSet(BOUND_KEY, id)
       }
       const last = Number(lsGet(SEEN_KEY) ?? 0)
       if (Date.now() - last > 10 * 60_000) {

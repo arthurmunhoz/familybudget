@@ -546,6 +546,24 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   locks are on the device's screen only (by design). Never say "tablet" in UI
   copy — "dispositivo". Vercel: deploy with `--force` after adding an action to
   an existing function (a cached build served the old widget.ts once).
+  **Security model since migration 111 (2026-11-15 review)** — keep it:
+  - The device binds its session to its row (`casa_bind_session`, right after
+    pairing and on every device check). A bound session is a "Modo Casa
+    session" in SQL (`is_casa_session()` / `casa_device_id()`): RESTRICTIVE
+    policies keep it out of documents, Whereabouts tables and document files
+    (storage: only `avatars|backdrop|pets|frame`), and `months`/`entries` open
+    only while `casa_unlock(pin)` has unlocked that device (30 min; the device
+    calls `casa_lock` on idle). Unpair (`revoked_at`, from the phone OR the
+    device) deletes its `auth.sessions` row and `current_household()` returns
+    null for it at once — revocation is server-side, not the device's goodwill.
+  - The PIN verifier is NOT readable: phones still write sha256 into
+    `pin_hash`, a trigger moves it to `pin_secret` and `pin_hash` reads `'set'`.
+    Never compare a PIN on a client; never select `pin_secret` (no grant).
+  - `home_devices`: clients may update only `name`, `revoked_at`,
+    `last_seen_at`; an unpair can't be undone (trigger).
+  - Pairing codes: CSPRNG, 5 min, claim is atomic, ≤10 wrong codes per member
+    per 10 min (`pair_attempts`), and the phone shows WHERE the request came
+    from (`casa-peek` → "Chrome · Android · Tampa, FL") before pairing.
   **Roof on Modo Casa (2026-11-14)** does everything the phone's Roof does
   EXCEPT money (add/summary/list/fix → "money is on the phone", with a button
   to the PIN-locked Money panel), games ("played on everyone's phone") and

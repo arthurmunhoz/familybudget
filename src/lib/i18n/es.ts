@@ -788,6 +788,7 @@ export const es: Record<keyof typeof en, string> = {
   "casa.money.pinSub": "Protegido con el PIN de la familia",
   "casa.money.pinTitle": "Escribe el PIN",
   "casa.money.pinWrong": "PIN incorrecto, intenta de nuevo",
+  "casa.money.pinTooMany": "Demasiados intentos, espera unos minutos",
   "casa.money.delete": "Borrar",
   "casa.money.noPinTitle": "Dinero necesita un PIN",
   "casa.money.noPinBody": "Crea el PIN en el celular: Ajustes › Modo Casa.",

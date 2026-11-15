@@ -240,6 +240,33 @@ one.
     sharing stays with the household where it was turned on;
     the frozen web client lists members via `allowed_users` (active ones only).
 
+**Security rules from the 2026-11-15 review (migration 111)** — don't undo:
+- `join_household` answers a wrong code with HTTP 400 (`response.status`)
+  WITHOUT raising, so the `join_attempts` row commits and the 10/10-min limit
+  works. Any definer RPC that must COUNT failures has to do the same: an
+  exception rolls back its own bookkeeping. It returns `json` (the household
+  id as a JSON string) — clients only look at `error`.
+- Own-row tables (`member_locations`, `location_live_requests`,
+  `safety_watches`, `place_watchers`, `push_subscriptions`,
+  `expo_push_tokens`): UPDATE `with check` also requires
+  `is_member_of(household_id)`. New own-row tables must do the same.
+- `households` is updatable only by the household OWNER and only `name`,
+  `backdrop_path` (column grants). The Plus link / `is_internal` are
+  server-only.
+- Modo Casa device sessions are restricted in SQL — see `mobile/CLAUDE.md`
+  (Modo Casa). A new sensitive table should get a `<table>_no_casa`
+  restrictive policy like `documents`.
+- Analytics: mobile `track()` drops typed content (`title`, `name`, `label`,
+  `item`, `email`, `amount`, `weight`, `text`, `pet` → `<key>_len`); the web
+  click tracker records only `data-track`/`aria-label`, never button text.
+  `web_events` is readable by the global admin — keep family content out.
+- The mobile OAuth callback accepts ONLY a PKCE `code` — never raw
+  `access_token`/`refresh_token` from a URL (login CSRF via
+  `oneroof://auth-callback`).
+- RevenueCat: sandbox events with no expiry get 7 days, never override a live
+  PRODUCTION subscription, and an older event (`event_timestamp_ms`) never
+  overwrites a newer one (`household_subscriptions.last_event_ms`).
+
 **Auth/profile**: `useAuth()` gives `profile` (self), `profiles` (members
 of OWN household only — already filtered; admins can query `allowed_users`
 directly for cross-household needs, see `Admin.tsx`), `profileLoaded`, and

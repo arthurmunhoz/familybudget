@@ -1,10 +1,14 @@
 // Finishing an OAuth redirect from the in-app browser.
 //
 // The client runs the authorization-code + PKCE flow (see lib/supabase.ts), so
-// Supabase hands back `?code=` and we exchange it for a session. The older
-// implicit flow returned `access_token`/`refresh_token` in the URL fragment;
-// that path is kept so a redirect already in flight during an app upgrade — or
-// any provider that still answers that way — completes instead of dead-ending.
+// Supabase hands back `?code=` and we exchange it for a session (the PKCE
+// verifier this device holds makes a code minted for anyone else fail).
+//
+// A raw `access_token`/`refresh_token` in the callback is NOT accepted any
+// more (security review, 2026-11): oneroof://auth-callback can be opened by
+// any web page or message, and adopting tokens from it would silently sign the
+// phone into a stranger's account (login CSRF) — everything then saved would
+// land in their family. The old implicit flow is long gone from this client.
 import type { Session } from '@supabase/supabase-js'
 
 import { supabase } from './supabase'
@@ -43,7 +47,7 @@ async function exchange(code: string): Promise<Session | null> {
 }
 
 /** Complete the redirect and return the resulting session (null if the URL
- *  carried neither a code nor tokens). Throws if the provider reported an
+ *  carried no code). Throws if the provider reported an
  *  error or the exchange failed. Safe to call twice with the same URL. */
 export async function completeOAuthRedirect(url: string): Promise<Session | null> {
   const params = callbackParams(url)
@@ -52,14 +56,6 @@ export async function completeOAuthRedirect(url: string): Promise<Session | null
   if (code) {
     if (exchanging?.code !== code) exchanging = { code, session: exchange(code) }
     return exchanging.session
-  }
-
-  const access_token = params.get('access_token')
-  const refresh_token = params.get('refresh_token')
-  if (access_token && refresh_token) {
-    const { data, error } = await supabase.auth.setSession({ access_token, refresh_token })
-    if (error) throw error
-    return data.session
   }
 
   const failure = params.get('error_description') ?? params.get('error')

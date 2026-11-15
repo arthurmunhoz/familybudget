@@ -88,8 +88,10 @@ const SESSION_READ_DEADLINE_MS = 8000
  *  after sign-in, which is exactly when this runs. */
 const PROFILE_RETRY_MS = [700, 2000, 5000, 10_000]
 
-const DEV_EMAIL = process.env.EXPO_PUBLIC_DEV_EMAIL ?? ''
-const DEV_PASSWORD = process.env.EXPO_PUBLIC_DEV_PASSWORD ?? ''
+// Behind __DEV__ so a release bundle never carries them: Metro inlines
+// EXPO_PUBLIC_* at build time and the minifier drops the dead branch.
+const DEV_EMAIL = __DEV__ ? (process.env.EXPO_PUBLIC_DEV_EMAIL ?? '') : ''
+const DEV_PASSWORD = __DEV__ ? (process.env.EXPO_PUBLIC_DEV_PASSWORD ?? '') : ''
 
 interface AuthState {
   session: Session | null

@@ -8,7 +8,7 @@ import { useI18n } from '../../hooks/useI18n'
 import { useAuth } from '../../hooks/useAuth'
 import type { Budget } from '../../lib/types'
 import type { HubData } from '../data'
-import { addEntry, loadMoney, pinMatches, pinState } from '../money'
+import { addEntry, loadMoney, pinState, unlockMoney } from '../money'
 import { chime, tick } from '../sound'
 import { Avatar } from '../ui'
 import { GRAD, budgetGradient, grad } from '../util'
@@ -19,15 +19,15 @@ export default function MoneyPanel({ data, unlocked, onUnlock, onClose }: { data
   const { t } = useI18n()
   const { profile } = useAuth()
   const hid = profile?.household_id ?? ''
-  const [pin, setPin] = useState<{ hash: string | null; loaded: boolean }>({
-    hash: null,
+  const [pin, setPin] = useState<{ set: boolean; loaded: boolean }>({
+    set: false,
     loaded: false,
   })
 
   useEffect(() => {
     if (unlocked || !hid) return
     let alive = true
-    void pinState(hid).then((r) => alive && setPin({ hash: r.hash, loaded: true }))
+    void pinState(hid).then((r) => alive && setPin({ set: r.set, loaded: true }))
     return () => {
       alive = false
     }
@@ -53,7 +53,7 @@ export default function MoneyPanel({ data, unlocked, onUnlock, onClose }: { data
             <i />
           </span>
         </div>
-      ) : !pin.hash ? (
+      ) : !pin.set ? (
         <div className="casa-scroll min-h-0 flex-1">
           <div className="casa-fade flex min-h-full flex-col items-center justify-center px-6 py-[clamp(12px,4dvh,48px)] text-center">
             <span
@@ -70,17 +70,17 @@ export default function MoneyPanel({ data, unlocked, onUnlock, onClose }: { data
           </div>
         </div>
       ) : (
-        <PinPad householdId={hid} hash={pin.hash} onOk={onUnlock} />
+        <PinPad onOk={onUnlock} />
       )}
     </div>
   )
 }
 
-export function PinPad({ householdId, hash, onOk }: { householdId: string; hash: string; onOk: () => void }) {
+export function PinPad({ onOk }: { onOk: () => void }) {
   const { t } = useI18n()
   const [digits, setDigits] = useState('')
   const [shake, setShake] = useState(0)
-  const [wrong, setWrong] = useState(false)
+  const [wrong, setWrong] = useState<false | 'wrong' | 'too_many'>(false)
 
   const press = useCallback(
     async (d: string) => {
@@ -90,18 +90,18 @@ export function PinPad({ householdId, hash, onOk }: { householdId: string; hash:
       setDigits(next)
       setWrong(false)
       if (next.length === 4) {
-        const ok = await pinMatches(householdId, next, hash)
-        if (ok) {
+        const r = await unlockMoney(next)
+        if (r === 'ok') {
           chime('done')
           setTimeout(onOk, 180)
         } else {
           setShake((s) => s + 1)
-          setWrong(true)
+          setWrong(r === 'too_many' ? 'too_many' : 'wrong')
           setTimeout(() => setDigits(''), 380)
         }
       }
     },
-    [digits, householdId, hash, onOk],
+    [digits, onOk],
   )
 
   useEffect(() => {
@@ -119,7 +119,7 @@ export function PinPad({ householdId, hash, onOk }: { householdId: string; hash:
       <div className="casa-pin casa-fade">
         <div className="flex flex-col items-center text-center">
           <p className="font-display text-[clamp(1.5rem,min(6vw,5.5dvh),2.4rem)] leading-tight">
-            {wrong ? t('casa.money.pinWrong') : t('casa.money.pinTitle')}
+            {wrong === 'too_many' ? t('casa.money.pinTooMany') : wrong ? t('casa.money.pinWrong') : t('casa.money.pinTitle')}
           </p>
           <div key={shake} className={`mt-[clamp(10px,2.6dvh,24px)] flex gap-[clamp(12px,2.4dvh,20px)] ${shake ? 'casa-shake' : ''}`}>
             {[0, 1, 2, 3].map((i) => (

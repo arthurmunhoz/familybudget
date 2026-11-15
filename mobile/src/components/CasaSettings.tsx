@@ -22,6 +22,7 @@ import {
   CASA_LOOK as CASA,
   CASA_URL,
   claimHomeDevice,
+  peekHomeDevice,
   fetchHomeDevices,
   fetchHomePlan,
   hasCasaPin,
@@ -44,6 +45,7 @@ const CLAIM_ERROR: Record<ClaimError, TKey> = {
   plus_required: 'casa.errPlus',
   device_limit: 'casa.errLimit',
   no_household: 'casa.errGeneric',
+  too_many: 'casa.errTooMany',
   generic: 'casa.errGeneric',
 }
 
@@ -249,6 +251,23 @@ function PairSheet({ initialCode, onClose, onPaired }: { initialCode: string; on
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<TKey | null>(null)
   const ready = normalizeCode(code).length === 6 && !busy
+  // Who's asking: shown before pairing so a code read out by a stranger
+  // (phishing for a session on THEIR screen) is easy to spot.
+  const [from, setFrom] = useState<string | null>(null)
+  const full = normalizeCode(code)
+  useEffect(() => {
+    setFrom(null)
+    if (full.length !== 6) return
+    let alive = true
+    void peekHomeDevice(full).then((r) => {
+      if (!alive || !r) return
+      if ('error' in r) setErr(CLAIM_ERROR[r.error])
+      else setFrom([r.device, r.city].filter(Boolean).join(' · ') || null)
+    })
+    return () => {
+      alive = false
+    }
+  }, [full])
 
   async function pair() {
     if (!ready) return
@@ -306,6 +325,12 @@ function PairSheet({ initialCode, onClose, onPaired }: { initialCode: string; on
           style={{ flex: 1, fontSize: 16, fontFamily: fonts.body, color: c.text, paddingVertical: 0 }}
         />
       </View>
+      {from && !err ? (
+        <View style={{ gap: 2 }}>
+          <Txt style={{ color: c.text, fontSize: 15, fontFamily: fonts.semibold }}>{t('casa.pairFrom', { from })}</Txt>
+          <Txt style={{ color: c.textMuted, fontSize: 14 }}>{t('casa.pairFromWarn')}</Txt>
+        </View>
+      ) : null}
       {err ? <Txt style={{ color: c.expense, fontSize: 14 }}>{t(err)}</Txt> : null}
       <TintButton
         tint={CASA[1]}

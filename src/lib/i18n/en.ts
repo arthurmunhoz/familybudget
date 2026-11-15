@@ -798,6 +798,7 @@ export const en = {
   "casa.money.pinSub": "Locked with the family PIN",
   "casa.money.pinTitle": "Enter the PIN",
   "casa.money.pinWrong": "Wrong PIN — try again",
+  "casa.money.pinTooMany": "Too many tries — wait a few minutes",
   "casa.money.delete": "Delete",
   "casa.money.noPinTitle": "Money needs a PIN",
   "casa.money.noPinBody": "Create the PIN on your phone: Settings › Home Mode.",

@@ -47,7 +47,7 @@ export async function hasCasaPin(): Promise<boolean> {
   return !!(data as { pin_hash?: string | null } | null)?.pin_hash
 }
 
-export type ClaimError = 'invalid_code' | 'already_claimed' | 'plus_required' | 'device_limit' | 'no_household' | 'generic'
+export type ClaimError = 'invalid_code' | 'already_claimed' | 'plus_required' | 'device_limit' | 'no_household' | 'too_many' | 'generic'
 
 /** Pair the device showing `code`, named `name` ("Cozinha"). */
 export async function claimHomeDevice(code: string, name: string): Promise<{ ok: true } | { ok: false; error: ClaimError }> {
@@ -63,13 +63,36 @@ export async function claimHomeDevice(code: string, name: string): Promise<{ ok:
     if (res.ok) return { ok: true }
     const j = (await res.json().catch(() => null)) as { error?: string } | null
     const e = j?.error as ClaimError | undefined
-    return { ok: false, error: e && ['invalid_code', 'already_claimed', 'plus_required', 'device_limit', 'no_household'].includes(e) ? e : 'generic' }
+    return { ok: false, error: e && ['invalid_code', 'already_claimed', 'plus_required', 'device_limit', 'no_household', 'too_many'].includes(e) ? e : 'generic' }
   } catch {
     return { ok: false, error: 'generic' }
   }
 }
 
-/** Unpair: the device notices and signs itself out. */
+/** Where a pending pairing request came from ("Chrome · Android",
+ *  "Tampa, FL"), so the phone can show it before pairing. null when the code
+ *  isn't valid (or the server predates the check). */
+export async function peekHomeDevice(code: string): Promise<{ device: string | null; city: string | null } | { error: ClaimError } | null> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token || !API_BASE) return null
+  try {
+    const res = await fetch(`${API_BASE}/api/widget?action=casa-peek`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ code: normalizeCode(code) }),
+    })
+    const j = (await res.json().catch(() => null)) as { device?: string | null; city?: string | null; error?: string } | null
+    if (res.ok) return { device: j?.device ?? null, city: j?.city ?? null }
+    if (j?.error === 'invalid_code' || j?.error === 'already_claimed' || j?.error === 'too_many') return { error: j.error }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/** Unpair: the server ends the device's session (migration 111) and the
+ *  device notices and returns to pairing. */
 export async function revokeHomeDevice(id: string): Promise<boolean> {
   const { error } = await supabase.from('home_devices').update({ revoked_at: new Date().toISOString() }).eq('id', id)
   return !error

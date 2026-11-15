@@ -5,7 +5,7 @@ import { suggestCategory } from '../lib/categories'
 import { currentPeriodStart, periodEndISO, todayISO } from '../lib/format'
 import { supabase } from '../lib/supabase'
 import type { Budget, CategoryOverride, CategoryRule, CustomCategory, Entry, Month } from '../lib/types'
-import { norm, sha256Hex } from './util'
+import { norm } from './util'
 
 export interface BudgetSummary {
   budget: Budget
@@ -19,15 +19,29 @@ export interface BudgetSummary {
   latest: Entry[]
 }
 
-/** Is there a PIN, and does `pin` match it? */
-export async function pinState(householdId: string): Promise<{ hash: string | null; error: boolean }> {
+/** Is a PIN set? The verifier itself never reaches the device (migration
+ *  111): pin_hash only reads 'set', and the server checks the digits. */
+export async function pinState(householdId: string): Promise<{ set: boolean; error: boolean }> {
   const { data, error } = await supabase.from('home_settings').select('pin_hash').eq('household_id', householdId).maybeSingle()
-  if (error) return { hash: null, error: true }
-  return { hash: (data as { pin_hash?: string | null } | null)?.pin_hash ?? null, error: false }
+  if (error) return { set: false, error: true }
+  return { set: !!(data as { pin_hash?: string | null } | null)?.pin_hash, error: false }
 }
 
-export async function pinMatches(householdId: string, pin: string, hash: string): Promise<boolean> {
-  return (await sha256Hex(`${householdId}:${pin}`)) === hash.toLowerCase()
+export type UnlockResult = 'ok' | 'wrong' | 'too_many' | 'error'
+
+/** Check the PIN on the server; on success it opens the money rows for this
+ *  device for a while (casa_unlock, migration 111). */
+export async function unlockMoney(pin: string): Promise<UnlockResult> {
+  const { data, error } = await supabase.rpc('casa_unlock', { p_pin: pin })
+  if (error || !data) return 'error'
+  const r = data as { ok?: boolean; error?: string }
+  if (r.ok) return 'ok'
+  return r.error === 'too_many' ? 'too_many' : r.error === 'wrong' ? 'wrong' : 'error'
+}
+
+/** Close the money again on the server (idle lock / panel closed). */
+export async function lockMoney(): Promise<void> {
+  await supabase.rpc('casa_lock')
 }
 
 export async function loadMoney(): Promise<BudgetSummary[]> {

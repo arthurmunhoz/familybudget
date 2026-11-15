@@ -115,12 +115,15 @@ export function initAnalytics(userEmail: string) {
   }
 
   // Generic click capture: nearest button/link label tells us what gets used.
+  // Only an explicit label (data-track / aria-label) — never the button's
+  // TEXT, which on Modo Casa is often family content (a list item, an event,
+  // a name) and web_events is readable by the global super-admin.
   document.addEventListener(
     'click',
     (e) => {
       const el = (e.target as HTMLElement | null)?.closest?.('button, a')
       if (!el) return
-      const label = (el.getAttribute('aria-label') || el.textContent || '')
+      const label = ((el as HTMLElement).dataset?.track || el.getAttribute('aria-label') || '')
         .trim()
         .replace(/\s+/g, ' ')
         .slice(0, 60)
