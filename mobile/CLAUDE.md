@@ -379,6 +379,19 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   SENT nudge is a plain card with ONE line "Seen by: Ana, Sam" (first
   names, the most recent first — a row per person grew too tall for big
   families) and an "n of total" chip; ✕ hides it on this device.
+- **Hand-drawn notes (migration 112, 2026-11-15):** Nudges screen → "Recado à
+  mão" card → `app/draw-note.tsx` (fullScreenModal, no swipe-dismiss — it
+  fights the pen) → `apps/pings/DrawNote`: a ruled-paper sheet drawn with
+  react-native-svg + a gesture-handler Pan (NO native module — works on
+  shipped binaries); the eraser removes whole strokes; undo keeps 50 steps.
+  Send = react-native-view-shot PNG (1080 wide) → `documents` bucket
+  `<household>/notes/<uuid>.png` → `sendPing('drawing', '✏️', notes.pushText,
+  …, { imagePath, expiresAt: +24h })`, so recipients, push and "seen by" are
+  the normal nudge ones. `pings.image_path` must start with
+  `<household_id>/notes/` (CHECK). On Home, `NudgesBanner` shows the note as a
+  small tilted sheet (signed URL) + Ver/Beleza; `NoteViewer` opens it full
+  screen sized to the PNG's shape (Got it acks). Older apps just show the
+  row's text. The PNGs are not deleted when the nudge expires (yet).
   `NewItemButton` takes `colors` to be a filled gradient button (white label
   + plus) — Money's New budget, New month (the budget's own gradient) and
   the calendar's New event use it.

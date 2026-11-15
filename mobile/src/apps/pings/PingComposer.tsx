@@ -23,7 +23,9 @@
 import { useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { Pressable } from '@/components/Pressable'
-import { Check, MessageCircle, Send, Users } from 'lucide-react-native'
+import { Check, ChevronRight, MessageCircle, Send, Users } from 'lucide-react-native'
+import Svg, { Line, Path, Rect } from 'react-native-svg'
+import { router } from 'expo-router'
 
 import { Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
@@ -40,7 +42,7 @@ const MAX_LEN = 120
 
 /** One person (or Everyone) as a round chip; picked ones are ringed in the
  *  Nudges blue with a check. */
-function PersonChip({ label, initials, on, onPress, color }: { label: string; initials: string | null; on: boolean; onPress: () => void; color: string }) {
+export function PersonChip({ label, initials, on, onPress, color }: { label: string; initials: string | null; on: boolean; onPress: () => void; color: string }) {
   const { c } = useTheme()
   return (
     <Pressable
@@ -68,6 +70,26 @@ function PersonChip({ label, initials, on, onPress, color }: { label: string; in
         {label}
       </Txt>
     </Pressable>
+  )
+}
+
+/** The little sheet on the "Hand-drawn note" card: ruled paper with a red
+ *  margin, a scribbled heart and hello, and a pencil resting on it. */
+function NoteArt() {
+  return (
+    <Svg width={74} height={74} viewBox="0 0 74 74">
+      <Rect x={9} y={6} width={50} height={60} rx={7} fill="#FFFBF2" transform="rotate(-6 34 36)" />
+      <Line x1={13} y1={24} x2={60} y2={19} stroke="#E9DFCB" strokeWidth={1.2} />
+      <Line x1={14} y1={34} x2={61} y2={29} stroke="#E9DFCB" strokeWidth={1.2} />
+      <Line x1={15} y1={44} x2={62} y2={39} stroke="#E9DFCB" strokeWidth={1.2} />
+      <Line x1={16} y1={54} x2={63} y2={49} stroke="#E9DFCB" strokeWidth={1.2} />
+      <Line x1={20} y1={9} x2={26} y2={66} stroke="#F1B9A6" strokeWidth={1.2} />
+      <Path d="M33 37c-5-6-12-1-8 5l8 8 8-9c4-6-3-11-8-4z" fill="none" stroke="#D9468F" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M27 26q4-6 7 0q3 5 6-1q3-5 6 0" fill="none" stroke="#2B2521" strokeWidth={2} strokeLinecap="round" />
+      <Path d="M49 64l15-27 6 3-15 27-7 3z" fill="#FFC93C" />
+      <Path d="M64 37l6 3 2-4c1-2-4-5-5-3z" fill="#F08A8A" />
+      <Path d="M49 64l6 3-7 3z" fill="#2B2521" />
+    </Svg>
   )
 }
 
@@ -242,6 +264,26 @@ export default function PingComposer({
         </View>
       ) : null}
 
+      {/* Hand-drawn note (2026-11-15): opens the sheet of paper, carrying the
+          recipients picked above. */}
+      <Pressable
+        onPress={() => router.push({ pathname: '/draw-note', params: { to: everyone ? '' : [...selected].join(',') } })}
+        disabled={sending}
+        accessibilityRole="button"
+        accessibilityLabel={t('notes.entryTitle')}
+      >
+        <View style={[styles.noteCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={styles.noteArt}>
+            <NoteArt />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 20, color: c.text }}>{t('notes.entryTitle')}</Txt>
+            <Txt style={{ fontSize: 14, color: c.textMuted, marginTop: 2 }}>{t('notes.entrySub')}</Txt>
+          </View>
+          <ChevronRight size={20} color={c.textFaint} />
+        </View>
+      </Pressable>
+
       {/* One-tap presets as a grid of tiles */}
       {presets.length > 0 ? (
         <View>
@@ -332,4 +374,6 @@ const styles = StyleSheet.create({
   },
   aiInput: { flex: 1, fontSize: 16, fontFamily: fonts.body, paddingVertical: 0 },
   sendBtn: { width: 42, height: 42 },
+  noteCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: 24, borderWidth: StyleSheet.hairlineWidth, padding: sp.md, paddingRight: sp.lg },
+  noteArt: { width: 74, height: 74, borderRadius: 18, backgroundColor: '#F4ECDD', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
 })

@@ -13,7 +13,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Vibration, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Check, ChevronRight, Layers, Phone, ThumbsUp, X } from 'lucide-react-native'
+import { Check, ChevronRight, Eye, Layers, Phone, ThumbsUp, X } from 'lucide-react-native'
+import { Image } from 'expo-image'
 
 import { Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
@@ -24,6 +25,8 @@ import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { channelName } from '@/lib/realtime'
 import { timeAgo } from '@/lib/format'
+import { getSignedUrls } from '@/lib/signedUrls'
+import { NoteViewer } from '@/apps/pings/NoteViewer'
 import type { Ping, PingAck } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
@@ -74,6 +77,10 @@ export default function NudgesBanner() {
   const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState(false)
+  // Hand-drawn notes (migration 112): signed URLs per image path, and the one
+  // open full screen.
+  const [noteUrls, setNoteUrls] = useState<Record<string, string>>({})
+  const [viewing, setViewing] = useState<{ p: ActivePing; mine: boolean } | null>(null)
   const insets = useSafeAreaInsets()
 
   const dismissKey = myEmail ? `nudges-dismissed:${myEmail}` : null
@@ -112,6 +119,21 @@ export default function NudgesBanner() {
   // version of that: tapping the push opened the app to a banner that didn't
   // list the nudge you'd just been told about.
   useRevalidateOnForeground(scheduleLoad)
+
+  const notePaths = pings
+    .map((p) => p.image_path)
+    .filter((x): x is string => !!x)
+    .join('|')
+  useEffect(() => {
+    const missing = notePaths ? notePaths.split('|').filter((x) => !noteUrls[x]) : []
+    if (!missing.length) return
+    let alive = true
+    void getSignedUrls(missing).then((m) => alive && setNoteUrls((prev) => ({ ...prev, ...m })))
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notePaths])
 
   // Load this device's dismissed-sent set for the signed-in user.
   useEffect(() => {
@@ -179,6 +201,51 @@ export default function NudgesBanner() {
 
   if (incoming.length === 0 && sent.length === 0) return null
 
+  /** Two RN modals can't be up at once on iOS: from inside the "see all"
+   *  overlay, close it first, then open the note. */
+  const openNote = (p: ActivePing, mine: boolean) => {
+    if (!expanded) return setViewing({ p, mine })
+    setExpanded(false)
+    setTimeout(() => setViewing({ p, mine }), 350)
+  }
+
+  /** The drawn note itself on its card: a small sheet of paper, tilted a
+   *  touch; tapping it opens the note full screen. */
+  const noteThumb = (p: ActivePing, mine: boolean) => {
+    const url = p.image_path ? noteUrls[p.image_path] : undefined
+    return (
+      <View style={styles.noteShadow}>
+        <Pressable
+          onPress={() => openNote(p, mine)}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={t('notes.tapToOpen')}
+          style={({ pressed }) => [styles.noteThumb, { opacity: pressed ? 0.85 : 1 }]}
+        >
+          {url ? <Image source={{ uri: url }} style={{ flex: 1 }} contentFit="cover" transition={160} /> : null}
+        </Pressable>
+      </View>
+    )
+  }
+
+  const viewer =
+    viewing && viewing.p.image_path && noteUrls[viewing.p.image_path] ? (
+      <NoteViewer
+        url={noteUrls[viewing.p.image_path]}
+        title={viewing.mine ? t('notes.youDrew') : t('notes.drew', { name: firstName(nameOf(viewing.p.sender_email)) })}
+        sub={timeAgo(viewing.p.created_at)}
+        onClose={() => setViewing(null)}
+        onGotIt={
+          viewing.mine
+            ? undefined
+            : () => {
+                const id = viewing.p.id
+                setViewing(null)
+                void ack(id)
+              }
+        }
+      />
+    ) : null
+
   // RECEIVED — a gradient card in the Nudges colour (red when it's urgent):
   // who and when as a kicker, the message large, the replies as pills inside
   // (2026-11). The card itself is inert.
@@ -197,10 +264,11 @@ export default function NudgesBanner() {
               {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
             </Txt>
             <Txt style={styles.msgOnColor} numberOfLines={3}>
-              {p.message}
+              {p.image_path ? t('notes.drew', { name: firstName(nameOf(p.sender_email)) }) : p.message}
             </Txt>
           </View>
         </View>
+        {p.image_path ? noteThumb(p, false) : null}
         <View style={styles.actions}>
           {/* Urgent: Call AND Got it, so a recipient can acknowledge
                   without having to call. */}
@@ -213,6 +281,17 @@ export default function NudgesBanner() {
             >
               <Phone size={15} strokeWidth={2.5} color={colors[1]} />
               <Txt style={[styles.pillTxt, { color: colors[1] }]}>{t('pings.call')}</Txt>
+            </Pressable>
+          ) : null}
+          {p.image_path ? (
+            <Pressable
+              onPress={() => openNote(p, false)}
+              style={({ pressed }) => [styles.pill, { backgroundColor: 'rgba(255,255,255,0.22)', opacity: pressed ? 0.8 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('notes.view')}
+            >
+              <Eye size={15} strokeWidth={2.5} color="#fff" />
+              <Txt style={[styles.pillTxt, { color: '#fff' }]}>{t('notes.view')}</Txt>
             </Pressable>
           ) : null}
           <Pressable
@@ -259,7 +338,7 @@ export default function NudgesBanner() {
               {t('pings.youSent')} · {timeAgo(p.created_at)}
             </Txt>
             <Txt style={[styles.msg, { color: c.text }]} numberOfLines={3}>
-              {p.message}
+              {p.image_path ? t('notes.youDrew') : p.message}
             </Txt>
           </View>
           {/* ✕ dismiss from my home (persists on this device). */}
@@ -273,6 +352,8 @@ export default function NudgesBanner() {
             <X size={14} color={c.textMuted} />
           </Pressable>
         </View>
+
+        {p.image_path ? noteThumb(p, true) : null}
 
         {/* One line, however big the family (owner, 2026-11): "Seen by:"
                 then the names, the most recent first; the count on the right. */}
@@ -316,7 +397,12 @@ export default function NudgesBanner() {
 
   // Up to two: just the cards.
   if (all.length < STACK_FROM) {
-    return <View style={{ gap: sp.sm, marginBottom: sp.lg }}>{all.map(render)}</View>
+    return (
+      <View style={{ gap: sp.sm, marginBottom: sp.lg }}>
+        {all.map(render)}
+        {viewer}
+      </View>
+    )
   }
 
   // Three or more (owner, 2026-11: a busy day turned Home into a long scroll
@@ -409,6 +495,7 @@ export default function NudgesBanner() {
           </ScrollView>
         </View>
       </Modal>
+      {viewer}
     </View>
   )
 }
@@ -422,6 +509,23 @@ const firstName = (n: string) => n.split(' ')[0]
 
 const styles = StyleSheet.create({
   card: { borderRadius: 24, padding: sp.md, gap: sp.md },
+  noteThumb: {
+    alignSelf: 'center',
+    height: 210,
+    aspectRatio: 0.72,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#FFFBF2',
+    transform: [{ rotate: '-2deg' }],
+    marginVertical: 4,
+  },
+  noteShadow: {
+    alignSelf: 'center',
+    shadowColor: '#2b1d10',
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
   top: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.md },
   emojiOnColor: {
     width: 46,

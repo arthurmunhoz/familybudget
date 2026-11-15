@@ -236,6 +236,8 @@ export interface Ping {
   recipients: string[] | null
   /** Urgent nudge (Need-Help-style): red UI, sound/vibration, Call CTA. */
   high_priority: boolean
+  /** A hand-drawn note (migration 112): PNG under "<household>/notes/". */
+  image_path?: string | null
   created_at: string
   expires_at: string
 }

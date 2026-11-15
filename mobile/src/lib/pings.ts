@@ -109,6 +109,7 @@ export async function sendPing(
   message: string,
   recipients: string[] | null = null,
   highPriority: boolean = false,
+  extra: { imagePath?: string; expiresAt?: string } = {},
 ): Promise<void> {
   const { data, error } = await supabase
     .from('pings')
@@ -118,16 +119,29 @@ export async function sendPing(
       message,
       recipients: highPriority ? null : recipients,
       high_priority: highPriority,
+      ...(extra.imagePath ? { image_path: extra.imagePath } : {}),
+      ...(extra.expiresAt ? { expires_at: extra.expiresAt } : {}),
     })
     .select()
     .single()
   if (error || !data) throw error ?? new Error('Could not send ping')
   // Log shape, not content: nudge text is user content and web_events is
   // readable by the GLOBAL super-admin across every household.
-  track('nudge.sent', { messageLength: message.length, kind, recipients: recipients?.length ?? null })
+  track('nudge.sent', { messageLength: message.length, kind, recipients: recipients?.length ?? null, drawing: !!extra.imagePath })
   // Best-effort, but no longer INVISIBLE: this call silently failed for every
   // nudge for two months. See lib/pushFanout.ts.
   await requestPushFanout({ ping_id: data.id }, 'nudge')
+}
+
+// A hand-drawn note was sent from its own screen: the Nudges screen behind it
+// shows the same "sent" toast as for any nudge.
+const noteSentListeners = new Set<() => void>()
+export function onNoteSent(cb: () => void): () => void {
+  noteSentListeners.add(cb)
+  return () => noteSentListeners.delete(cb)
+}
+export function emitNoteSent(): void {
+  noteSentListeners.forEach((cb) => cb())
 }
 
 /** AI: map free text → {kind, emoji, message} in the user's language, then send

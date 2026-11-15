@@ -277,3 +277,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-109-quiz-synced-start.sql (quiz: state.opens_at lead-in per question — question 1 waits for every phone's quiz_ready (max 12 s) then opens 3 s later; quiz_buzz refuses before it; game_server_now() for round-trip clock sync)
 --   migration-110-game-rematch.sql (game_rematch: "Play again" — the first tap creates the room and stores it in the finished game's state.rematch; everyone else joins THAT room on their old team)
 --   migration-111-security-hardening.sql (security review: Modo Casa device sessions bound + ended server-side on unpair, kept out of documents/location, money behind a server-checked PIN; home_devices/households column limits; own-row tables pinned to my households; join_household counts wrong codes; CSPRNG join codes)
+--   migration-112-drawn-notes.sql (pings.image_path: a hand-drawn note PNG under <household>/notes/; Modo Casa may read notes)

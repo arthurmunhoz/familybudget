@@ -5,7 +5,7 @@
 // There is no history here: an incoming nudge surfaces on the Hub through
 // NudgesBanner (which owns its own Supabase Realtime subscription and carries
 // the Got it / Call actions), and it drops off once acknowledged or expired.
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { ChevronLeft, Settings2 } from 'lucide-react-native'
@@ -15,7 +15,7 @@ import { RoofExamples } from '@/components/RoofExamples'
 import { Toast, type ToastData } from '@/components/Toast'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
-import { fetchPingPresets } from '@/lib/pings'
+import { fetchPingPresets, onNoteSent } from '@/lib/pings'
 import type { PingPreset } from '@/lib/types'
 import { fonts, sp, useTheme } from '@/theme/theme'
 import PingComposer from '@/apps/pings/PingComposer'
@@ -28,6 +28,7 @@ export default function NudgesScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   // A NEW object each send so the toast re-triggers even for the same nudge.
   const [toast, setToast] = useState<ToastData | null>(null)
+  useEffect(() => onNoteSent(() => setToast({ emoji: '✏️', text: t('notes.sent') })), [t])
 
   // "Write your own" is the last thing on the page, so the keyboard would sit
   // right over it (owner, 2026-11: you couldn't see what you were typing).

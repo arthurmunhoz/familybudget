@@ -154,6 +154,8 @@ function Chrome() {
           }
         >
           <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+          {/* The sheet of paper: no swipe-to-dismiss (it would fight the pen). */}
+          <Stack.Screen name="draw-note" options={{ presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }} />
         </Stack>
         {/* The opening: starts identical to the native splash, animates, then
             fades into the app once the session is known (LaunchIntro). */}
