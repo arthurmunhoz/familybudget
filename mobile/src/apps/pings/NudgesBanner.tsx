@@ -1,7 +1,7 @@
 // Home-screen nudge banners (the RN equivalent of the PWA's PingsBanner). Two
 // groups, both between the Hub header and the app grid:
 //  • RECEIVED — active nudges sent TO me I haven't acknowledged, each with a
-//    respond CTA (Got it / Call). The row itself is inert: this banner IS the
+//    compact respond CTA (Got it / Call) on a light card (red when urgent). The row itself is inert: this banner IS the
 //    inbox — there is no nudge history screen behind it.
 //  • SENT — active nudges I sent, showing who has acknowledged ("seen by …"),
 //    each with an ✕ to dismiss from my home (persisted per-device via
@@ -247,95 +247,156 @@ export default function NudgesBanner() {
   // blue (owner, 2026-11-15: the blue under a drawing didn't feel right):
   // dark ink type, the note pinned in the middle, View / Got it in ink.
   const renderIncomingNote = (p: ActivePing) => (
-    <GradientBox key={p.id} colors={KRAFT} radius={24} style={[styles.card, styles.kraftCard]}>
-      <View style={styles.top}>
-        {noteThumb(p, false)}
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={1}>
-            {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
-          </Txt>
-          <Txt style={[styles.msg, { color: INK }]} numberOfLines={2}>
-            {t('notes.drew', { name: firstName(nameOf(p.sender_email)) })}
-          </Txt>
+    <GradientBox key={p.id} colors={KRAFT} radius={24} style={[styles.card, styles.kraftCard, styles.noteCard]}>
+      {noteThumb(p, false)}
+      <View style={styles.noteSide}>
+        <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={2}>
+          {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
+        </Txt>
+        <View style={styles.actions}>
+          <Pressable
+            onPress={() => openNote(p, false)}
+            style={({ pressed }) => [styles.roundPill, { backgroundColor: 'rgba(43,37,33,0.08)', opacity: pressed ? 0.8 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('notes.view')}
+          >
+            <Eye size={17} strokeWidth={2.4} color={INK} />
+          </Pressable>
+          <Pressable
+            onPress={() => ack(p.id)}
+            style={({ pressed }) => [styles.chipBtn, { backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('pings.gotIt')}
+          >
+            <ThumbsUp size={15} strokeWidth={2.5} color="#FFFBF2" />
+            <Txt style={[styles.pillTxt, { color: '#FFFBF2' }]}>{t('pings.gotIt')}</Txt>
+          </Pressable>
         </View>
-      </View>
-      <View style={styles.actions}>
-        <Pressable
-          onPress={() => openNote(p, false)}
-          style={({ pressed }) => [styles.pill, { backgroundColor: 'rgba(43,37,33,0.08)', opacity: pressed ? 0.8 : 1 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t('notes.view')}
-        >
-          <Eye size={15} strokeWidth={2.5} color={INK} />
-          <Txt style={[styles.pillTxt, { color: INK }]}>{t('notes.view')}</Txt>
-        </Pressable>
-        <Pressable
-          onPress={() => ack(p.id)}
-          style={({ pressed }) => [styles.pill, { backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
-          accessibilityRole="button"
-          accessibilityLabel={t('pings.gotIt')}
-        >
-          <ThumbsUp size={15} strokeWidth={2.5} color="#FFFBF2" />
-          <Txt style={[styles.pillTxt, { color: '#FFFBF2' }]}>{t('pings.gotIt')}</Txt>
-        </Pressable>
       </View>
     </GradientBox>
   )
 
+  // SENT hand-drawn note — the drawing does the talking (owner, 2026-11-15):
+  // it fills the card's height on the left; beside it only when, who has
+  // seen it, and the ✕.
+  const renderSentNote = (p: ActivePing) => {
+    const seen = p.acks.filter((a) => a.user_email !== myEmail).sort((x, y) => y.created_at.localeCompare(x.created_at))
+    const audience = (p.recipients?.length ? p.recipients : profiles.map((m) => m.email)).filter((e) => e !== myEmail)
+    const total = Math.max(audience.length, seen.length)
+    const all = total > 0 && seen.length === total
+    return (
+      <View key={p.id} style={[styles.card, styles.noteCard, { backgroundColor: c.card, borderColor: c.border, borderWidth: StyleSheet.hairlineWidth }]}>
+        {noteThumb(p, true)}
+        <View style={styles.noteSide}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm }}>
+            <Txt style={[styles.kicker, { flex: 1, color: c.textMuted }]} numberOfLines={1}>
+              {t('pings.youSent')} · {timeAgo(p.created_at)}
+            </Txt>
+            <Pressable
+              onPress={() => dismiss(p.id)}
+              hitSlop={8}
+              style={[styles.close, { backgroundColor: c.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+            >
+              <X size={14} color={c.textMuted} />
+            </Pressable>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Txt style={{ fontSize: 14, color: c.textMuted }} numberOfLines={2}>
+              <Txt style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{t('pings.seenByLabel')}: </Txt>
+              {seen.length ? seen.map((a) => firstName(nameOf(a.user_email))).join(', ') : t('pings.nobodyYet')}
+            </Txt>
+            {total ? (
+              <View style={[styles.count, { alignSelf: 'flex-start', backgroundColor: all ? c.income + '22' : c.surface }]}>
+                {all ? <Check size={12} color={c.income} strokeWidth={3} /> : null}
+                <Txt style={{ fontSize: 12, fontWeight: '700', color: all ? c.income : c.textMuted }}>
+                  {t('pings.seenCount', { n: seen.length, total })}
+                </Txt>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    )
+  }
+
+  // RECEIVED text nudge (owner, 2026-11-15: the full blue card and the
+  // full-width Got it were heavy) — a light card like the sent one, the emoji
+  // in its Nudges tile, a thin Nudges-blue edge, and compact replies in the
+  // corner. Urgent ones stay red: that colour is a warning, not decoration.
   const renderIncoming = (p: ActivePing) => {
     if (p.image_path) return renderIncomingNote(p)
     const isHigh = p.high_priority
     const phone = phones[p.sender_email]
-    const colors = isHigh ? URGENT : (APP_GRADIENT.pings as [string, string])
-    return (
-      <GradientBox key={p.id} colors={colors} radius={24} style={styles.card}>
+    const blue = (APP_GRADIENT.pings as [string, string])[1]
+    const body = (
+      <>
         <View style={styles.top}>
-          <View style={styles.emojiOnColor}>
-            <Txt style={styles.emoji}>{p.emoji}</Txt>
-          </View>
+          {isHigh ? (
+            <View style={styles.emojiOnColor}>
+              <Txt style={styles.emoji}>{p.emoji}</Txt>
+            </View>
+          ) : (
+            <GradientBox colors={APP_GRADIENT.pings as [string, string]} radius={14} style={styles.emojiTile}>
+              <Txt style={styles.emoji}>{p.emoji}</Txt>
+            </GradientBox>
+          )}
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt style={styles.kickerOnColor} numberOfLines={1}>
+            <Txt style={isHigh ? styles.kickerOnColor : [styles.kicker, { color: c.textMuted }]} numberOfLines={1}>
               {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
             </Txt>
-            <Txt style={styles.msgOnColor} numberOfLines={2}>
+            <Txt style={isHigh ? styles.msgOnColor : [styles.msg, { color: c.text }]} numberOfLines={2}>
               {p.message}
             </Txt>
           </View>
         </View>
-        <View style={styles.actions}>
+        <View style={styles.replies}>
           {/* Urgent: Call AND Got it, so a recipient can acknowledge
-                  without having to call. */}
+              without having to call. */}
           {isHigh && phone ? (
             <Pressable
               onPress={() => void Linking.openURL(`tel:${phone}`)}
-              style={({ pressed }) => [styles.pill, { backgroundColor: '#fff', opacity: pressed ? 0.8 : 1 }]}
+              style={({ pressed }) => [styles.chipBtn, { backgroundColor: '#fff', opacity: pressed ? 0.8 : 1 }]}
               accessibilityRole="button"
               accessibilityLabel={t('pings.call')}
             >
-              <Phone size={15} strokeWidth={2.5} color={colors[1]} />
-              <Txt style={[styles.pillTxt, { color: colors[1] }]}>{t('pings.call')}</Txt>
+              <Phone size={14} strokeWidth={2.5} color={URGENT[1]} />
+              <Txt style={[styles.pillTxt, { color: URGENT[1] }]}>{t('pings.call')}</Txt>
             </Pressable>
           ) : null}
           <Pressable
             onPress={() => ack(p.id)}
             style={({ pressed }) => [
-              styles.pill,
-              isHigh && phone ? { backgroundColor: 'rgba(255,255,255,0.22)' } : { backgroundColor: '#fff' },
-              { opacity: pressed ? 0.8 : 1 },
+              styles.chipBtn,
+              { backgroundColor: isHigh ? (phone ? 'rgba(255,255,255,0.22)' : '#fff') : blue, opacity: pressed ? 0.85 : 1 },
             ]}
             accessibilityRole="button"
             accessibilityLabel={t('pings.gotIt')}
           >
-            <ThumbsUp size={15} strokeWidth={2.5} color={isHigh && phone ? '#fff' : colors[1]} />
-            <Txt style={[styles.pillTxt, { color: isHigh && phone ? '#fff' : colors[1] }]}>{t('pings.gotIt')}</Txt>
+            <ThumbsUp size={14} strokeWidth={2.5} color={isHigh && !phone ? URGENT[1] : '#fff'} />
+            <Txt style={[styles.pillTxt, { color: isHigh && !phone ? URGENT[1] : '#fff' }]}>{t('pings.gotIt')}</Txt>
           </Pressable>
         </View>
-      </GradientBox>
+      </>
+    )
+    if (isHigh) {
+      return (
+        <GradientBox key={p.id} colors={URGENT} radius={24} style={styles.card}>
+          {body}
+        </GradientBox>
+      )
+    }
+    return (
+      <View key={p.id} style={[styles.card, { backgroundColor: c.card, borderWidth: 1, borderColor: blue + '55' }]}>
+        {body}
+      </View>
     )
   }
 
   // SENT — a plain card: what I sent, then WHO HAS SEEN IT, newest first.
   const renderSent = (p: ActivePing) => {
+    if (p.image_path) return renderSentNote(p)
     const seen = p.acks.filter((a) => a.user_email !== myEmail).sort((x, y) => y.created_at.localeCompare(x.created_at))
     const audience = (p.recipients?.length ? p.recipients : profiles.map((m) => m.email)).filter((e) => e !== myEmail)
     const total = Math.max(audience.length, seen.length)
@@ -352,19 +413,15 @@ export default function NudgesBanner() {
         ]}
       >
         <View style={styles.top}>
-          {p.image_path ? (
-            noteThumb(p, true)
-          ) : (
-            <GradientBox colors={APP_GRADIENT.pings as [string, string]} radius={14} style={styles.emojiTile}>
-              <Txt style={styles.emoji}>{p.emoji}</Txt>
-            </GradientBox>
-          )}
+          <GradientBox colors={APP_GRADIENT.pings as [string, string]} radius={14} style={styles.emojiTile}>
+            <Txt style={styles.emoji}>{p.emoji}</Txt>
+          </GradientBox>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Txt style={[styles.kicker, { color: c.textMuted }]} numberOfLines={1}>
               {t('pings.youSent')} · {timeAgo(p.created_at)}
             </Txt>
             <Txt style={[styles.msg, { color: c.text }]} numberOfLines={2}>
-              {p.image_path ? t('notes.youDrew') : p.message}
+              {p.message}
             </Txt>
           </View>
           {/* ✕ dismiss from my home (persists on this device). */}
@@ -469,7 +526,9 @@ export default function NudgesBanner() {
 /** How much of the next card shows at the right edge. */
 const PEEK = 28
 /** Every nudge card is this tall — text, urgent, sent or a drawing. */
-const CARD_H = 178
+const CARD_H = 142
+/** The drawing fills the card's height (minus padding and the tilt). */
+const NOTE_H = CARD_H - sp.md * 2 - 4
 const GAP = 10
 
 const KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
@@ -486,13 +545,16 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: sp.sm },
   dot: { height: 6, borderRadius: 3 },
   noteThumb: {
-    width: 64,
-    height: 88,
-    borderRadius: 7,
+    height: NOTE_H,
+    aspectRatio: 0.8,
+    borderRadius: 9,
     overflow: 'hidden',
     backgroundColor: '#FFFBF2',
-    transform: [{ rotate: '-3deg' }],
+    transform: [{ rotate: '-2deg' }],
   },
+  noteCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: sp.md },
+  noteSide: { flex: 1, minWidth: 0, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2 },
+  roundPill: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   noteShadow: {
     shadowColor: '#2b1d10',
     shadowOpacity: 0.22,
@@ -535,16 +597,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   actions: { flexDirection: 'row', gap: sp.sm },
-  pill: {
-    flex: 1,
-    height: 42,
+  pillTxt: { fontWeight: '700', fontSize: 14 },
+  replies: { flexDirection: 'row', justifyContent: 'flex-end', gap: sp.sm },
+  chipBtn: {
+    height: 36,
+    paddingHorizontal: 16,
     borderRadius: radius.pill,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  pillTxt: { fontWeight: '700', fontSize: 14 },
   close: {
     width: 26,
     height: 26,

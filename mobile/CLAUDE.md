@@ -197,7 +197,7 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 - **Nudges carousel (Home, 2026-11-15):** one nudge shows full width; two or more
   sit in a horizontal snap carousel (next card peeks, dots under it). Card height
   is FIXED (`CARD_H`) for every kind — text, urgent, sent, drawing — so Home never
-  jumps (owner); a drawing's thumbnail sits in the icon's place. It replaced the
+  jumps (owner); a drawing fills the card's height on the left with only when / seen-by / replies beside it. It replaced the
   stack + "see all" overlay. The Roof dock's mute persists per device
   (AsyncStorage `roof.paused`) until tapped again.
   Tapping a `location-request` nudge PUSH acks it, uploads a fix and lands on
@@ -378,7 +378,8 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   optional `action` (tappable pill, stays 5 s). Nothing matched / empty lists
   → no sheet. Pinned by `__tests__/receiptMatches.test.ts`.
 - **Nudge banners on the Hub (`apps/pings/NudgesBanner`, 2026-11):** a
-  RECEIVED nudge is a gradient card in the Nudges colour (red when urgent),
+  RECEIVED nudge is a LIGHT card with a thin Nudges-blue edge (red gradient
+  only when urgent; owner 2026-11-15: the full blue was heavy),
   "From Sam · 4m ago", the message large, Got it / Call as pills inside. A
   SENT nudge is a plain card with ONE line "Seen by: Ana, Sam" (first
   names, the most recent first — a row per person grew too tall for big
