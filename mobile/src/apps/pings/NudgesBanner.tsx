@@ -1,7 +1,8 @@
 // Home-screen nudge banners (the RN equivalent of the PWA's PingsBanner). Two
 // groups, both between the Hub header and the app grid:
 //  • RECEIVED — active nudges sent TO me I haven't acknowledged, each with a
-//    compact respond CTA (Got it / Call) on a light card (red when urgent). The row itself is inert: this banner IS the
+//    compact respond CTA (a thumbs-up for Got it, Call when urgent) on a light
+//    card (red when urgent); a drawing has "👁 Ver" + 👍. The row itself is inert: this banner IS the
 //    inbox — there is no nudge history screen behind it.
 //  • SENT — active nudges I sent, showing who has acknowledged ("seen by …"),
 //    each with an ✕ to dismiss from my home (persisted per-device via
@@ -256,20 +257,20 @@ export default function NudgesBanner() {
         <View style={styles.actions}>
           <Pressable
             onPress={() => openNote(p, false)}
-            style={({ pressed }) => [styles.roundPill, { backgroundColor: 'rgba(43,37,33,0.08)', opacity: pressed ? 0.8 : 1 }]}
+            style={({ pressed }) => [styles.chipBtn, { backgroundColor: 'rgba(43,37,33,0.08)', opacity: pressed ? 0.8 : 1 }]}
             accessibilityRole="button"
             accessibilityLabel={t('notes.view')}
           >
-            <Eye size={17} strokeWidth={2.4} color={INK} />
+            <Eye size={15} strokeWidth={2.4} color={INK} />
+            <Txt style={[styles.pillTxt, { color: INK }]}>{t('notes.view')}</Txt>
           </Pressable>
           <Pressable
             onPress={() => ack(p.id)}
-            style={({ pressed }) => [styles.chipBtn, { backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
+            style={({ pressed }) => [styles.roundPill, { backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
             accessibilityRole="button"
             accessibilityLabel={t('pings.gotIt')}
           >
-            <ThumbsUp size={15} strokeWidth={2.5} color="#FFFBF2" />
-            <Txt style={[styles.pillTxt, { color: '#FFFBF2' }]}>{t('pings.gotIt')}</Txt>
+            <ThumbsUp size={16} strokeWidth={2.5} color="#FFFBF2" />
           </Pressable>
         </View>
       </View>
@@ -368,14 +369,13 @@ export default function NudgesBanner() {
           <Pressable
             onPress={() => ack(p.id)}
             style={({ pressed }) => [
-              styles.chipBtn,
+              styles.roundPill,
               { backgroundColor: isHigh ? (phone ? 'rgba(255,255,255,0.22)' : '#fff') : blue, opacity: pressed ? 0.85 : 1 },
             ]}
             accessibilityRole="button"
             accessibilityLabel={t('pings.gotIt')}
           >
-            <ThumbsUp size={14} strokeWidth={2.5} color={isHigh && !phone ? URGENT[1] : '#fff'} />
-            <Txt style={[styles.pillTxt, { color: isHigh && !phone ? URGENT[1] : '#fff' }]}>{t('pings.gotIt')}</Txt>
+            <ThumbsUp size={16} strokeWidth={2.5} color={isHigh && !phone ? URGENT[1] : '#fff'} />
           </Pressable>
         </View>
       </>
