@@ -2,8 +2,8 @@
 // groups, both between the Hub header and the app grid:
 //  • RECEIVED — active nudges sent TO me I haven't acknowledged, each with a
 //    compact respond CTA (a thumbs-up for Got it, Call when urgent) on a light
-//    card (red when urgent); a drawing's free side is two big buttons,
-//    👁 | 👍, split by a vertical hairline. The row itself is inert: this banner IS the
+//    card (red when urgent); a received drawing bleeds off the card's left
+//    half and fades into kraft, with "View note" on the right. The row itself is inert: this banner IS the
 //    inbox — there is no nudge history screen behind it.
 //  • SENT — active nudges I sent, showing who has acknowledged ("seen by …"),
 //    each with an ✕ to dismiss from my home (persisted per-device via
@@ -20,6 +20,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Vibration, View, useWindowD
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Check, Eye, Phone, ThumbsUp, X } from 'lucide-react-native'
 import { Image } from 'expo-image'
+import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg'
 
 import { Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
@@ -248,38 +249,54 @@ export default function NudgesBanner() {
   // RECEIVED hand-drawn note — a sheet of kraft paper instead of the Nudges
   // blue (owner, 2026-11-15: the blue under a drawing didn't feel right):
   // dark ink type, the note pinned in the middle, View / Got it in ink.
-  const renderIncomingNote = (p: ActivePing) => (
-    <GradientBox key={p.id} colors={KRAFT} radius={24} style={[styles.card, styles.kraftCard, styles.noteCard]}>
-      {noteThumb(p, false)}
-      <View style={styles.noteSide}>
-        <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={1}>
-          {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
-        </Txt>
-        {/* The empty side of the card IS the two buttons (owner, 2026-11-15):
-            👁 on the left, 👍 on the right, split by a vertical hairline, no
-            box behind them, icons a darker shade of the kraft. */}
-        <View style={styles.noteButtons}>
+  // RECEIVED hand-drawn note (owner, 2026-11-15): the drawing bleeds off
+  // the card's left half — just the top of the sheet, edge to edge — and
+  // fades into the kraft; who and when sit on the right with one "View note"
+  // button. The whole card opens it; "Got it" lives in the full-screen view.
+  const renderIncomingNote = (p: ActivePing) => {
+    const url = p.image_path ? noteUrls[p.image_path] : undefined
+    return (
+      <Pressable
+        key={p.id}
+        onPress={() => openNote(p, false)}
+        accessibilityRole="button"
+        accessibilityLabel={t('notes.tapToOpen')}
+        style={({ pressed }) => [styles.card, styles.kraftCard, styles.bleedCard, pressed && { opacity: 0.92 }]}
+      >
+        <View style={styles.bleedArt} pointerEvents="none">
+          {url ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top" transition={160} /> : null}
+          <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
+            <Defs>
+              <SvgGradient id="noteFade" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0.35" stopColor={KRAFT_SOLID} stopOpacity={0} />
+                <Stop offset="1" stopColor={KRAFT_SOLID} stopOpacity={1} />
+              </SvgGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100" height="100" fill="url(#noteFade)" />
+          </Svg>
+        </View>
+        <View style={styles.bleedSide}>
+          <View>
+            <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={1}>
+              {timeAgo(p.created_at)}
+            </Txt>
+            <Txt style={[styles.msg, { color: INK, fontSize: 17, lineHeight: 21 }]} numberOfLines={2}>
+              {t('notes.drew', { name: firstName(nameOf(p.sender_email)) })}
+            </Txt>
+          </View>
           <Pressable
             onPress={() => openNote(p, false)}
-            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(120,90,50,0.10)' }]}
+            style={({ pressed }) => [styles.chipBtn, { alignSelf: 'flex-start', backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
             accessibilityRole="button"
-            accessibilityLabel={t('notes.view')}
+            accessibilityLabel={t('notes.viewNote')}
           >
-            <Eye size={26} strokeWidth={2.1} color={KRAFT_ICON} />
-          </Pressable>
-          <View style={styles.noteDivider} />
-          <Pressable
-            onPress={() => ack(p.id)}
-            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(120,90,50,0.10)' }]}
-            accessibilityRole="button"
-            accessibilityLabel={t('pings.gotIt')}
-          >
-            <ThumbsUp size={25} strokeWidth={2.1} color={KRAFT_ICON} />
+            <Eye size={15} strokeWidth={2.4} color="#FFFBF2" />
+            <Txt style={[styles.pillTxt, { color: '#FFFBF2' }]}>{t('notes.viewNote')}</Txt>
           </Pressable>
         </View>
-      </View>
-    </GradientBox>
-  )
+      </Pressable>
+    )
+  }
 
   // SENT hand-drawn note — the drawing does the talking (owner, 2026-11-15):
   // it fills the card's height on the left; beside it only when, who has
@@ -538,8 +555,8 @@ const GAP = 10
 const KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
 const INK = '#2B2521'
 const INK_SOFT = 'rgba(43,37,33,0.62)'
-/** A darker shade of the kraft — the drawing card's view / got-it icons. */
-const KRAFT_ICON = '#A07A4C'
+/** The flat kraft the received drawing fades into. */
+const KRAFT_SOLID = '#F3E2C6'
 
 const URGENT: [string, string] = ['#F2605A', '#C9353F']
 
@@ -560,9 +577,9 @@ const styles = StyleSheet.create({
   },
   noteCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: sp.md },
   noteSide: { flex: 1, minWidth: 0, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2 },
-  noteButtons: { flex: 1, flexDirection: 'row', alignItems: 'stretch', marginTop: 4 },
-  noteButton: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
-  noteDivider: { width: StyleSheet.hairlineWidth, backgroundColor: KRAFT_ICON, opacity: 0.6, marginVertical: 14 },
+  bleedCard: { padding: 0, flexDirection: 'row', backgroundColor: KRAFT_SOLID, overflow: 'hidden', gap: 0 },
+  bleedArt: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '58%' },
+  bleedSide: { marginLeft: '50%', flex: 1, padding: sp.md, justifyContent: 'space-between' },
   roundPill: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   noteShadow: {
     shadowColor: '#2b1d10',

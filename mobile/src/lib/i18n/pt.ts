@@ -2059,6 +2059,7 @@ export const pt: Record<keyof typeof en, string> = {
   'notes.color': "Cor da caneta",
   'notes.size': "Espessura",
   'notes.view': "Ver",
+  'notes.viewNote': "Ver nota",
   'notes.drew': "{name} desenhou um recado",
   'notes.youDrew': "Seu recado à mão",
   'notes.tapToOpen': "Toque para ver em tela cheia",

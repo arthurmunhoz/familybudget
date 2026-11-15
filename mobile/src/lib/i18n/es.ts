@@ -2059,6 +2059,7 @@ export const es: Record<keyof typeof en, string> = {
   'notes.color': "Color del lápiz",
   'notes.size': "Grosor",
   'notes.view': "Ver",
+  'notes.viewNote': "Ver nota",
   'notes.drew': "{name} te dibujó una nota",
   'notes.youDrew': "Tu nota a mano",
   'notes.tapToOpen': "Toca para verla en pantalla completa",

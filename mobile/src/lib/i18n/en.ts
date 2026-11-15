@@ -2069,6 +2069,7 @@ export const en = {
   'notes.color': "Pen color",
   'notes.size': "Thickness",
   'notes.view': "View",
+  'notes.viewNote': "View note",
   'notes.drew': "{name} drew you a note",
   'notes.youDrew': "Your hand-drawn note",
   'notes.tapToOpen': "Tap to see it full screen",
