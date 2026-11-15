@@ -197,6 +197,8 @@ Architecture, systems, remaining setup, and the improvement backlog are in
 - **Nudges carousel (Home, 2026-11-15):** one nudge shows full width; two or more
   sit in a horizontal snap carousel (next card peeks, dots under it) whose height
   animates to the card on screen. It replaced the stack + "see all" overlay.
+  Tapping a `location-request` nudge PUSH acks it, uploads a fix and lands on
+  Home (`backgroundNotifications.answerLocationRequests`).
 - **Admin (2026-11):** `ADMIN_LOOK` (palette.ts) — vivid indigo gradient for
   the overview card (the old navy made the week bars muddy on light) + `tint`
   for tabs/period pills (soft wash + outline), toggles, initials and Create.
