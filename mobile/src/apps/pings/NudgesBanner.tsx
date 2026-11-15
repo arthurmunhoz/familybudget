@@ -14,7 +14,7 @@
 // Its own lightweight Realtime subscription (distinct channel from the Nudges
 // screen) so it stays live on the Hub. Renders nothing when both groups empty.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Animated, Linking, Pressable, ScrollView, StyleSheet, Vibration, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import { Linking, Pressable, ScrollView, StyleSheet, Vibration, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Check, Eye, Phone, ThumbsUp, X } from 'lucide-react-native'
 import { Image } from 'expo-image'
@@ -82,11 +82,6 @@ export default function NudgesBanner() {
   // Which card the carousel shows (for the dots).
   const [page, setPage] = useState(0)
   const { width: screenW } = useWindowDimensions()
-  // The carousel takes the height of the card on screen (a one-line nudge
-  // next to a drawing would otherwise leave a hole under it).
-  const [cardH, setCardH] = useState<Record<string, number>>({})
-  const [carouselH] = useState(() => new Animated.Value(0))
-  const heightSet = useRef(false)
   // Hand-drawn notes (migration 112): signed URLs per image path, and the one
   // open full screen.
   const [noteUrls, setNoteUrls] = useState<Record<string, string>>({})
@@ -203,30 +198,19 @@ export default function NudgesBanner() {
   }, [highIds])
 
 
-  const shownId = [...incoming, ...sent][page]?.id ?? [...incoming, ...sent][0]?.id
-  const shownH = shownId ? cardH[shownId] : undefined
-  useEffect(() => {
-    if (!shownH) return
-    if (!heightSet.current) {
-      heightSet.current = true
-      carouselH.setValue(shownH)
-      return
-    }
-    Animated.timing(carouselH, { toValue: shownH, duration: 220, useNativeDriver: false }).start()
-  }, [shownH, carouselH])
-
   if (incoming.length === 0 && sent.length === 0) return null
 
   const openNote = (p: ActivePing, mine: boolean) => setViewing({ p, mine })
 
-  /** The drawn note itself on its card: a small sheet of paper, tilted a
-   *  touch; tapping it opens the note full screen. */
+  /** The drawn note on its card, in the icon's place: a little sheet of
+   *  paper, tilted a touch; tapping it opens the note full screen. */
   const noteThumb = (p: ActivePing, mine: boolean) => {
     const url = p.image_path ? noteUrls[p.image_path] : undefined
     return (
       <View style={styles.noteShadow}>
         <Pressable
           onPress={() => openNote(p, mine)}
+          hitSlop={6}
           accessibilityRole="imagebutton"
           accessibilityLabel={t('notes.tapToOpen')}
           style={({ pressed }) => [styles.noteThumb, { opacity: pressed ? 0.85 : 1 }]}
@@ -262,12 +246,10 @@ export default function NudgesBanner() {
   // RECEIVED hand-drawn note — a sheet of kraft paper instead of the Nudges
   // blue (owner, 2026-11-15: the blue under a drawing didn't feel right):
   // dark ink type, the note pinned in the middle, View / Got it in ink.
-  const renderIncomingNote = (p: ActivePing, fill: boolean) => (
-    <GradientBox key={p.id} colors={KRAFT} radius={24} style={[styles.card, styles.kraftCard, fill && styles.fill]}>
+  const renderIncomingNote = (p: ActivePing) => (
+    <GradientBox key={p.id} colors={KRAFT} radius={24} style={[styles.card, styles.kraftCard]}>
       <View style={styles.top}>
-        <View style={styles.emojiOnKraft}>
-          <Txt style={styles.emoji}>{p.emoji}</Txt>
-        </View>
+        {noteThumb(p, false)}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={1}>
             {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
@@ -277,7 +259,6 @@ export default function NudgesBanner() {
           </Txt>
         </View>
       </View>
-      {noteThumb(p, false)}
       <View style={styles.actions}>
         <Pressable
           onPress={() => openNote(p, false)}
@@ -301,13 +282,13 @@ export default function NudgesBanner() {
     </GradientBox>
   )
 
-  const renderIncoming = (p: ActivePing, fill = false) => {
-    if (p.image_path) return renderIncomingNote(p, fill)
+  const renderIncoming = (p: ActivePing) => {
+    if (p.image_path) return renderIncomingNote(p)
     const isHigh = p.high_priority
     const phone = phones[p.sender_email]
     const colors = isHigh ? URGENT : (APP_GRADIENT.pings as [string, string])
     return (
-      <GradientBox key={p.id} colors={colors} radius={24} style={[styles.card, fill && styles.fill]}>
+      <GradientBox key={p.id} colors={colors} radius={24} style={styles.card}>
         <View style={styles.top}>
           <View style={styles.emojiOnColor}>
             <Txt style={styles.emoji}>{p.emoji}</Txt>
@@ -316,7 +297,7 @@ export default function NudgesBanner() {
             <Txt style={styles.kickerOnColor} numberOfLines={1}>
               {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
             </Txt>
-            <Txt style={styles.msgOnColor} numberOfLines={3}>
+            <Txt style={styles.msgOnColor} numberOfLines={2}>
               {p.message}
             </Txt>
           </View>
@@ -354,7 +335,7 @@ export default function NudgesBanner() {
   }
 
   // SENT — a plain card: what I sent, then WHO HAS SEEN IT, newest first.
-  const renderSent = (p: ActivePing, fill = false) => {
+  const renderSent = (p: ActivePing) => {
     const seen = p.acks.filter((a) => a.user_email !== myEmail).sort((x, y) => y.created_at.localeCompare(x.created_at))
     const audience = (p.recipients?.length ? p.recipients : profiles.map((m) => m.email)).filter((e) => e !== myEmail)
     const total = Math.max(audience.length, seen.length)
@@ -363,7 +344,6 @@ export default function NudgesBanner() {
         key={p.id}
         style={[
           styles.card,
-          fill && styles.fill,
           {
             backgroundColor: c.card,
             borderColor: c.border,
@@ -372,14 +352,18 @@ export default function NudgesBanner() {
         ]}
       >
         <View style={styles.top}>
-          <GradientBox colors={APP_GRADIENT.pings as [string, string]} radius={14} style={styles.emojiTile}>
-            <Txt style={styles.emoji}>{p.emoji}</Txt>
-          </GradientBox>
+          {p.image_path ? (
+            noteThumb(p, true)
+          ) : (
+            <GradientBox colors={APP_GRADIENT.pings as [string, string]} radius={14} style={styles.emojiTile}>
+              <Txt style={styles.emoji}>{p.emoji}</Txt>
+            </GradientBox>
+          )}
           <View style={{ flex: 1, minWidth: 0 }}>
             <Txt style={[styles.kicker, { color: c.textMuted }]} numberOfLines={1}>
               {t('pings.youSent')} · {timeAgo(p.created_at)}
             </Txt>
-            <Txt style={[styles.msg, { color: c.text }]} numberOfLines={3}>
+            <Txt style={[styles.msg, { color: c.text }]} numberOfLines={2}>
               {p.image_path ? t('notes.youDrew') : p.message}
             </Txt>
           </View>
@@ -395,12 +379,10 @@ export default function NudgesBanner() {
           </Pressable>
         </View>
 
-        {p.image_path ? noteThumb(p, true) : null}
-
         {/* One line, however big the family (owner, 2026-11): "Seen by:"
                 then the names, the most recent first; the count on the right. */}
         <View style={[styles.seenBox, { borderTopColor: c.border }]}>
-          <Txt style={{ flex: 1, fontSize: 13.5, color: c.textMuted }} numberOfLines={2}>
+          <Txt style={{ flex: 1, fontSize: 13.5, color: c.textMuted }} numberOfLines={1}>
             <Txt style={{ fontSize: 13.5, fontWeight: '700', color: c.text }}>{t('pings.seenByLabel')}: </Txt>
             {seen.length ? seen.map((a) => firstName(nameOf(a.user_email))).join(', ') : t('pings.nobodyYet')}
           </Txt>
@@ -432,7 +414,7 @@ export default function NudgesBanner() {
 
   // Received first (they need an answer), then sent.
   const all = [...incoming.map((p) => ({ p, mine: false })), ...sent.map((p) => ({ p, mine: true }))]
-  const render = (x: { p: ActivePing; mine: boolean }, fill = false) => (x.mine ? renderSent(x.p, fill) : renderIncoming(x.p, fill))
+  const render = (x: { p: ActivePing; mine: boolean }) => (x.mine ? renderSent(x.p) : renderIncoming(x.p))
 
   if (all.length === 1) {
     return (
@@ -445,7 +427,8 @@ export default function NudgesBanner() {
 
   // Two or more (owner, 2026-11-15: a busy family turned Home into a long
   // timeline): one card at a time in a horizontal carousel, the next one
-  // peeking in from the right, dots under it. Each card keeps its own height.
+  // peeking in from the right, dots under it. Every card is CARD_H tall, so
+  // Home never jumps with the kind of nudge on screen (owner, 2026-11-15).
   const cardW = Math.min(screenW - sp.lg * 2 - PEEK, 520)
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / (cardW + GAP))
@@ -453,7 +436,6 @@ export default function NudgesBanner() {
   }
   return (
     <View style={{ marginBottom: sp.lg, marginHorizontal: -sp.lg }}>
-      <Animated.View style={shownH ? { height: carouselH, overflow: 'hidden' } : null}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -463,22 +445,14 @@ export default function NudgesBanner() {
         disableIntervalMomentum
         onScroll={onScroll}
         scrollEventThrottle={32}
-        contentContainerStyle={{ paddingHorizontal: sp.lg, gap: GAP, alignItems: 'flex-start' }}
+        contentContainerStyle={{ paddingHorizontal: sp.lg, gap: GAP }}
       >
         {all.map((x) => (
-          <View
-            key={x.p.id}
-            style={{ width: cardW }}
-            onLayout={(e) => {
-              const h = Math.round(e.nativeEvent.layout.height)
-              setCardH((m) => (m[x.p.id] === h ? m : { ...m, [x.p.id]: h }))
-            }}
-          >
+          <View key={x.p.id} style={{ width: cardW }}>
             {render(x)}
           </View>
         ))}
       </ScrollView>
-      </Animated.View>
       <View style={styles.dots} accessibilityLabel={t('pings.stackTitle', { n: all.length })}>
         {all.map((x, i) => (
           <View
@@ -494,6 +468,8 @@ export default function NudgesBanner() {
 
 /** How much of the next card shows at the right edge. */
 const PEEK = 28
+/** Every nudge card is this tall — text, urgent, sent or a drawing. */
+const CARD_H = 172
 const GAP = 10
 
 const KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
@@ -505,35 +481,23 @@ const URGENT: [string, string] = ['#F2605A', '#C9353F']
 const firstName = (n: string) => n.split(' ')[0]
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 24, padding: sp.md, gap: sp.md },
-  fill: { flex: 1, justifyContent: 'space-between' },
+  card: { borderRadius: 24, padding: sp.md, gap: sp.md, height: CARD_H, justifyContent: 'space-between' },
   kraftCard: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(120,90,50,0.25)' },
-  emojiOnKraft: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,251,242,0.75)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: sp.sm },
   dot: { height: 6, borderRadius: 3 },
   noteThumb: {
-    alignSelf: 'center',
-    height: 168,
-    aspectRatio: 0.72,
-    borderRadius: 10,
+    width: 64,
+    height: 88,
+    borderRadius: 7,
     overflow: 'hidden',
     backgroundColor: '#FFFBF2',
-    transform: [{ rotate: '-2deg' }],
-    marginVertical: 4,
+    transform: [{ rotate: '-3deg' }],
   },
   noteShadow: {
-    alignSelf: 'center',
     shadowColor: '#2b1d10',
     shadowOpacity: 0.22,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   top: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.md },
   emojiOnColor: {

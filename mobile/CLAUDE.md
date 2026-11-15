@@ -195,8 +195,11 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   APP (the server only understands), so it needs a store release; older apps
   get null from `fromServer` and fall back.
 - **Nudges carousel (Home, 2026-11-15):** one nudge shows full width; two or more
-  sit in a horizontal snap carousel (next card peeks, dots under it) whose height
-  animates to the card on screen. It replaced the stack + "see all" overlay.
+  sit in a horizontal snap carousel (next card peeks, dots under it). Card height
+  is FIXED (`CARD_H`) for every kind — text, urgent, sent, drawing — so Home never
+  jumps (owner); a drawing's thumbnail sits in the icon's place. It replaced the
+  stack + "see all" overlay. The Roof dock's mute persists per device
+  (AsyncStorage `roof.paused`) until tapped again.
   Tapping a `location-request` nudge PUSH acks it, uploads a fix and lands on
   Home (`backgroundNotifications.answerLocationRequests`).
 - **Admin (2026-11):** `ADMIN_LOOK` (palette.ts) — vivid indigo gradient for

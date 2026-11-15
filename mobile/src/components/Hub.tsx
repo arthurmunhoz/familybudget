@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Settings } from 'lucide-react-native'
 
 import { Txt } from './ui'
@@ -43,6 +44,10 @@ import { supabase } from '../lib/supabase'
 import { channelName } from '@/lib/realtime'
 import { fonts, sp, useTheme } from '../theme/theme'
 
+
+/** Per-device: the Roof dock's mute survives closing the app. */
+const ROOF_PAUSED_KEY = 'roof.paused'
+
 export default function Hub() {
   const { c } = useTheme()
   const { profile, profiles } = useAuth()
@@ -61,7 +66,28 @@ export default function Hub() {
   const { isPlus, loading: plusLoading } = usePlus()
   const roofReady = useRoofPrefsReady()
   const [homeFocused, setHomeFocused] = useState(true)
-  const [roofPaused, setRoofPaused] = useState(false)
+  // The dock's mute is a SETTING, not a moment (owner, 2026-11-15): muted
+  // stays muted across closing and reopening the app, until it's tapped
+  // again. Kept per device; Roof doesn't listen until it has been read.
+  const [roofPaused, setRoofPausedState] = useState(false)
+  const [pausedReady, setPausedReady] = useState(false)
+  useEffect(() => {
+    let alive = true
+    AsyncStorage.getItem(ROOF_PAUSED_KEY)
+      .then((v) => alive && setRoofPausedState(v === '1'))
+      .catch(() => {})
+      .finally(() => alive && setPausedReady(true))
+    return () => {
+      alive = false
+    }
+  }, [])
+  const setRoofPaused = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setRoofPausedState((prev) => {
+      const v = typeof next === 'function' ? next(prev) : next
+      void AsyncStorage.setItem(ROOF_PAUSED_KEY, v ? '1' : '0').catch(() => {})
+      return v
+    })
+  }, [])
   useFocusEffect(
     useCallback(() => {
       setHomeFocused(true)
@@ -101,7 +127,7 @@ export default function Hub() {
     [],
   )
   const wake = useRoofWake(
-    roof.wake && isPlus && homeFocused && !roofPaused && !wakeHold && (!asking || wakeCapture),
+    roof.wake && isPlus && homeFocused && pausedReady && !roofPaused && !wakeHold && (!asking || wakeCapture),
     lang,
     wakeHandlers,
     wakeEpoch,
