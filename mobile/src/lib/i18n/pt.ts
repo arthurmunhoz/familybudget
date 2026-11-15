@@ -2062,6 +2062,8 @@ export const pt: Record<keyof typeof en, string> = {
   'notes.drew': "{name} desenhou um recado",
   'notes.youDrew': "Seu recado à mão",
   'notes.tapToOpen': "Toque para ver em tela cheia",
+  'notes.save': "Salvar",
+  'notes.saveFailed': "Não deu para salvar o recado. Tente de novo.",
   'notes.sent': "Recado à mão enviado!",
   'pings.ownPlaceholder': "Escreva sua mensagem…",
   'pings.ownHint': "Vai exatamente como você escrever — só desta vez.",

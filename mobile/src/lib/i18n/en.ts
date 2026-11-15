@@ -2072,6 +2072,8 @@ export const en = {
   'notes.drew': "{name} drew you a note",
   'notes.youDrew': "Your hand-drawn note",
   'notes.tapToOpen': "Tap to see it full screen",
+  'notes.save': "Save",
+  'notes.saveFailed': "Couldn’t save the note. Try again.",
   'notes.sent': "Hand-drawn note sent!",
   'pings.ownPlaceholder': "Type your message…",
   'pings.ownHint': "Sent exactly as you write it — just this once.",

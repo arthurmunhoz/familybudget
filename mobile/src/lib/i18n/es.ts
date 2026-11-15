@@ -2062,6 +2062,8 @@ export const es: Record<keyof typeof en, string> = {
   'notes.drew': "{name} te dibujó una nota",
   'notes.youDrew': "Tu nota a mano",
   'notes.tapToOpen': "Toca para verla en pantalla completa",
+  'notes.save': "Guardar",
+  'notes.saveFailed': "No se pudo guardar la nota. Inténtalo de nuevo.",
   'notes.sent': "¡Nota a mano enviada!",
   'pings.ownPlaceholder': "Escribe tu mensaje…",
   'pings.ownHint': "Se envía tal cual lo escribes — solo esta vez.",

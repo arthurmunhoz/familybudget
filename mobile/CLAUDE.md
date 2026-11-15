@@ -395,7 +395,8 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   the normal nudge ones. `pings.image_path` must start with
   `<household_id>/notes/` (CHECK). On Home, `NudgesBanner` shows the note as a
   small tilted sheet on a KRAFT-paper card (not the Nudges blue — owner) + Ver/Beleza; `NoteViewer` opens it full
-  screen sized to the PNG's shape (Got it acks). Older apps just show the
+  screen sized to the PNG's shape (Got it acks). Its "Salvar" button downloads the PNG and opens
+  the system share sheet (Save Image / gallery) — no photo-library module. Older apps just show the
   row's text. The PNGs are not deleted when the nudge expires (yet).
   `NewItemButton` takes `colors` to be a filled gradient button (white label
   + plus) — Money's New budget, New month (the budget's own gradient) and

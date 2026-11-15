@@ -1,11 +1,16 @@
 // Full-screen view of a hand-drawn note (migration 112). Opens from the note's
 // card on the Home: the sheet floats in over a dimmed screen, with who sent
 // it and when, and — for one sent to me — the same "Got it" as any nudge.
+// "Save" downloads the PNG and opens the system share sheet, whose "Save
+// Image" (iOS) / save-to-gallery (Android) puts it in the photos — the same
+// route the printables use, so no photo-library module is needed.
+/* eslint-disable @typescript-eslint/no-require-imports -- expo-sharing loaded lazily (older binaries) */
 import { useEffect, useState } from 'react'
-import { Animated, Modal, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
+import { ActivityIndicator, Alert, Animated, Modal, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
-import { ThumbsUp, X } from 'lucide-react-native'
+import { Download, ThumbsUp, X } from 'lucide-react-native'
+import { File, Paths } from 'expo-file-system'
 
 import { Txt } from '@/components/ui'
 import { GradientBox } from '@/components/home/GradientBox'
@@ -31,6 +36,25 @@ export function NoteViewer({
   const { t } = useI18n()
   const insets = useSafeAreaInsets()
   const [pop] = useState(() => new Animated.Value(0))
+  const [saving, setSaving] = useState(false)
+  async function save() {
+    if (saving) return
+    setSaving(true)
+    try {
+      const sharing = require('expo-sharing') as typeof import('expo-sharing')
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(String(res.status))
+      const file = new File(Paths.cache, `recado-${Date.now()}.png`)
+      if (file.exists) file.delete()
+      file.create()
+      file.write(new Uint8Array(await res.arrayBuffer()))
+      haptic('light')
+      await sharing.shareAsync(file.uri, { mimeType: 'image/png', UTI: 'public.png', dialogTitle: t('notes.save') })
+    } catch {
+      Alert.alert(t('notes.saveFailed'))
+    }
+    setSaving(false)
+  }
   // The sheet takes the note's own shape, as big as the space allows.
   const [ratio, setRatio] = useState(0.72)
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
@@ -69,6 +93,16 @@ export function NoteViewer({
               {sub}
             </Txt>
           </View>
+          <Pressable
+            onPress={() => void save()}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('notes.save')}
+            style={styles.saveBtn}
+          >
+            {saving ? <ActivityIndicator color="#fff" /> : <Download size={17} color="#fff" strokeWidth={2.4} />}
+            <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14.5 }}>{t('notes.save')}</Txt>
+          </Pressable>
           <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')} style={styles.close}>
             <X size={20} color="#fff" />
           </Pressable>
@@ -158,6 +192,15 @@ const styles = StyleSheet.create({
   },
   title: { color: '#fff', fontFamily: fonts.display, fontSize: 22 },
   sub: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 2 },
+  saveBtn: {
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
   close: {
     width: 40,
     height: 40,
