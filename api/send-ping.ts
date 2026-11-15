@@ -49,6 +49,10 @@ interface ExpoMessage {
    *  raising a channel's importance requires a NEW id, so this must be updated
    *  in lockstep with the app or notifications land on a fallback channel). */
   channelId?: 'household' | 'urgent'
+  /** A picture in the notification (hand-drawn notes). Android shows it as
+   *  is; iOS needs a Notification Service Extension (not in the app yet), so
+   *  there it's ignored. */
+  richContent?: { image: string }
 }
 
 interface Ticket {
@@ -567,7 +571,7 @@ export default async function handler(req: any, res: any) {
   const { data: ping } = await db
     .from('pings')
     .select(
-      'id, household_id, sender_email, kind, emoji, message, recipients, high_priority, expires_at, pushed_at',
+      'id, household_id, sender_email, kind, emoji, message, recipients, high_priority, expires_at, pushed_at, image_path',
     )
     .eq('id', ping_id)
     .single()
@@ -670,6 +674,15 @@ export default async function handler(req: any, res: any) {
   }
   if (stale.length) await db.from('push_subscriptions').delete().in('endpoint', stale)
 
+  // A hand-drawn note (migration 112) rides in the notification as a picture,
+  // via a signed URL that lives as long as the note does (≤ 1 day). Tapping
+  // opens Home, where the note's card is.
+  let noteImage: string | null = null
+  if (ping.image_path) {
+    const { data: signed } = await db.storage.from('documents').createSignedUrl(ping.image_path, 24 * 60 * 60)
+    noteImage = signed?.signedUrl ?? null
+  }
+
   // Native (Expo) devices for the same recipients — best-effort, alongside web push.
   const { data: expoTokens } = await db
     .from('expo_push_tokens')
@@ -680,8 +693,9 @@ export default async function handler(req: any, res: any) {
       to: t.token,
       title: labelled(pingTitle, hhName, multi.has(t.user_email)),
       body: ping.message,
-      data: { url: '/pings', tel, household: ping.household_id },
+      data: { url: ping.image_path ? '/' : '/pings', tel, household: ping.household_id },
       sound: 'default' as const,
+      ...(noteImage ? { richContent: { image: noteImage } } : {}),
       // priority is the FCM transport (beats Doze); channelId is how Android
       // presents it. Both nudges are high-priority to SEND — a nudge nobody
       // sees until they open the app is not a nudge — and only an urgent one
