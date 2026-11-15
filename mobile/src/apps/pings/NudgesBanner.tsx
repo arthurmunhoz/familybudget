@@ -7,13 +7,16 @@
 //    each with an ✕ to dismiss from my home (persisted per-device via
 //    AsyncStorage; the nudge itself still lives until it expires).
 //
+// One card shows full width; two or more sit in a horizontal carousel with
+// dots (2026-11-15 — it replaced a stack + "see all" overlay). A hand-drawn
+// note (migration 112) gets a kraft-paper card with the note pinned on it.
+//
 // Its own lightweight Realtime subscription (distinct channel from the Nudges
 // screen) so it stays live on the Hub. Renders nothing when both groups empty.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Vibration, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Animated, Linking, Pressable, ScrollView, StyleSheet, Vibration, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Check, ChevronRight, Eye, Layers, Phone, ThumbsUp, X } from 'lucide-react-native'
+import { Check, Eye, Phone, ThumbsUp, X } from 'lucide-react-native'
 import { Image } from 'expo-image'
 
 import { Txt } from '@/components/ui'
@@ -76,12 +79,18 @@ export default function NudgesBanner() {
   const [phones, setPhones] = useState<Record<string, string>>({})
   const [ackedLocal, setAckedLocal] = useState<Set<string>>(new Set())
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
-  const [expanded, setExpanded] = useState(false)
+  // Which card the carousel shows (for the dots).
+  const [page, setPage] = useState(0)
+  const { width: screenW } = useWindowDimensions()
+  // The carousel takes the height of the card on screen (a one-line nudge
+  // next to a drawing would otherwise leave a hole under it).
+  const [cardH, setCardH] = useState<Record<string, number>>({})
+  const [carouselH] = useState(() => new Animated.Value(0))
+  const heightSet = useRef(false)
   // Hand-drawn notes (migration 112): signed URLs per image path, and the one
   // open full screen.
   const [noteUrls, setNoteUrls] = useState<Record<string, string>>({})
   const [viewing, setViewing] = useState<{ p: ActivePing; mine: boolean } | null>(null)
-  const insets = useSafeAreaInsets()
 
   const dismissKey = myEmail ? `nudges-dismissed:${myEmail}` : null
 
@@ -193,21 +202,22 @@ export default function NudgesBanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highIds])
 
-  // The overlay closes itself once there's no stack left to show (everything
-  // acknowledged / dismissed from inside it), so it can't pop back open later.
-  // Adjusted during render (React's derived-state pattern), not in an effect.
-  const stacked = incoming.length + sent.length >= STACK_FROM
-  if (expanded && !stacked) setExpanded(false)
+
+  const shownId = [...incoming, ...sent][page]?.id ?? [...incoming, ...sent][0]?.id
+  const shownH = shownId ? cardH[shownId] : undefined
+  useEffect(() => {
+    if (!shownH) return
+    if (!heightSet.current) {
+      heightSet.current = true
+      carouselH.setValue(shownH)
+      return
+    }
+    Animated.timing(carouselH, { toValue: shownH, duration: 220, useNativeDriver: false }).start()
+  }, [shownH, carouselH])
 
   if (incoming.length === 0 && sent.length === 0) return null
 
-  /** Two RN modals can't be up at once on iOS: from inside the "see all"
-   *  overlay, close it first, then open the note. */
-  const openNote = (p: ActivePing, mine: boolean) => {
-    if (!expanded) return setViewing({ p, mine })
-    setExpanded(false)
-    setTimeout(() => setViewing({ p, mine }), 350)
-  }
+  const openNote = (p: ActivePing, mine: boolean) => setViewing({ p, mine })
 
   /** The drawn note itself on its card: a small sheet of paper, tilted a
    *  touch; tapping it opens the note full screen. */
@@ -249,12 +259,55 @@ export default function NudgesBanner() {
   // RECEIVED — a gradient card in the Nudges colour (red when it's urgent):
   // who and when as a kicker, the message large, the replies as pills inside
   // (2026-11). The card itself is inert.
-  const renderIncoming = (p: ActivePing) => {
+  // RECEIVED hand-drawn note — a sheet of kraft paper instead of the Nudges
+  // blue (owner, 2026-11-15: the blue under a drawing didn't feel right):
+  // dark ink type, the note pinned in the middle, View / Got it in ink.
+  const renderIncomingNote = (p: ActivePing, fill: boolean) => (
+    <GradientBox key={p.id} colors={KRAFT} radius={24} style={[styles.card, styles.kraftCard, fill && styles.fill]}>
+      <View style={styles.top}>
+        <View style={styles.emojiOnKraft}>
+          <Txt style={styles.emoji}>{p.emoji}</Txt>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={1}>
+            {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
+          </Txt>
+          <Txt style={[styles.msg, { color: INK }]} numberOfLines={2}>
+            {t('notes.drew', { name: firstName(nameOf(p.sender_email)) })}
+          </Txt>
+        </View>
+      </View>
+      {noteThumb(p, false)}
+      <View style={styles.actions}>
+        <Pressable
+          onPress={() => openNote(p, false)}
+          style={({ pressed }) => [styles.pill, { backgroundColor: 'rgba(43,37,33,0.08)', opacity: pressed ? 0.8 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('notes.view')}
+        >
+          <Eye size={15} strokeWidth={2.5} color={INK} />
+          <Txt style={[styles.pillTxt, { color: INK }]}>{t('notes.view')}</Txt>
+        </Pressable>
+        <Pressable
+          onPress={() => ack(p.id)}
+          style={({ pressed }) => [styles.pill, { backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('pings.gotIt')}
+        >
+          <ThumbsUp size={15} strokeWidth={2.5} color="#FFFBF2" />
+          <Txt style={[styles.pillTxt, { color: '#FFFBF2' }]}>{t('pings.gotIt')}</Txt>
+        </Pressable>
+      </View>
+    </GradientBox>
+  )
+
+  const renderIncoming = (p: ActivePing, fill = false) => {
+    if (p.image_path) return renderIncomingNote(p, fill)
     const isHigh = p.high_priority
     const phone = phones[p.sender_email]
     const colors = isHigh ? URGENT : (APP_GRADIENT.pings as [string, string])
     return (
-      <GradientBox key={p.id} colors={colors} radius={24} style={styles.card}>
+      <GradientBox key={p.id} colors={colors} radius={24} style={[styles.card, fill && styles.fill]}>
         <View style={styles.top}>
           <View style={styles.emojiOnColor}>
             <Txt style={styles.emoji}>{p.emoji}</Txt>
@@ -264,11 +317,10 @@ export default function NudgesBanner() {
               {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
             </Txt>
             <Txt style={styles.msgOnColor} numberOfLines={3}>
-              {p.image_path ? t('notes.drew', { name: firstName(nameOf(p.sender_email)) }) : p.message}
+              {p.message}
             </Txt>
           </View>
         </View>
-        {p.image_path ? noteThumb(p, false) : null}
         <View style={styles.actions}>
           {/* Urgent: Call AND Got it, so a recipient can acknowledge
                   without having to call. */}
@@ -281,17 +333,6 @@ export default function NudgesBanner() {
             >
               <Phone size={15} strokeWidth={2.5} color={colors[1]} />
               <Txt style={[styles.pillTxt, { color: colors[1] }]}>{t('pings.call')}</Txt>
-            </Pressable>
-          ) : null}
-          {p.image_path ? (
-            <Pressable
-              onPress={() => openNote(p, false)}
-              style={({ pressed }) => [styles.pill, { backgroundColor: 'rgba(255,255,255,0.22)', opacity: pressed ? 0.8 : 1 }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('notes.view')}
-            >
-              <Eye size={15} strokeWidth={2.5} color="#fff" />
-              <Txt style={[styles.pillTxt, { color: '#fff' }]}>{t('notes.view')}</Txt>
             </Pressable>
           ) : null}
           <Pressable
@@ -313,7 +354,7 @@ export default function NudgesBanner() {
   }
 
   // SENT — a plain card: what I sent, then WHO HAS SEEN IT, newest first.
-  const renderSent = (p: ActivePing) => {
+  const renderSent = (p: ActivePing, fill = false) => {
     const seen = p.acks.filter((a) => a.user_email !== myEmail).sort((x, y) => y.created_at.localeCompare(x.created_at))
     const audience = (p.recipients?.length ? p.recipients : profiles.map((m) => m.email)).filter((e) => e !== myEmail)
     const total = Math.max(audience.length, seen.length)
@@ -322,6 +363,7 @@ export default function NudgesBanner() {
         key={p.id}
         style={[
           styles.card,
+          fill && styles.fill,
           {
             backgroundColor: c.card,
             borderColor: c.border,
@@ -390,118 +432,73 @@ export default function NudgesBanner() {
 
   // Received first (they need an answer), then sent.
   const all = [...incoming.map((p) => ({ p, mine: false })), ...sent.map((p) => ({ p, mine: true }))]
-  const render = (x: { p: ActivePing; mine: boolean }) => (x.mine ? renderSent(x.p) : renderIncoming(x.p))
-  /** The colour a card shows, for the slices peeking out under the stack. */
-  const tone = (x: { p: ActivePing; mine: boolean }) =>
-    x.mine ? c.card : x.p.high_priority ? URGENT[1] : (APP_GRADIENT.pings as [string, string])[1]
+  const render = (x: { p: ActivePing; mine: boolean }, fill = false) => (x.mine ? renderSent(x.p, fill) : renderIncoming(x.p, fill))
 
-  // Up to two: just the cards.
-  if (all.length < STACK_FROM) {
+  if (all.length === 1) {
     return (
-      <View style={{ gap: sp.sm, marginBottom: sp.lg }}>
-        {all.map(render)}
+      <View style={{ marginBottom: sp.lg }}>
+        {render(all[0])}
         {viewer}
       </View>
     )
   }
 
-  // Three or more (owner, 2026-11: a busy day turned Home into a long scroll
-  // of nudges): the newest card on top — its buttons still work — with the
-  // next two peeking out beneath it like a stack, and a "+N · See all" chip.
-  // Tapping the stack opens every card over a dimmed Home.
-  const behind = all.slice(1, 3)
+  // Two or more (owner, 2026-11-15: a busy family turned Home into a long
+  // timeline): one card at a time in a horizontal carousel, the next one
+  // peeking in from the right, dots under it. Each card keeps its own height.
+  const cardW = Math.min(screenW - sp.lg * 2 - PEEK, 520)
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / (cardW + GAP))
+    if (i !== page) setPage(Math.max(0, Math.min(all.length - 1, i)))
+  }
   return (
-    <View style={{ marginBottom: sp.lg }}>
-      <Pressable
-        onPress={() => setExpanded(true)}
-        accessibilityRole="button"
-        accessibilityLabel={t('pings.stackOpen', { n: all.length })}
+    <View style={{ marginBottom: sp.lg, marginHorizontal: -sp.lg }}>
+      <Animated.View style={shownH ? { height: carouselH, overflow: 'hidden' } : null}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={cardW + GAP}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        disableIntervalMomentum
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+        contentContainerStyle={{ paddingHorizontal: sp.lg, gap: GAP, alignItems: 'flex-start' }}
       >
-        <View style={{ paddingBottom: 14 }}>
-          {behind
-            .map((x, i) => (
-              <View
-                key={`slice-${x.p.id}`}
-                style={[
-                  styles.slice,
-                  {
-                    bottom: i === 0 ? 7 : 0,
-                    left: i === 0 ? 10 : 20,
-                    right: i === 0 ? 10 : 20,
-                    backgroundColor: tone(x),
-                    opacity: i === 0 ? 0.75 : 0.45,
-                    borderColor: c.border,
-                  },
-                ]}
-              />
-            ))
-            .reverse()}
-          {render(all[0])}
-        </View>
-        <View style={[styles.stackChip, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Layers size={14} color={c.textMuted} />
-          <Txt style={{ fontSize: 13, fontFamily: fonts.semibold, color: c.text }}>
-            {t('pings.stackMore', { n: all.length - 1 })}
-          </Txt>
-          <Txt style={{ fontSize: 13, color: c.textMuted }}>·</Txt>
-          <Txt
-            style={{
-              fontSize: 13,
-              fontFamily: fonts.semibold,
-              color: (APP_GRADIENT.pings as [string, string])[1],
+        {all.map((x) => (
+          <View
+            key={x.p.id}
+            style={{ width: cardW }}
+            onLayout={(e) => {
+              const h = Math.round(e.nativeEvent.layout.height)
+              setCardH((m) => (m[x.p.id] === h ? m : { ...m, [x.p.id]: h }))
             }}
           >
-            {t('pings.stackSeeAll')}
-          </Txt>
-          <ChevronRight size={14} color={(APP_GRADIENT.pings as [string, string])[1]} />
-        </View>
-      </Pressable>
-
-      <Modal visible={expanded} transparent animationType="fade" onRequestClose={() => setExpanded(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }}>
-          {/* Tapping the dim, not a card, closes. */}
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setExpanded(false)} accessible={false} />
-          <View style={[styles.overlayHead, { paddingTop: insets.top + sp.sm }]} pointerEvents="box-none">
-            <Txt
-              style={{
-                flex: 1,
-                fontFamily: fonts.display,
-                fontSize: 24,
-                color: '#fff',
-              }}
-            >
-              {t('pings.stackTitle', { n: all.length })}
-            </Txt>
-            <Pressable
-              onPress={() => setExpanded(false)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.close')}
-              style={styles.overlayClose}
-            >
-              <X size={18} color="#fff" />
-            </Pressable>
+            {render(x)}
           </View>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{
-              paddingHorizontal: sp.lg,
-              paddingBottom: insets.bottom + sp.xl,
-              gap: sp.sm,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            {all.map(render)}
-          </ScrollView>
-        </View>
-      </Modal>
+        ))}
+      </ScrollView>
+      </Animated.View>
+      <View style={styles.dots} accessibilityLabel={t('pings.stackTitle', { n: all.length })}>
+        {all.map((x, i) => (
+          <View
+            key={x.p.id}
+            style={[styles.dot, { backgroundColor: i === page ? (APP_GRADIENT.pings as [string, string])[1] : c.border, width: i === page ? 18 : 6 }]}
+          />
+        ))}
+      </View>
       {viewer}
     </View>
   )
 }
 
-/** From this many nudges on, Home shows them as a stack. */
-const STACK_FROM = 3
+/** How much of the next card shows at the right edge. */
+const PEEK = 28
+const GAP = 10
+
+const KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
+const INK = '#2B2521'
+const INK_SOFT = 'rgba(43,37,33,0.62)'
 
 const URGENT: [string, string] = ['#F2605A', '#C9353F']
 
@@ -509,9 +506,21 @@ const firstName = (n: string) => n.split(' ')[0]
 
 const styles = StyleSheet.create({
   card: { borderRadius: 24, padding: sp.md, gap: sp.md },
+  fill: { flex: 1, justifyContent: 'space-between' },
+  kraftCard: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(120,90,50,0.25)' },
+  emojiOnKraft: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,251,242,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: sp.sm },
+  dot: { height: 6, borderRadius: 3 },
   noteThumb: {
     alignSelf: 'center',
-    height: 210,
+    height: 168,
     aspectRatio: 0.72,
     borderRadius: 10,
     overflow: 'hidden',
@@ -599,36 +608,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
-  },
-  slice: {
-    position: 'absolute',
-    height: 40,
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  stackChip: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: sp.sm,
-    paddingHorizontal: 14,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  overlayHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: sp.lg,
-    paddingBottom: sp.md,
-  },
-  overlayClose: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 })

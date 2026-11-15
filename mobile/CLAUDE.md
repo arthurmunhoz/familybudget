@@ -194,10 +194,9 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   Claude also has `PET TASKS` and `CATEGORIES`. Each new intent ships in the
   APP (the server only understands), so it needs a store release; older apps
   get null from `fromServer` and fall back.
-- **Nudges stack (Home):** from `STACK_FROM` (3) nudges `NudgesBanner` shows the
-  newest card with two slices behind it + "+N · See all", opening a dimmed
-  overlay Modal with every card. Tapping a `location-request` nudge PUSH acks
-  it, uploads a fix and lands on Home (`backgroundNotifications.answerLocationRequests`).
+- **Nudges carousel (Home, 2026-11-15):** one nudge shows full width; two or more
+  sit in a horizontal snap carousel (next card peeks, dots under it) whose height
+  animates to the card on screen. It replaced the stack + "see all" overlay.
 - **Admin (2026-11):** `ADMIN_LOOK` (palette.ts) — vivid indigo gradient for
   the overview card (the old navy made the week bars muddy on light) + `tint`
   for tabs/period pills (soft wash + outline), toggles, initials and Create.
@@ -389,7 +388,7 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   …, { imagePath, expiresAt: +24h })`, so recipients, push and "seen by" are
   the normal nudge ones. `pings.image_path` must start with
   `<household_id>/notes/` (CHECK). On Home, `NudgesBanner` shows the note as a
-  small tilted sheet (signed URL) + Ver/Beleza; `NoteViewer` opens it full
+  small tilted sheet on a KRAFT-paper card (not the Nudges blue — owner) + Ver/Beleza; `NoteViewer` opens it full
   screen sized to the PNG's shape (Got it acks). Older apps just show the
   row's text. The PNGs are not deleted when the nudge expires (yet).
   `NewItemButton` takes `colors` to be a filled gradient button (white label
