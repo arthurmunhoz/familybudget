@@ -469,7 +469,7 @@ export default function NudgesBanner() {
 /** How much of the next card shows at the right edge. */
 const PEEK = 28
 /** Every nudge card is this tall — text, urgent, sent or a drawing. */
-const CARD_H = 172
+const CARD_H = 178
 const GAP = 10
 
 const KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
