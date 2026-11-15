@@ -2,7 +2,8 @@
 // groups, both between the Hub header and the app grid:
 //  • RECEIVED — active nudges sent TO me I haven't acknowledged, each with a
 //    compact respond CTA (a thumbs-up for Got it, Call when urgent) on a light
-//    card (red when urgent); a drawing has "👁 Ver" + 👍. The row itself is inert: this banner IS the
+//    card (red when urgent); a drawing's free side is two stacked buttons,
+//    👁 over 👍, split by a hairline. The row itself is inert: this banner IS the
 //    inbox — there is no nudge history screen behind it.
 //  • SENT — active nudges I sent, showing who has acknowledged ("seen by …"),
 //    each with an ✕ to dismiss from my home (persisted per-device via
@@ -251,26 +252,29 @@ export default function NudgesBanner() {
     <GradientBox key={p.id} colors={KRAFT} radius={24} style={[styles.card, styles.kraftCard, styles.noteCard]}>
       {noteThumb(p, false)}
       <View style={styles.noteSide}>
-        <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={2}>
+        <Txt style={[styles.kicker, { color: INK_SOFT }]} numberOfLines={1}>
           {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
         </Txt>
-        <View style={styles.actions}>
+        {/* The empty side of the card IS the two buttons (owner, 2026-11-15):
+            one big tap target each, split by a hairline — 👁 to see it, 👍 to
+            say got it. */}
+        <View style={styles.noteButtons}>
           <Pressable
             onPress={() => openNote(p, false)}
-            style={({ pressed }) => [styles.chipBtn, { backgroundColor: 'rgba(43,37,33,0.08)', opacity: pressed ? 0.8 : 1 }]}
+            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(43,37,33,0.08)' }]}
             accessibilityRole="button"
             accessibilityLabel={t('notes.view')}
           >
-            <Eye size={15} strokeWidth={2.4} color={INK} />
-            <Txt style={[styles.pillTxt, { color: INK }]}>{t('notes.view')}</Txt>
+            <Eye size={22} strokeWidth={2.2} color={INK} />
           </Pressable>
+          <View style={styles.noteDivider} />
           <Pressable
             onPress={() => ack(p.id)}
-            style={({ pressed }) => [styles.roundPill, { backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
+            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(43,37,33,0.08)' }]}
             accessibilityRole="button"
             accessibilityLabel={t('pings.gotIt')}
           >
-            <ThumbsUp size={16} strokeWidth={2.5} color="#FFFBF2" />
+            <ThumbsUp size={21} strokeWidth={2.2} color={INK} />
           </Pressable>
         </View>
       </View>
@@ -554,6 +558,17 @@ const styles = StyleSheet.create({
   },
   noteCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: sp.md },
   noteSide: { flex: 1, minWidth: 0, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2 },
+  noteButtons: {
+    flex: 1,
+    marginTop: 6,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,251,242,0.55)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(120,90,50,0.25)',
+  },
+  noteButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  noteDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(120,90,50,0.35)', marginHorizontal: 12 },
   roundPill: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   noteShadow: {
     shadowColor: '#2b1d10',
