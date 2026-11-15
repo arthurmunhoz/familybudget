@@ -2,8 +2,8 @@
 // groups, both between the Hub header and the app grid:
 //  • RECEIVED — active nudges sent TO me I haven't acknowledged, each with a
 //    compact respond CTA (a thumbs-up for Got it, Call when urgent) on a light
-//    card (red when urgent); a drawing's free side is two stacked buttons,
-//    👁 over 👍, split by a hairline. The row itself is inert: this banner IS the
+//    card (red when urgent); a drawing's free side is two big buttons,
+//    👁 | 👍, split by a vertical hairline. The row itself is inert: this banner IS the
 //    inbox — there is no nudge history screen behind it.
 //  • SENT — active nudges I sent, showing who has acknowledged ("seen by …"),
 //    each with an ✕ to dismiss from my home (persisted per-device via
@@ -256,25 +256,25 @@ export default function NudgesBanner() {
           {t('pings.from', { name: firstName(nameOf(p.sender_email)) })} · {timeAgo(p.created_at)}
         </Txt>
         {/* The empty side of the card IS the two buttons (owner, 2026-11-15):
-            one big tap target each, split by a hairline — 👁 to see it, 👍 to
-            say got it. */}
+            👁 on the left, 👍 on the right, split by a vertical hairline, no
+            box behind them, icons a darker shade of the kraft. */}
         <View style={styles.noteButtons}>
           <Pressable
             onPress={() => openNote(p, false)}
-            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(43,37,33,0.08)' }]}
+            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(120,90,50,0.10)' }]}
             accessibilityRole="button"
             accessibilityLabel={t('notes.view')}
           >
-            <Eye size={22} strokeWidth={2.2} color={INK} />
+            <Eye size={26} strokeWidth={2.1} color={KRAFT_ICON} />
           </Pressable>
           <View style={styles.noteDivider} />
           <Pressable
             onPress={() => ack(p.id)}
-            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(43,37,33,0.08)' }]}
+            style={({ pressed }) => [styles.noteButton, pressed && { backgroundColor: 'rgba(120,90,50,0.10)' }]}
             accessibilityRole="button"
             accessibilityLabel={t('pings.gotIt')}
           >
-            <ThumbsUp size={21} strokeWidth={2.2} color={INK} />
+            <ThumbsUp size={25} strokeWidth={2.1} color={KRAFT_ICON} />
           </Pressable>
         </View>
       </View>
@@ -538,6 +538,8 @@ const GAP = 10
 const KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
 const INK = '#2B2521'
 const INK_SOFT = 'rgba(43,37,33,0.62)'
+/** A darker shade of the kraft — the drawing card's view / got-it icons. */
+const KRAFT_ICON = '#A07A4C'
 
 const URGENT: [string, string] = ['#F2605A', '#C9353F']
 
@@ -558,17 +560,9 @@ const styles = StyleSheet.create({
   },
   noteCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: sp.md },
   noteSide: { flex: 1, minWidth: 0, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2 },
-  noteButtons: {
-    flex: 1,
-    marginTop: 6,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,251,242,0.55)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(120,90,50,0.25)',
-  },
-  noteButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  noteDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(120,90,50,0.35)', marginHorizontal: 12 },
+  noteButtons: { flex: 1, flexDirection: 'row', alignItems: 'stretch', marginTop: 4 },
+  noteButton: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  noteDivider: { width: StyleSheet.hairlineWidth, backgroundColor: KRAFT_ICON, opacity: 0.6, marginVertical: 14 },
   roundPill: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   noteShadow: {
     shadowColor: '#2b1d10',
