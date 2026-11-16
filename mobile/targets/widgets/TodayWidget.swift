@@ -60,6 +60,9 @@ struct TodayCache: Codable {
   let unit: String?
   let code: Int?
   let alertKind: String?
+  /// Open-Meteo `is_day` at fetch time. Optional: caches written before the
+  /// sky look have no such key and must still decode.
+  let isDay: Bool?
 }
 
 /// What the view actually renders (assembled fresh on every timeline reload).
@@ -75,6 +78,8 @@ struct TodayRender {
   let alertKind: String?
   let items: [TodayItem]
   let emptyLabel: String
+  /// nil when unknown → the view falls back to roughlyDay().
+  var isDay: Bool? = nil
 }
 
 func loadToday() -> TodayInfo? {
@@ -145,6 +150,7 @@ private struct OMResponse: Codable {
   struct Current: Codable {
     let temperature_2m: Double
     let weather_code: Int
+    let is_day: Int?
   }
   struct CurrentUnits: Codable { let temperature_2m: String? }
   struct Daily: Codable {
@@ -178,11 +184,11 @@ private func dayAlert(_ d: OMResponse.Daily?, _ unit: String) -> String? {
 }
 
 private func fetchWeather(lat: Double, lon: Double, unit: String) async
-  -> (temp: Double, unit: String, code: Int, alertKind: String?)?
+  -> (temp: Double, unit: String, code: Int, alertKind: String?, isDay: Bool?)?
 {
   let s =
     "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)"
-    + "&current=temperature_2m,weather_code"
+    + "&current=temperature_2m,weather_code,is_day"
     + "&daily=weather_code,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max,wind_gusts_10m_max"
     + "&temperature_unit=\(unit)&wind_speed_unit=kmh&timezone=auto&forecast_days=1"
   guard
@@ -192,7 +198,7 @@ private func fetchWeather(lat: Double, lon: Double, unit: String) async
     let cur = r.current
   else { return nil }
   let unitStr = r.current_units?.temperature_2m ?? (unit == "celsius" ? "°C" : "°F")
-  return (cur.temperature_2m.rounded(), unitStr, cur.weather_code, dayAlert(r.daily, unit))
+  return (cur.temperature_2m.rounded(), unitStr, cur.weather_code, dayAlert(r.daily, unit), cur.is_day.map { $0 == 1 })
 }
 
 private struct AgendaResponse: Codable {
@@ -232,6 +238,7 @@ func buildToday() async -> TodayRender? {
   var unitStr: String?
   var code: Int?
   var alertKind: String?
+  var isDay: Bool?
   var items: [TodayItem]?
 
   if let lat = cfg?.lat, let lon = cfg?.lon,
@@ -241,6 +248,7 @@ func buildToday() async -> TodayRender? {
     unitStr = w.unit
     code = w.code
     alertKind = w.alertKind
+    isDay = w.isDay
   }
 
   let token = groupDefaults()?.string(forKey: "widget_token") ?? ""
@@ -257,12 +265,14 @@ func buildToday() async -> TodayRender? {
     unitStr = cache?.unit ?? snap?.unit
     code = cache?.code ?? snap?.code
     alertKind = cache?.alertKind ?? snap?.alertKind
+    isDay = cache?.isDay
   }
   if items == nil { items = cache?.items ?? snap?.items }
 
   saveTodayCache(
     TodayCache(
-      day: today, items: items, temp: temp, unit: unitStr, code: code, alertKind: alertKind))
+      day: today, items: items, temp: temp, unit: unitStr, code: code, alertKind: alertKind,
+      isDay: isDay))
 
   return TodayRender(
     todayLabel: base?.todayLabel ?? "Today",
@@ -275,7 +285,8 @@ func buildToday() async -> TodayRender? {
     alert: alertKind.flatMap { cfg?.alerts[$0] },
     alertKind: alertKind,
     items: items ?? [],
-    emptyLabel: base?.emptyLabel ?? "Nothing today")
+    emptyLabel: base?.emptyLabel ?? "Nothing today",
+    isDay: isDay)
 }
 
 // Weather-alert kind → SF Symbol (matches lib/weather.ts WeatherAlertKind).
@@ -352,139 +363,301 @@ struct TodayProvider: TimelineProvider {
 }
 
 // ── View ─────────────────────────────────────────────────────────────────────
+// The 2026-11 look (see Kit.swift): the weather sky carries the date and the
+// temperature in white; the agenda sits on a neutral appTheme() surface (medium
+// / large) or straight on the sky (small). No SwiftUI semantic colours — they
+// follow the DEVICE appearance, not the app's manual theme.
+
+/// Fallback header when there is no weather (no home city / fetch failed).
+private let TODAY_NO_WEATHER = ["3E7BFA", "5B4CF0"]
+private let TODAY_PAD: CGFloat = 14
+
+/// The header backdrop: the sky for the current weather, else the gradient.
+private struct TodaySky: View {
+  let info: TodayRender?
+  let date: Date
+  var body: some View {
+    if let info, info.temp != nil, let code = info.code {
+      SkyScene(kind: skyKind(code: code, isDay: info.isDay ?? roughlyDay(date)))
+    } else {
+      WGradient(TODAY_NO_WEATHER)
+    }
+  }
+}
+
+/// Row bar colour. The agenda payload carries no colour or kind of its own, so
+/// the only signal is the emoji the server picked: pet care wears the Pets hue,
+/// everything else the app's accent.
+private func todayBarColor(_ item: TodayItem) -> Color {
+  if item.emoji == "🐾" { return Color(hex: WG.pets[1]) }
+  return appTheme().accent
+}
+
+private func tempText(_ info: TodayRender) -> String? {
+  guard let t = info.temp else { return nil }
+  return "\(Int(t))\(info.unit ?? "°")"
+}
+
+/// One agenda row on the neutral surface: colour bar, title, time/who.
+private struct TodayRow: View {
+  let item: TodayItem
+  var body: some View {
+    let theme = appTheme()
+    let sub = (item.subtitle ?? "").isEmpty ? nil : item.subtitle
+    HStack(alignment: .center, spacing: 8) {
+      RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+        .fill(todayBarColor(item))
+        .frame(width: 3, height: sub == nil ? 16 : 28)
+      VStack(alignment: .leading, spacing: 1) {
+        Text(item.title)
+          .font(.system(size: 13, weight: .semibold, design: .rounded))
+          .foregroundStyle(theme.text)
+          .lineLimit(1)
+          .minimumScaleFactor(0.85)
+        if let sub {
+          Text(sub)
+            .font(.system(size: 11.5, weight: .medium, design: .rounded))
+            .foregroundStyle(theme.textMuted)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+        }
+      }
+      Spacer(minLength: 0)
+    }
+    .frame(height: TodayRow.height, alignment: .center)
+  }
+  static let height: CGFloat = 32
+  static let gap: CGFloat = 6
+}
+
+/// The agenda on the neutral surface; shows as many rows as actually fit (up to
+/// `maxRows`) and a muted "+N" footer when there are more.
+private struct TodayAgenda: View {
+  let info: TodayRender
+  let maxRows: Int
+  let footer: Bool
+  var body: some View {
+    let theme = appTheme()
+    GeometryReader { geo in
+      let footerH: CGFloat = 16
+      let avail = geo.size.height
+      let fitAll = Int((avail + TodayRow.gap) / (TodayRow.height + TodayRow.gap))
+      let wantAll = min(maxRows, info.items.count)
+      let needsFooter = footer && (info.items.count > min(wantAll, fitAll))
+      let fit = needsFooter
+        ? Int((avail - footerH + TodayRow.gap) / (TodayRow.height + TodayRow.gap)) : fitAll
+      let n = max(1, min(wantAll, fit))
+      let more = info.items.count - n
+      if info.items.isEmpty {
+        VStack(spacing: 6) {
+          Image(systemName: "checkmark.circle")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(theme.textMuted)
+          Text(info.emptyLabel)
+            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .foregroundStyle(theme.textMuted)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        VStack(alignment: .leading, spacing: TodayRow.gap) {
+          ForEach(Array(info.items.prefix(n).enumerated()), id: \.offset) { _, item in
+            TodayRow(item: item)
+          }
+          if footer && more > 0 {
+            Text("+\(more)")
+              .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+              .foregroundStyle(theme.textMuted)
+              .lineLimit(1)
+              .padding(.leading, 11)
+          }
+          Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      }
+    }
+  }
+}
+
+/// Date kicker + big temperature (or the date large, with no weather) + the
+/// one-line condition / alert. White on the sky.
+private struct TodayHeader: View {
+  let info: TodayRender
+  let longDate: Bool
+  let bigSize: CGFloat
+  let noteLines: Int
+
+  var body: some View {
+    let date = longDate ? info.dateLong : info.dateShort
+    VStack(alignment: .leading, spacing: 1) {
+      if let t = tempText(info) {
+        WKicker(date)
+        WBig(t, size: bigSize)
+      } else {
+        WKicker(info.todayLabel)
+        WBig(date, size: bigSize * 0.76)
+      }
+      Spacer(minLength: 4)
+      note
+    }
+    .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  /// The alert sentence when there is one, else the weather glyph + city.
+  @ViewBuilder private var note: some View {
+    if let alert = info.alert, !alert.isEmpty {
+      noteLine(alertSymbol(info.alertKind ?? ""), alert)
+    } else if info.temp != nil, let code = info.code {
+      noteLine(weatherSymbol(code), info.city ?? "")
+    } else if let city = info.city, !city.isEmpty {
+      noteLine("mappin.and.ellipse", city)
+    }
+  }
+
+  private func noteLine(_ symbol: String, _ text: String) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 5) {
+      Image(systemName: symbol)
+        .font(.system(size: 11, weight: .bold))
+        .foregroundStyle(.white)
+      if !text.isEmpty {
+        Text(text)
+          .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+          .foregroundStyle(.white.opacity(0.95))
+          .lineLimit(noteLines)
+          .minimumScaleFactor(0.8)
+      }
+    }
+  }
+}
+
 struct TodayWidgetView: View {
   var entry: TodayEntry
   @Environment(\.widgetFamily) var family
-  private var theme: WarmHearth { appTheme() }
-  // The widget's background is appTheme().bg (the app's MANUAL light/dark
-  // choice, not the system's), so contrast is judged against that same signal.
-  private var lightMode: Bool { groupDefaults()?.string(forKey: "widget_theme") != "dark" }
-
-  private var maxItems: Int {
-    switch family {
-    case .systemSmall: return 3
-    case .systemMedium: return 4
-    default: return 7
-    }
-  }
-  private var isSmall: Bool { family == .systemSmall }
 
   var body: some View {
     if let info = entry.info {
-      VStack(alignment: .leading, spacing: isSmall ? 6 : 8) {
-        HStack(alignment: .top) {
-          VStack(alignment: .leading, spacing: 0) {
-            Text(info.todayLabel.uppercased())
-              .font(.system(size: 10, weight: .bold))
-              .foregroundStyle(theme.textMuted)
-            Text(isSmall ? info.dateShort : info.dateLong)
-              .font(.system(size: isSmall ? 15 : 18, weight: .bold))
-              .lineLimit(1)
-              .minimumScaleFactor(0.7)
-          }
-          Spacer(minLength: isSmall ? 8 : 14)
-          if let temp = info.temp {
-            // Glyph stacked ABOVE the temperature. In LIGHT mode the pair
-            // washed into the widget's pale background, so they sit on a dark
-            // chip; dark mode already separates cleanly — no chip there.
-            VStack(alignment: .trailing, spacing: 3) {
-              VStack(spacing: 1) {
-                // Always the natural multicolour — clouds are WHITE by design,
-                // which is exactly why the chip below is dark rather than white.
-                Image(systemName: weatherSymbol(info.code ?? -1))
-                  .font(.system(size: isSmall ? 14 : 16))
-                  .symbolRenderingMode(.multicolor)
-                Text("\(Int(temp))\(info.unit ?? "°")")
-                  .font(.system(size: isSmall ? 14 : 16, weight: .bold))
-                  .foregroundStyle(lightMode ? darkTheme.text : Color.primary)
-                  // Never wrap the unit onto a second line — shrink instead, so
-                  // three-digit temperatures ("100°F") still fit on one row.
-                  .lineLimit(1)
-                  .minimumScaleFactor(0.7)
-                  .fixedSize(horizontal: false, vertical: true)
-              }
-              .padding(.horizontal, lightMode ? 9 : 0)
-              .padding(.vertical, lightMode ? 6 : 0)
-              // A white chip hid the white cloud glyphs. Light mode gets the
-              // app's own warm-espresso surface instead, so every symbol reads
-              // exactly as it already does in dark mode.
-              .background(lightMode ? darkTheme.card : Color.clear)
-              .clipShape(RoundedRectangle(cornerRadius: 10))
-              if !isSmall, let city = info.city {
-                Text(city).font(.system(size: 10)).foregroundStyle(theme.textMuted).lineLimit(1)
-              }
-            }
-            // The weather block keeps its width; the date on the left shrinks
-            // first (it already carries minimumScaleFactor).
-            .layoutPriority(1)
-          }
-        }
-
-        // Weather alert (rain / storm / extreme temp / wind) — mirrors the app's
-        // Today card banner. Medium/large only (small has no room).
-        if !isSmall, let alert = info.alert {
-          HStack(spacing: 6) {
-            Image(systemName: alertSymbol(info.alertKind ?? ""))
-              .symbolRenderingMode(.multicolor)
-              .font(.system(size: 13))
-            Text(alert).font(.caption2).lineLimit(2)
-            Spacer(minLength: 0)
-          }
-          .padding(.horizontal, 8)
-          .padding(.vertical, 6)
-          .background(theme.accent.opacity(lightMode ? 0.22 : 0.15))
-          .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-
-        if info.items.isEmpty {
-          // Center the empty message (with a small glyph) so the widget reads as
-          // intentionally "clear day" instead of a top-stuck label + blank space.
-          Spacer(minLength: 0)
-          VStack(spacing: 6) {
-            Image(systemName: "checkmark.circle").font(.title3).foregroundStyle(theme.textMuted)
-            Text(info.emptyLabel)
-              .font(.caption)
-              .foregroundStyle(theme.textMuted)
-              .multilineTextAlignment(.center)
-          }
-          .frame(maxWidth: .infinity)
-          Spacer(minLength: 0)
-        } else {
-          VStack(alignment: .leading, spacing: isSmall ? 5 : 6) {
-            ForEach(Array(info.items.prefix(maxItems).enumerated()), id: \.offset) { _, item in
-              HStack(spacing: 6) {
-                Text(item.emoji).font(.system(size: isSmall ? 13 : 15))
-                Text(item.title)
-                  .font(.system(size: isSmall ? 12 : 13, weight: .medium))
-                  .lineLimit(1)
-                if !isSmall, let sub = item.subtitle {
-                  Text("· \(sub)")
-                    .font(.system(size: 11))
-                    .foregroundStyle(theme.textMuted)
-                    .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-              }
-            }
-          }
-          // Small has no weather-alert banner between the date and the list, so
-          // the two blocks ran together — worst with only one or two items, where
-          // there's plenty of room to spare. Nudge the list down a little.
-          .padding(.top, isSmall ? 5 : 0)
-          Spacer(minLength: 0)
-        }
+      switch family {
+      case .systemSmall: small(info)
+      case .systemMedium: medium(info)
+      default: large(info)
       }
-      // Without this, anything that sets no colour of its own (the date, the
-      // agenda titles) inherits .primary — which follows the DEVICE appearance
-      // and turns white on our light background.
-      .foregroundStyle(theme.text)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     } else {
-      VStack(spacing: 4) {
-        Image(systemName: "calendar").foregroundStyle(theme.textMuted)
-        Text("Open One Roof").font(.caption).foregroundStyle(theme.textMuted)
+      VStack(spacing: 6) {
+        Image(systemName: "calendar")
+          .font(.system(size: 22, weight: .bold))
+          .foregroundStyle(.white)
+        Text("Open One Roof")
+          .font(.system(size: 13, weight: .semibold, design: .rounded))
+          .foregroundStyle(.white)
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(WGradient(TODAY_NO_WEATHER))
+    }
+  }
+
+  // Small: the sky is the whole widget (it is the container background).
+  private func small(_ info: TodayRender) -> some View {
+    VStack(alignment: .leading, spacing: 1) {
+      if let t = tempText(info) {
+        WKicker(info.dateShort)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          WBig(t, size: 34)
+          if let kind = info.alertKind {
+            Image(systemName: alertSymbol(kind))
+              .font(.system(size: 12, weight: .bold))
+              .foregroundStyle(.white.opacity(0.95))
+          }
+        }
+      } else {
+        WKicker(info.todayLabel)
+        WBig(info.dateShort, size: 26)
+      }
+      Spacer(minLength: 4)
+      if let next = info.items.first {
+        let more = info.items.count - 1
+        let sub = (next.subtitle ?? "").isEmpty ? nil : next.subtitle
+        let line = [sub, more > 0 ? "+\(more)" : nil].compactMap { $0 }.joined(separator: " · ")
+        Text(next.title)
+          .font(.system(size: 13, weight: .semibold, design: .rounded))
+          .foregroundStyle(.white)
+          .lineLimit(1)
+          .minimumScaleFactor(0.8)
+        if !line.isEmpty {
+          Text(line)
+            .font(.system(size: 11.5, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.8))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+        }
+      } else {
+        Text(info.emptyLabel)
+          .font(.system(size: 12, weight: .semibold, design: .rounded))
+          .foregroundStyle(.white.opacity(0.85))
+          .lineLimit(2)
+          .minimumScaleFactor(0.8)
+      }
+    }
+    .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+    .padding(TODAY_PAD)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  // Medium: sky on the left ~42%, agenda on the neutral surface on the right.
+  private func medium(_ info: TodayRender) -> some View {
+    GeometryReader { geo in
+      HStack(spacing: 0) {
+        TodayHeader(info: info, longDate: true, bigSize: 34, noteLines: 2)
+          .padding(TODAY_PAD)
+          .frame(width: geo.size.width * 0.42)
+          .frame(maxHeight: .infinity)
+          .background(TodaySky(info: info, date: entry.date))
+          .clipped()
+        TodayAgenda(info: info, maxRows: 3, footer: false)
+          .padding(.horizontal, TODAY_PAD)
+          .padding(.vertical, 12)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .background(appTheme().card)
+      }
+    }
+  }
+
+  // Large: sky across the top ~42%, agenda below.
+  private func large(_ info: TodayRender) -> some View {
+    GeometryReader { geo in
+      VStack(spacing: 0) {
+        TodayHeader(info: info, longDate: true, bigSize: 42, noteLines: 1)
+          .padding(16)
+          .frame(height: geo.size.height * 0.42)
+          .frame(maxWidth: .infinity)
+          .background(TodaySky(info: info, date: entry.date))
+          .clipped()
+        TodayAgenda(info: info, maxRows: 5, footer: true)
+          .padding(.horizontal, 16)
+          .padding(.vertical, 12)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .background(appTheme().card)
+      }
+    }
+  }
+}
+
+/// Small: the sky itself. Medium / large: the neutral surface (their two halves
+/// are drawn edge to edge by the view, since content margins are disabled).
+private struct TodayBackdrop: View {
+  let entry: TodayEntry
+  @Environment(\.widgetFamily) var family
+  var body: some View {
+    if entry.info == nil {
+      WGradient(TODAY_NO_WEATHER)
+    } else if family == .systemSmall {
+      TodaySky(info: entry.info, date: entry.date)
+    } else {
+      appTheme().card
     }
   }
 }
@@ -493,11 +666,12 @@ struct TodayWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: "TodayWidget", provider: TodayProvider()) { entry in
       TodayWidgetView(entry: entry)
-        // The app's own Light/Dark choice, NOT the device's. See index.swift.
-        .containerBackground(appTheme().bg, for: .widget)
+        .containerBackground(for: .widget) { TodayBackdrop(entry: entry) }
     }
     .configurationDisplayName("Today")
     .description("Today's agenda and weather at a glance.")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    // The view pads itself, so the sky and the neutral half reach the edges.
+    .contentMarginsDisabled()
   }
 }

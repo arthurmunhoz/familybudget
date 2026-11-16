@@ -41,6 +41,7 @@ import { memberColor } from '@/lib/calendar'
 import { DismissKeyboard, Loader, Txt } from '@/components/ui'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
+import { reloadListsWidget } from '@/lib/widget'
 import { readCache, useRevalidateOnForeground, writeCache } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
@@ -353,6 +354,13 @@ export default function ShoppingList() {
   // holds its own optimistic state rather than a useCachedQuery (which does
   // this internally), so it subscribes to the foreground event directly.
   useRevalidateOnForeground(scheduleLoad)
+
+  // The Home-Screen Lists widget fetches for itself; tell it when what's open
+  // here changes (an add, a tick, a change from another phone via Realtime).
+  const openSig = items.filter((i) => !i.checked).length + ':' + items.length
+  useEffect(() => {
+    reloadListsWidget()
+  }, [openSig])
 
   function selectStore(id: string | null) {
     setActiveStoreId(id)

@@ -809,6 +809,70 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ day, items: [...evItems, ...petItems].slice(0, MAX_ITEMS) })
   }
 
+  // ── note ──────────────────────────────────────────────────────────────────
+  // The Recado widget: the latest hand-drawn note (migration 112) this member
+  // RECEIVED — sent to the whole household or to them, never their own. The
+  // picture is a 24 h signed URL; the widget keeps its own copy of the bytes.
+  if (action === 'note') {
+    const { data: rows } = await db
+      .from('pings')
+      .select('id, sender_email, image_path, created_at, recipients')
+      .eq('household_id', household)
+      .not('image_path', 'is', null)
+      .neq('sender_email', senderEmail)
+      .order('created_at', { ascending: false })
+      .limit(15)
+    const row = ((rows ?? []) as any[]).find((r) => !r.recipients || (r.recipients as string[]).includes(senderEmail))
+    if (!row || !String(row.image_path).startsWith(`${household}/notes/`)) return res.status(200).json({ note: null })
+    const [{ data: signed }, { data: who }] = await Promise.all([
+      db.storage.from('documents').createSignedUrl(row.image_path, 86_400),
+      db.from('household_members').select('display_name').eq('household_id', household).eq('email', row.sender_email).maybeSingle(),
+    ])
+    const name = String((who as any)?.display_name || String(row.sender_email).split('@')[0]).trim().split(/\s+/)[0]
+    return res.status(200).json({
+      note: { id: row.id, from: name, createdAt: row.created_at, imageUrl: signed?.signedUrl ?? null },
+    })
+  }
+
+  // ── lists ─────────────────────────────────────────────────────────────────
+  // The Lists widget: the household's OPEN shopping items grouped by store
+  // (null store = the general list), most items first — the same order as the
+  // Shopping screen's tiles. `list-check` ticks one item exactly like the app
+  // does (checked + checked_at), so Realtime moves it on every phone.
+  if (action === 'lists' || action === 'list-check') {
+    if (action === 'list-check') {
+      const { itemId } = req.body ?? {}
+      if (!itemId || typeof itemId !== 'string') return res.status(400).json({ error: 'Missing itemId' })
+      const { error } = await db
+        .from('shopping_items')
+        .update({ checked: true, checked_at: new Date().toISOString() })
+        .eq('id', itemId)
+        .eq('household_id', household)
+      if (error) return res.status(500).json({ error: 'Could not check item' })
+    }
+    const [{ data: items }, { data: stores }] = await Promise.all([
+      db
+        .from('shopping_items')
+        .select('id, label, store_id, created_at')
+        .eq('household_id', household)
+        .eq('checked', false)
+        .order('created_at', { ascending: true })
+        .limit(300),
+      db.from('shopping_stores').select('id, name').eq('household_id', household),
+    ])
+    const nameOf = new Map(((stores ?? []) as any[]).map((st) => [st.id as string, st.name as string]))
+    const groups = new Map<string, { id: string; name: string | null; items: { id: string; label: string }[] }>()
+    for (const it of (items ?? []) as any[]) {
+      const key = it.store_id && nameOf.has(it.store_id) ? (it.store_id as string) : ''
+      if (!groups.has(key)) groups.set(key, { id: key, name: key ? nameOf.get(key)! : null, items: [] })
+      groups.get(key)!.items.push({ id: it.id, label: it.label })
+    }
+    const lists = [...groups.values()]
+      .sort((x, y) => y.items.length - x.items.length)
+      .map((g) => ({ id: g.id, name: g.name, count: g.items.length, items: g.items.slice(0, 12) }))
+    return res.status(200).json({ total: (items ?? []).length, lists })
+  }
+
   // ── petcare ───────────────────────────────────────────────────────────────
   // The Pet Care widget: per-pet daily checklist + interval routines
   // (migration 069). `petcare` returns fresh state; `petcare-done` marks a task

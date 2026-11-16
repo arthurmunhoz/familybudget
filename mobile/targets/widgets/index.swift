@@ -48,13 +48,13 @@ struct WarmHearth {
 }
 
 let lightTheme = WarmHearth(
-  bg: Color(hex: "fbf6f0"), card: Color(hex: "ffffff"), text: Color(hex: "2b2521"),
-  textMuted: Color(hex: "8c8076"), accent: Color(hex: "c2603f"), expense: Color(hex: "cf5a4c"),
+  bg: Color(hex: "F2F2F3"), card: Color(hex: "FFFFFF"), text: Color(hex: "1E1E22"),
+  textMuted: Color(hex: "6E6E75"), accent: Color(hex: "c2603f"), expense: Color(hex: "cf5a4c"),
   income: Color(hex: "3c7d58"), onAccent: Color(hex: "ffffff"))
 
 let darkTheme = WarmHearth(
-  bg: Color(hex: "1b1714"), card: Color(hex: "262019"), text: Color(hex: "f3ebe0"),
-  textMuted: Color(hex: "a89c8e"), accent: Color(hex: "da7a5b"), expense: Color(hex: "e07a6a"),
+  bg: Color(hex: "17171A"), card: Color(hex: "222226"), text: Color(hex: "F2F2F4"),
+  textMuted: Color(hex: "A2A2AA"), accent: Color(hex: "da7a5b"), expense: Color(hex: "e07a6a"),
   income: Color(hex: "6fb58a"), onAccent: Color(hex: "1b1a18"))
 
 /** The app's manually-chosen Light/Dark, mirrored into the App Group — NOT the
@@ -146,53 +146,62 @@ private let sampleBudget = BudgetInfo(
     BudgetEntryRow(emoji: "📺", label: "Netflix", amount: 16, type: "expense"),
   ])
 
-// Two small deep-link action buttons (Scan / Add) for the Budget widget
-// (medium/large).
+/// The green of the Budget gradient's deep end — ink on the solid white button.
+private let BUDGET_GREEN = Color(hex: "0FA37F")
+
+// Two deep-link capsules (Scan / Add) for the Budget widget (medium/large):
+// Scan frosted on the gradient, Add solid white with green ink.
 struct AddEntryButtons: View {
   let budgetId: String
   let monthId: String
   var addLabel: String = "Add"
-  private var theme: WarmHearth { appTheme() }
   var body: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: 6) {
       Link(destination: addEntryURL(budgetId: budgetId, monthId: monthId, scan: true) ?? URL(string: "oneroof:///")!) {
-        Label("Scan", systemImage: "camera.fill")
-          .font(.caption).fontWeight(.semibold)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 8)
-          .foregroundStyle(theme.text)
-          .background(theme.textMuted.opacity(0.16))
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+        capsuleLabel("Scan", "camera.fill")
+          .foregroundStyle(Color.white)
+          .wGlass(radius: 18)
       }
       Link(destination: addEntryURL(budgetId: budgetId, monthId: monthId, scan: false) ?? URL(string: "oneroof:///")!) {
-        Label(addLabel, systemImage: "plus")
-          .font(.caption).fontWeight(.semibold)
-          .lineLimit(1)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 8)
-          .foregroundStyle(theme.onAccent)
-          .background(theme.accent)
-          .clipShape(RoundedRectangle(cornerRadius: 10))
+        capsuleLabel(addLabel, "plus")
+          .foregroundStyle(BUDGET_GREEN)
+          .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white))
       }
     }
   }
+
+  private func capsuleLabel(_ title: String, _ symbol: String) -> some View {
+    HStack(spacing: 4) {
+      Image(systemName: symbol).font(.system(size: 11, weight: .bold))
+      Text(title)
+        .font(.system(size: 12, weight: .bold, design: .rounded))
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 7)
+    .padding(.horizontal, 6)
+  }
 }
 
-// A "received ↓ / spent ↑" stat block (right-aligned by default; left on small).
+// One stat row on the gradient: label left, amount right (Received / Spent).
+// Both are white — on green the label tells them apart, not red/green ink.
 struct BudgetStat: View {
   let label: String
   let value: String
-  let symbol: String
-  let color: Color
-  var align: HorizontalAlignment = .trailing
-  private var theme: WarmHearth { appTheme() }
   var body: some View {
-    VStack(alignment: align, spacing: 1) {
-      Text(label).font(.caption2).foregroundStyle(theme.textMuted)
-      HStack(spacing: 2) {
-        Image(systemName: symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(color)
-        Text(value).font(.subheadline).minimumScaleFactor(0.7).lineLimit(1)
-      }
+    HStack(spacing: 6) {
+      Text(label)
+        .font(.system(size: 13, weight: .medium, design: .rounded))
+        .foregroundStyle(Color.white.opacity(0.85))
+        .lineLimit(1)
+      Spacer(minLength: 4)
+      Text(value)
+        .font(.system(size: 13, weight: .bold, design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(Color.white)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
     }
   }
 }
@@ -261,115 +270,114 @@ struct BudgetProvider: AppIntentTimelineProvider {
 struct BudgetWidgetView: View {
   var entry: BudgetEntry
   @Environment(\.widgetFamily) var family
-  private var theme: WarmHearth { appTheme() }
-  private var isSmall: Bool { family == .systemSmall }
-  /// Budget name. Small stays at caption size — that tile is already tight and
-  /// the balance figure is what it's there for; the wider sizes have the room to
-  /// let the name read as an actual header.
-  private var nameSize: CGFloat {
-    switch family {
-    case .systemSmall: return 12
-    case .systemMedium: return 16
-    default: return 18
+
+  var body: some View {
+    Group {
+      if let b = entry.budget {
+        switch family {
+        case .systemSmall: summary(b)
+        case .systemMedium: header(b, buttons: true)
+        default: large(b)
+        }
+      } else {
+        VStack(spacing: 6) {
+          Image(systemName: "wallet.pass").font(.system(size: 22, weight: .semibold))
+          Text("Open One Roof").font(.system(size: 12, weight: .semibold, design: .rounded))
+        }
+        .foregroundStyle(Color.white.opacity(0.9))
+      }
+    }
+    // Nothing here may fall back to SwiftUI's .primary (it follows the DEVICE
+    // appearance): everything on the green is white.
+    .foregroundStyle(Color.white)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  /// Spent ÷ income, 0 when nothing came in yet.
+  private func spentRatio(_ b: BudgetInfo) -> Double {
+    b.income > 0 ? max(0, b.spent / b.income) : 0
+  }
+
+  /// "NAME · PERIOD" when the pair is short enough for one kicker line.
+  private func kicker(_ b: BudgetInfo) -> String {
+    let both = b.name + " · " + b.period
+    return b.period.isEmpty || both.count > 22 ? b.name : both
+  }
+
+  /// The small tile, and the left half of the wider ones: name, the balance
+  /// very large, what the number is, then how much of the income is spent.
+  private func summary(_ b: BudgetInfo) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      WKicker(kicker(b))
+      WBig(money(b.balance, b.currency), size: family == .systemSmall ? 32 : 34)
+        .padding(.top, 4)
+      Text("balance")
+        .font(.system(size: 12, weight: .medium, design: .rounded))
+        .foregroundStyle(Color.white.opacity(0.8))
+        .lineLimit(1)
+      Spacer(minLength: 6)
+      WProgress(spentRatio(b))
+      Text("spent \(Int((spentRatio(b) * 100).rounded()))%")
+        .font(.system(size: 12, weight: .semibold, design: .rounded))
+        .foregroundStyle(Color.white.opacity(0.9))
+        .lineLimit(1)
+        .padding(.top, 5)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  /// Medium, and the top of large: the summary on the left half, the darker
+  /// Received / Spent panel on the right (carrying Scan / Add on medium).
+  private func header(_ b: BudgetInfo, buttons: Bool) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      summary(b)
+      VStack(spacing: 8) {
+        BudgetStat(label: "Received", value: money(b.income, b.currency))
+        BudgetStat(label: "Spent", value: money(b.spent, b.currency))
+        if buttons {
+          Spacer(minLength: 0)
+          if let mid = b.monthId {
+            AddEntryButtons(budgetId: b.id, monthId: mid)
+          }
+        }
+      }
+      .padding(10)
+      .frame(maxWidth: .infinity, maxHeight: buttons ? .infinity : nil, alignment: .top)
+      .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.black.opacity(0.14)))
     }
   }
 
-  var body: some View {
-    if let b = entry.budget {
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(spacing: 6) {
-          // wallet.pass, not wallet.bifold — the latter is iOS 18+ and this
-          // target deploys to 17.0, where it would render as a missing glyph.
-          Image(systemName: "wallet.pass").font(.system(size: nameSize - 1))
-          // No foregroundStyle: inherits theme.text from the root, so the name
-          // reads as a header rather than as a muted caption.
-          Text(b.name)
-            .font(.system(size: nameSize, weight: isSmall ? .regular : .semibold))
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-        }
-        Spacer(minLength: 0)
-        if family == .systemSmall {
-          // Narrow tile: received/spent up top, balance pinned to the bottom —
-          // it's the biggest number, so it reads last and sits nearest the edge.
-          HStack(spacing: 12) {
-            BudgetStat(label: "received", value: money(b.income, b.currency), symbol: "arrow.down", color: theme.income, align: .leading)
-            BudgetStat(label: "spent", value: money(b.spent, b.currency), symbol: "arrow.up", color: theme.expense, align: .leading)
-            Spacer(minLength: 0)
-          }
-          VStack(alignment: .leading, spacing: 1) {
-            Text("balance").font(.caption2).foregroundStyle(theme.textMuted)
-            Text(money(b.balance, b.currency))
-              .font(.system(size: 26, weight: .semibold))
-              .foregroundStyle(b.balance >= 0 ? theme.income : theme.expense)
-              .minimumScaleFactor(0.6)
-              .lineLimit(1)
-          }
-        } else {
-          // Wide tile: balance on the left; received/spent stacked on the right.
-          HStack(alignment: .bottom, spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
-              Text("balance").font(.caption2).foregroundStyle(theme.textMuted)
-              Text(money(b.balance, b.currency))
-                .font(.system(size: family == .systemLarge ? 40 : 34, weight: .semibold))
-                .foregroundStyle(b.balance >= 0 ? theme.income : theme.expense)
-                .minimumScaleFactor(0.6)
+  private func large(_ b: BudgetInfo) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      header(b, buttons: false)
+        .frame(height: 104)
+      if let entries = b.entries, !entries.isEmpty {
+        WKicker("Latest entries", color: Color.white.opacity(0.75))
+          .padding(.top, 14)
+        VStack(spacing: 7) {
+          ForEach(Array(entries.prefix(6).enumerated()), id: \.offset) { _, e in
+            let isIncome = e.type == "income"
+            HStack(spacing: 8) {
+              Text(e.emoji).font(.system(size: 14))
+              Text(e.label)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.white)
+                .lineLimit(1)
+              Spacer(minLength: 6)
+              Text((isIncome ? "+" : "") + money(e.amount, b.currency))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Color.white.opacity(isIncome ? 1 : 0.85))
                 .lineLimit(1)
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 6) {
-              BudgetStat(label: "received", value: money(b.income, b.currency), symbol: "arrow.down", color: theme.income)
-              BudgetStat(label: "spent", value: money(b.spent, b.currency), symbol: "arrow.up", color: theme.expense)
-            }
-          }
-          // Large has the room for the period's latest entries; Medium doesn't
-          // (it's ~155pt tall and already carries the stats + both actions).
-          if family == .systemLarge, let entries = b.entries, !entries.isEmpty {
-            Divider().padding(.top, 6)
-            Text("Latest entries")
-              .font(.system(size: 9, weight: .bold))
-              .kerning(0.7)
-              .foregroundStyle(theme.textMuted)
-              .padding(.top, 4)
-            VStack(spacing: 3) {
-              ForEach(Array(entries.prefix(6).enumerated()), id: \.offset) { _, e in
-                HStack(spacing: 7) {
-                  Text(e.emoji).font(.system(size: 13))
-                  Text(e.label).font(.system(size: 13)).lineLimit(1)
-                  Spacer(minLength: 4)
-                  Text((e.type == "income" ? "+" : "−") + money(e.amount, b.currency))
-                    .font(.system(size: 13, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(e.type == "income" ? theme.income : theme.expense)
-                }
-              }
-            }
-            .padding(.top, 2)
-          }
-
-          // On the tall Large size, push the buttons to the bottom.
-          if family == .systemLarge { Spacer(minLength: 0) }
-          if let mid = b.monthId {
-            AddEntryButtons(budgetId: b.id, monthId: mid, addLabel: "Add Entry")
-              .padding(.top, 6)
           }
         }
+        .padding(.top, 8)
       }
-      .padding(.vertical, 6)
-      // Small trims its side padding (into the widget's own margin) so the
-      // balance figure gets more room; the wider sizes keep the 6pt inset.
-      .padding(.horizontal, family == .systemSmall ? -6 : 6)
-      // Everything that doesn't set its own colour (the balance figures, entry
-      // labels) would otherwise inherit SwiftUI's .primary, which follows the
-      // DEVICE appearance and goes white on our light background.
-      .foregroundStyle(theme.text)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    } else {
-      VStack(spacing: 4) {
-        Image(systemName: "wallet.pass").foregroundStyle(theme.textMuted)
-        Text("Open One Roof").font(.caption).foregroundStyle(theme.textMuted)
+      Spacer(minLength: 8)
+      if let mid = b.monthId {
+        AddEntryButtons(budgetId: b.id, monthId: mid, addLabel: "Add Entry")
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 }
@@ -378,9 +386,9 @@ struct BudgetWidget: Widget {
   var body: some WidgetConfiguration {
     AppIntentConfiguration(kind: "BudgetWidget", intent: SelectBudgetIntent.self, provider: BudgetProvider()) { entry in
       BudgetWidgetView(entry: entry)
-        // The app's own Light/Dark choice, NOT .fill.tertiary — that follows the
-        // device and was why this tile stayed black in a light-themed app.
-        .containerBackground(appTheme().bg, for: .widget)
+        // The Budget app's own green — identity, so it does not follow the
+        // app's (or the device's) light/dark choice.
+        .containerBackground(for: .widget) { WGradient(WG.budget) }
     }
     .configurationDisplayName("Budget")
     .description("Pick a budget to show its balance and quick-add entries.")
@@ -396,5 +404,7 @@ struct OneRoofWidgets: WidgetBundle {
     NudgesWidget()
     TodayWidget()
     PetCareWidget()
+    NoteWidget()
+    ListsWidget()
   }
 }

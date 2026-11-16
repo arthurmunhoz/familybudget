@@ -31,6 +31,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { supabase } from '@/lib/supabase'
 import { channelName } from '@/lib/realtime'
 import { timeAgo } from '@/lib/format'
+import { reloadNoteWidget } from '@/lib/widget'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { NoteViewer } from '@/apps/pings/NoteViewer'
 import type { Ping, PingAck } from '@/lib/types'
@@ -147,6 +148,10 @@ export default function NudgesBanner({
       alive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notePaths])
+  // A note came or went: the Home-Screen Recado widget re-fetches.
+  useEffect(() => {
+    reloadNoteWidget()
   }, [notePaths])
 
   // Load this device's dismissed-sent set for the signed-in user.

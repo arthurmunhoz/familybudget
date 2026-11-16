@@ -298,3 +298,24 @@ export function writeAckStatus(data: { emoji: string; label: string; ackerName: 
     /* native module unavailable — ignore */
   }
 }
+
+/** The Recado and Lists widgets fetch for themselves (api/widget.ts ?action=
+ *  note | lists); the app only tells them WHEN: a new drawn note arrived, the
+ *  shopping list changed. Kinds must match NoteWidget.swift / ListsWidget.swift. */
+export function reloadNoteWidget(): void {
+  if (Platform.OS !== 'ios') return
+  try {
+    ExtensionStorage.reloadWidget('NoteWidget')
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}
+
+export function reloadListsWidget(): void {
+  if (Platform.OS !== 'ios') return
+  try {
+    ExtensionStorage.reloadWidget('ListsWidget')
+  } catch {
+    /* native module unavailable — ignore */
+  }
+}

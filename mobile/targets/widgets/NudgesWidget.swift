@@ -314,8 +314,8 @@ struct UndoNudgeIntent: AppIntent {
 }
 
 // ── Nudge selection (configurable small widget) ──────────────────────────────
-// The small widget shows a SINGLE nudge; this lets the user pick which one via
-// the system "Edit Widget" long-press (same pattern as BudgetWidget's
+// The small widget's 2×2 grid LEADS with one nudge the user picks via the
+// system "Edit Widget" long-press (same pattern as BudgetWidget's
 // SelectBudgetIntent in index.swift). Medium/large keep showing the top-N grid
 // and ignore this selection. The picker's options come straight from the
 // presets the app already mirrored into the App Group ("nudge_presets").
@@ -413,48 +413,52 @@ struct NudgesProvider: AppIntentTimelineProvider {
 }
 
 // ── Views ────────────────────────────────────────────────────────────────────
+// The 2026-11 look (Kit.swift): the Pings blue gradient with white type, frosted
+// white tiles, the urgent red for high-priority presets. Identity colours — they
+// do not follow the app's light/dark choice.
+private let NUDGE_BLUE = Color(hex: "4A5BF5")
+
+// One person in the recipient selector: solid white when chosen, frosted when not.
 struct NudgeChip: View {
   let title: String
   let active: Bool
-  let theme: WarmHearth
   var body: some View {
     Text(title)
-      .font(.caption2).fontWeight(.semibold)
+      .font(.system(size: 11, weight: .semibold, design: .rounded))
       .lineLimit(1)
-      .padding(.horizontal, 9).padding(.vertical, 5)
-      .background(active ? theme.accent : theme.card)
-      .foregroundStyle(active ? Color.white : theme.textMuted)
-      .clipShape(Capsule())
+      .minimumScaleFactor(0.75)
+      .padding(.horizontal, 9).padding(.vertical, 4)
+      .foregroundStyle(active ? NUDGE_BLUE : Color.white)
+      .background(Capsule().fill(Color.white.opacity(active ? 1 : 0.2)))
   }
 }
 
-// One preset as a big, centred tappable tile. The medium/large widgets lay these
-// out 2-up in a grid (see nudgeGridRows) instead of thin full-width rows, so each
-// target is larger and clearly separated left/right — a near-miss can no longer
-// land on the neighbouring nudge and fire the wrong one.
+// One preset as a tappable tile: the emoji over its label, on frosted white —
+// or on the urgent red when the preset is high priority. Tiles sit in a grid
+// (see nudgeGridRows) so each target is clearly separated from its neighbours.
 struct NudgeTile: View {
   let preset: NudgePreset
-  let theme: WarmHearth
-  let prominent: Bool  // the small widget's single, oversized tile
+  var emojiSize: CGFloat = 22
+
+  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 14, style: .continuous) }
 
   var body: some View {
-    VStack(spacing: 4) {
-      Text(preset.emoji).font(.system(size: prominent ? 36 : 22))
+    let content = VStack(spacing: 2) {
+      Text(preset.emoji).font(.system(size: emojiSize))
       Text(preset.label)
-        .font(prominent ? .subheadline : .caption)
-        .fontWeight(.medium)
-        .foregroundStyle(theme.text)
-        .lineLimit(2)
-        .multilineTextAlignment(.center)
-        .minimumScaleFactor(0.8)
+        .font(.system(size: 11, weight: .semibold, design: .rounded))
+        .foregroundStyle(Color.white)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding(.horizontal, 6).padding(.vertical, 8)
-    .background(preset.highPriority ? theme.expense.opacity(0.14) : theme.card)
-    .overlay(
-      RoundedRectangle(cornerRadius: 12)
-        .stroke(preset.highPriority ? theme.expense.opacity(0.55) : Color.clear, lineWidth: 1))
-    .clipShape(RoundedRectangle(cornerRadius: 12))
+    .padding(.horizontal, 5).padding(.vertical, 3)
+
+    if preset.highPriority {
+      content.background(WGradient(WG.urgent)).clipShape(shape)
+    } else {
+      content.wGlass(radius: 14).contentShape(shape)
+    }
   }
 }
 
@@ -480,33 +484,37 @@ func nudgeGridRows(_ presets: [NudgePreset], columns: Int) -> [NudgeGridRow] {
   return rows
 }
 
+// The centred state that replaces the grid: pending (Sent + Undo), sent, or
+// "seen by X" — on the same blue.
 struct NudgeConfirmationView: View {
   let status: WidgetStatus
-  let theme: WarmHearth
   var body: some View {
     VStack(spacing: 6) {
-      Text(status.emoji).font(.system(size: 30))
+      Text(status.emoji).font(.system(size: 38))
       Text(status.label)
-        .font(.subheadline).fontWeight(.semibold)
-        .foregroundStyle(theme.text)
+        .font(.system(size: 15, weight: .bold, design: .rounded))
+        .foregroundStyle(Color.white)
         .lineLimit(2)
         .multilineTextAlignment(.center)
+        .minimumScaleFactor(0.8)
       HStack(spacing: 4) {
-        Image(systemName: "checkmark.circle.fill").font(.caption)
+        Image(systemName: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
         Text(status.type == "ack" ? "seen by \(status.name ?? "")" : "Sent")
-          .font(.caption).fontWeight(.semibold)
+          .font(.system(size: 12, weight: .semibold, design: .rounded))
+          .lineLimit(1)
+          .minimumScaleFactor(0.8)
       }
-      .foregroundStyle(theme.accent)
+      .foregroundStyle(Color.white.opacity(0.9))
 
       // Only while the upload is still held on-device. Once `until` passes the
       // timeline reverts to the list, so there's never a dead Undo on screen.
       if status.type == "pending" {
         Button(intent: UndoNudgeIntent()) {
           Text("Undo")
-            .font(.caption).fontWeight(.bold)
-            .foregroundStyle(theme.text)
-            .padding(.horizontal, 14).padding(.vertical, 5)
-            .background(Capsule().fill(theme.card))
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(NUDGE_BLUE)
+            .padding(.horizontal, 18).padding(.vertical, 6)
+            .background(Capsule().fill(Color.white))
         }
         .buttonStyle(.plain)
         .padding(.top, 2)
@@ -520,26 +528,27 @@ struct NudgeConfirmationView: View {
 struct NudgesWidgetView: View {
   var entry: NudgesEntry
   @Environment(\.widgetFamily) var family
-  private var theme: WarmHearth { appTheme() }
 
-  // Small shows a single big tile; medium/large go 2-up.
-  private var columns: Int { family == .systemSmall ? 1 : 2 }
+  // Small is 2×2; medium (beside its side column) and large are 3-up.
+  private var columns: Int { family == .systemSmall ? 2 : 3 }
 
   private var presetCount: Int {
     switch family {
-    case .systemSmall: return 1
-    case .systemMedium: return 4   // 2×2
-    default: return 6              // 2×3
+    case .systemSmall: return 4    // 2×2
+    case .systemMedium: return 6   // 3×2
+    default: return 6              // 3×2
     }
   }
 
-  // Small shows the single user-picked preset (falling back to the first, e.g.
-  // when nothing's configured yet or the pick was deleted); medium/large show
-  // the top-N in their existing order.
+  // Small leads with the user-picked preset (Edit Widget → Select nudge), then
+  // fills the rest of its 2×2 with the others in their existing order; with no
+  // pick (or a deleted one) it's simply the first four. Medium/large show the
+  // top-N in their existing order.
   private var visiblePresets: [NudgePreset] {
-    if family == .systemSmall {
-      if let id = entry.pickedId, let p = entry.presets.first(where: { $0.id == id }) { return [p] }
-      return Array(entry.presets.prefix(1))
+    if family == .systemSmall,
+      let id = entry.pickedId, let p = entry.presets.first(where: { $0.id == id })
+    {
+      return Array(([p] + entry.presets.filter { $0.id != id }).prefix(presetCount))
     }
     return Array(entry.presets.prefix(presetCount))
   }
@@ -548,54 +557,111 @@ struct NudgesWidgetView: View {
     nudgeGridRows(visiblePresets, columns: columns)
   }
 
-  var body: some View {
-    if let status = entry.status {
-      NudgeConfirmationView(status: status, theme: theme)
-    } else if !entry.hasToken || entry.presets.isEmpty {
-      VStack(spacing: 4) {
-        Image(systemName: "bell.badge").foregroundStyle(theme.textMuted)
-        Text("Open One Roof").font(.caption).foregroundStyle(theme.textMuted)
+  // Who a (non-urgent) tap goes to right now — the current recipient selection.
+  private var statusLine: String {
+    let names = entry.members.filter { entry.selected.contains($0.email) }.map { firstName($0.name) }
+    return names.isEmpty ? "To everyone" : "To " + names.joined(separator: ", ")
+  }
+
+  private var statusText: some View {
+    Text(statusLine)
+      .font(.system(size: 12, weight: .medium, design: .rounded))
+      .foregroundStyle(Color.white.opacity(0.85))
+  }
+
+  private var hasSelector: Bool { family != .systemSmall && !entry.members.isEmpty }
+
+  private var selector: some View {
+    HStack(spacing: 5) {
+      Button(intent: ToggleRecipientIntent(email: "")) {
+        NudgeChip(title: "All", active: entry.selected.isEmpty)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-    } else {
-      VStack(spacing: 6) {
-        if family != .systemSmall && !entry.members.isEmpty {
-          HStack(spacing: 5) {
-            Button(intent: ToggleRecipientIntent(email: "")) {
-              NudgeChip(title: "All", active: entry.selected.isEmpty, theme: theme)
-            }
-            .buttonStyle(.plain)
-            ForEach(entry.members) { m in
-              Button(intent: ToggleRecipientIntent(email: m.email)) {
-                NudgeChip(title: firstName(m.name), active: entry.selected.contains(m.email), theme: theme)
+      .buttonStyle(.plain)
+      ForEach(entry.members) { m in
+        Button(intent: ToggleRecipientIntent(email: m.email)) {
+          NudgeChip(title: firstName(m.name), active: entry.selected.contains(m.email))
+        }
+        .buttonStyle(.plain)
+      }
+    }
+  }
+
+  private var grid: some View {
+    let gap: CGFloat = family == .systemLarge ? 8 : 6
+    return VStack(spacing: gap) {
+      ForEach(gridRows) { row in
+        HStack(spacing: gap) {
+          ForEach(Array(row.cells.enumerated()), id: \.offset) { _, cell in
+            if let p = cell {
+              Button(
+                intent: SendNudgeIntent(kind: p.kind, emoji: p.emoji, message: p.label, highPriority: p.highPriority)
+              ) {
+                NudgeTile(preset: p, emojiSize: family == .systemLarge ? 24 : 22)
               }
               .buttonStyle(.plain)
+            } else {
+              Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-          }
-          .frame(maxWidth: .infinity)
-        }
-        VStack(spacing: 6) {
-          ForEach(gridRows) { row in
-            HStack(spacing: 6) {
-              ForEach(Array(row.cells.enumerated()), id: \.offset) { _, cell in
-                if let p = cell {
-                  Button(
-                    intent: SendNudgeIntent(kind: p.kind, emoji: p.emoji, message: p.label, highPriority: p.highPriority)
-                  ) {
-                    NudgeTile(preset: p, theme: theme, prominent: family == .systemSmall)
-                  }
-                  .buttonStyle(.plain)
-                } else {
-                  Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-              }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
           }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  var body: some View {
+    if let status = entry.status {
+      NudgeConfirmationView(status: status)
+    } else if !entry.hasToken || entry.presets.isEmpty {
+      VStack(spacing: 6) {
+        Image(systemName: "bell.badge.fill")
+          .font(.system(size: 22, weight: .semibold))
+          .foregroundStyle(Color.white)
+        Text("Open One Roof")
+          .font(.system(size: 12, weight: .semibold, design: .rounded))
+          .foregroundStyle(Color.white.opacity(0.85))
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    } else {
+      switch family {
+      case .systemSmall:
+        VStack(alignment: .leading, spacing: 6) {
+          WKicker("Nudges")
+          grid
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      case .systemMedium:
+        GeometryReader { geo in
+          HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 0) {
+              WKicker("Nudges")
+              Spacer(minLength: 4)
+              statusText
+                .lineLimit(3)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.leading)
+            }
+            .frame(width: geo.size.width * 0.3, alignment: .leading)
+            .frame(maxHeight: .infinity)
+            VStack(spacing: 6) {
+              if hasSelector { selector.frame(maxWidth: .infinity, alignment: .leading) }
+              grid
+            }
+          }
+        }
+      default:
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(alignment: .firstTextBaseline, spacing: 8) {
+            WKicker("Nudges")
+            Spacer(minLength: 4)
+            statusText.lineLimit(1).minimumScaleFactor(0.8)
+          }
+          if hasSelector { selector.frame(maxWidth: .infinity, alignment: .leading) }
+          grid
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+      }
     }
   }
 }
@@ -604,7 +670,7 @@ struct NudgesWidget: Widget {
   var body: some WidgetConfiguration {
     AppIntentConfiguration(kind: "NudgesWidget", intent: SelectNudgeIntent.self, provider: NudgesProvider()) { entry in
       NudgesWidgetView(entry: entry)
-        .containerBackground(appTheme().bg, for: .widget)
+        .containerBackground(for: .widget) { WGradient(WG.pings) }
     }
     .configurationDisplayName("Nudges")
     .description("Send a household nudge from your Home Screen. Long-press the small widget to pick which nudge it sends.")
