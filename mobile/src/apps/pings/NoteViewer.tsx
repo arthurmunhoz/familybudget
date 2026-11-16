@@ -1,6 +1,7 @@
 // Full-screen view of a hand-drawn note (migration 112). Opens from the note's
 // card on the Home: the sheet floats in over a dimmed screen, with who sent
-// it and when, and — for one sent to me — the same "Got it" as any nudge.
+// it and when; Save and Close at the bottom (opening it counts as seen —
+// the banner acks a received note when it opens).
 // "Save" downloads the PNG and opens the system share sheet, whose "Save
 // Image" (iOS) / save-to-gallery (Android) puts it in the photos — the same
 // route the printables use, so no photo-library module is needed.
@@ -9,12 +10,10 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, Modal, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
-import { Download, ThumbsUp, X } from 'lucide-react-native'
+import { Download, X } from 'lucide-react-native'
 import { File, Paths } from 'expo-file-system'
 
 import { Txt } from '@/components/ui'
-import { GradientBox } from '@/components/home/GradientBox'
-import { APP_GRADIENT } from '@/components/home/palette'
 import { useI18n } from '@/hooks/useI18n'
 import { haptic } from '@/apps/games/feedback'
 import { fonts, sp } from '@/theme/theme'
@@ -24,14 +23,11 @@ export function NoteViewer({
   title,
   sub,
   onClose,
-  onGotIt,
 }: {
   url: string
   title: string
   sub: string
   onClose: () => void
-  /** Present for a note sent to me: acknowledges it and closes. */
-  onGotIt?: () => void
 }) {
   const { t } = useI18n()
   const insets = useSafeAreaInsets()
@@ -93,19 +89,6 @@ export function NoteViewer({
               {sub}
             </Txt>
           </View>
-          <Pressable
-            onPress={() => void save()}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('notes.save')}
-            style={styles.saveBtn}
-          >
-            {saving ? <ActivityIndicator color="#fff" /> : <Download size={17} color="#fff" strokeWidth={2.4} />}
-            <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 14.5 }}>{t('notes.save')}</Txt>
-          </Pressable>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')} style={styles.close}>
-            <X size={20} color="#fff" />
-          </Pressable>
         </View>
 
         <View
@@ -153,30 +136,28 @@ export function NoteViewer({
           ) : null}
         </View>
 
-        {onGotIt ? (
+        {/* Save on the left, Close on the right (owner, 2026-11-15). No
+            "Got it": opening a note already counts as seen. */}
+        <View style={styles.bottom}>
           <Pressable
-            onPress={() => {
-              haptic('success')
-              onGotIt()
-            }}
+            onPress={() => void save()}
             accessibilityRole="button"
-            accessibilityLabel={t('pings.gotIt')}
-            style={{ alignSelf: 'stretch', marginHorizontal: sp.lg }}
+            accessibilityLabel={t('notes.save')}
+            style={({ pressed }) => [styles.bottomBtn, styles.bottomGhost, pressed && { opacity: 0.8 }]}
           >
-            <GradientBox colors={APP_GRADIENT.pings} radius={22} style={styles.gotIt}>
-              <ThumbsUp size={18} strokeWidth={2.4} color="#fff" />
-              <Txt
-                style={{
-                  color: '#fff',
-                  fontFamily: fonts.semibold,
-                  fontSize: 16.5,
-                }}
-              >
-                {t('pings.gotIt')}
-              </Txt>
-            </GradientBox>
+            {saving ? <ActivityIndicator color="#fff" /> : <Download size={18} color="#fff" strokeWidth={2.4} />}
+            <Txt style={styles.bottomTxt}>{t('notes.save')}</Txt>
           </Pressable>
-        ) : null}
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
+            style={({ pressed }) => [styles.bottomBtn, { backgroundColor: '#FFFBF2' }, pressed && { opacity: 0.85 }]}
+          >
+            <X size={18} color="#2B2521" strokeWidth={2.4} />
+            <Txt style={[styles.bottomTxt, { color: '#2B2521' }]}>{t('common.close')}</Txt>
+          </Pressable>
+        </View>
       </View>
     </Modal>
   )
@@ -192,33 +173,13 @@ const styles = StyleSheet.create({
   },
   title: { color: '#fff', fontFamily: fonts.display, fontSize: 22 },
   sub: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 2 },
-  saveBtn: {
-    height: 40,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
-  close: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  bottom: { flexDirection: 'row', gap: sp.md, marginHorizontal: sp.lg },
+  bottomBtn: { flex: 1, height: 52, borderRadius: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  bottomGhost: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  bottomTxt: { color: '#fff', fontFamily: fonts.semibold, fontSize: 16 },
   sheet: {
     borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: '#FFFBF2',
-  },
-  gotIt: {
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
   },
 })

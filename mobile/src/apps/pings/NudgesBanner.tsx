@@ -203,7 +203,12 @@ export default function NudgesBanner() {
 
   if (incoming.length === 0 && sent.length === 0) return null
 
-  const openNote = (p: ActivePing, mine: boolean) => setViewing({ p, mine })
+  // Opening a note someone sent me counts as seeing it (owner, 2026-11-15):
+  // it's acked right away, and drops off Home once the viewer closes.
+  const openNote = (p: ActivePing, mine: boolean) => {
+    setViewing({ p, mine })
+    if (!mine) void ack(p.id)
+  }
 
   /** The drawn note on its card, in the icon's place: a little sheet of
    *  paper, tilted a touch; tapping it opens the note full screen. */
@@ -231,21 +236,9 @@ export default function NudgesBanner() {
         title={viewing.mine ? t('notes.youDrew') : t('notes.drew', { name: firstName(nameOf(viewing.p.sender_email)) })}
         sub={timeAgo(viewing.p.created_at)}
         onClose={() => setViewing(null)}
-        onGotIt={
-          viewing.mine
-            ? undefined
-            : () => {
-                const id = viewing.p.id
-                setViewing(null)
-                void ack(id)
-              }
-        }
       />
     ) : null
 
-  // RECEIVED — a gradient card in the Nudges colour (red when it's urgent):
-  // who and when as a kicker, the message large, the replies as pills inside
-  // (2026-11). The card itself is inert.
   // RECEIVED hand-drawn note — a sheet of kraft paper instead of the Nudges
   // blue (owner, 2026-11-15: the blue under a drawing didn't feel right):
   // dark ink type, the note pinned in the middle, View / Got it in ink.
