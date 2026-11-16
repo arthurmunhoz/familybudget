@@ -9,6 +9,7 @@
 import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 
+import { NativeGoogleUnavailable, nativeGoogleAvailable, nativeGoogleCalendarCode } from './googleNative'
 import { supabase } from './supabase'
 import { completeOAuthRedirect } from './oauthRedirect'
 
@@ -43,6 +44,20 @@ async function authedPost(path: string, body?: unknown): Promise<unknown> {
  *  Returns false if the user cancelled the browser; throws on failure (notably
  *  'no-refresh-token' if Google didn't return one). */
 export async function connectGoogleCalendar(): Promise<boolean> {
+  // Native sheet first (lib/googleNative): it returns a one-time code that the
+  // SERVER exchanges for the refresh token. Falls through to the browser flow
+  // when the native path isn't set up on this binary / platform.
+  if (nativeGoogleAvailable()) {
+    try {
+      const got = await nativeGoogleCalendarCode(GOOGLE_CALENDAR_SCOPE)
+      if (!got) return false
+      await authedPost('/api/google-calendar-connect', { code: got.code, google_email: got.email })
+      await syncGoogleCalendar().catch(() => {})
+      return true
+    } catch (e) {
+      if (!(e instanceof NativeGoogleUnavailable)) throw e
+    }
+  }
   const redirectTo = makeRedirectUri({ scheme: 'oneroof', path: 'auth-callback' })
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

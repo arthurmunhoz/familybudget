@@ -2,6 +2,8 @@
 // after the "Connect Google Calendar" consent redirect. The client can't write
 // these (RLS denies it); only this service-role endpoint can. Auth: caller must
 // send a valid Supabase JWT — we link the connection to THAT user.
+// Two shapes: tokens captured from the web OAuth redirect (older flow), or a
+// one-time `code` from the native Google sheet, exchanged here.
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req: any, res: any) {
@@ -24,7 +26,45 @@ export default async function handler(req: any, res: any) {
   const callerEmail = (await userRes.json())?.email
   if (!callerEmail) return res.status(401).json({ error: 'Unauthorized' })
 
-  const { access_token, refresh_token, expires_in, google_email, calendar_id } = req.body ?? {}
+  let { access_token, refresh_token, expires_in, google_email } = req.body ?? {}
+  const { calendar_id, code } = req.body ?? {}
+
+  // The native Google sheet (mobile lib/googleNative) sends a one-time SERVER
+  // AUTH CODE instead of tokens: exchange it here, with the web client's
+  // secret, so the refresh token never passes through the phone. A code from
+  // the native SDKs is redeemed with an EMPTY redirect_uri.
+  if (code && typeof code === 'string') {
+    const clientId = process.env.GOOGLE_CLIENT_ID
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+    if (!clientId || !clientSecret) return res.status(500).json({ error: 'Not configured (Google client).' })
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: '',
+      }).toString(),
+    })
+    const tok = (await tokenRes.json().catch(() => ({}))) as {
+      access_token?: string
+      refresh_token?: string
+      expires_in?: number
+      scope?: string
+    }
+    if (!tokenRes.ok || !tok.access_token) return res.status(400).json({ error: 'Google did not accept the code — please reconnect.' })
+    // Only a grant that really includes the calendar is worth storing.
+    if (!String(tok.scope ?? '').includes('auth/calendar')) {
+      return res.status(400).json({ error: 'Calendar access was not granted.' })
+    }
+    access_token = tok.access_token
+    refresh_token = tok.refresh_token
+    expires_in = tok.expires_in
+    google_email = typeof google_email === 'string' ? google_email : undefined
+  }
+
   if (!access_token) return res.status(400).json({ error: 'Missing access_token' })
   // A refresh token is what makes long-lived sync possible. It only comes back
   // with access_type=offline + prompt=consent; if it's missing, tell the client

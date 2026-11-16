@@ -18,6 +18,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 import type { Session } from '@supabase/supabase-js'
 
+import { NativeGoogleUnavailable, nativeGoogleAvailable, nativeGoogleSignIn, nativeGoogleSignOut } from './googleNative'
 import { supabase } from './supabase'
 import { completeOAuthRedirect } from './oauthRedirect'
 import { disablePush } from './notifications'
@@ -345,6 +346,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signInWithGoogle = useCallback(async () => {
+    // The system's own Google sheet when this binary and platform have it
+    // (lib/googleNative): no web page, so no technical address on screen. A
+    // set-up problem falls through to the browser flow below, never a dead end.
+    if (nativeGoogleAvailable()) {
+      try {
+        await nativeGoogleSignIn()
+        return
+      } catch (e) {
+        if (!(e instanceof NativeGoogleUnavailable)) throw e
+      }
+    }
     const redirectTo = makeRedirectUri({ scheme: 'oneroof', path: 'auth-callback' })
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -395,6 +407,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // locally, so writes keep working) but every server-side call that
     // validates against /auth/v1/user starts returning 401. Nudges saved and
     // never pushed. Signing out here must only sign out THIS device.
+    // Forget the Google account picked on this device too, or the next
+    // sign-in would silently reuse it instead of offering the chooser.
+    await nativeGoogleSignOut()
     await supabase.auth.signOut({ scope: 'local' })
   }, [])
 

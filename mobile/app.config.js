@@ -63,6 +63,9 @@ const ANDROID_LOCATION_PERMISSIONS = [
  *  is not what Play measures and it can drop resources looked up by name.
  *  A library missing its keep rules only fails at RUNTIME in a release build,
  *  so every Android release must be opened on a real phone before upload. */
+// Keep equal to GOOGLE_IOS_CLIENT_ID in src/lib/googleNative.ts.
+const GOOGLE_IOS_CLIENT_ID = ''
+
 const ANDROID_KEEP_RULES = `
 # One Roof (app.config.js withAndroidMinify). Classes Android loads BY NAME,
 # which R8 cannot see and renames or drops:
@@ -183,6 +186,18 @@ module.exports = ({ config }) => {
       ],
       ...(WHEREABOUTS_ON_ANDROID ? [] : [withoutAndroidLocationService]),
       withAndroidMinify,
+      // Native Google sign-in (src/lib/googleNative.ts). iOS returns through a
+      // URL scheme that is the iOS client id reversed, and the plugin refuses
+      // to run without it — so it is only added once that client exists.
+      // Android needs no plugin (autolinked; it signs with the web client id).
+      ...(GOOGLE_IOS_CLIENT_ID
+        ? [
+            [
+              '@react-native-google-signin/google-signin',
+              { iosUrlScheme: 'com.googleusercontent.apps.' + GOOGLE_IOS_CLIENT_ID.replace('.apps.googleusercontent.com', '') },
+            ],
+          ]
+        : []),
       [
         '@rnmapbox/maps',
         {
