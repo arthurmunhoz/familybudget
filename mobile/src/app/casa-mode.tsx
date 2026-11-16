@@ -9,7 +9,7 @@
 import { useState, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
-import { ChevronLeft, Globe, Lock } from 'lucide-react-native'
+import { Award, Check, ChevronLeft, Globe, Lock } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Card, Screen, Txt } from '@/components/ui'
@@ -18,15 +18,20 @@ import { CasaPinCard, CasaSettings } from '@/components/CasaSettings'
 import { CasaDevicesArt } from '@/components/CasaDevicesArt'
 import { useI18n } from '@/hooks/useI18n'
 import { CASA_LOOK as CASA, CASA_URL } from '@/lib/casa'
+import { usePlus } from '@/lib/plus'
 import type { TKey } from '@/lib/i18n'
 import { fonts, sp, useTheme } from '@/theme/theme'
 
 const STEPS: TKey[] = ['casa.step1', 'casa.step2', 'casa.step3']
+// Settings' Plus card colours (app/settings.tsx PLUS_GRADIENT) — keep in step.
+const PLUS_GRADIENT = ['#8E6CF0', '#C2468E'] as const
+const PLUS_POINTS: TKey[] = ['casa.plusPoint1', 'casa.plusPoint2', 'casa.plusPoint3']
 
 export default function CasaModeScreen() {
   const { c } = useTheme()
   const { t } = useI18n()
   const { pair } = useLocalSearchParams<{ pair?: string }>()
+  const { isPlus, isTrial } = usePlus()
   const [count, setCount] = useState<number | null>(null)
   const state =
     count === null ? ' ' : count === 0 ? t('casa.stateNone') : count === 1 ? t('casa.pairedOne') : t('casa.pairedMany', { n: count })
@@ -108,20 +113,60 @@ export default function CasaModeScreen() {
         {/* The two plans, side by side. */}
         <View style={{ gap: sp.sm }}>
           <Label>{t('casa.plansTitle')}</Label>
-          <View style={{ flexDirection: 'row', gap: sp.md }}>
-            <View style={[s.plan, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.textMuted }}>{t('casa.planFree')}</Txt>
-              <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 24, color: c.text }}>{t('casa.planFreeBig')}</Txt>
-              <Txt variant="faint" style={{ fontSize: 13, lineHeight: 18 }}>
-                {t('casa.planFreeSub')}
-              </Txt>
-            </View>
-            <GradientBox colors={CASA} radius={20} style={s.plan}>
-              <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: 'rgba(255,255,255,0.9)' }}>Plus</Txt>
-              <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 24, color: '#fff' }}>{t('casa.planPlusBig')}</Txt>
-              <Txt style={{ fontSize: 13, lineHeight: 18, color: 'rgba(255,255,255,0.9)' }}>{t('casa.planPlusSub')}</Txt>
-            </GradientBox>
+          <View style={[s.plan, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.textMuted }}>{t('casa.planFree')}</Txt>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 24, color: c.text }}>{t('casa.planFreeBig')}</Txt>
+            <Txt variant="faint" style={{ fontSize: 13, lineHeight: 18 }}>
+              {t('casa.planFreeSub')}
+            </Txt>
           </View>
+
+          {/* Plus: the same card as Settings' (purple gradient, award tile,
+              what you get, one white action). Tapping it opens the paywall
+              (owner, 2026-11-15). */}
+          <Pressable
+            onPress={() => router.push('/paywall')}
+            disabled={isPlus && !isTrial}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.plus')}
+            style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}
+          >
+            <GradientBox colors={PLUS_GRADIENT} radius={24} style={{ padding: sp.lg, gap: sp.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                <View style={s.award}>
+                  <Award size={26} color="#fff" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 22, lineHeight: 27, color: '#fff' }}>{t('settings.plus')}</Txt>
+                  <Txt style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.88)' }}>{t('casa.plusSub')}</Txt>
+                </View>
+                {isPlus ? (
+                  <View style={s.badge}>
+                    <Txt style={{ fontSize: 11, fontFamily: fonts.semibold, letterSpacing: 0.5, color: '#fff' }}>
+                      {(isTrial ? t('settings.trial') : t('settings.active')).toUpperCase()}
+                    </Txt>
+                  </View>
+                ) : null}
+              </View>
+              <View style={{ gap: 9 }}>
+                {PLUS_POINTS.map((k) => (
+                  <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={s.tick}>
+                      <Check size={13} color="#fff" strokeWidth={3} />
+                    </View>
+                    <Txt style={{ flex: 1, fontSize: 14.5, lineHeight: 20, color: '#fff' }}>{t(k)}</Txt>
+                  </View>
+                ))}
+              </View>
+              {isPlus && !isTrial ? null : (
+                <View style={s.plusBtn}>
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: PLUS_GRADIENT[1] }}>
+                    {isPlus ? t('settings.keepPlus') : t('settings.getPlus')}
+                  </Txt>
+                </View>
+              )}
+            </GradientBox>
+          </Pressable>
           <Txt variant="faint" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 2 }}>
             {t('casa.unpairNote')}
           </Txt>
@@ -143,7 +188,11 @@ function Label({ children }: { children: ReactNode }) {
 const s = StyleSheet.create({
   back: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   step: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  plan: { flex: 1, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: 'transparent', padding: sp.md, gap: 2 },
+  plan: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, padding: sp.md, gap: 2 },
+  award: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: 'rgba(255,255,255,0.22)' },
+  tick: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.24)', alignItems: 'center', justifyContent: 'center' },
+  plusBtn: { height: 46, borderRadius: 23, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   url: {
     flexDirection: 'row',
     alignItems: 'center',
