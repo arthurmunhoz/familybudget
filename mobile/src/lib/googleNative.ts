@@ -30,12 +30,12 @@ import { supabase } from './supabase'
 
 export const GOOGLE_WEB_CLIENT_ID = '528369183381-9iaforlv3sjg909t9q5ji9ar10s86bfv.apps.googleusercontent.com'
 /** Empty until the iOS OAuth client exists — then iOS switches to native. */
-export const GOOGLE_IOS_CLIENT_ID = ''
+export const GOOGLE_IOS_CLIENT_ID = '528369183381-mji8rj24o4lavrksftdgntrmoakubej6.apps.googleusercontent.com'
 /** false until the Android OAuth clients exist for BOTH signing certificates
  *  (Play app signing + the EAS keystore, SHA-1 20:D5:D4:41:09:59:EB:31:0D:8F:
  *  73:38:63:42:09:88:D1:40:3C:92). Without them Google shows the account
  *  chooser and THEN fails (DEVELOPER_ERROR), so the person would be asked twice. */
-export const GOOGLE_ANDROID_READY = false
+export const GOOGLE_ANDROID_READY = true
 
 type Lib = typeof import('@react-native-google-signin/google-signin')
 let lib: Lib | null | undefined

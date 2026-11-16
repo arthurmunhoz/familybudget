@@ -64,7 +64,7 @@ const ANDROID_LOCATION_PERMISSIONS = [
  *  A library missing its keep rules only fails at RUNTIME in a release build,
  *  so every Android release must be opened on a real phone before upload. */
 // Keep equal to GOOGLE_IOS_CLIENT_ID in src/lib/googleNative.ts.
-const GOOGLE_IOS_CLIENT_ID = ''
+const GOOGLE_IOS_CLIENT_ID = '528369183381-mji8rj24o4lavrksftdgntrmoakubej6.apps.googleusercontent.com'
 
 const ANDROID_KEEP_RULES = `
 # One Roof (app.config.js withAndroidMinify). Classes Android loads BY NAME,
