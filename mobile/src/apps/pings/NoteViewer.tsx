@@ -1,7 +1,9 @@
 // Full-screen view of a hand-drawn note (migration 112). Opens from the note's
 // card on the Home: the sheet floats in over a dimmed screen, with who sent
 // it and when; Save and Close at the bottom (opening it counts as seen —
-// the banner acks a received note when it opens).
+// the banner acks a received note when it opens). With a `pingId`, a heart in
+// the corner keeps the note on the wall for good (migration 113; hidden on a
+// server without it).
 // "Save" downloads the PNG and opens the system share sheet, whose "Save
 // Image" (iOS) / save-to-gallery (Android) puts it in the photos — the same
 // route the printables use, so no photo-library module is needed.
@@ -10,21 +12,24 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, Modal, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
-import { Download, X } from 'lucide-react-native'
+import { Download, Heart, X } from 'lucide-react-native'
 import { File, Paths } from 'expo-file-system'
 
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { haptic } from '@/apps/games/feedback'
+import { isFavorite, setFavorite } from '@/lib/notes'
 import { fonts, sp } from '@/theme/theme'
 
 export function NoteViewer({
   url,
+  pingId,
   title,
   sub,
   onClose,
 }: {
   url: string
+  pingId?: string
   title: string
   sub: string
   onClose: () => void
@@ -33,6 +38,30 @@ export function NoteViewer({
   const insets = useSafeAreaInsets()
   const [pop] = useState(() => new Animated.Value(0))
   const [saving, setSaving] = useState(false)
+  // null = unknown or not available → no heart.
+  const [fav, setFav] = useState<boolean | null>(null)
+  const [beat] = useState(() => new Animated.Value(1))
+  useEffect(() => {
+    if (!pingId) return
+    let alive = true
+    void isFavorite(pingId).then((v) => alive && setFav(v))
+    return () => {
+      alive = false
+    }
+  }, [pingId])
+  async function toggleFav() {
+    if (!pingId || fav === null) return
+    const next = !fav
+    setFav(next)
+    haptic('light')
+    if (next) {
+      Animated.sequence([
+        Animated.timing(beat, { toValue: 1.25, duration: 120, useNativeDriver: true }),
+        Animated.timing(beat, { toValue: 1, duration: 160, useNativeDriver: true }),
+      ]).start()
+    }
+    if (!(await setFavorite(pingId, next))) setFav(!next)
+  }
   async function save() {
     if (saving) return
     setSaving(true)
@@ -89,6 +118,20 @@ export function NoteViewer({
               {sub}
             </Txt>
           </View>
+          {pingId && fav !== null ? (
+            <Pressable
+              onPress={() => void toggleFav()}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityState={{ selected: fav }}
+              accessibilityLabel={t(fav ? 'notes.unkeep' : 'notes.keep')}
+              style={({ pressed }) => [styles.heart, pressed && { opacity: 0.8 }]}
+            >
+              <Animated.View style={{ transform: [{ scale: beat }] }}>
+                <Heart size={20} color={fav ? '#FF6B63' : '#fff'} fill={fav ? '#FF6B63' : 'transparent'} strokeWidth={2.2} />
+              </Animated.View>
+            </Pressable>
+          ) : null}
         </View>
 
         <View
@@ -173,6 +216,7 @@ const styles = StyleSheet.create({
   },
   title: { color: '#fff', fontFamily: fonts.display, fontSize: 22 },
   sub: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 2 },
+  heart: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
   bottom: { flexDirection: 'row', gap: sp.md, marginHorizontal: sp.lg },
   bottomBtn: { flex: 1, height: 52, borderRadius: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   bottomGhost: { backgroundColor: 'rgba(255,255,255,0.16)' },

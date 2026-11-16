@@ -19,6 +19,8 @@ import FamilyPanel from './panels/FamilyPanel'
 import ListsPanel from './panels/ListsPanel'
 import { lockMoney } from './money'
 import MoneyPanel from './panels/MoneyPanel'
+import { NotesWidget } from './NotesWall'
+import { useCasaNotes } from './notes'
 import PetsPanel from './panels/PetsPanel'
 import { usePrefs } from './prefs'
 import { CalendarPreview, ListsPreview, MoneyWidget, PetsPreview, PreviewCard, calendarSub, petsLeftCount } from './Previews'
@@ -45,6 +47,7 @@ export default function Hub() {
   const plan = usePlan()
   const { data, loading, revalidate } = useHubData()
   const album = useFramePhotos()
+  const notes = useCasaNotes(profile?.household_id ?? '')
   const now = useNow(1000)
   const today = isoOf(now)
   const refresh = useCallback(() => void revalidate(), [revalidate])
@@ -195,6 +198,11 @@ export default function Hub() {
           <PetsPreview data={data} today={today} full={plan.full} refresh={refresh} big onOpen={(el) => openPanel('pets', el)} />
         </PreviewCard>
       ),
+    },
+    {
+      id: 'notes',
+      label: t('casa.notes.title'),
+      render: () => <NotesWidget notes={notes} members={data.members} />,
     },
     {
       id: 'money',

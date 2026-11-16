@@ -2179,3 +2179,20 @@ A household of one is how this app dies, so the invite is a first-class step:
 - Events: `household.created`, `household.joined` (`via: link|typed`),
   `invite.shown`, `invite.shared`, `invite.skipped` (`source`:
   onboarding|banner|strip|settings).
+
+## Notes wall (migration 113, 2026-11-15)
+
+Drawn notes no longer vanish after 24 h (they still leave the HOME then):
+- `/notes` → `apps/pings/NotesWall` (entry row at the foot of the Nudges
+  screen): sheets taped to a wall, filters all / received / sent / kept, tap →
+  `NoteViewer`. Data in `lib/notes.ts` (`fetchWall`, `isFavorite`,
+  `setFavorite`, `onNotesChange`). RLS (pings_select) decides what a member sees.
+- A heart in `NoteViewer` (needs `pingId`) writes `note_favorites` — personal,
+  one row per (note, member). Hidden against a server without 113.
+- Housekeeping: `purgeOldNotes` in `api/send-digest.ts` (daily cron) deletes a
+  note nobody hearted 30 days after it was sent, row + PNG, ONLY in households
+  without Plus. Any failed lookup keeps the note.
+- Modo Casa has a "Recados" widget page (`src/casa/NotesWall.tsx`, data in
+  `src/casa/notes.ts`): only notes sent to the WHOLE household — enforced by the
+  restrictive policy `pings_casa_notes`, not just the client filter.
+- Not built yet: the Home-Screen widget showing the latest note.

@@ -217,6 +217,7 @@ export default function NudgesBanner({
     if (!p?.image_path || !noteUrls[p.image_path]) return
     opened.current = openNoteId
     const mine = p.sender_email === myEmail
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- opening the note a push asked for
     setViewing({ p, mine })
     if (!mine) void ack(p.id)
     onNoteOpened?.()
@@ -255,6 +256,7 @@ export default function NudgesBanner({
     viewing && viewing.p.image_path && noteUrls[viewing.p.image_path] ? (
       <NoteViewer
         url={noteUrls[viewing.p.image_path]}
+        pingId={viewing.p.id}
         title={viewing.mine ? t('notes.youDrew') : t('notes.drew', { name: firstName(nameOf(viewing.p.sender_email)) })}
         sub={timeAgo(viewing.p.created_at)}
         onClose={() => setViewing(null)}
@@ -569,7 +571,6 @@ const CARD_H = 142
 const NOTE_H = CARD_H - sp.md * 2 - 4
 const GAP = 10
 
-const KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
 const INK = '#2B2521'
 const INK_SOFT = 'rgba(43,37,33,0.62)'
 /** The flat kraft the received drawing fades into. */

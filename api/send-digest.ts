@@ -368,6 +368,48 @@ async function docThumb(req: any, res: any) {
   }
 }
 
+/** Hand-drawn notes (migrations 112/113): a note nobody kept with a heart is
+ *  deleted NOTE_KEEP_DAYS after it was sent, in households WITHOUT Plus — the
+ *  row and its PNG. Plus households keep everything. Capped per run; the next
+ *  day picks up the rest. Any doubt (a failed lookup) keeps the note. */
+const NOTE_KEEP_DAYS = 30
+async function purgeOldNotes(db: any): Promise<number> {
+  const cutoff = new Date(Date.now() - NOTE_KEEP_DAYS * 86_400_000).toISOString()
+  const { data: old, error } = await db
+    .from('pings')
+    .select('id, household_id, image_path')
+    .not('image_path', 'is', null)
+    .lt('created_at', cutoff)
+    .order('created_at', { ascending: true })
+    .limit(300)
+  if (error || !old?.length) return 0
+  const rows = old as { id: string; household_id: string; image_path: string }[]
+
+  const { data: favs, error: favErr } = await db
+    .from('note_favorites')
+    .select('ping_id')
+    .in('ping_id', rows.map((r) => r.id))
+  if (favErr) return 0 // table missing or unreadable: keep everything
+  const kept = new Set(((favs ?? []) as { ping_id: string }[]).map((f) => f.ping_id))
+
+  const plus = new Map<string, boolean>()
+  for (const hh of new Set(rows.map((r) => r.household_id))) {
+    const { data, error: plusErr } = await db.rpc('household_is_plus', { p_household: hh })
+    plus.set(hh, plusErr ? true : data === true) // unknown counts as Plus: keep
+  }
+
+  // The path must be the note's own (the CHECK guarantees it; belt and braces
+  // before a storage delete).
+  const gone = rows.filter(
+    (r) => !kept.has(r.id) && plus.get(r.household_id) === false && r.image_path.startsWith(`${r.household_id}/notes/`),
+  )
+  if (!gone.length) return 0
+  const { error: delErr } = await db.from('pings').delete().in('id', gone.map((r) => r.id))
+  if (delErr) return 0
+  await db.storage.from('documents').remove(gone.map((r) => r.image_path))
+  return gone.length
+}
+
 export default async function handler(req: any, res: any) {
   if (String(req.query?.action ?? '') === 'doc-thumb') return docThumb(req, res)
   // Only Vercel Cron (which sends the secret) may run this.
@@ -597,5 +639,13 @@ export default async function handler(req: any, res: any) {
     await db.from('push_subscriptions').delete().in('endpoint', stale)
   }
 
-  return res.status(200).json({ ok: true, households, sent, expoSent, pruned: stale.length })
+  // Housekeeping rides on the daily cron (Hobby: one cron, 12 functions).
+  let notesPurged = 0
+  try {
+    notesPurged = await purgeOldNotes(db)
+  } catch {
+    /* never fail the digest over housekeeping */
+  }
+
+  return res.status(200).json({ ok: true, households, sent, expoSent, pruned: stale.length, notesPurged })
 }
