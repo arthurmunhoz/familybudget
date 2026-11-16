@@ -8,6 +8,8 @@ import AppIntents
 // ticks through ?action=list-check — the same write as the app, so Realtime
 // moves the item on every phone. A tick here is reversible in the app (the
 // item goes to "bought"), so there is no undo window like Nudges has.
+// Soft look (2026-11-15): a pale wash of the Lists yellow, ink text, the
+// orange only on the circles and icons.
 
 private let LISTS_KIND = "ListsWidget"
 
@@ -128,7 +130,7 @@ struct ListsWidgetView: View {
       }
     }
     .widgetURL(URL(string: "oneroof:///shopping")!)
-    .containerBackground(for: .widget) { WGradient(WG.shopping) }
+    .containerBackground(for: .widget) { WSoft(WG.shopping) }
   }
 
   private func title(_ g: ListGroup) -> String { g.name ?? lT("general") }
@@ -136,8 +138,8 @@ struct ListsWidgetView: View {
   private func row(_ it: ListItem, size: CGFloat = 13.5) -> some View {
     Button(intent: CheckListItemIntent(itemId: it.id)) {
       HStack(spacing: 8) {
-        Circle().strokeBorder(W_INK, lineWidth: 2).frame(width: 19, height: 19)
-        Text(it.label).font(.system(size: size, weight: .semibold, design: .rounded)).foregroundStyle(W_INK).lineLimit(1)
+        Circle().strokeBorder(wAccent(WG.shopping), lineWidth: 2).frame(width: 19, height: 19)
+        Text(it.label).font(.system(size: size, weight: .semibold, design: .rounded)).foregroundStyle(wInk()).lineLimit(1)
         Spacer(minLength: 0)
       }
       .contentShape(Rectangle())
@@ -147,9 +149,9 @@ struct ListsWidgetView: View {
 
   private func head(_ g: ListGroup, big: Bool = false) -> some View {
     HStack(alignment: .firstTextBaseline) {
-      Text(title(g)).font(.system(size: big ? 19 : 16, weight: .heavy, design: .rounded)).foregroundStyle(W_INK).lineLimit(1).minimumScaleFactor(0.7)
+      Text(title(g)).font(.system(size: big ? 19 : 16, weight: .heavy, design: .rounded)).foregroundStyle(wInk()).lineLimit(1).minimumScaleFactor(0.7)
       Spacer(minLength: 4)
-      Text(lT("items", g.count)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(W_INK.opacity(0.7)).lineLimit(1)
+      Text(lT("items", g.count)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft()).lineLimit(1)
     }
   }
 
@@ -159,7 +161,7 @@ struct ListsWidgetView: View {
       ForEach(g.items.prefix(3)) { row($0) }
       Spacer(minLength: 0)
       if g.count > 3 {
-        Text(lT("more", g.count - 3)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(W_INK.opacity(0.7))
+        Text(lT("more", g.count - 3)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
       }
     }
     .padding(14)
@@ -168,17 +170,17 @@ struct ListsWidgetView: View {
   private func medium(_ g: ListGroup) -> some View {
     HStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 2) {
-        Image(systemName: "cart.fill").font(.system(size: 20, weight: .semibold)).foregroundStyle(W_INK)
-        Text(title(g)).font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(W_INK).lineLimit(2).minimumScaleFactor(0.7).padding(.top, 4)
-        Text(lT("items", g.count)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(W_INK.opacity(0.7))
+        Image(systemName: "cart.fill").font(.system(size: 20, weight: .semibold)).foregroundStyle(wAccent(WG.shopping))
+        Text(title(g)).font(.system(size: 18, weight: .heavy, design: .rounded)).foregroundStyle(wInk()).lineLimit(2).minimumScaleFactor(0.7).padding(.top, 4)
+        Text(lT("items", g.count)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
         Spacer(minLength: 0)
         if let o = others.first {
-          Text("\(title(o)) · \(o.count)").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(W_INK.opacity(0.7)).lineLimit(1)
+          Text("\(title(o)) · \(o.count)").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft()).lineLimit(1)
         }
       }
       .padding(14)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .background(Color.white.opacity(0.22))
+      .background(Color(hex: WG.shopping[1]).opacity(wDark() ? 0.18 : 0.1))
       .frame(width: 118)
 
       LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], alignment: .leading, spacing: 9) {
@@ -195,16 +197,16 @@ struct ListsWidgetView: View {
       ForEach(g.items.prefix(others.isEmpty ? 9 : 6)) { row($0, size: 14.5) }
       if g.count > g.items.prefix(others.isEmpty ? 9 : 6).count {
         Text(lT("more", g.count - (others.isEmpty ? min(9, g.items.count) : min(6, g.items.count))))
-          .font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(W_INK.opacity(0.7))
+          .font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
       }
       Spacer(minLength: 0)
       if !others.isEmpty {
-        Rectangle().fill(W_INK.opacity(0.15)).frame(height: 1)
+        Rectangle().fill(wInkSoft().opacity(0.25)).frame(height: 1)
         ForEach(others.prefix(3)) { o in
           HStack {
-            Text(title(o)).font(.system(size: 13.5, weight: .bold, design: .rounded)).foregroundStyle(W_INK).lineLimit(1)
+            Text(title(o)).font(.system(size: 13.5, weight: .bold, design: .rounded)).foregroundStyle(wInk()).lineLimit(1)
             Spacer()
-            Text(lT("items", o.count)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(W_INK.opacity(0.7))
+            Text(lT("items", o.count)).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
           }
         }
       }
@@ -214,9 +216,9 @@ struct ListsWidgetView: View {
 
   private var done: some View {
     VStack(spacing: 6) {
-      Image(systemName: "checkmark.circle.fill").font(.system(size: 34, weight: .semibold)).foregroundStyle(W_INK)
-      Text(lT("doneTitle")).font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(W_INK)
-      Text(lT("doneHint")).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(W_INK.opacity(0.7))
+      Image(systemName: "checkmark.circle.fill").font(.system(size: 34, weight: .semibold)).foregroundStyle(wAccent(WG.shopping))
+      Text(lT("doneTitle")).font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(wInk())
+      Text(lT("doneHint")).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity)

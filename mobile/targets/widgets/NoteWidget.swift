@@ -207,7 +207,7 @@ struct NoteWidgetView: View {
       }
     }
     .widgetURL(open)
-    .containerBackground(for: .widget) { WGradient(WG.kraft) }
+    .containerBackground(for: .widget) { WSoft(WG.kraft) }
   }
 
   private var caption: String {
@@ -245,9 +245,9 @@ struct NoteWidgetView: View {
     VStack(alignment: .leading, spacing: 3) {
       if let n = entry.note {
         Text(entry.sample ? " " : noteAgo(n.createdAt))
-          .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(W_INK_SOFT)
+          .font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
         Text(nT("drew", n.from))
-          .font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(W_INK)
+          .font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(wInk())
           .lineLimit(2).minimumScaleFactor(0.8)
       }
       Spacer(minLength: 4)
@@ -263,17 +263,17 @@ struct NoteWidgetView: View {
   private func pill(_ text: String, filled: Bool) -> some View {
     Text(text)
       .font(.system(size: 12.5, weight: .bold, design: .rounded))
-      .foregroundStyle(filled ? W_PAPER : W_INK)
+      .foregroundStyle(filled ? Color.white : wInk())
       .lineLimit(1)
       .padding(.horizontal, 12).padding(.vertical, 7)
-      .background(Capsule().fill(filled ? W_INK : W_INK.opacity(0.1)))
+      .background(Capsule().fill(filled ? Color(hex: "8A5A2B") : Color(hex: "8A5A2B").opacity(wDark() ? 0.3 : 0.14)))
   }
 
   private var empty: some View {
     VStack(spacing: 6) {
-      Image(systemName: "pencil.and.scribble").font(.system(size: 30, weight: .semibold)).foregroundStyle(W_INK)
-      Text(nT("emptyTitle")).font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(W_INK).multilineTextAlignment(.center)
-      Text(nT("emptyHint")).font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(W_INK_SOFT).multilineTextAlignment(.center)
+      Image(systemName: "pencil.and.scribble").font(.system(size: 30, weight: .semibold)).foregroundStyle(Color(hex: wDark() ? "E0B98A" : "8A5A2B"))
+      Text(nT("emptyTitle")).font(.system(size: 15, weight: .heavy, design: .rounded)).foregroundStyle(wInk()).multilineTextAlignment(.center)
+      Text(nT("emptyHint")).font(.system(size: 12, weight: .medium, design: .rounded)).foregroundStyle(wInkSoft()).multilineTextAlignment(.center)
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity)

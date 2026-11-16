@@ -413,28 +413,30 @@ struct NudgesProvider: AppIntentTimelineProvider {
 }
 
 // ── Views ────────────────────────────────────────────────────────────────────
-// The 2026-11 look (Kit.swift): the Pings blue gradient with white type, frosted
-// white tiles, the urgent red for high-priority presets. Identity colours — they
-// do not follow the app's light/dark choice.
-private let NUDGE_BLUE = Color(hex: "4A5BF5")
+// The SOFT look (Kit.swift): a pale wash of the Pings blue, the theme's ink for
+// text, blue-washed tiles, and the accent blue kept for the kicker, ticks, the
+// selected chip and the Undo button. Urgent presets get a light red wash.
 
-// One person in the recipient selector: solid white when chosen, frosted when not.
+// One person in the recipient selector: accent-filled when chosen, a washed tile when not.
 struct NudgeChip: View {
   let title: String
   let active: Bool
   var body: some View {
-    Text(title)
+    let label = Text(title)
       .font(.system(size: 11, weight: .semibold, design: .rounded))
       .lineLimit(1)
       .minimumScaleFactor(0.75)
       .padding(.horizontal, 9).padding(.vertical, 4)
-      .foregroundStyle(active ? NUDGE_BLUE : Color.white)
-      .background(Capsule().fill(Color.white.opacity(active ? 1 : 0.2)))
+    if active {
+      label.foregroundStyle(Color.white).background(Capsule().fill(wAccent(WG.pings)))
+    } else {
+      label.foregroundStyle(wInk()).wTile(WG.pings, radius: 99)
+    }
   }
 }
 
-// One preset as a tappable tile: the emoji over its label, on frosted white —
-// or on the urgent red when the preset is high priority. Tiles sit in a grid
+// One preset as a tappable tile: the emoji over its label, on a blue-washed tile —
+// or on a light red wash when the preset is high priority. Tiles sit in a grid
 // (see nudgeGridRows) so each target is clearly separated from its neighbours.
 struct NudgeTile: View {
   let preset: NudgePreset
@@ -447,7 +449,7 @@ struct NudgeTile: View {
       Text(preset.emoji).font(.system(size: emojiSize))
       Text(preset.label)
         .font(.system(size: 11, weight: .semibold, design: .rounded))
-        .foregroundStyle(Color.white)
+        .foregroundStyle(preset.highPriority ? Color(hex: wDark() ? "FF9A90" : "C0392B") : wInk())
         .lineLimit(1)
         .minimumScaleFactor(0.7)
     }
@@ -455,9 +457,9 @@ struct NudgeTile: View {
     .padding(.horizontal, 5).padding(.vertical, 3)
 
     if preset.highPriority {
-      content.background(WGradient(WG.urgent)).clipShape(shape)
+      content.background(Color(hex: "E4554A").opacity(wDark() ? 0.32 : 0.16)).clipShape(shape)
     } else {
-      content.wGlass(radius: 14).contentShape(shape)
+      content.wTile(WG.pings, radius: 14).contentShape(shape)
     }
   }
 }
@@ -485,7 +487,7 @@ func nudgeGridRows(_ presets: [NudgePreset], columns: Int) -> [NudgeGridRow] {
 }
 
 // The centred state that replaces the grid: pending (Sent + Undo), sent, or
-// "seen by X" — on the same blue.
+// "seen by X" — on the same soft wash.
 struct NudgeConfirmationView: View {
   let status: WidgetStatus
   var body: some View {
@@ -493,18 +495,19 @@ struct NudgeConfirmationView: View {
       Text(status.emoji).font(.system(size: 38))
       Text(status.label)
         .font(.system(size: 15, weight: .bold, design: .rounded))
-        .foregroundStyle(Color.white)
+        .foregroundStyle(wInk())
         .lineLimit(2)
         .multilineTextAlignment(.center)
         .minimumScaleFactor(0.8)
       HStack(spacing: 4) {
         Image(systemName: "checkmark.circle.fill").font(.system(size: 12, weight: .bold))
+          .foregroundStyle(wAccent(WG.pings))
         Text(status.type == "ack" ? "seen by \(status.name ?? "")" : "Sent")
           .font(.system(size: 12, weight: .semibold, design: .rounded))
           .lineLimit(1)
           .minimumScaleFactor(0.8)
       }
-      .foregroundStyle(Color.white.opacity(0.9))
+      .foregroundStyle(wInkSoft())
 
       // Only while the upload is still held on-device. Once `until` passes the
       // timeline reverts to the list, so there's never a dead Undo on screen.
@@ -512,9 +515,9 @@ struct NudgeConfirmationView: View {
         Button(intent: UndoNudgeIntent()) {
           Text("Undo")
             .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(NUDGE_BLUE)
+            .foregroundStyle(Color.white)
             .padding(.horizontal, 18).padding(.vertical, 6)
-            .background(Capsule().fill(Color.white))
+            .background(Capsule().fill(wAccent(WG.pings)))
         }
         .buttonStyle(.plain)
         .padding(.top, 2)
@@ -566,7 +569,7 @@ struct NudgesWidgetView: View {
   private var statusText: some View {
     Text(statusLine)
       .font(.system(size: 12, weight: .medium, design: .rounded))
-      .foregroundStyle(Color.white.opacity(0.85))
+      .foregroundStyle(wInkSoft())
   }
 
   private var hasSelector: Bool { family != .systemSmall && !entry.members.isEmpty }
@@ -617,17 +620,17 @@ struct NudgesWidgetView: View {
       VStack(spacing: 6) {
         Image(systemName: "bell.badge.fill")
           .font(.system(size: 22, weight: .semibold))
-          .foregroundStyle(Color.white)
+          .foregroundStyle(wAccent(WG.pings))
         Text("Open One Roof")
           .font(.system(size: 12, weight: .semibold, design: .rounded))
-          .foregroundStyle(Color.white.opacity(0.85))
+          .foregroundStyle(wInkSoft())
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else {
       switch family {
       case .systemSmall:
         VStack(alignment: .leading, spacing: 6) {
-          WKicker("Nudges")
+          WKicker("Nudges", color: wAccent(WG.pings))
           grid
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -635,7 +638,7 @@ struct NudgesWidgetView: View {
         GeometryReader { geo in
           HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 0) {
-              WKicker("Nudges")
+              WKicker("Nudges", color: wAccent(WG.pings))
               Spacer(minLength: 4)
               statusText
                 .lineLimit(3)
@@ -653,7 +656,7 @@ struct NudgesWidgetView: View {
       default:
         VStack(alignment: .leading, spacing: 10) {
           HStack(alignment: .firstTextBaseline, spacing: 8) {
-            WKicker("Nudges")
+            WKicker("Nudges", color: wAccent(WG.pings))
             Spacer(minLength: 4)
             statusText.lineLimit(1).minimumScaleFactor(0.8)
           }
@@ -670,7 +673,7 @@ struct NudgesWidget: Widget {
   var body: some WidgetConfiguration {
     AppIntentConfiguration(kind: "NudgesWidget", intent: SelectNudgeIntent.self, provider: NudgesProvider()) { entry in
       NudgesWidgetView(entry: entry)
-        .containerBackground(for: .widget) { WGradient(WG.pings) }
+        .containerBackground(for: .widget) { WSoft(WG.pings) }
     }
     .configurationDisplayName("Nudges")
     .description("Send a household nudge from your Home Screen. Long-press the small widget to pick which nudge it sends.")

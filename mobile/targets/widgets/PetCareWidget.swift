@@ -320,11 +320,11 @@ struct PetCareProvider: AppIntentTimelineProvider {
 
 
 // ── Views ────────────────────────────────────────────────────────────────────
-// The 2026-11 look (Kit.swift): the Pets orange gradient with white type. The
-// pet is a ROUND avatar — their photo (mirrored by the app into the shared
+// The SOFT look (Kit.swift): a pale wash of the Pets orange with the theme's
+// ink for text; the orange itself is kept for marks (ticks, progress, icons).
+// The pet is a ROUND avatar — their photo (mirrored by the app into the shared
 // container, "petcare_photo_<id>") or their emoji on a soft peach circle —
 // then name + "2 of 4 today", a progress bar, and the routine as check rows.
-// The gradient is identity, so nothing here follows the app's light/dark.
 
 func nextUndone(_ pet: PetCarePetW) -> PetCareTaskW? {
   pet.daily.first { !$0.done }
@@ -356,11 +356,17 @@ func petPhotoImage(_ id: String) -> UIImage? {
 }
 
 /// The success green of the "done" beat and the all-done card. Deliberately
-/// NOT the Pets orange: finishing is its own colour. Fixed hexes (white type
-/// reads on both stops), not the system `.green`.
-private let PET_DONE_GREEN = ["27B078", "0F8F6C"]
-private let PET_PEACH = Color(hex: "FFD9C7")
-private let PET_ORANGE = Color(hex: "F2603A")
+/// NOT the Pets orange: finishing is its own colour — a soft wash with a
+/// deeper green for the tick and title. Fixed hexes, not the system `.green`.
+private func petDoneWash() -> Color { Color(hex: "1F9E68").opacity(wDark() ? 0.3 : 0.16) }
+private func petDoneInk() -> Color { Color(hex: wDark() ? "6FD3A4" : "17805A") }
+/// Overdue: a soft red chip with a deeper red for its text / icon.
+private func petOverdueWash() -> Color { Color(hex: "E4554A").opacity(wDark() ? 0.32 : 0.16) }
+private func petOverdueInk() -> Color { Color(hex: wDark() ? "FF9A90" : "C0392B") }
+/// The Pets wash a step stronger than the background (same as `.wTile`).
+private func petTileWash() -> Color { Color(hex: WG.pets[1]).opacity(wDark() ? 0.3 : 0.14) }
+/// A quieter panel wash (medium's left panel, large's other-pets card).
+private func petPanelWash() -> Color { Color(hex: WG.pets[1]).opacity(wDark() ? 0.18 : 0.1) }
 
 private func doneCount(_ pet: PetCarePetW) -> Int { pet.daily.filter { $0.done }.count }
 
@@ -380,7 +386,7 @@ private func visibleTasks(_ pet: PetCarePetW, max: Int) -> [PetCareTaskW] {
   return Array((pet.daily.filter { !$0.done } + pet.daily.filter { $0.done }).prefix(max))
 }
 
-/// The pet as a circle: their photo, or their emoji on soft peach.
+/// The pet as a circle: their photo, or their emoji on the Pets wash.
 struct PetAvatar: View {
   let pet: PetCarePetW
   let size: CGFloat
@@ -394,18 +400,18 @@ struct PetAvatar: View {
           .frame(width: size, height: size)
           .clipShape(Circle())
       } else {
-        Circle().fill(PET_PEACH)
+        Circle().fill(petTileWash())
         if pet.emoji.isEmpty {
           Text(String(pet.name.prefix(1)).uppercased())
             .font(.system(size: size * 0.46, weight: .heavy, design: .rounded))
-            .foregroundStyle(PET_ORANGE)
+            .foregroundStyle(wAccent(WG.pets))
         } else {
           Text(pet.emoji).font(.system(size: size * 0.56))
         }
       }
     }
     .frame(width: size, height: size)
-    .overlay(Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: 1.5))
+    .overlay(Circle().strokeBorder(wAccent(WG.pets).opacity(0.35), lineWidth: 1.5))
   }
 }
 
@@ -416,10 +422,10 @@ private struct PetNameBlock: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      WBig(pet.name, size: nameSize)
+      WBig(pet.name, size: nameSize, color: wInk())
       Text(countLabel(pet))
         .font(.system(size: 12, weight: .medium, design: .rounded))
-        .foregroundStyle(Color.white.opacity(0.85))
+        .foregroundStyle(wInkSoft())
         .lineLimit(1)
         .minimumScaleFactor(0.8)
     }
@@ -436,17 +442,17 @@ private struct PetTaskRow: View {
 
   private var label: some View {
     HStack(spacing: 8) {
-      WCheck(done: task.done, color: task.done ? Color.white.opacity(0.75) : Color.white, size: check)
+      WCheck(done: task.done, color: wAccent(WG.pets), tick: .white, size: check)
       Text(task.title)
         .font(.system(size: fontSize, weight: .semibold, design: .rounded))
-        .foregroundStyle(task.done ? Color.white.opacity(0.75) : Color.white)
+        .foregroundStyle(task.done ? wInkSoft() : wInk())
         .lineLimit(1)
         .minimumScaleFactor(0.85)
       Spacer(minLength: 0)
       if showDoneBy, let by = task.doneBy {
         Text(by)
           .font(.system(size: 11, weight: .medium, design: .rounded))
-          .foregroundStyle(Color.white.opacity(0.7))
+          .foregroundStyle(wInkSoft())
           .lineLimit(1)
       }
     }
@@ -471,22 +477,22 @@ struct DoneFlashTile: View {
     VStack(spacing: 6) {
       Image(systemName: "checkmark.circle.fill")
         .font(.system(size: 30, weight: .heavy))
-        .foregroundStyle(Color.white)
+        .foregroundStyle(petDoneInk())
       Text(status.title)
         .font(.system(size: 14, weight: .heavy, design: .rounded))
-        .foregroundStyle(Color.white)
+        .foregroundStyle(petDoneInk())
         .multilineTextAlignment(.center)
         .lineLimit(2)
         .minimumScaleFactor(0.8)
     }
     .padding(10)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(WGradient(PET_DONE_GREEN))
+    .background(petDoneWash())
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 }
 
-/// "Nothing left to do" — the green success card, shared by small and medium:
+/// "Nothing left to do" — the soft green success card, shared by small and medium:
 /// a big tick, the pet's name, the all-done line, and a routine that is due.
 struct AllDoneTile: View {
   let pet: PetCarePetW
@@ -496,30 +502,30 @@ struct AllDoneTile: View {
     VStack(alignment: .leading, spacing: 2) {
       Image(systemName: "checkmark.circle.fill")
         .font(.system(size: 30, weight: .heavy))
-        .foregroundStyle(Color.white)
+        .foregroundStyle(petDoneInk())
       Spacer(minLength: 2)
-      if named { WBig(pet.name, size: 17) }
+      if named { WBig(pet.name, size: 17, color: wInk()) }
       Text(pet.daily.isEmpty ? "No routine yet" : "All done today")
         .font(.system(size: named ? 12 : 15, weight: named ? .semibold : .heavy, design: .rounded))
-        .foregroundStyle(Color.white.opacity(named ? 0.9 : 1))
+        .foregroundStyle(petDoneInk())
         .lineLimit(1)
         .minimumScaleFactor(0.8)
       if let urgent = pet.routines.first, urgent.dueIn <= 0 {
         Text("\(urgent.title) · \(dueLabel(urgent.dueIn))")
           .font(.system(size: 11, weight: .bold, design: .rounded))
-          .foregroundStyle(Color.white)
+          .foregroundStyle(wInkSoft())
           .lineLimit(1)
           .minimumScaleFactor(0.8)
       }
     }
     .padding(12)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    .background(WGradient(PET_DONE_GREEN))
+    .background(petDoneWash())
     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
   }
 }
 
-/// A small white-on-gradient chip ("2 overdue", "All done").
+/// A small chip: `solid` is the overdue one (soft red), otherwise a Pets tile.
 private struct PetChip: View {
   let text: String
   var icon: String? = nil
@@ -530,14 +536,14 @@ private struct PetChip: View {
       if let icon { Image(systemName: icon).font(.system(size: 9, weight: .heavy)) }
       Text(text).font(.system(size: 10.5, weight: .bold, design: .rounded)).lineLimit(1)
     }
-    .foregroundStyle(solid ? PET_ORANGE : Color.white)
+    .foregroundStyle(solid ? petOverdueInk() : wInk())
     .padding(.horizontal, 8)
     .padding(.vertical, 4)
-    .background(Capsule().fill(Color.white.opacity(solid ? 1 : 0.2)))
+    .background(Capsule().fill(solid ? petOverdueWash() : petTileWash()))
   }
 }
 
-/// Medium's darker left panel lives in the container background so it bleeds
+/// Medium's stronger-wash left panel lives in the container background so it bleeds
 /// to the widget's edges; the content column in the view is sized to match.
 private let PET_MEDIUM_PANEL: CGFloat = 0.38
 
@@ -546,10 +552,10 @@ struct PetCareBackground: View {
 
   var body: some View {
     ZStack(alignment: .leading) {
-      WGradient(WG.pets)
+      WSoft(WG.pets)
       if family == .systemMedium {
         GeometryReader { geo in
-          Color.black.opacity(0.1).frame(width: geo.size.width * PET_MEDIUM_PANEL)
+          petPanelWash().frame(width: geo.size.width * PET_MEDIUM_PANEL)
         }
       }
     }
@@ -574,12 +580,12 @@ struct PetCareWidgetView: View {
       VStack(spacing: 8) {
         Image(systemName: "pawprint.fill")
           .font(.system(size: 26, weight: .bold))
-          .foregroundStyle(Color.white)
+          .foregroundStyle(wAccent(WG.pets))
           .frame(width: 52, height: 52)
-          .wGlass(radius: 26)
+          .wTile(WG.pets, radius: 26)
         Text("Open One Roof")
           .font(.system(size: 13, weight: .heavy, design: .rounded))
-          .foregroundStyle(Color.white)
+          .foregroundStyle(wInk())
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -599,13 +605,13 @@ struct PetCareWidgetView: View {
           if overdueCount(pet) > 0 {
             Image(systemName: "exclamationmark.circle.fill")
               .font(.system(size: 14, weight: .bold))
-              .foregroundStyle(Color.white)
+              .foregroundStyle(petOverdueInk())
           }
         }
         if let status = entry.status {
           DoneFlashTile(status: status)
         } else {
-          WProgress(petProgress(pet))
+          WProgress(petProgress(pet), fill: wAccent(WG.pets), track: wAccent(WG.pets).opacity(0.2))
           Spacer(minLength: 0)
           ForEach(visibleTasks(pet, max: 2)) { task in
             PetTaskRow(task: task)
@@ -616,7 +622,7 @@ struct PetCareWidgetView: View {
     }
   }
 
-  // Medium: the pet on the darker left panel, up to four rows on the right.
+  // Medium: the pet on the stronger-wash left panel, up to four rows on the right.
   private func medium(_ pet: PetCarePetW) -> some View {
     GeometryReader { geo in
       let full = geo.size.width + margins.leading + margins.trailing
@@ -630,12 +636,12 @@ struct PetCareWidgetView: View {
             if overdueCount(pet) > 0 {
               Image(systemName: "exclamationmark.circle.fill")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(petOverdueInk())
             }
           }
           PetNameBlock(pet: pet, nameSize: 16)
           Spacer(minLength: 0)
-          WProgress(petProgress(pet))
+          WProgress(petProgress(pet), fill: wAccent(WG.pets), track: wAccent(WG.pets).opacity(0.2))
         }
         .frame(width: leftW, alignment: .leading)
 
@@ -677,7 +683,7 @@ struct PetCareWidgetView: View {
           PetChip(text: "All done", icon: "checkmark")
         }
       }
-      WProgress(petProgress(pet))
+      WProgress(petProgress(pet), fill: wAccent(WG.pets), track: wAccent(WG.pets).opacity(0.2))
 
       VStack(alignment: .leading, spacing: 7) {
         ForEach(rows) { task in
@@ -687,12 +693,12 @@ struct PetCareWidgetView: View {
 
       if !routines.isEmpty {
         VStack(alignment: .leading, spacing: 5) {
-          WKicker("Coming up", color: Color.white.opacity(0.8))
+          WKicker("Coming up", color: wAccent(WG.pets))
           ForEach(routines) { r in
             HStack(spacing: 6) {
               Text(r.title)
                 .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.white.opacity(r.dueIn <= 0 ? 1 : 0.85))
+                .foregroundStyle(r.dueIn <= 0 ? wInk() : wInkSoft())
                 .lineLimit(1)
               Spacer(minLength: 4)
               if r.dueIn < 0 {
@@ -700,7 +706,7 @@ struct PetCareWidgetView: View {
               } else {
                 Text(dueLabel(r.dueIn))
                   .font(.system(size: 11.5, weight: r.dueIn == 0 ? .heavy : .medium, design: .rounded))
-                  .foregroundStyle(Color.white.opacity(r.dueIn == 0 ? 1 : 0.85))
+                  .foregroundStyle(r.dueIn == 0 ? wInk() : wInkSoft())
               }
             }
           }
@@ -715,25 +721,25 @@ struct PetCareWidgetView: View {
             HStack(spacing: 8) {
               PetAvatar(pet: p, size: 26)
               VStack(alignment: .leading, spacing: 0) {
-                WBig(p.name, size: 13)
+                WBig(p.name, size: 13, color: wInk())
                 Text(overdueCount(p) > 0 ? "\(countLabel(p)) · \(overdueCount(p)) overdue" : countLabel(p))
                   .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                  .foregroundStyle(Color.white.opacity(0.85))
+                  .foregroundStyle(wInkSoft())
                   .lineLimit(1)
               }
               Spacer(minLength: 4)
               if let next = nextUndone(p) {
                 Button(intent: MarkTaskDoneIntent(taskId: next.id)) {
                   HStack(spacing: 5) {
-                    WCheck(done: false, size: 15)
+                    WCheck(done: false, color: wAccent(WG.pets), tick: .white, size: 15)
                     Text(next.title)
                       .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                      .foregroundStyle(Color.white)
+                      .foregroundStyle(wInk())
                       .lineLimit(1)
                   }
                   .padding(.horizontal, 8)
                   .padding(.vertical, 5)
-                  .wGlass(radius: 12)
+                  .wTile(WG.pets, radius: 12)
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: 150, alignment: .trailing)
@@ -744,7 +750,7 @@ struct PetCareWidgetView: View {
           }
         }
         .padding(8)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.1)))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(petPanelWash()))
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

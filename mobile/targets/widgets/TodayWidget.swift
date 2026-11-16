@@ -364,7 +364,8 @@ struct TodayProvider: TimelineProvider {
 
 // ── View ─────────────────────────────────────────────────────────────────────
 // The 2026-11 look (see Kit.swift): the weather sky carries the date and the
-// temperature in white; the agenda sits on a neutral appTheme() surface (medium
+// temperature — dark ink on the pale day skies, white on the night / storm
+// ones (see todayInk); the agenda sits on a neutral appTheme() surface (medium
 // / large) or straight on the sky (small). No SwiftUI semantic colours — they
 // follow the DEVICE appearance, not the app's manual theme.
 
@@ -372,15 +373,57 @@ struct TodayProvider: TimelineProvider {
 private let TODAY_NO_WEATHER = ["3E7BFA", "5B4CF0"]
 private let TODAY_PAD: CGFloat = 14
 
-/// The header backdrop: the sky for the current weather, else the gradient.
+private let TODAY_ACCENT = ["6E8BFF", "4A5BF5"]
+
+/// The sky being drawn, or nil when there is no weather (→ the soft wash).
+private func todaySkyKind(_ info: TodayRender?, _ date: Date) -> SkyKind? {
+  guard let info, info.temp != nil, let code = info.code else { return nil }
+  return skyKind(code: code, isDay: info.isDay ?? roughlyDay(date))
+}
+
+/// Whether that sky is one of the DARK ones. Must mirror what SkyScene really
+/// paints: night, nightCloudy and storm. (SkyScene has no night variant of
+/// rain / snow today — skyKind() maps them regardless of is_day and the scene
+/// asks for their day palette — so they count as pale here. If SkyScene starts
+/// drawing them dark at night, add that case here.)
+private func todaySkyIsDark(_ kind: SkyKind) -> Bool {
+  kind == .night || kind == .nightCloudy || kind == .storm
+}
+
+/// Text colours over the header backdrop. On a sky they are FIXED (the sky
+/// does not follow the app's light/dark theme): white on the dark skies, dark
+/// ink on the pale day ones. With no weather the backdrop is the soft wash,
+/// so the text is the theme's ink and the kicker the accent.
+private struct TodayInk {
+  let main: Color
+  let soft: Color
+  let kicker: Color
+  let shadow: Color
+}
+
+private func todayInk(_ info: TodayRender?, _ date: Date) -> TodayInk {
+  guard let kind = todaySkyKind(info, date) else {
+    return TodayInk(main: wInk(), soft: wInkSoft(), kicker: wAccent(TODAY_ACCENT), shadow: .clear)
+  }
+  if todaySkyIsDark(kind) {
+    return TodayInk(
+      main: .white, soft: .white.opacity(0.85), kicker: .white.opacity(0.85),
+      shadow: .black.opacity(0.18))
+  }
+  return TodayInk(
+    main: Color(hex: "1E1E22"), soft: Color(hex: "55606E"), kicker: Color(hex: "55606E"),
+    shadow: .clear)
+}
+
+/// The header backdrop: the sky for the current weather, else the soft wash.
 private struct TodaySky: View {
   let info: TodayRender?
   let date: Date
   var body: some View {
-    if let info, info.temp != nil, let code = info.code {
-      SkyScene(kind: skyKind(code: code, isDay: info.isDay ?? roughlyDay(date)))
+    if let kind = todaySkyKind(info, date) {
+      SkyScene(kind: kind)
     } else {
-      WGradient(TODAY_NO_WEATHER)
+      WSoft(TODAY_NO_WEATHER)
     }
   }
 }
@@ -482,50 +525,52 @@ private struct TodayAgenda: View {
 }
 
 /// Date kicker + big temperature (or the date large, with no weather) + the
-/// one-line condition / alert. White on the sky.
+/// one-line condition / alert. Ink follows the sky (todayInk).
 private struct TodayHeader: View {
   let info: TodayRender
+  let date: Date
   let longDate: Bool
   let bigSize: CGFloat
   let noteLines: Int
 
   var body: some View {
-    let date = longDate ? info.dateLong : info.dateShort
+    let label = longDate ? info.dateLong : info.dateShort
+    let ink = todayInk(info, date)
     VStack(alignment: .leading, spacing: 1) {
       if let t = tempText(info) {
-        WKicker(date)
-        WBig(t, size: bigSize)
+        WKicker(label, color: ink.kicker)
+        WBig(t, size: bigSize, color: ink.main)
       } else {
-        WKicker(info.todayLabel)
-        WBig(date, size: bigSize * 0.76)
+        WKicker(info.todayLabel, color: ink.kicker)
+        WBig(label, size: bigSize * 0.76, color: ink.main)
       }
       Spacer(minLength: 4)
-      note
+      note(ink)
     }
-    .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+    .shadow(color: ink.shadow, radius: 2, x: 0, y: 1)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   /// The alert sentence when there is one, else the weather glyph + city.
-  @ViewBuilder private var note: some View {
+  @ViewBuilder private func note(_ ink: TodayInk) -> some View {
     if let alert = info.alert, !alert.isEmpty {
-      noteLine(alertSymbol(info.alertKind ?? ""), alert)
+      noteLine(alertSymbol(info.alertKind ?? ""), alert, ink)
     } else if info.temp != nil, let code = info.code {
-      noteLine(weatherSymbol(code), info.city ?? "")
+      noteLine(weatherSymbol(code), info.city ?? "", ink)
     } else if let city = info.city, !city.isEmpty {
-      noteLine("mappin.and.ellipse", city)
+      noteLine("mappin.and.ellipse", city, ink)
     }
   }
 
-  private func noteLine(_ symbol: String, _ text: String) -> some View {
+  private func noteLine(_ symbol: String, _ text: String, _ ink: TodayInk) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 5) {
       Image(systemName: symbol)
         .font(.system(size: 11, weight: .bold))
-        .foregroundStyle(.white)
+        .foregroundStyle(ink.main)
       if !text.isEmpty {
         Text(text)
           .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-          .foregroundStyle(.white.opacity(0.95))
+          .foregroundStyle(ink.main)
           .lineLimit(noteLines)
           .minimumScaleFactor(0.8)
       }
@@ -548,34 +593,35 @@ struct TodayWidgetView: View {
       VStack(spacing: 6) {
         Image(systemName: "calendar")
           .font(.system(size: 22, weight: .bold))
-          .foregroundStyle(.white)
+          .foregroundStyle(wAccent(TODAY_ACCENT))
         Text("Open One Roof")
           .font(.system(size: 13, weight: .semibold, design: .rounded))
-          .foregroundStyle(.white)
+          .foregroundStyle(wInk())
           .lineLimit(1)
           .minimumScaleFactor(0.7)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(WGradient(TODAY_NO_WEATHER))
+      .background(WSoft(TODAY_NO_WEATHER))
     }
   }
 
   // Small: the sky is the whole widget (it is the container background).
   private func small(_ info: TodayRender) -> some View {
-    VStack(alignment: .leading, spacing: 1) {
+    let ink = todayInk(info, entry.date)
+    return VStack(alignment: .leading, spacing: 1) {
       if let t = tempText(info) {
-        WKicker(info.dateShort)
+        WKicker(info.dateShort, color: ink.kicker)
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-          WBig(t, size: 34)
+          WBig(t, size: 34, color: ink.main)
           if let kind = info.alertKind {
             Image(systemName: alertSymbol(kind))
               .font(.system(size: 12, weight: .bold))
-              .foregroundStyle(.white.opacity(0.95))
+              .foregroundStyle(ink.main)
           }
         }
       } else {
-        WKicker(info.todayLabel)
-        WBig(info.dateShort, size: 26)
+        WKicker(info.todayLabel, color: ink.kicker)
+        WBig(info.dateShort, size: 26, color: ink.main)
       }
       Spacer(minLength: 4)
       if let next = info.items.first {
@@ -584,25 +630,25 @@ struct TodayWidgetView: View {
         let line = [sub, more > 0 ? "+\(more)" : nil].compactMap { $0 }.joined(separator: " · ")
         Text(next.title)
           .font(.system(size: 13, weight: .semibold, design: .rounded))
-          .foregroundStyle(.white)
+          .foregroundStyle(ink.main)
           .lineLimit(1)
           .minimumScaleFactor(0.8)
         if !line.isEmpty {
           Text(line)
             .font(.system(size: 11.5, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.8))
+            .foregroundStyle(ink.soft)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
         }
       } else {
         Text(info.emptyLabel)
           .font(.system(size: 12, weight: .semibold, design: .rounded))
-          .foregroundStyle(.white.opacity(0.85))
+          .foregroundStyle(ink.soft)
           .lineLimit(2)
           .minimumScaleFactor(0.8)
       }
     }
-    .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+    .shadow(color: ink.shadow, radius: 2, x: 0, y: 1)
     .padding(TODAY_PAD)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
@@ -611,7 +657,7 @@ struct TodayWidgetView: View {
   private func medium(_ info: TodayRender) -> some View {
     GeometryReader { geo in
       HStack(spacing: 0) {
-        TodayHeader(info: info, longDate: true, bigSize: 34, noteLines: 2)
+        TodayHeader(info: info, date: entry.date, longDate: true, bigSize: 34, noteLines: 2)
           .padding(TODAY_PAD)
           .frame(width: geo.size.width * 0.42)
           .frame(maxHeight: .infinity)
@@ -630,7 +676,7 @@ struct TodayWidgetView: View {
   private func large(_ info: TodayRender) -> some View {
     GeometryReader { geo in
       VStack(spacing: 0) {
-        TodayHeader(info: info, longDate: true, bigSize: 42, noteLines: 1)
+        TodayHeader(info: info, date: entry.date, longDate: true, bigSize: 42, noteLines: 1)
           .padding(16)
           .frame(height: geo.size.height * 0.42)
           .frame(maxWidth: .infinity)
@@ -653,7 +699,7 @@ private struct TodayBackdrop: View {
   @Environment(\.widgetFamily) var family
   var body: some View {
     if entry.info == nil {
-      WGradient(TODAY_NO_WEATHER)
+      WSoft(TODAY_NO_WEATHER)
     } else if family == .systemSmall {
       TodaySky(info: entry.info, date: entry.date)
     } else {

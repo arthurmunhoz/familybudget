@@ -146,11 +146,8 @@ private let sampleBudget = BudgetInfo(
     BudgetEntryRow(emoji: "📺", label: "Netflix", amount: 16, type: "expense"),
   ])
 
-/// The green of the Budget gradient's deep end — ink on the solid white button.
-private let BUDGET_GREEN = Color(hex: "0FA37F")
-
 // Two deep-link capsules (Scan / Add) for the Budget widget (medium/large):
-// Scan frosted on the gradient, Add solid white with green ink.
+// Scan a soft green tile with ink, Add solid accent green with white ink.
 struct AddEntryButtons: View {
   let budgetId: String
   let monthId: String
@@ -159,13 +156,13 @@ struct AddEntryButtons: View {
     HStack(spacing: 6) {
       Link(destination: addEntryURL(budgetId: budgetId, monthId: monthId, scan: true) ?? URL(string: "oneroof:///")!) {
         capsuleLabel("Scan", "camera.fill")
-          .foregroundStyle(Color.white)
-          .wGlass(radius: 18)
+          .foregroundStyle(wInk())
+          .wTile(WG.budget, radius: 18)
       }
       Link(destination: addEntryURL(budgetId: budgetId, monthId: monthId, scan: false) ?? URL(string: "oneroof:///")!) {
         capsuleLabel(addLabel, "plus")
-          .foregroundStyle(BUDGET_GREEN)
-          .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white))
+          .foregroundStyle(Color.white)
+          .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(wAccent(WG.budget)))
       }
     }
   }
@@ -184,22 +181,23 @@ struct AddEntryButtons: View {
   }
 }
 
-// One stat row on the gradient: label left, amount right (Received / Spent).
-// Both are white — on green the label tells them apart, not red/green ink.
+// One stat row on the soft panel: label left, amount right (Received / Spent).
+// The amount is coloured by meaning, as in the app (income green, expense red).
 struct BudgetStat: View {
   let label: String
   let value: String
+  var color: Color = wInk()
   var body: some View {
     HStack(spacing: 6) {
       Text(label)
         .font(.system(size: 13, weight: .medium, design: .rounded))
-        .foregroundStyle(Color.white.opacity(0.85))
+        .foregroundStyle(wInkSoft())
         .lineLimit(1)
       Spacer(minLength: 4)
       Text(value)
         .font(.system(size: 13, weight: .bold, design: .rounded))
         .monospacedDigit()
-        .foregroundStyle(Color.white)
+        .foregroundStyle(color)
         .lineLimit(1)
         .minimumScaleFactor(0.7)
     }
@@ -284,12 +282,12 @@ struct BudgetWidgetView: View {
           Image(systemName: "wallet.pass").font(.system(size: 22, weight: .semibold))
           Text("Open One Roof").font(.system(size: 12, weight: .semibold, design: .rounded))
         }
-        .foregroundStyle(Color.white.opacity(0.9))
+        .foregroundStyle(wInkSoft())
       }
     }
     // Nothing here may fall back to SwiftUI's .primary (it follows the DEVICE
-    // appearance): everything on the green is white.
-    .foregroundStyle(Color.white)
+    // appearance): the default on the soft wash is the theme's ink.
+    .foregroundStyle(wInk())
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
@@ -308,18 +306,19 @@ struct BudgetWidgetView: View {
   /// very large, what the number is, then how much of the income is spent.
   private func summary(_ b: BudgetInfo) -> some View {
     VStack(alignment: .leading, spacing: 0) {
-      WKicker(kicker(b))
-      WBig(money(b.balance, b.currency), size: family == .systemSmall ? 32 : 34)
+      WKicker(kicker(b), color: wAccent(WG.budget))
+      WBig(money(b.balance, b.currency), size: family == .systemSmall ? 32 : 34,
+           color: b.balance < 0 ? appTheme().expense : wInk())
         .padding(.top, 4)
       Text("balance")
         .font(.system(size: 12, weight: .medium, design: .rounded))
-        .foregroundStyle(Color.white.opacity(0.8))
+        .foregroundStyle(wInkSoft())
         .lineLimit(1)
       Spacer(minLength: 6)
-      WProgress(spentRatio(b))
+      WProgress(spentRatio(b), fill: wAccent(WG.budget), track: wAccent(WG.budget).opacity(0.2))
       Text("spent \(Int((spentRatio(b) * 100).rounded()))%")
         .font(.system(size: 12, weight: .semibold, design: .rounded))
-        .foregroundStyle(Color.white.opacity(0.9))
+        .foregroundStyle(wInkSoft())
         .lineLimit(1)
         .padding(.top, 5)
     }
@@ -332,8 +331,8 @@ struct BudgetWidgetView: View {
     HStack(alignment: .top, spacing: 12) {
       summary(b)
       VStack(spacing: 8) {
-        BudgetStat(label: "Received", value: money(b.income, b.currency))
-        BudgetStat(label: "Spent", value: money(b.spent, b.currency))
+        BudgetStat(label: "Received", value: money(b.income, b.currency), color: appTheme().income)
+        BudgetStat(label: "Spent", value: money(b.spent, b.currency), color: appTheme().expense)
         if buttons {
           Spacer(minLength: 0)
           if let mid = b.monthId {
@@ -343,7 +342,7 @@ struct BudgetWidgetView: View {
       }
       .padding(10)
       .frame(maxWidth: .infinity, maxHeight: buttons ? .infinity : nil, alignment: .top)
-      .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.black.opacity(0.14)))
+      .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(hex: WG.budget[1]).opacity(wDark() ? 0.18 : 0.1)))
     }
   }
 
@@ -352,7 +351,7 @@ struct BudgetWidgetView: View {
       header(b, buttons: false)
         .frame(height: 104)
       if let entries = b.entries, !entries.isEmpty {
-        WKicker("Latest entries", color: Color.white.opacity(0.75))
+        WKicker("Latest entries", color: wAccent(WG.budget))
           .padding(.top, 14)
         VStack(spacing: 7) {
           ForEach(Array(entries.prefix(6).enumerated()), id: \.offset) { _, e in
@@ -361,13 +360,13 @@ struct BudgetWidgetView: View {
               Text(e.emoji).font(.system(size: 14))
               Text(e.label)
                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(wInk())
                 .lineLimit(1)
               Spacer(minLength: 6)
               Text((isIncome ? "+" : "") + money(e.amount, b.currency))
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(Color.white.opacity(isIncome ? 1 : 0.85))
+                .foregroundStyle(isIncome ? appTheme().income : wInk())
                 .lineLimit(1)
             }
           }
@@ -386,9 +385,9 @@ struct BudgetWidget: Widget {
   var body: some WidgetConfiguration {
     AppIntentConfiguration(kind: "BudgetWidget", intent: SelectBudgetIntent.self, provider: BudgetProvider()) { entry in
       BudgetWidgetView(entry: entry)
-        // The Budget app's own green — identity, so it does not follow the
-        // app's (or the device's) light/dark choice.
-        .containerBackground(for: .widget) { WGradient(WG.budget) }
+        // A pale wash of the Budget app's green over the app's card colour
+        // (follows the APP's light/dark choice, not the device's).
+        .containerBackground(for: .widget) { WSoft(WG.budget) }
     }
     .configurationDisplayName("Budget")
     .description("Pick a budget to show its balance and quick-add entries.")

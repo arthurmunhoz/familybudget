@@ -24,6 +24,57 @@ enum WG {
   static let kraft = ["F8EBD6", "EDD7B4"]
 }
 
+// ── The SOFT look (owner, 2026-11-15: "each feature has its colour, but it
+// doesn't need to be so heavy") ───────────────────────────────────────────────
+// A widget's background is now a pale WASH of its app's colour over the app's
+// own card colour — not the full gradient. Text is the theme's ink; the app's
+// colour is kept for what is small and meaningful: icons, the progress bar,
+// ticks, the primary button. So:
+//   .containerBackground(for: .widget) { WSoft(WG.pets) }
+//   text      → wInk() / wInkSoft()
+//   marks     → wAccent(WG.pets)   (icons, WProgress fill, WCheck, kicker)
+//   tiles     → .wTile(WG.pets)    (a slightly stronger wash, for buttons/chips)
+//   primary   → a capsule filled with wAccent(...) and WHITE text
+// `WGradient` (the full gradient) is now only for SMALL things: an icon tile,
+// an urgent button — never a whole widget.
+
+func wDark() -> Bool { groupDefaults()?.string(forKey: "widget_theme") == "dark" }
+
+/// The theme's text colours (follow the APP's light/dark choice).
+func wInk() -> Color { appTheme().text }
+func wInkSoft() -> Color { appTheme().textMuted }
+
+/// The app's colour for marks on the soft wash: the gradient's deep end on
+/// light (contrast on a pale ground), its bright end on dark.
+func wAccent(_ colors: [String]) -> Color { Color(hex: wDark() ? colors[0] : colors[1]) }
+
+/// The pale wash that fills a widget: the app's card colour with its gradient
+/// laid over it at low strength.
+struct WSoft: View {
+  let colors: [String]
+  init(_ colors: [String]) { self.colors = colors }
+  var body: some View {
+    ZStack {
+      appTheme().card
+      LinearGradient(colors: colors.map { Color(hex: $0) }, startPoint: .topLeading, endPoint: .bottomTrailing)
+        .opacity(wDark() ? 0.22 : 0.16)
+    }
+  }
+}
+
+/// A tile / chip on the wash: the same colour a step stronger.
+struct WTile: ViewModifier {
+  let colors: [String]
+  var radius: CGFloat = 14
+  func body(content: Content) -> some View {
+    content.background(
+      RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Color(hex: colors[1]).opacity(wDark() ? 0.3 : 0.14)))
+  }
+}
+extension View {
+  func wTile(_ colors: [String], radius: CGFloat = 14) -> some View { modifier(WTile(colors: colors, radius: radius)) }
+}
+
 /// Ink for text on the two LIGHT gradients (shopping yellow, kraft paper).
 let W_INK = Color(hex: "2B2521")
 let W_INK_SOFT = Color(hex: "6B5E52")
@@ -145,15 +196,17 @@ func roughlyDay(_ date: Date = Date()) -> Bool {
 
 private func skyColors(_ k: SkyKind, night: Bool) -> [String] {
   switch k {
-  case .clear: return ["4F9BFF", "2E6BF0"]
-  case .partly: return ["5AA2FA", "3D74E8"]
-  case .cloudy: return ["7E93B4", "566A8C"]
-  case .fog: return ["9AA5B5", "6F7B8D"]
-  case .rain: return night ? ["2A3558", "161D38"] : ["5B7494", "34475F"]
-  case .snow: return night ? ["3A4670", "202A4C"] : ["8FB0D6", "5F83B4"]
-  case .storm: return ["3B3F5C", "1C1F33"]
-  case .night: return ["27306A", "111838"]
-  case .nightCloudy: return ["313A66", "171D3A"]
+  // SOFT skies: the day kinds are pale enough for DARK ink; night and storm
+  // stay dark (white ink) but low in saturation.
+  case .clear: return ["CFE2FF", "E9F1FF"]
+  case .partly: return ["D8E5F8", "EFF3FA"]
+  case .cloudy: return ["D9DEE6", "EBEEF2"]
+  case .fog: return ["DCDFE5", "EDEFF2"]
+  case .rain: return night ? ["2E3653", "1E2338"] : ["C9D3E0", "E2E8EF"]
+  case .snow: return night ? ["343C5A", "232941"] : ["DDE8F5", "F1F5FA"]
+  case .storm: return ["3D4257", "2A2E40"]
+  case .night: return ["2B3358", "1C2240"]
+  case .nightCloudy: return ["333A56", "22273C"]
   }
 }
 
@@ -184,16 +237,16 @@ struct SkyScene: View {
 
         // Sun or moon, top right.
         if kind == .clear || kind == .partly {
-          Circle().fill(Color(hex: "FFE08A").opacity(0.28)).frame(width: s * 0.86, height: s * 0.86).position(x: w - s * 0.2, y: s * 0.22)
-          Circle().fill(Color(hex: "FFD45C").opacity(0.4)).frame(width: s * 0.6, height: s * 0.6).position(x: w - s * 0.2, y: s * 0.22)
-          Circle().fill(Color(hex: "FFC93C")).frame(width: s * 0.38, height: s * 0.38).position(x: w - s * 0.2, y: s * 0.22)
+          Circle().fill(Color(hex: "FFE08A").opacity(0.22)).frame(width: s * 0.86, height: s * 0.86).position(x: w - s * 0.2, y: s * 0.22)
+          Circle().fill(Color(hex: "FFD45C").opacity(0.32)).frame(width: s * 0.6, height: s * 0.6).position(x: w - s * 0.2, y: s * 0.22)
+          Circle().fill(Color(hex: "FFCB4D")).frame(width: s * 0.38, height: s * 0.38).position(x: w - s * 0.2, y: s * 0.22)
         }
         if night {
           // Stars, then a crescent cut from a full moon.
           ForEach(0..<7, id: \.self) { i in
             let xs: [CGFloat] = [0.12, 0.3, 0.46, 0.58, 0.2, 0.7, 0.9]
             let ys: [CGFloat] = [0.2, 0.1, 0.3, 0.14, 0.44, 0.4, 0.5]
-            Circle().fill(.white.opacity(0.75)).frame(width: 2.4, height: 2.4).position(x: w * xs[i], y: h * ys[i])
+            Circle().fill(.white.opacity(0.6)).frame(width: 2.4, height: 2.4).position(x: w * xs[i], y: h * ys[i])
           }
           Circle().fill(Color(hex: "F3EBD2")).frame(width: s * 0.3, height: s * 0.3).position(x: w - s * 0.22, y: s * 0.22)
           Circle().fill(Color(hex: skyColors(kind, night: true)[0])).frame(width: s * 0.26, height: s * 0.26).position(x: w - s * 0.29, y: s * 0.18)
@@ -201,40 +254,40 @@ struct SkyScene: View {
 
         // Clouds.
         if kind == .partly {
-          Cloud(color: .white.opacity(0.85)).frame(width: s * 0.62, height: s * 0.26).position(x: w - s * 0.44, y: s * 0.4)
+          Cloud(color: .white.opacity(0.95)).frame(width: s * 0.62, height: s * 0.26).position(x: w - s * 0.44, y: s * 0.4)
         }
         if kind == .cloudy || kind == .fog || kind == .nightCloudy || kind == .rain || kind == .snow || kind == .storm {
-          let c: Color = dark ? .white.opacity(0.2) : .white.opacity(kind == .rain ? 0.45 : 0.6)
+          let c: Color = dark ? .white.opacity(0.16) : .white.opacity(kind == .rain ? 0.8 : 0.92)
           Cloud(color: c).frame(width: s * 0.8, height: s * 0.32).position(x: w - s * 0.42, y: s * 0.26)
-          Cloud(color: c.opacity(0.7)).frame(width: s * 0.56, height: s * 0.22).position(x: w * 0.22, y: s * 0.42)
+          Cloud(color: dark ? .white.opacity(0.11) : Color(hex: "B9C6D8").opacity(0.55)).frame(width: s * 0.56, height: s * 0.22).position(x: w * 0.22, y: s * 0.42)
         }
         if kind == .fog {
           ForEach(0..<3, id: \.self) { i in
-            Capsule().fill(.white.opacity(0.28)).frame(width: w * 0.8, height: 5).position(x: w * (0.42 + CGFloat(i) * 0.08), y: h * (0.52 + CGFloat(i) * 0.1))
+            Capsule().fill(Color(hex: "AEB6C2").opacity(0.5)).frame(width: w * 0.8, height: 5).position(x: w * (0.42 + CGFloat(i) * 0.08), y: h * (0.52 + CGFloat(i) * 0.1))
           }
         }
 
         // What falls.
         if kind == .rain || kind == .storm {
           ForEach(0..<6, id: \.self) { i in
-            Capsule().fill(Color(hex: "A9CCFF").opacity(0.9)).frame(width: 2.4, height: s * 0.09)
+            Capsule().fill(Color(hex: dark ? "9DB8E6" : "6C97D6").opacity(0.85)).frame(width: 2.4, height: s * 0.09)
               .rotationEffect(.degrees(18))
               .position(x: w - s * (0.72 - CGFloat(i) * 0.11), y: s * (0.5 + CGFloat(i % 2) * 0.07))
           }
         }
         if kind == .storm {
-          Image(systemName: "bolt.fill").font(.system(size: s * 0.2, weight: .bold)).foregroundStyle(Color(hex: "FFD45C"))
+          Image(systemName: "bolt.fill").font(.system(size: s * 0.2, weight: .bold)).foregroundStyle(Color(hex: "F5D679"))
             .position(x: w - s * 0.3, y: s * 0.5)
         }
         if kind == .snow {
           ForEach(0..<7, id: \.self) { i in
-            Circle().fill(.white.opacity(0.95)).frame(width: 4.5, height: 4.5)
+            Circle().fill(Color(hex: "9DB6D6").opacity(0.9)).frame(width: 4.5, height: 4.5)
               .position(x: w - s * (0.78 - CGFloat(i) * 0.1), y: s * (0.48 + CGFloat(i % 3) * 0.06))
           }
         }
 
         // Fade to the sky's own bottom colour so text over the lower half reads.
-        LinearGradient(colors: [.clear, Color(hex: skyColors(kind, night: night)[1]).opacity(0.85)], startPoint: .center, endPoint: .bottom)
+        LinearGradient(colors: [.clear, Color(hex: skyColors(kind, night: night)[1]).opacity(0.6)], startPoint: .center, endPoint: .bottom)
       }
     }
   }
