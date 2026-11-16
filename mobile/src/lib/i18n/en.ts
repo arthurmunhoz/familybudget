@@ -1046,6 +1046,8 @@ export const en = {
 
   // Onboarding (first login, no household yet)
   'onboarding.title': "Let's get you set up",
+  'login.what': "The household's calendar, lists, nudges, pets and money in one place.",
+  'onboarding.houseTitle': 'Hi, {name}.',
   'onboarding.subtitle': 'Create a household or join one you were invited to.',
   'onboarding.createTitle': 'Create a household',
   'onboarding.createDesc': 'Start fresh, then invite your family with a code.',

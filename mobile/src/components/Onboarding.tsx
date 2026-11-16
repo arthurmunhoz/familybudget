@@ -12,14 +12,18 @@
 // things like "z5khzgh5ff". We can only apply the name AFTER create/join, since
 // that's what creates the allowed_users row to update.
 //
+// 2026-11-15 restyle: the Home's language on every step — three progress
+// bars, a big display title with a faded line under it, the Family purple on
+// the avatar, choice tiles and the one primary button.
 // 2026-11 redesign (components/form): calm, ONE primary action per step. The
 // name is a row; create vs join is a two-row choice; only the chosen path's
 // field and its button appear. Sign out is a quiet text link, not a button.
-import { useEffect, useState } from 'react'
-import { Alert, StyleSheet, View } from 'react-native'
-import { Check, Plus, Share2 } from 'lucide-react-native'
+import { useEffect, useState, type ReactNode } from 'react'
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native'
+import { Check, House, KeyRound, Plus, Share2 } from 'lucide-react-native'
 
-import { Btn, Screen, Txt } from './ui'
+import { Screen, Txt } from './ui'
+import { TintButton } from './TintButton'
 import { Pressable } from './Pressable'
 import { FormSection, TextRow } from './form'
 import { GradientBox } from './home/GradientBox'
@@ -31,14 +35,19 @@ import { useI18n } from '../hooks/useI18n'
 import { supabase } from '../lib/supabase'
 import { fonts, sp, useTheme } from '../theme/theme'
 
-/** One of the two household paths, as a row: title + one line of context,
- *  a check on the chosen one. */
-function ChoiceRow({
+// Setting up a household is Family's business: its purple carries the steps.
+const FAMILY = APP_GRADIENT.family
+
+/** One of the two household paths, as a tile: gradient icon, title, one line
+ *  of context; the chosen one is outlined and washed in the Family colour. */
+function ChoiceTile({
+  icon,
   title,
   desc,
   selected,
   onPress,
 }: {
+  icon: ReactNode
   title: string
   desc: string
   selected: boolean
@@ -50,32 +59,57 @@ function ChoiceRow({
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      style={({ pressed }) => [styles.choice, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [
+        styles.choice,
+        { backgroundColor: selected ? FAMILY[1] + '14' : c.card, borderColor: selected ? FAMILY[1] : c.border },
+        pressed && { opacity: 0.7 },
+      ]}
     >
+      <GradientBox colors={FAMILY} radius={14} style={styles.choiceIcon}>
+        {icon}
+      </GradientBox>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Txt style={{ fontSize: 16, fontFamily: fonts.semibold, color: c.text }}>{title}</Txt>
-        <Txt variant="faint" style={{ fontSize: 13 }}>
+        <Txt style={{ fontSize: 16.5, fontFamily: fonts.semibold, color: c.text }}>{title}</Txt>
+        <Txt variant="faint" style={{ fontSize: 13.5, lineHeight: 18 }}>
           {desc}
         </Txt>
       </View>
-      <View
-        style={[
-          styles.radio,
-          selected ? { backgroundColor: c.action, borderColor: c.action } : { borderColor: c.border },
-        ]}
-      >
-        {selected ? <Check size={13} color={c.onAction} strokeWidth={3} /> : null}
+      <View style={[styles.radio, selected ? { backgroundColor: FAMILY[1], borderColor: FAMILY[1] } : { borderColor: c.border }]}>
+        {selected ? <Check size={13} color="#fff" strokeWidth={3} /> : null}
       </View>
     </Pressable>
   )
 }
 
-/** A low-key text action (Change, Sign out). */
-function QuietLink({ label, onPress, accent }: { label: string; onPress: () => void; accent?: boolean }) {
+/** Where you are in the set-up: three small bars. */
+function Steps({ at }: { at: number }) {
   const { c } = useTheme()
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'center', paddingVertical: sp.xs }}>
-      <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: accent ? c.accent : c.textMuted }}>{label}</Txt>
+    <View style={{ flexDirection: 'row', gap: 6 }} accessible={false}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={{ width: i === at ? 28 : 14, height: 5, borderRadius: 3, backgroundColor: i <= at ? FAMILY[1] : c.border }} />
+      ))}
+    </View>
+  )
+}
+
+/** The step's heading in the Home's type: big title, faded line under it. */
+function Head({ title, sub }: { title: string; sub?: string }) {
+  const { c } = useTheme()
+  return (
+    <View>
+      <Txt style={{ fontFamily: fonts.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6, color: c.text }}>{title}</Txt>
+      {sub ? <Txt style={{ fontFamily: fonts.display, fontSize: 19, lineHeight: 25, color: c.textFaint }}>{sub}</Txt> : null}
+    </View>
+  )
+}
+
+/** A low-key text action (Change, Sign out). */
+function QuietLink({ label, onPress, accent, left }: { label: string; onPress: () => void; accent?: boolean; left?: boolean }) {
+  const { c } = useTheme()
+  return (
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={{ alignSelf: left ? 'flex-start' : 'center', paddingVertical: sp.xs }}>
+      <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: accent ? FAMILY[1] : c.textMuted }}>{label}</Txt>
     </Pressable>
   )
 }
@@ -205,42 +239,19 @@ export default function Onboarding() {
     await refreshProfile()
   }
 
+  const initial = (myName.trim().charAt(0) || '?').toUpperCase()
   return (
     <Screen scroll>
-      <View style={{ gap: sp.xl, paddingVertical: sp.xl }}>
-        <View style={{ alignItems: 'center', gap: 6 }}>
-          <Txt variant="display" style={{ fontSize: 34 }}>
-            One Roof
-          </Txt>
-          {/* Subtle rule parting the brand from the set-up flow. alignSelf
-              stretches it to the content width — the parent centres its
-              children, which would otherwise shrink it to nothing. */}
-          <View
-            style={{
-              alignSelf: 'stretch',
-              height: StyleSheet.hairlineWidth,
-              backgroundColor: c.border,
-              marginVertical: sp.sm,
-            }}
-          />
-          <Txt variant="title" style={{ textAlign: 'center' }}>
-            {step === 'invite' ? t('onboarding.inviteTitle') : t('onboarding.title')}
-          </Txt>
-          {/* The instruction only belongs to the household step — on the name
-              step the question below asks its own. */}
-          {step === 'household' ? (
-            <Txt variant="muted" style={{ textAlign: 'center' }}>
-              {t('onboarding.subtitle')}
-            </Txt>
-          ) : null}
-        </View>
+      <View style={{ gap: sp.xl, paddingTop: sp.lg, paddingBottom: sp.xxl }}>
+        <Steps at={step === 'name' ? 0 : step === 'household' ? 1 : 2} />
 
         {step === 'invite' ? (
           <View style={{ gap: sp.lg }}>
+            <Head title={t('onboarding.inviteTitle')} sub={shared ? t('onboarding.inviteSent') : t('onboarding.inviteBody')} />
             {/* You, and the empty seats next to you. */}
             <View style={styles.seats}>
-              <GradientBox colors={APP_GRADIENT.family} radius={32} style={styles.seat}>
-                <Txt style={{ fontFamily: fonts.display, fontSize: 26, color: '#fff' }}>{myName.trim().charAt(0).toUpperCase()}</Txt>
+              <GradientBox colors={FAMILY} radius={32} style={styles.seat}>
+                <Txt style={{ fontFamily: fonts.display, fontSize: 26, color: '#fff' }}>{initial}</Txt>
               </GradientBox>
               {[0, 1].map((i) => (
                 <View key={i} style={[styles.seat, styles.seatEmpty, { borderColor: c.border }]}>
@@ -248,9 +259,6 @@ export default function Onboarding() {
                 </View>
               ))}
             </View>
-            <Txt variant="muted" style={{ textAlign: 'center' }}>
-              {shared ? t('onboarding.inviteSent') : t('onboarding.inviteBody')}
-            </Txt>
             <View style={[styles.ticket, { borderColor: c.border, backgroundColor: c.card }]}>
               <Txt variant="faint" style={{ fontSize: 12.5 }}>
                 {t('onboarding.inviteCodeLabel')}
@@ -261,71 +269,71 @@ export default function Onboarding() {
             </View>
             {shared ? (
               <>
-                <Btn title={t('onboarding.continue')} onPress={finishInvite} />
+                <TintButton inline tint={FAMILY[1]} colors={FAMILY} title={t('onboarding.continue')} onPress={() => void finishInvite()} />
                 <QuietLink label={t('onboarding.inviteAgain')} onPress={sendInvite} accent />
               </>
             ) : (
               <>
-                <Btn title={t('onboarding.inviteCta')} onPress={sendInvite} icon={<Share2 size={18} color={c.onAction} strokeWidth={2.4} />} />
+                <TintButton
+                  inline
+                  tint={FAMILY[1]}
+                  colors={FAMILY}
+                  icon={<Share2 size={18} color="#fff" strokeWidth={2.4} />}
+                  title={t('onboarding.inviteCta')}
+                  onPress={() => void sendInvite()}
+                />
                 <QuietLink label={t('onboarding.inviteLater')} onPress={finishInvite} />
               </>
             )}
           </View>
         ) : step === 'name' ? (
           <View style={{ gap: sp.lg }}>
-            <View style={{ gap: 2, alignItems: 'center' }}>
-              <Txt variant="h2" style={{ textAlign: 'center' }}>
-                {t('onboarding.nameTitle')}
-              </Txt>
-              <Txt variant="faint" style={{ textAlign: 'center' }}>
-                {t('onboarding.nameDesc')}
-              </Txt>
+            <Head title={t('onboarding.nameTitle')} sub={t('onboarding.nameDesc')} />
+            {/* The avatar the family will see, filling in as you type. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+              <GradientBox colors={FAMILY} radius={32} style={styles.seat}>
+                <Txt style={{ fontFamily: fonts.display, fontSize: 26, color: '#fff' }}>{initial}</Txt>
+              </GradientBox>
+              <View style={{ flex: 1 }}>
+                <FormSection>
+                  <TextRow
+                    label={t('family.myName')}
+                    value={myName}
+                    onChangeText={setMyName}
+                    placeholder={t('onboarding.yourNamePlaceholder')}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    maxLength={40}
+                    returnKeyType="done"
+                    onSubmitEditing={toHousehold}
+                  />
+                </FormSection>
+              </View>
             </View>
-            <FormSection>
-              <TextRow
-                label={t('family.myName')}
-                value={myName}
-                onChangeText={setMyName}
-                placeholder={t('onboarding.yourNamePlaceholder')}
-                autoCapitalize="words"
-                autoCorrect={false}
-                maxLength={40}
-                returnKeyType="done"
-                onSubmitEditing={toHousehold}
-              />
-            </FormSection>
-            <Btn title={t('onboarding.continue')} onPress={toHousehold} disabled={!myName.trim()} />
+            <TintButton inline tint={FAMILY[1]} colors={FAMILY} title={t('onboarding.continue')} onPress={toHousehold} disabled={!myName.trim()} />
             <QuietLink label={t('settings.signOut')} onPress={signOut} />
           </View>
         ) : (
           <View style={{ gap: sp.lg }}>
-            {/* Echo the name back, big — they just typed it, so let them
-                actually confirm it before committing to a household. */}
-            <View style={{ alignItems: 'center', gap: 2 }}>
-              <Txt variant="faint">{t('onboarding.appearAs')}</Txt>
-              <Txt style={{ fontFamily: fonts.display, fontSize: 24, color: c.text }} numberOfLines={1}>
-                {myName.trim()}
-              </Txt>
-              <QuietLink label={t('onboarding.changeName')} onPress={() => setStep('name')} accent />
-            </View>
+            <Head title={t('onboarding.houseTitle', { name: myName.trim().split(/\s+/)[0] })} sub={t('onboarding.subtitle')} />
+            <QuietLink label={`${t('onboarding.appearAs')} ${myName.trim()} · ${t('onboarding.changeName')}`} onPress={() => setStep('name')} accent left />
 
-            {/* Both paths start as a title + blurb — showing two inputs at once
-                made the choice look like a form to fill in. Only the chosen
-                path's field and button appear. */}
-            <FormSection>
-              <ChoiceRow
+            <View style={{ gap: sp.md }}>
+              <ChoiceTile
+                icon={<House size={20} color="#fff" strokeWidth={2.2} />}
                 title={t('onboarding.createTitle')}
                 desc={t('onboarding.createDesc')}
                 selected={choice === 'create'}
                 onPress={() => setChoice('create')}
               />
-              <ChoiceRow
+              <ChoiceTile
+                icon={<KeyRound size={20} color="#fff" strokeWidth={2.2} />}
                 title={t('onboarding.joinTitle')}
                 desc={t('onboarding.joinDesc')}
                 selected={choice === 'join'}
                 onPress={() => setChoice('join')}
               />
-            </FormSection>
+            </View>
 
             {choice === 'create' ? (
               <>
@@ -341,10 +349,13 @@ export default function Onboarding() {
                     onSubmitEditing={create}
                   />
                 </FormSection>
-                <Btn
+                <TintButton
+                  inline
+                  tint={FAMILY[1]}
+                  colors={FAMILY}
+                  icon={busy === 'create' ? <ActivityIndicator color="#fff" /> : undefined}
                   title={t('onboarding.createBtn')}
-                  onPress={create}
-                  loading={busy === 'create'}
+                  onPress={() => void create()}
                   disabled={busy !== null}
                 />
               </>
@@ -368,10 +379,13 @@ export default function Onboarding() {
                     onSubmitEditing={join}
                   />
                 </FormSection>
-                <Btn
+                <TintButton
+                  inline
+                  tint={FAMILY[1]}
+                  colors={FAMILY}
+                  icon={busy === 'join' ? <ActivityIndicator color="#fff" /> : undefined}
                   title={t('onboarding.joinBtn')}
-                  onPress={join}
-                  loading={busy === 'join'}
+                  onPress={() => void join()}
                   disabled={busy !== null}
                 />
               </>
@@ -386,14 +400,9 @@ export default function Onboarding() {
 }
 
 const styles = StyleSheet.create({
-  choice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp.md,
-    paddingHorizontal: sp.md,
-    paddingVertical: 14,
-  },
-  seats: { flexDirection: 'row', justifyContent: 'center', gap: sp.md },
+  choice: { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.md, borderRadius: 20, borderWidth: 1.5 },
+  choiceIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  seats: { flexDirection: 'row', gap: sp.md },
   seat: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   seatEmpty: { borderWidth: 1.5, borderStyle: 'dashed' },
   ticket: { alignItems: 'center', gap: 4, paddingVertical: sp.md, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed' },

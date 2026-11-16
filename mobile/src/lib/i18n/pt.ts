@@ -1037,6 +1037,8 @@ export const pt: Record<keyof typeof en, string> = {
 
   // Onboarding (primeiro login, ainda sem casa)
   'onboarding.title': 'Vamos configurar você',
+  'login.what': 'Agenda, listas, avisos, pets e dinheiro da casa em um só lugar.',
+  'onboarding.houseTitle': 'Oi, {name}.',
   'onboarding.subtitle': 'Crie uma casa ou entre em uma para a qual você foi convidado.',
   'onboarding.createTitle': 'Criar uma casa',
   'onboarding.createDesc': 'Comece do zero e depois convide sua família com um código.',
