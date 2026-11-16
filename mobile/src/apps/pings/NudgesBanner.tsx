@@ -34,6 +34,7 @@ import { timeAgo } from '@/lib/format'
 import { reloadNoteWidget } from '@/lib/widget'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { NoteViewer } from '@/apps/pings/NoteViewer'
+import { fetchHiddenNotes, removeNote } from '@/lib/notes'
 import type { Ping, PingAck } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
@@ -48,7 +49,9 @@ async function fetchActivePings(): Promise<ActivePing[]> {
     .gt('expires_at', nowISO)
     .order('created_at', { ascending: false })
   if (error) throw error
-  const pings = (rows ?? []) as Ping[]
+  // A note this member took off their wall leaves the Home too (migration 114).
+  const hidden = (rows ?? []).some((r) => (r as Ping).image_path) ? await fetchHiddenNotes() : new Set<string>()
+  const pings = ((rows ?? []) as Ping[]).filter((p) => !(p.image_path && hidden.has(p.id)))
   if (!pings.length) return []
   const { data: acks } = await supabase
     .from('ping_acks')
@@ -265,6 +268,14 @@ export default function NudgesBanner({
         title={viewing.mine ? t('notes.youDrew') : t('notes.drew', { name: firstName(nameOf(viewing.p.sender_email)) })}
         sub={timeAgo(viewing.p.created_at)}
         onClose={() => setViewing(null)}
+        remove={{
+          mine: viewing.mine,
+          run: async () => {
+            const ok = await removeNote(viewing.p, myEmail ?? undefined)
+            if (ok) void load()
+            return ok
+          },
+        }}
       />
     ) : null
 

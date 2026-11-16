@@ -16,7 +16,7 @@ import { APP_GRADIENT } from '@/components/home/palette'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
-import { fetchWall, onNotesChange, type Wall, type WallNote } from '@/lib/notes'
+import { fetchWall, onNotesChange, removeNote, type Wall, type WallNote } from '@/lib/notes'
 import { usePlus } from '@/lib/plus'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { fonts, sp, useTheme } from '@/theme/theme'
@@ -224,6 +224,7 @@ export default function NotesWall() {
           title={viewing.sender_email === me ? t('notes.youDrew') : t('notes.drew', { name: nameOf(viewing.sender_email) })}
           sub={when(viewing.created_at)}
           onClose={() => setViewing(null)}
+          remove={{ mine: viewing.sender_email === me, run: () => removeNote(viewing, me) }}
         />
       ) : null}
     </>

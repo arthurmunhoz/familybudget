@@ -279,3 +279,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-111-security-hardening.sql (security review: Modo Casa device sessions bound + ended server-side on unpair, kept out of documents/location, money behind a server-checked PIN; home_devices/households column limits; own-row tables pinned to my households; join_household counts wrong codes; CSPRNG join codes)
 --   migration-112-drawn-notes.sql (pings.image_path: a hand-drawn note PNG under <household>/notes/; Modo Casa may read notes)
 --   migration-113-note-wall.sql (note_favorites: a member keeps a drawn note with a heart; notes stay on the wall; Modo Casa only reads notes sent to the whole household)
+--   migration-114-note-hide.sql (note_hidden: a recipient takes a drawn note off THEIR wall; the sender deletes it for everyone via pings_delete)

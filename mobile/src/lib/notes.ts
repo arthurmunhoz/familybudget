@@ -3,6 +3,7 @@
 // RLS decides what comes back (pings_select: to everyone, to me, or mine).
 import { supabase } from './supabase'
 import type { Ping } from './types'
+import { reloadNoteWidget } from './widget'
 
 export type WallNote = Ping & { image_path: string }
 export type Wall = {
@@ -21,12 +22,13 @@ export function onNotesChange(cb: () => void): () => void {
 const changed = () => listeners.forEach((cb) => cb())
 
 export async function fetchWall(): Promise<Wall> {
-  const [notesRes, favRes] = await Promise.all([
+  const [notesRes, favRes, hidden] = await Promise.all([
     supabase.from('pings').select('*').not('image_path', 'is', null).order('created_at', { ascending: false }).limit(200),
     supabase.from('note_favorites').select('ping_id'),
+    fetchHiddenNotes(),
   ])
   return {
-    notes: ((notesRes.data ?? []) as WallNote[]).filter((n) => !!n.image_path),
+    notes: ((notesRes.data ?? []) as WallNote[]).filter((n) => !!n.image_path && !hidden.has(n.id)),
     favs: ((favRes.data ?? []) as { ping_id: string }[]).map((f) => f.ping_id),
     canFavorite: !favRes.error,
   }
@@ -45,4 +47,31 @@ export async function setFavorite(pingId: string, on: boolean): Promise<boolean>
     : await supabase.from('note_favorites').delete().eq('ping_id', pingId)
   if (!error) changed()
   return !error
+}
+
+/** Notes this member took off their wall (migration 114). Empty set on a
+ *  server without it — nothing is hidden then. */
+export async function fetchHiddenNotes(): Promise<Set<string>> {
+  const { data, error } = await supabase.from('note_hidden').select('ping_id')
+  if (error) return new Set()
+  return new Set(((data ?? []) as { ping_id: string }[]).map((r) => r.ping_id))
+}
+
+/** Takes a note off the wall. The SENDER deletes it for everyone (row, then
+ *  the PNG); anyone else hides it for themselves only (and drops their heart). */
+export async function removeNote(note: { id: string; image_path?: string | null; sender_email: string }, me: string | undefined): Promise<boolean> {
+  if (me && note.sender_email === me) {
+    const { error } = await supabase.from('pings').delete().eq('id', note.id)
+    if (error) return false
+    if (note.image_path) void supabase.storage.from('documents').remove([note.image_path])
+  } else {
+    const { error } = await supabase
+      .from('note_hidden')
+      .upsert({ ping_id: note.id }, { onConflict: 'ping_id,user_email', ignoreDuplicates: true })
+    if (error) return false
+    void supabase.from('note_favorites').delete().eq('ping_id', note.id)
+  }
+  reloadNoteWidget()
+  changed()
+  return true
 }

@@ -822,7 +822,12 @@ export default async function handler(req: any, res: any) {
       .neq('sender_email', senderEmail)
       .order('created_at', { ascending: false })
       .limit(15)
-    const row = ((rows ?? []) as any[]).find((r) => !r.recipients || (r.recipients as string[]).includes(senderEmail))
+    // Notes this member took off their wall (migration 114) stay off the widget too.
+    const { data: hid } = await db.from('note_hidden').select('ping_id').eq('user_email', senderEmail)
+    const hidden = new Set(((hid ?? []) as any[]).map((h) => h.ping_id))
+    const row = ((rows ?? []) as any[]).find(
+      (r) => !hidden.has(r.id) && (!r.recipients || (r.recipients as string[]).includes(senderEmail)),
+    )
     if (!row || !String(row.image_path).startsWith(`${household}/notes/`)) return res.status(200).json({ note: null })
     const [{ data: signed }, { data: who }] = await Promise.all([
       db.storage.from('documents').createSignedUrl(row.image_path, 86_400),

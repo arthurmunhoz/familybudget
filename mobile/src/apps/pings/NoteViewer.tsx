@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, Modal, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
-import { Download, Heart, X } from 'lucide-react-native'
+import { Download, Heart, Trash2, X } from 'lucide-react-native'
 import { File, Paths } from 'expo-file-system'
 
 import { Txt } from '@/components/ui'
@@ -27,12 +27,16 @@ export function NoteViewer({
   title,
   sub,
   onClose,
+  remove,
 }: {
   url: string
   pingId?: string
   title: string
   sub: string
   onClose: () => void
+  /** Bin in the corner (migration 114): `mine` = the sender deletes it for
+   *  everyone; otherwise it only leaves this member's wall. */
+  remove?: { mine: boolean; run: () => Promise<boolean> }
 }) {
   const { t } = useI18n()
   const insets = useSafeAreaInsets()
@@ -61,6 +65,30 @@ export function NoteViewer({
       ]).start()
     }
     if (!(await setFavorite(pingId, next))) setFav(!next)
+  }
+  const [removing, setRemoving] = useState(false)
+  function askRemove() {
+    if (!remove || removing) return
+    haptic('light')
+    Alert.alert(
+      t(remove.mine ? 'notes.delete.mineTitle' : 'notes.delete.theirsTitle'),
+      t(remove.mine ? 'notes.delete.mineBody' : 'notes.delete.theirsBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t(remove.mine ? 'notes.delete.mineCta' : 'notes.delete.theirsCta'),
+          style: 'destructive',
+          onPress: () => {
+            setRemoving(true)
+            void remove.run().then((ok) => {
+              setRemoving(false)
+              if (ok) onClose()
+              else Alert.alert(t('notes.delete.failed'))
+            })
+          },
+        },
+      ],
+    )
   }
   async function save() {
     if (saving) return
@@ -130,6 +158,17 @@ export function NoteViewer({
               <Animated.View style={{ transform: [{ scale: beat }] }}>
                 <Heart size={20} color={fav ? '#FF6B63' : '#fff'} fill={fav ? '#FF6B63' : 'transparent'} strokeWidth={2.2} />
               </Animated.View>
+            </Pressable>
+          ) : null}
+          {remove ? (
+            <Pressable
+              onPress={askRemove}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t(remove.mine ? 'notes.delete.mineCta' : 'notes.delete.theirsCta')}
+              style={({ pressed }) => [styles.heart, pressed && { opacity: 0.8 }]}
+            >
+              {removing ? <ActivityIndicator color="#fff" /> : <Trash2 size={19} color="#fff" strokeWidth={2.2} />}
             </Pressable>
           ) : null}
         </View>
