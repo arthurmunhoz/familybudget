@@ -17,11 +17,15 @@
 // field and its button appear. Sign out is a quiet text link, not a button.
 import { useEffect, useState } from 'react'
 import { Alert, StyleSheet, View } from 'react-native'
-import { Check } from 'lucide-react-native'
+import { Check, Plus, Share2 } from 'lucide-react-native'
 
 import { Btn, Screen, Txt } from './ui'
 import { Pressable } from './Pressable'
 import { FormSection, TextRow } from './form'
+import { GradientBox } from './home/GradientBox'
+import { APP_GRADIENT } from './home/palette'
+import { track } from '../lib/analytics'
+import { fetchJoinCode, shareInvite, takePendingJoinCode } from '../lib/invite'
 import { takePendingDisplayName, useAuth } from '../lib/auth'
 import { useI18n } from '../hooks/useI18n'
 import { supabase } from '../lib/supabase'
@@ -80,7 +84,7 @@ export default function Onboarding() {
   const { t } = useI18n()
   const { c } = useTheme()
   const { refreshProfile, signOut } = useAuth()
-  const [step, setStep] = useState<'name' | 'household'>('name')
+  const [step, setStep] = useState<'name' | 'household' | 'invite'>('name')
   const [myName, setMyName] = useState('')
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
@@ -88,6 +92,23 @@ export default function Onboarding() {
   // Which path they've picked. Both cards start collapsed to a title + blurb —
   // showing two inputs at once made the choice look like a form to fill in.
   const [choice, setChoice] = useState<'create' | 'join' | null>(null)
+  // The invite step (2026-11-15): right after creating the household, while
+  // the person still has the reason they installed the app in mind. A household
+  // of one is the most common way this app dies, and the code used to be a
+  // banner and several screens away.
+  const [inviteCode, setInviteCode] = useState<string | null>(null)
+  const [shared, setShared] = useState(false)
+  // Arrived through an invite link (app/join.tsx): the code is already known.
+  const [viaLink, setViaLink] = useState(false)
+
+  useEffect(() => {
+    void takePendingJoinCode().then((cd) => {
+      if (!cd) return
+      setCode(cd)
+      setChoice('join')
+      setViaLink(true)
+    })
+  }, [])
 
   // Apple gives us the real name exactly once, at sign-in — use it as the
   // default. Don't clobber anything already typed if this resolves late.
@@ -140,7 +161,27 @@ export default function Onboarding() {
       return
     }
     await applyName()
+    track('household.created')
+    // Only the owner can read the code, and they just became one. No code
+    // (offline, an old server) → straight to the Hub, where the banner waits.
+    const jc = await fetchJoinCode().catch(() => null)
     setBusy(null)
+    if (!jc) {
+      await refreshProfile()
+      return
+    }
+    setInviteCode(jc)
+    setStep('invite')
+    track('invite.shown', { source: 'onboarding' })
+  }
+
+  async function sendInvite() {
+    if (!inviteCode) return
+    if (await shareInvite(t, inviteCode, 'onboarding')) setShared(true)
+  }
+
+  async function finishInvite() {
+    if (!shared) track('invite.skipped', { source: 'onboarding' })
     await refreshProfile()
   }
 
@@ -159,6 +200,7 @@ export default function Onboarding() {
       return
     }
     await applyName()
+    track('household.joined', { via: viaLink ? 'link' : 'typed' })
     setBusy(null)
     await refreshProfile()
   }
@@ -182,7 +224,7 @@ export default function Onboarding() {
             }}
           />
           <Txt variant="title" style={{ textAlign: 'center' }}>
-            {t('onboarding.title')}
+            {step === 'invite' ? t('onboarding.inviteTitle') : t('onboarding.title')}
           </Txt>
           {/* The instruction only belongs to the household step — on the name
               step the question below asks its own. */}
@@ -193,7 +235,43 @@ export default function Onboarding() {
           ) : null}
         </View>
 
-        {step === 'name' ? (
+        {step === 'invite' ? (
+          <View style={{ gap: sp.lg }}>
+            {/* You, and the empty seats next to you. */}
+            <View style={styles.seats}>
+              <GradientBox colors={APP_GRADIENT.family} radius={32} style={styles.seat}>
+                <Txt style={{ fontFamily: fonts.display, fontSize: 26, color: '#fff' }}>{myName.trim().charAt(0).toUpperCase()}</Txt>
+              </GradientBox>
+              {[0, 1].map((i) => (
+                <View key={i} style={[styles.seat, styles.seatEmpty, { borderColor: c.border }]}>
+                  <Plus size={22} color={c.textFaint} strokeWidth={2.2} />
+                </View>
+              ))}
+            </View>
+            <Txt variant="muted" style={{ textAlign: 'center' }}>
+              {shared ? t('onboarding.inviteSent') : t('onboarding.inviteBody')}
+            </Txt>
+            <View style={[styles.ticket, { borderColor: c.border, backgroundColor: c.card }]}>
+              <Txt variant="faint" style={{ fontSize: 12.5 }}>
+                {t('onboarding.inviteCodeLabel')}
+              </Txt>
+              <Txt selectable style={{ fontFamily: fonts.display, fontSize: 26, letterSpacing: 4, color: c.text }}>
+                {inviteCode}
+              </Txt>
+            </View>
+            {shared ? (
+              <>
+                <Btn title={t('onboarding.continue')} onPress={finishInvite} />
+                <QuietLink label={t('onboarding.inviteAgain')} onPress={sendInvite} accent />
+              </>
+            ) : (
+              <>
+                <Btn title={t('onboarding.inviteCta')} onPress={sendInvite} icon={<Share2 size={18} color={c.onAction} strokeWidth={2.4} />} />
+                <QuietLink label={t('onboarding.inviteLater')} onPress={finishInvite} />
+              </>
+            )}
+          </View>
+        ) : step === 'name' ? (
           <View style={{ gap: sp.lg }}>
             <View style={{ gap: 2, alignItems: 'center' }}>
               <Txt variant="h2" style={{ textAlign: 'center' }}>
@@ -272,6 +350,11 @@ export default function Onboarding() {
               </>
             ) : choice === 'join' ? (
               <>
+                {viaLink ? (
+                  <Txt variant="faint" style={{ textAlign: 'center' }}>
+                    {t('onboarding.invitedHint')}
+                  </Txt>
+                ) : null}
                 <FormSection key="join">
                   <TextRow
                     label={t('onboarding.codePlaceholder')}
@@ -279,7 +362,7 @@ export default function Onboarding() {
                     onChangeText={(v) => setCode(v.toUpperCase())}
                     autoCapitalize="characters"
                     autoCorrect={false}
-                    autoFocus
+                    autoFocus={!viaLink}
                     maxLength={8}
                     returnKeyType="done"
                     onSubmitEditing={join}
@@ -310,6 +393,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: sp.md,
     paddingVertical: 14,
   },
+  seats: { flexDirection: 'row', justifyContent: 'center', gap: sp.md },
+  seat: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  seatEmpty: { borderWidth: 1.5, borderStyle: 'dashed' },
+  ticket: { alignItems: 'center', gap: 4, paddingVertical: sp.md, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed' },
   radio: {
     width: 22,
     height: 22,

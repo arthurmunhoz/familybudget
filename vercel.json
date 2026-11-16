@@ -3,6 +3,7 @@
     { "source": "/api/apple-connect", "destination": "/api/apple?action=connect" },
     { "source": "/api/apple-revoke", "destination": "/api/apple?action=revoke" },
     { "source": "/api/widget-nudge", "destination": "/api/widget?action=nudge" },
+    { "source": "/join", "destination": "/join.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [{ "path": "/api/send-digest", "schedule": "0 11 * * *" }]

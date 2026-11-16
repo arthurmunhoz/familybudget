@@ -12,12 +12,13 @@
 // Switching re-renders the whole card for the new family (AuthProvider moves
 // profile.household_id first, see lib/households.ts).
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, Share, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
 import { Crown, RefreshCw, Share2, X } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Card, Txt } from '@/components/ui'
+import { shareInvite } from '@/lib/invite'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
 import { MEMBER_LIMIT_PLUS, memberLimit, usePlus } from '@/lib/plus'
@@ -75,11 +76,7 @@ export function FamilySection({ highlight = false }: { highlight?: boolean }) {
 
   async function shareCode() {
     if (!shownCode) return
-    try {
-      await Share.share({ message: t('household.shareMessage', { code: shownCode }) })
-    } catch {
-      /* dismissed */
-    }
+    await shareInvite(t, shownCode, 'settings')
   }
 
   function rotate() {

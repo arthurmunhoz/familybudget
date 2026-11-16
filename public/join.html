@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>One Roof</title>
+    <meta property="og:title" content="One Roof" />
+    <meta property="og:description" content="You've been invited to a household on One Roof." />
+    <meta property="og:image" content="https://one-roof-app.vercel.app/roof-icon-512.png" />
+    <link rel="icon" href="/favicon.svg" />
+    <style>
+      :root { color-scheme: light dark; --bg: #fbf6f0; --ink: #2b2521; --soft: #7a6f65; --card: #fff; --line: #e6dbcd; --accent: #c2603f; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #1b1714; --ink: #f3ebe0; --soft: #a99d90; --card: #26211d; --line: #3a332d; --accent: #e08a66; } }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
+      main { max-width: 440px; margin: 0 auto; padding: 40px 20px 56px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center; }
+      img.icon { width: 84px; height: 84px; border-radius: 20px; }
+      h1 { font-size: 26px; line-height: 1.2; margin: 0; }
+      p { margin: 0; color: var(--soft); font-size: 16px; }
+      .ticket { width: 100%; border: 1.5px dashed var(--line); background: var(--card); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+      .ticket small { color: var(--soft); font-size: 13px; }
+      .code { font-size: 30px; font-weight: 700; letter-spacing: 5px; font-variant-numeric: tabular-nums; }
+      .btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 54px; border-radius: 27px; font-size: 17px; font-weight: 600; text-decoration: none; border: 0; cursor: pointer; font-family: inherit; }
+      .primary { background: var(--accent); color: #fff; }
+      .ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+      .link { background: none; border: 0; color: var(--accent); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 4px; }
+      ol { text-align: left; color: var(--soft); font-size: 15px; margin: 0; padding-left: 22px; width: 100%; }
+      ol li { margin: 4px 0; }
+      .stack { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img class="icon" src="/roof-icon-192.png" alt="" />
+      <h1 id="title"></h1>
+      <p id="lead"></p>
+
+      <div class="ticket" id="ticket" hidden>
+        <small id="codeLabel"></small>
+        <div class="code" id="code"></div>
+        <button class="link" id="copy" type="button"></button>
+      </div>
+
+      <div class="stack">
+        <a class="btn primary" id="store" href="#"></a>
+        <a class="btn ghost" id="open" href="#" hidden></a>
+      </div>
+
+      <ol>
+        <li id="s1"></li>
+        <li id="s2"></li>
+        <li id="s3"></li>
+      </ol>
+    </main>
+    <script>
+      (function () {
+        var T = {
+          en: { title: "You're invited to a household on One Roof", lead: 'One shared list, calendar and nudges for everyone at home.', codeLabel: 'Household code', copy: 'Copy code', copied: 'Copied', store: 'Get the app', open: 'I already have the app', s1: 'Install One Roof and sign in.', s2: 'Come back to this page and tap "I already have the app".', s3: 'Or choose "Join a household" and type the code.', desktop: 'Open this link on your phone to install the app.' },
+          pt: { title: 'Você foi convidado para uma casa no One Roof', lead: 'Uma lista, um calendário e avisos compartilhados por todos da casa.', codeLabel: 'Código da casa', copy: 'Copiar código', copied: 'Copiado', store: 'Baixar o app', open: 'Já tenho o app', s1: 'Instale o One Roof e entre na sua conta.', s2: 'Volte a esta página e toque em “Já tenho o app”.', s3: 'Ou escolha “Entrar em uma casa” e digite o código.', desktop: 'Abra este link no celular para instalar o app.' },
+          es: { title: 'Te invitaron a un hogar en One Roof', lead: 'Una lista, un calendario y avisos compartidos por todos en casa.', codeLabel: 'Código del hogar', copy: 'Copiar código', copied: 'Copiado', store: 'Descargar la app', open: 'Ya tengo la app', s1: 'Instala One Roof e inicia sesión.', s2: 'Vuelve a esta página y toca “Ya tengo la app”.', s3: 'O elige “Unirse a un hogar” y escribe el código.', desktop: 'Abre este enlace en tu teléfono para instalar la app.' }
+        };
+        var lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+        var t = T[lang] || T.en;
+        document.documentElement.lang = T[lang] ? lang : 'en';
+        function set(id, text) { document.getElementById(id).textContent = text; }
+        ['title', 'lead', 'codeLabel', 'copy', 'store', 'open', 's1', 's2', 's3'].forEach(function (k) { set(k, t[k]); });
+
+        // The code rides in the fragment, so it never reaches the server.
+        var code = decodeURIComponent(location.hash.replace(/^#/, '')).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+        if (code) {
+          set('code', code);
+          document.getElementById('ticket').hidden = false;
+          var open = document.getElementById('open');
+          open.href = 'oneroof://join?code=' + encodeURIComponent(code);
+          open.hidden = false;
+          var copy = document.getElementById('copy');
+          copy.addEventListener('click', function () {
+            if (!navigator.clipboard) return;
+            navigator.clipboard.writeText(code).then(function () {
+              copy.textContent = t.copied;
+              setTimeout(function () { copy.textContent = t.copy; }, 1800);
+            });
+          });
+        }
+
+        var ua = navigator.userAgent || '';
+        var store = document.getElementById('store');
+        if (/android/i.test(ua)) store.href = 'https://play.google.com/store/apps/details?id=one.roof.family.organizer';
+        else if (/iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)) store.href = 'https://apps.apple.com/app/id6786347512';
+        else {
+          store.href = 'https://apps.apple.com/app/id6786347512';
+          set('lead', t.desktop);
+          document.getElementById('open').hidden = true;
+        }
+      })();
+    </script>
+  </body>
+</html>

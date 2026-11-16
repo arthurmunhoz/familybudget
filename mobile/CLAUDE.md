@@ -2158,3 +2158,24 @@ already there.
   plain camera). This has bitten twice; adding a native dep needs a rebuild
   (`npx expo prebuild -p ios --clean`) and every already-installed build keeps
   running the old binary until then.
+
+## Invite funnel (2026-11-15)
+
+A household of one is how this app dies, so the invite is a first-class step:
+
+- `lib/invite.ts` is the ONE place that builds the invite link, opens the share
+  sheet and tracks it. Every surface goes through `shareInvite(t, code, source)`:
+  the onboarding invite step, the Home banner, the family strip's "+" seat
+  (owner only) and Settings' Family card.
+- The link is `https://one-roof-app.vercel.app/join#CODE` → `public/join.html`
+  (web project; code in the FRAGMENT so it never hits a server log) → store
+  buttons + "I already have the app" → `oneroof://join?code=…` → `app/join.tsx`
+  → the join step with the code filled in (`takePendingJoinCode`). Binaries
+  older than this have no `/join` route; the page still shows the code to type.
+- Onboarding has a third step after "Create household": the invite, before the
+  Hub. It only appears when `get_join_code` answers.
+- The Home banner SNOOZES on dismiss (3 days, up to 3 times) instead of hiding
+  for good.
+- Events: `household.created`, `household.joined` (`via: link|typed`),
+  `invite.shown`, `invite.shared`, `invite.skipped` (`source`:
+  onboarding|banner|strip|settings).

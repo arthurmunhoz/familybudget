@@ -96,6 +96,11 @@ const CATALOG: Record<string, (m: Record<string, unknown>) => Rendered> = {
   'calendar.updated': (m) => ({ icon: CalendarDays, app: 'Calendar', isError: false, detail: null, predicate: `edited ${quote(str(m.title))}` }),
   'calendar.deleted': (m) => ({ icon: CalendarDays, app: 'Calendar', isError: false, detail: null, predicate: `deleted ${quote(str(m.title))}` }),
   'member.added': (m) => ({ icon: Users, app: 'Family', isError: false, detail: null, predicate: `added a member: ${quote(str(m.name) || str(m.email))}` }),
+  'household.created': () => ({ icon: Users, app: 'Family', isError: false, detail: null, predicate: 'created the household' }),
+  'household.joined': (m) => ({ icon: Users, app: 'Family', isError: false, detail: null, predicate: `joined the household (${str(m.via) || 'code'})` }),
+  'invite.shown': (m) => ({ icon: Users, app: 'Family', isError: false, detail: null, predicate: `saw the invite (${str(m.source)})` }),
+  'invite.shared': (m) => ({ icon: Users, app: 'Family', isError: false, detail: null, predicate: `shared the invite (${str(m.source)})` }),
+  'invite.skipped': (m) => ({ icon: Users, app: 'Family', isError: false, detail: null, predicate: `skipped the invite (${str(m.source)})` }),
   'plan.changed': (m) => ({ icon: Award, app: 'Admin', isError: false, detail: null, predicate: `set the plan to ${str(m.plan) || 'free'}` }),
   'apps.customized': (m) => ({ icon: LayoutGrid, app: 'Settings', isError: false, detail: null, predicate: `customized their app list (${num(m.hidden)} hidden)` }),
 }

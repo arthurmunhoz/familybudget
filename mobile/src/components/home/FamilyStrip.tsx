@@ -1,11 +1,13 @@
 // The household on the Home, under the greeting (owner, 2026-11: it moved up
 // from the bottom dock, which is Roof's now). Each member is a tinted initial
 // with their first name — tap for their page — and "Family" opens the app.
-// Scrolls sideways when the family is bigger than the row.
+// Scrolls sideways when the family is bigger than the row. The owner also gets
+// a dashed "+" seat after the last member (2026-11-15): the invite, one tap
+// from the Home, for as long as the household exists.
 import { useEffect, useState } from 'react'
 import { Animated, Easing, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronRight } from 'lucide-react-native'
+import { ChevronRight, Plus } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Txt } from '@/components/ui'
@@ -14,7 +16,7 @@ import { memberColor } from '@/lib/calendar'
 import type { Profile } from '@/lib/types'
 import { fonts, sp, useTheme } from '@/theme/theme'
 
-export function FamilyStrip({ members, emails, me }: { members: Profile[]; emails: string[]; me?: string }) {
+export function FamilyStrip({ members, emails, me, onInvite }: { members: Profile[]; emails: string[]; me?: string; onInvite?: () => void }) {
   const { c } = useTheme()
   const { t } = useI18n()
   return (
@@ -41,6 +43,21 @@ export function FamilyStrip({ members, emails, me }: { members: Profile[]; email
                 </Pressable>
               )
             })}
+        {onInvite && members.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('home.invite.title')}
+            onPress={onInvite}
+            style={({ pressed }) => [s.member, { opacity: pressed ? 0.6 : 1 }]}
+          >
+            <View style={[s.avatar, { borderColor: c.border, borderStyle: 'dashed', borderWidth: 1.5 }]}>
+              <Plus size={20} color={c.textMuted} strokeWidth={2.2} />
+            </View>
+            <Txt numberOfLines={1} style={{ fontSize: 12, fontFamily: fonts.medium, color: c.textMuted, maxWidth: 64 }}>
+              {t('home.invite.short')}
+            </Txt>
+          </Pressable>
+        ) : null}
       </ScrollView>
       <Pressable
         onPress={() => router.push('/family')}

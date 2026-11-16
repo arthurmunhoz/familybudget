@@ -37,6 +37,7 @@ import { useScreenCorner } from '../hooks/useScreenCorner'
 import { ADMIN_APP, APPS, type HubApp } from '../lib/apps'
 import { WHEREABOUTS_ENABLED } from '../lib/features'
 import { useAuth } from '../lib/auth'
+import { fetchJoinCode, shareInvite } from '../lib/invite'
 import { useCachedQuery } from '../hooks/useCachedQuery'
 import { useI18n } from '../hooks/useI18n'
 import type { TKey } from '../lib/i18n'
@@ -52,6 +53,13 @@ export default function Hub() {
   const { c } = useTheme()
   const { profile, profiles } = useAuth()
   const { t, lang } = useI18n()
+  // The family strip's "+" seat: the invite link, straight into the share
+  // sheet; Settings' invite card when the code can't be read.
+  const inviteFromStrip = useCallback(async () => {
+    const code = await fetchJoinCode().catch(() => null)
+    if (code) await shareInvite(t, code, 'strip')
+    else router.push({ pathname: '/settings', params: { highlight: 'invite' } })
+  }, [t])
   const [asking, setAsking] = useState(false)
   const [askKey, setAskKey] = useState(0)
   const [askListen, setAskListen] = useState(false)
@@ -231,7 +239,7 @@ export default function Hub() {
         <TodaySection
           name={firstName}
           household={householdName ?? null}
-          below={<FamilyStrip members={members} emails={memberEmails} me={profile?.email} />}
+          below={<FamilyStrip members={members} emails={memberEmails} me={profile?.email} onInvite={profile?.role === 'owner' ? inviteFromStrip : undefined} />}
           right={
             <Pressable
               accessibilityLabel="Settings"

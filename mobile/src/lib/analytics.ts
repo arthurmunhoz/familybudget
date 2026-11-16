@@ -60,6 +60,13 @@ export type EventName =
   | 'calendar.deleted'
   // Family / admin
   | 'member.added'
+  // The invite funnel (2026-11-15): a household is only alive once a second
+  // person joins, so each step from "created" to "joined" is counted.
+  | 'household.created'
+  | 'household.joined'
+  | 'invite.shown'
+  | 'invite.shared'
+  | 'invite.skipped'
   | 'plan.changed'
   | 'apps.customized'
 
@@ -99,6 +106,11 @@ export const SEMANTIC_EVENTS: EventName[] = [
   'calendar.updated',
   'calendar.deleted',
   'member.added',
+  'household.created',
+  'household.joined',
+  'invite.shown',
+  'invite.shared',
+  'invite.skipped',
   'plan.changed',
   'apps.customized',
 ]

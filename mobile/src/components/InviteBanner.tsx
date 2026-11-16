@@ -6,13 +6,17 @@
 //
 // Shares NudgesBanner's slot and its received-nudge card shape (gradient card,
 // icon tile, title + subtitle, one action pill), in the Family app's colours —
-// an invitation, not a warning. Tapping deep-links to Settings' invite card and outlines it
-// (?highlight=invite), so the code is on screen at the end of one tap instead
-// of somewhere on a long page.
+// an invitation, not a warning. Tapping opens the share sheet with the invite
+// link right there (2026-11-15: it used to detour through Settings, a second
+// tap away); only when the code can't be read does it fall back to Settings'
+// invite card (?highlight=invite).
+//
+// Dismissing it SNOOZES it: it comes back after a few days, up to three times.
+// One tap on the X used to hide the only invite prompt on the Home for good.
 //
 // Renders nothing unless the household really is just you AND you can act on
 // it — see the guards in the component.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { router } from 'expo-router'
@@ -22,13 +26,31 @@ import { Pressable } from './Pressable'
 import { Txt } from './ui'
 import { GradientBox } from './home/GradientBox'
 import { APP_GRADIENT } from './home/palette'
+import { track } from '@/lib/analytics'
 import { useAuth } from '@/lib/auth'
+import { fetchJoinCode, shareInvite } from '@/lib/invite'
 import { useI18n } from '@/hooks/useI18n'
 import { fonts, radius, sp } from '@/theme/theme'
 
 /** Dismissed per DEVICE and per account, like NudgesBanner's dismissed set —
  *  a household that is deliberately one person shouldn't be nagged forever. */
 const dismissKeyFor = (email: string) => `invite-banner-dismissed:${email}`
+const SNOOZE_MS = 3 * 24 * 60 * 60 * 1000
+const MAX_DISMISSALS = 3
+
+/** Stored as {n, at}. The old value was a bare '1' (hidden forever): read as
+ *  one dismissal long ago, so those households get the reminder back. */
+function parseDismissal(v: string | null): { n: number; at: number } {
+  if (!v) return { n: 0, at: 0 }
+  if (v === '1') return { n: 1, at: 0 }
+  try {
+    const d = JSON.parse(v) as { n?: number; at?: number }
+    return { n: Number(d.n) || 0, at: Number(d.at) || 0 }
+  } catch {
+    return { n: 1, at: 0 }
+  }
+}
+const isSnoozed = (d: { n: number; at: number }) => d.n >= MAX_DISMISSALS || (d.n > 0 && Date.now() - d.at < SNOOZE_MS)
 
 export default function InviteBanner() {
   const { t } = useI18n()
@@ -43,7 +65,7 @@ export default function InviteBanner() {
     let active = true
     AsyncStorage.getItem(dismissKeyFor(email))
       .then((v) => {
-        if (active) setDismissed(v === '1')
+        if (active) setDismissed(isSnoozed(parseDismissal(v)))
       })
       .catch(() => {
         if (active) setDismissed(false)
@@ -55,19 +77,39 @@ export default function InviteBanner() {
 
   const dismiss = useCallback(() => {
     setDismissed(true)
-    if (email) void AsyncStorage.setItem(dismissKeyFor(email), '1').catch(() => {})
+    track('invite.skipped', { source: 'banner' })
+    if (!email) return
+    const key = dismissKeyFor(email)
+    void AsyncStorage.getItem(key)
+      .then((v) => AsyncStorage.setItem(key, JSON.stringify({ n: parseDismissal(v).n + 1, at: Date.now() })))
+      .catch(() => {})
   }, [email])
+
+  const visible = !!profileLoaded && !!profile && profiles.length === 1 && profile.role === 'owner' && dismissed === false
+  const counted = useRef(false)
+  useEffect(() => {
+    if (!visible || counted.current) return
+    counted.current = true
+    track('invite.shown', { source: 'banner' })
+  }, [visible])
+
+  const [busy, setBusy] = useState(false)
+  const invite = useCallback(async () => {
+    if (busy) return
+    setBusy(true)
+    const code = await fetchJoinCode().catch(() => null)
+    setBusy(false)
+    if (code) await shareInvite(t, code, 'banner')
+    else router.push({ pathname: '/settings', params: { highlight: 'invite' } })
+  }, [busy, t])
 
   // Wait for the members list to resolve: `profiles` is empty while it loads,
   // so acting on its length early would show this to every household for a
   // moment, including full ones.
-  if (!profileLoaded || !profile) return null
-  if (profiles.length !== 1) return null
   // Only the OWNER can read a join code (get_join_code returns null to everyone
-  // else), so for anyone else this would open Settings to a card that isn't
-  // there. A lone member is normally the owner; this is for the exception.
-  if (profile.role !== 'owner') return null
-  if (dismissed !== false) return null
+  // else), so for anyone else there would be nothing to share. A lone member
+  // is normally the owner; this is for the exception.
+  if (!visible) return null
 
   const colors = APP_GRADIENT.family
   return (
@@ -96,8 +138,8 @@ export default function InviteBanner() {
       </View>
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.push({ pathname: '/settings', params: { highlight: 'invite' } })}
-        style={({ pressed }) => [styles.pill, { opacity: pressed ? 0.85 : 1 }]}
+        onPress={() => void invite()}
+        style={({ pressed }) => [styles.pill, { opacity: pressed || busy ? 0.85 : 1 }]}
       >
         <Share2 size={15} strokeWidth={2.5} color={colors[1]} />
         <Txt style={[styles.pillTxt, { color: colors[1] }]}>{t('home.invite.cta')}</Txt>
