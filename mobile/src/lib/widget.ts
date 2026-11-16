@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- the Android widget modules load lazily (iOS never needs them) */
 // Home-screen widget bridge. Writes app data into the shared App Group so the
 // native WidgetKit extension (mobile/targets/widgets) can render it, then asks
 // iOS to reload the widget. Safe no-op off iOS and where the native module
@@ -26,6 +27,26 @@ export interface BudgetWidgetItem {
   currency: string
 }
 
+
+// ── Android (react-native-android-widget, 2026-11-16) ────────────────────────
+// Same data, different home: AsyncStorage `aw:<key>` instead of the App Group,
+// and the widgets (src/widgets/android) draw themselves from it + api/widget.
+type AndroidWidget = 'TodayWidget' | 'NudgesWidget' | 'BudgetWidget' | 'PetCareWidget' | 'NoteWidget' | 'ListsWidget'
+function android(values: Record<string, unknown> | null, ...widgets: AndroidWidget[]): void {
+  if (Platform.OS !== 'android') return
+  void (async () => {
+    try {
+      const { awSet } = require('@/widgets/android/store') as typeof import('@/widgets/android/store')
+      const { updateAndroidWidget, updateAllAndroidWidgets } = require('@/widgets/android/update') as typeof import('@/widgets/android/update')
+      if (values) for (const [k, v] of Object.entries(values)) await awSet(k, v)
+      if (widgets.length) await Promise.all(widgets.map((w) => updateAndroidWidget(w)))
+      else await updateAllAndroidWidgets()
+    } catch {
+      /* widget module missing in this binary — ignore */
+    }
+  })()
+}
+
 let storage: ExtensionStorage | null = null
 function store(): ExtensionStorage | null {
   if (Platform.OS !== 'ios') return null
@@ -40,6 +61,7 @@ function store(): ExtensionStorage | null {
 /** Write the budget snapshot for the home-screen widget + reload it. The widget
  *  is budget-selectable; it picks by id from this list (default = first). */
 export function syncBudgetWidget(budgets: BudgetWidgetItem[]): void {
+  android({ budgets }, 'BudgetWidget')
   const s = store()
   if (!s) return
   try {
@@ -121,6 +143,7 @@ export interface TodayWidgetConfig {
  *  fetch out of the widget's limited refresh budget. */
 let lastTodayCfg = ''
 export function syncTodayConfig(cfg: TodayWidgetConfig): void {
+  android({ today_cfg: cfg }, 'TodayWidget')
   const s = store()
   if (!s) return
   const json = JSON.stringify(cfg)
@@ -138,6 +161,7 @@ export function syncTodayConfig(cfg: TodayWidgetConfig): void {
  *  the App Group so the Nudges widget matches it instead of following the
  *  device's system appearance. */
 export function syncWidgetTheme(mode: 'light' | 'dark'): void {
+  android({ widget_theme: mode })
   const s = store()
   if (!s) return
   try {
@@ -168,6 +192,8 @@ export function syncNudgeWidget(data: {
   members: NudgeMember[]
   presets: NudgePreset[]
 }): void {
+  // The token is every Android widget's key — redraw them all (sign-in, switch).
+  android({ ...(data.token ? { widget_token: data.token } : {}), nudge_members: data.members, nudge_presets: data.presets })
   const s = store()
   if (!s) return
   try {
@@ -209,6 +235,7 @@ export interface PetCareWidgetPet {
 /** Offline fallback + the pet picker's entity list. `day` lets the widget
  *  refuse to show a stale checklist on a later day (same rule as Today). */
 export function syncPetCareWidget(day: string, pets: PetCareWidgetPet[]): void {
+  android(null, 'PetCareWidget')
   const s = store()
   if (!s) return
   try {
@@ -222,6 +249,7 @@ export function syncPetCareWidget(day: string, pets: PetCareWidgetPet[]): void {
 /** Reload only — used by the silent-push handler when ANOTHER member marks a
  *  task done, so this device's widget re-fetches the fresh state. */
 export function reloadPetCareWidget(): void {
+  android(null, 'PetCareWidget')
   if (Platform.OS !== 'ios') return
   try {
     ExtensionStorage.reloadWidget(PETCARE_WIDGET_KIND)
@@ -262,6 +290,17 @@ const HOUSEHOLD_WIDGET_KEYS = [
  *  (`petcare_photo_<id>`) which can't be enumerated from here; they are
  *  overwritten on the next sign-in. */
 export function clearWidgetData(): void {
+  if (Platform.OS === 'android') {
+    void (async () => {
+      try {
+        const { awRemove } = require('@/widgets/android/store') as typeof import('@/widgets/android/store')
+        await awRemove(['widget_token', 'nudge_members', 'nudge_presets', 'nudge_status', 'budgets', 'today_cfg'])
+      } catch {
+        /* ignore */
+      }
+      android(null)
+    })()
+  }
   const s = store()
   if (!s) return
   try {
@@ -303,6 +342,7 @@ export function writeAckStatus(data: { emoji: string; label: string; ackerName: 
  *  note | lists); the app only tells them WHEN: a new drawn note arrived, the
  *  shopping list changed. Kinds must match NoteWidget.swift / ListsWidget.swift. */
 export function reloadNoteWidget(): void {
+  android(null, 'NoteWidget')
   if (Platform.OS !== 'ios') return
   try {
     ExtensionStorage.reloadWidget('NoteWidget')
@@ -312,6 +352,7 @@ export function reloadNoteWidget(): void {
 }
 
 export function reloadListsWidget(): void {
+  android(null, 'ListsWidget')
   if (Platform.OS !== 'ios') return
   try {
     ExtensionStorage.reloadWidget('ListsWidget')

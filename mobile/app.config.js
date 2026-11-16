@@ -76,6 +76,10 @@ const ANDROID_KEEP_RULES = `
 -keep class expo.modules.adapters.react.apploader.** { *; }
 -keep class expo.modules.apploader.** { *; }
 -keep class * implements expo.modules.apploader.HeadlessAppLoader { *; }
+# Home-screen widgets (react-native-android-widget): the providers are named in
+# the manifest, and the library builds its views from class names.
+-keep class one.roof.family.organizer.widget.** { *; }
+-keep class com.reactnativeandroidwidget.** { *; }
 `
 
 function withAndroidMinify(config) {
@@ -186,6 +190,21 @@ module.exports = ({ config }) => {
       ],
       ...(WHEREABOUTS_ON_ANDROID ? [] : [withoutAndroidLocationService]),
       withAndroidMinify,
+      // Android home-screen widgets (src/widgets/android). Names must match
+      // WIDGETS in widgets.tsx — and, for parity, the iOS widget kinds.
+      [
+        'react-native-android-widget',
+        {
+          widgets: [
+            { name: 'TodayWidget', label: 'Today', description: 'Your day: agenda and weather', minWidth: '250dp', minHeight: '110dp', targetCellWidth: 4, targetCellHeight: 2, resizeMode: 'horizontal|vertical', updatePeriodMillis: 1800000 },
+            { name: 'NudgesWidget', label: 'Nudges', description: 'Send a nudge in two taps', minWidth: '250dp', minHeight: '110dp', targetCellWidth: 4, targetCellHeight: 2, resizeMode: 'horizontal|vertical' },
+            { name: 'BudgetWidget', label: 'Money', description: 'Balance of your budget', minWidth: '110dp', minHeight: '110dp', targetCellWidth: 2, targetCellHeight: 2, resizeMode: 'horizontal|vertical', updatePeriodMillis: 1800000 },
+            { name: 'PetCareWidget', label: 'Pet care', description: "Today's routine, tick it off", minWidth: '180dp', minHeight: '110dp', targetCellWidth: 3, targetCellHeight: 2, resizeMode: 'horizontal|vertical', updatePeriodMillis: 1800000 },
+            { name: 'NoteWidget', label: 'Note', description: 'The latest hand-drawn note', minWidth: '110dp', minHeight: '110dp', targetCellWidth: 2, targetCellHeight: 2, resizeMode: 'horizontal|vertical', updatePeriodMillis: 1800000 },
+            { name: 'ListsWidget', label: 'Lists', description: 'Your shopping list, tick items off', minWidth: '180dp', minHeight: '110dp', targetCellWidth: 3, targetCellHeight: 3, resizeMode: 'horizontal|vertical', updatePeriodMillis: 1800000 },
+          ],
+        },
+      ],
       // Native Google sign-in (src/lib/googleNative.ts). iOS returns through a
       // URL scheme that is the iOS client id reversed, and the plugin refuses
       // to run without it — so it is only added once that client exists.

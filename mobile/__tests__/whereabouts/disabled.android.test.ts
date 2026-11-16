@@ -117,7 +117,8 @@ describe('G1 — native config (default build)', () => {
       expect(on.extra.whereaboutsAndroid).toBe(true)
       expect(on.android.permissions).toEqual(expect.arrayContaining(LOCATION_PERMS))
       expect(on.android.blockedPermissions ?? []).not.toEqual(expect.arrayContaining(LOCATION_PERMS))
-      expect((on.plugins ?? []).filter((p: unknown) => typeof p === 'function')).toHaveLength(0)
+      // Only the location-service stripper is tied to the switch (withAndroidMinify is always on).
+      expect((on.plugins ?? []).filter((p: unknown) => typeof p === 'function' && (p as { name?: string }).name === 'withoutAndroidLocationService')).toHaveLength(0)
     } finally {
       delete process.env.WHEREABOUTS_ANDROID
     }
