@@ -894,6 +894,12 @@ export const pt: Record<keyof typeof en, string> = {
   'household.removeMember': 'Remover membro',
   'household.removeConfirm': 'Remover {name} da casa? Ela perderá o acesso a tudo o que é compartilhado aqui.',
   'household.removeError': 'Não foi possível remover este membro. Tente novamente.',
+  'household.transferTitle': 'Tornar {name} dono da casa?',
+  'household.transferBody': '{name} passa a ser o dono: convida e remove pessoas, muda o nome da família e cuida do código de convite. Você vira membro. Nada muda na assinatura do Plus.',
+  'household.transferCta': 'Tornar dono',
+  'household.transferError': 'Não deu para passar a família. Tente de novo.',
+  'household.transferPlusOwner': 'Esta família usa o Plus de outra família que você paga. Enquanto isso valer, você precisa continuar como dono.',
+  'household.transferUnavailable': 'Isso ainda não está disponível. Tente de novo mais tarde.',
   'household.notOwnerHint': 'Apenas o dono da casa pode convidar ou remover membros.',
 
   // Várias famílias por conta (migration 099)

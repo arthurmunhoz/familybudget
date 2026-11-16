@@ -903,6 +903,12 @@ export const en = {
   'household.removeMember': 'Remove member',
   'household.removeConfirm': 'Remove {name} from the household? They’ll lose access to everything shared here.',
   'household.removeError': 'Could not remove this member. Please try again.',
+  'household.transferTitle': 'Make {name} the owner?',
+  'household.transferBody': '{name} becomes the owner: invites and removes people, renames the family and manages the invite code. You become a member. Your Plus subscription does not change.',
+  'household.transferCta': 'Make owner',
+  'household.transferError': "Couldn't hand the family over. Try again.",
+  'household.transferPlusOwner': 'This family runs on the Plus of another family you pay for. While that holds, you need to stay the owner.',
+  'household.transferUnavailable': "This isn't available yet. Try again later.",
   'household.notOwnerHint': 'Only the household owner can invite or remove members.',
 
   // Several families per account (migration 099)
