@@ -340,13 +340,14 @@ export default function NudgesBanner({
               <X size={14} color={c.textMuted} />
             </Pressable>
           </View>
-          <View style={{ gap: 6 }}>
-            <Txt style={{ fontSize: 14, color: c.textMuted }} numberOfLines={2}>
+          {/* Who has seen it, right-aligned (owner, 2026-11-15). */}
+          <View style={{ gap: 6, alignItems: 'flex-end' }}>
+            <Txt style={{ fontSize: 14, color: c.textMuted, textAlign: 'right' }} numberOfLines={2}>
               <Txt style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{t('pings.seenByLabel')}: </Txt>
               {seen.length ? seen.map((a) => firstName(nameOf(a.user_email))).join(', ') : t('pings.nobodyYet')}
             </Txt>
             {total ? (
-              <View style={[styles.count, { alignSelf: 'flex-start', backgroundColor: all ? c.income + '22' : c.surface }]}>
+              <View style={[styles.count, { alignSelf: 'flex-end', backgroundColor: all ? c.income + '22' : c.surface }]}>
                 {all ? <Check size={12} color={c.income} strokeWidth={3} /> : null}
                 <Txt style={{ fontSize: 12, fontWeight: '700', color: all ? c.income : c.textMuted }}>
                   {t('pings.seenCount', { n: seen.length, total })}
