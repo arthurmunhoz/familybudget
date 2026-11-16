@@ -11,7 +11,7 @@
 
 // v4: the manifest + icon set are cached here cache-first, so the Android icon
 // work (maskable icons, shortcuts) only reaches installed users on a bump.
-const CACHE = 'one-roof-shell-v4'
+const CACHE = 'one-roof-shell-v5'
 const SHELL = '/index.html'
 
 self.addEventListener('install', (event) => {

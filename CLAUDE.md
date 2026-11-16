@@ -46,7 +46,7 @@ this doc is the contract for every agent that follows you.
   is a no-op so dev/HMR is unaffected. Bump `CACHE` in `sw.js` to hard-reset.
   - **The manifest and the icons are served CACHE-FIRST by `sw.js`**, so any
     change to either only reaches already-installed users when you bump `CACHE`.
-    Currently `one-roof-shell-v4`.
+    Currently `one-roof-shell-v5` (2026-11-15: every web icon re-rendered from the app's glass icon, `mobile/assets/images/icon.png` — render new sizes from that file, never draw another).
   - **Android is now the PWA's primary audience** (iOS users have the App Store
     build; there's no Play Store listing yet). So: icons ship in `any` AND
     `maskable` purposes at 192 + 512 (Android crops to the launcher's shape and

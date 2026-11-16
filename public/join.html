@@ -7,22 +7,23 @@
     <title>One Roof</title>
     <meta property="og:title" content="One Roof" />
     <meta property="og:description" content="You've been invited to a household on One Roof." />
-    <meta property="og:image" content="https://one-roof-app.vercel.app/roof-icon-512.png" />
-    <link rel="icon" href="/favicon.svg" />
+    <meta property="og:image" content="https://one-roof-app.vercel.app/roof-icon-512.png?v=2" />
+    <link rel="icon" type="image/png" href="/roof-icon-192.png?v=2" />
+    <link rel="apple-touch-icon" href="/roof-icon-180.png?v=2" />
     <style>
-      :root { color-scheme: light dark; --bg: #fbf6f0; --ink: #2b2521; --soft: #7a6f65; --card: #fff; --line: #e6dbcd; --accent: #c2603f; }
-      @media (prefers-color-scheme: dark) { :root { --bg: #1b1714; --ink: #f3ebe0; --soft: #a99d90; --card: #26211d; --line: #3a332d; --accent: #e08a66; } }
+      :root { color-scheme: light dark; --bg: #f2f2f3; --ink: #1e1e22; --soft: #66666d; --card: #fff; --line: #dedee2; --accent: #d9483f; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #17171a; --ink: #f2f2f4; --soft: #a2a2aa; --card: #222226; --line: #36363c; --accent: #f08a6c; } }
       * { box-sizing: border-box; }
       body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
       main { max-width: 440px; margin: 0 auto; padding: 40px 20px 56px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center; }
-      img.icon { width: 84px; height: 84px; border-radius: 20px; }
+      img.icon { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 14px 30px rgba(214, 72, 70, 0.32); }
       h1 { font-size: 26px; line-height: 1.2; margin: 0; }
       p { margin: 0; color: var(--soft); font-size: 16px; }
       .ticket { width: 100%; border: 1.5px dashed var(--line); background: var(--card); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
       .ticket small { color: var(--soft); font-size: 13px; }
       .code { font-size: 30px; font-weight: 700; letter-spacing: 5px; font-variant-numeric: tabular-nums; }
       .btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 54px; border-radius: 27px; font-size: 17px; font-weight: 600; text-decoration: none; border: 0; cursor: pointer; font-family: inherit; }
-      .primary { background: var(--accent); color: #fff; }
+      .primary { background: linear-gradient(135deg, #f0764e 0%, #e2503f 50%, #c13c62 100%); color: #fff; box-shadow: 0 10px 22px rgba(214, 72, 70, 0.28); }
       .ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
       .link { background: none; border: 0; color: var(--accent); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 4px; }
       ol { text-align: left; color: var(--soft); font-size: 15px; margin: 0; padding-left: 22px; width: 100%; }
@@ -33,7 +34,7 @@
   </head>
   <body>
     <main>
-      <img class="icon" src="/roof-icon-192.png" alt="" />
+      <img class="icon" src="/roof-icon-512.png?v=2" alt="" />
       <h1 id="title"></h1>
       <p id="lead"></p>
 
