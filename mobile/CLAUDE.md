@@ -2212,3 +2212,12 @@ breaks background tasks. After adding a native library, install a RELEASE build
 on a phone and scan the log before uploading:
 `adb logcat -d | grep -E "FATAL EXCEPTION|ClassNotFoundException|NoSuchMethodError|NoSuchFieldError|UnsatisfiedLinkError"`
 and add a keep rule for anything it names.
+
+## Android widgets (react-native-android-widget, `src/widgets/android/`)
+
+- Every `.tsx` there starts with `'use no memo'`. The app has the React
+  Compiler on (`app.json` `experiments.reactCompiler`), and the library walks
+  raw function components: a compiled one throws "Invalid Hook Call detected
+  in Shell", and the widget lands on the Home screen INVISIBLE (still tappable,
+  opens the app). Shipped that way in Play 1.6.0 (23); fixed in 24. A new
+  widget file needs the directive too. Debug with `adb logcat | grep -i widget`.
