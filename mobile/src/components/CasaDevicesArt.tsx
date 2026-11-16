@@ -24,6 +24,10 @@ const APath = Animated.createAnimatedComponent(Path)
 
 const W = 300
 const H = 170
+// The outer Wi-Fi arc curves above y = 0 and its 5pt stroke was cut off at
+// the top of the box (owner, 2026-11-15): the box starts TOP points higher.
+const TOP = 20
+const VIEW = `0 ${-TOP} ${W} ${H + TOP}`
 const INK = '#B9532F' // the gradient's deep end, for the screens' details
 
 /** A small "family screen": clock line, three agenda bars, a photo heart. */
@@ -87,9 +91,9 @@ export function CasaDevicesArt() {
 
   const layer = { position: 'absolute' as const, left: 0, top: 0, width: '100%' as const, height: '100%' as const }
   return (
-    <View style={{ width: '100%', aspectRatio: W / H }} accessible={false} importantForAccessibility="no-hide-descendants">
+    <View style={{ width: '100%', aspectRatio: W / (H + TOP) }} accessible={false} importantForAccessibility="no-hide-descendants">
       {/* Wi-Fi */}
-      <Svg viewBox={`0 0 ${W} ${H}`} style={layer}>
+      <Svg viewBox={VIEW} style={layer}>
         <Circle cx={150} cy={44} r={4.5} fill="#fff" />
         <Arc d="M138 32 Q150 22 162 32" t={t} i={0} />
         <Arc d="M128 22 Q150 4 172 22" t={t} i={1} />
@@ -97,14 +101,14 @@ export function CasaDevicesArt() {
       </Svg>
       {/* tablet, centre */}
       <Animated.View style={[layer, tablet]}>
-        <Svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
+        <Svg viewBox={VIEW} style={{ width: '100%', height: '100%' }}>
           <Rect x={95} y={62} width={110} height={78} rx={12} fill="#fff" />
           <Screen x={102} y={69} w={96} h={64} />
         </Svg>
       </Animated.View>
       {/* old phone, left, leaning */}
       <Animated.View style={[layer, phone]}>
-        <Svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
+        <Svg viewBox={VIEW} style={{ width: '100%', height: '100%' }}>
           <G rotation={-8} origin="52, 112">
             <Rect x={30} y={72} width={44} height={82} rx={9} fill="#fff" opacity={0.95} />
             <Screen x={35} y={80} w={34} h={62} />
@@ -114,7 +118,7 @@ export function CasaDevicesArt() {
       </Animated.View>
       {/* laptop, right */}
       <Animated.View style={[layer, laptop]}>
-        <Svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
+        <Svg viewBox={VIEW} style={{ width: '100%', height: '100%' }}>
           <Rect x={218} y={88} width={66} height={46} rx={6} fill="#fff" />
           <Screen x={222} y={92} w={58} h={38} />
           <Path d="M210 136 H292 L286 144 H216 Z" fill="#fff" opacity={0.95} />

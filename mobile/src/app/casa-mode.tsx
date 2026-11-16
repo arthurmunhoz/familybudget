@@ -1,14 +1,15 @@
 // Settings › Modo Casa (owner, 2026-11): its own screen, in the shape of
 // "Another family" (/families). Hero art that says the point — ANY device with
 // internet becomes the family's hub, nothing to buy —, then the family's
-// devices (pair, unpair, Money PIN: components/CasaSettings) and the rules:
+// devices (pair, unpair, Money PIN: components/CasaSettings), three pairing
+// steps and the two plans side by side (2026-11-15 restyle). The rules:
 // free = 1 device, 30 full days from the first, then it only shows the day;
 // Plus = as many devices as the family wants (api/widget.ts CASA_DEVICES_PLUS
 // is only an abuse ceiling). Never "tablet" in copy — "dispositivo".
 import { useState, type ReactNode } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
-import { ChevronLeft, Globe, QrCode, Smartphone, Sparkles, Timer, Unlink } from 'lucide-react-native'
+import { ChevronLeft, Globe, Lock } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Card, Screen, Txt } from '@/components/ui'
@@ -20,13 +21,7 @@ import { CASA_LOOK as CASA, CASA_URL } from '@/lib/casa'
 import type { TKey } from '@/lib/i18n'
 import { fonts, sp, useTheme } from '@/theme/theme'
 
-const RULES: { icon: typeof Globe; title: TKey; body: TKey }[] = [
-  { icon: Smartphone, title: 'casa.rule1Title', body: 'casa.rule1Body' },
-  { icon: QrCode, title: 'casa.rule2Title', body: 'casa.rule2Body' },
-  { icon: Timer, title: 'casa.rule3Title', body: 'casa.rule3Body' },
-  { icon: Sparkles, title: 'casa.rule4Title', body: 'casa.rule4Body' },
-  { icon: Unlink, title: 'casa.rule6Title', body: 'casa.rule6Body' },
-]
+const STEPS: TKey[] = ['casa.step1', 'casa.step2', 'casa.step3']
 
 export default function CasaModeScreen() {
   const { c } = useTheme()
@@ -61,7 +56,7 @@ export default function CasaModeScreen() {
           <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 26, color: c.textFaint }}>{state}</Txt>
         </View>
 
-        <GradientBox colors={CASA} radius={24} style={{ padding: sp.lg, gap: sp.sm, overflow: 'hidden' }}>
+        <GradientBox colors={CASA} radius={26} style={{ padding: sp.lg, gap: sp.sm }}>
           <CasaDevicesArt />
           <Txt style={{ fontFamily: fonts.display, fontSize: 22, lineHeight: 28, color: '#fff', marginTop: sp.xs }}>
             {t('casa.heroTitle')}
@@ -80,30 +75,56 @@ export default function CasaModeScreen() {
           </Card>
         </View>
 
+        {/* Money: one short line, then the PIN row (owner, 2026-11-15: the
+            old explanation was a whole paragraph). */}
         <View style={{ gap: sp.sm }}>
           <Label>{t('casa.moneyTitle')}</Label>
-          <Card>
+          <Card style={{ gap: sp.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+              <Lock size={15} color={c.textMuted} />
+              <Txt variant="muted" style={{ flex: 1, fontSize: 14, lineHeight: 19 }}>
+                {t('casa.moneyShort')}
+              </Txt>
+            </View>
             <CasaPinCard />
           </Card>
         </View>
 
+        {/* How to pair: three numbered steps. */}
         <View style={{ gap: sp.sm }}>
-          <Label>{t('families.howTitle')}</Label>
-          <Card style={{ padding: sp.md, gap: sp.md + 2 }}>
-            {RULES.map((r) => (
-              <View key={r.title} style={{ flexDirection: 'row', gap: sp.md }}>
-                <View style={[s.ruleIcon, { backgroundColor: CASA[0] + '26' }]}>
-                  <r.icon size={17} color={CASA[1]} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <Txt style={{ fontFamily: fonts.semibold, color: c.text }}>{t(r.title)}</Txt>
-                  <Txt variant="faint" style={{ fontSize: 13.5, lineHeight: 19 }}>
-                    {t(r.body, { url: CASA_URL })}
-                  </Txt>
-                </View>
+          <Label>{t('casa.pairHowTitle')}</Label>
+          <Card style={{ padding: sp.md, gap: sp.md }}>
+            {STEPS.map((k, i) => (
+              <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                <GradientBox colors={CASA} radius={16} style={s.step}>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 16, color: '#fff' }}>{i + 1}</Txt>
+                </GradientBox>
+                <Txt style={{ flex: 1, fontSize: 15, lineHeight: 20, color: c.text }}>{t(k, { url: CASA_URL })}</Txt>
               </View>
             ))}
           </Card>
+        </View>
+
+        {/* The two plans, side by side. */}
+        <View style={{ gap: sp.sm }}>
+          <Label>{t('casa.plansTitle')}</Label>
+          <View style={{ flexDirection: 'row', gap: sp.md }}>
+            <View style={[s.plan, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: c.textMuted }}>{t('casa.planFree')}</Txt>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 24, color: c.text }}>{t('casa.planFreeBig')}</Txt>
+              <Txt variant="faint" style={{ fontSize: 13, lineHeight: 18 }}>
+                {t('casa.planFreeSub')}
+              </Txt>
+            </View>
+            <GradientBox colors={CASA} radius={20} style={s.plan}>
+              <Txt style={{ fontFamily: fonts.semibold, fontSize: 13, color: 'rgba(255,255,255,0.9)' }}>Plus</Txt>
+              <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 24, color: '#fff' }}>{t('casa.planPlusBig')}</Txt>
+              <Txt style={{ fontSize: 13, lineHeight: 18, color: 'rgba(255,255,255,0.9)' }}>{t('casa.planPlusSub')}</Txt>
+            </GradientBox>
+          </View>
+          <Txt variant="faint" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 2 }}>
+            {t('casa.unpairNote')}
+          </Txt>
         </View>
       </View>
     </Screen>
@@ -121,7 +142,8 @@ function Label({ children }: { children: ReactNode }) {
 
 const s = StyleSheet.create({
   back: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
-  ruleIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  step: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  plan: { flex: 1, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, borderColor: 'transparent', padding: sp.md, gap: 2 },
   url: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -159,15 +159,13 @@ export function CasaPinCard() {
   }, [profile?.household_id])
   return (
     <View style={{ gap: sp.md }}>
-      <Txt variant="muted" style={{ fontSize: 14.5, lineHeight: 20 }}>
-        {t('casa.moneyBody')}
-      </Txt>
       <Row
         icon={<KeyRound size={17} color="#fff" />}
         colors={PIN_LOOK}
         title={pin ? t('casa.pinChange') : t('casa.pinCreate')}
         sub={pin ? t('casa.pinSet') : t('casa.pinNone')}
         onPress={() => setPinOpen(true)}
+        first
       />
       {pinOpen && profile?.household_id ? (
         <PinSheet
