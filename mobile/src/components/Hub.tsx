@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Settings } from 'lucide-react-native'
 
@@ -69,6 +69,8 @@ export default function Hub() {
   // The dock's mute is a SETTING, not a moment (owner, 2026-11-15): muted
   // stays muted across closing and reopening the app, until it's tapped
   // again. Kept per device; Roof doesn't listen until it has been read.
+  // ?note=<id> — a tapped hand-drawn-note push (lib/backgroundNotifications).
+  const { note: noteParam } = useLocalSearchParams<{ note?: string }>()
   const [roofPaused, setRoofPausedState] = useState(false)
   const [pausedReady, setPausedReady] = useState(false)
   useEffect(() => {
@@ -249,7 +251,7 @@ export default function Hub() {
           {/* Someone's birthday later this month (or today) → their Birthday page. */}
           <HomeBirthdays />
           {/* Incoming nudges you can respond to — tap to jump to the Past tab. */}
-          <NudgesBanner />
+          <NudgesBanner openNoteId={typeof noteParam === 'string' ? noteParam : undefined} onNoteOpened={() => router.setParams({ note: undefined })} />
           {/* An active safety radius — tap to manage or stop it. */}
           {WHEREABOUTS_ENABLED && <SafetyBanner />}
           {/* Household of one — where to find the invite code. Last: a live

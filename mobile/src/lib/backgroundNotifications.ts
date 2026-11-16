@@ -201,7 +201,11 @@ function routeFromNotification(response: Notifications.NotificationResponse | nu
     void ready.then(() => answerLocationRequests()).then((handled) => go(handled ? '/' : url))
     return
   }
-  void ready.then(() => go(url))
+  // A hand-drawn note (migration 112) opens straight in its full-screen view:
+  // Home with ?note=<id>, which NudgesBanner picks up. Older builds ignore
+  // `note` and just land on Home.
+  const note = typeof data.note === 'string' && /^[0-9a-f-]{36}$/i.test(data.note) ? data.note : null
+  void ready.then(() => go(note ? `/?note=${note}` : url))
 }
 
 /** Tapping the push for a Whereabouts "your location is out of date" request
@@ -246,7 +250,7 @@ function go(url: string): void {
   setTimeout(() => {
     try {
       // navigate, not push, for Home: it's already the root of the stack.
-      if (url === '/') router.navigate('/')
+      if (url === '/' || url.startsWith('/?')) router.navigate(url as Parameters<typeof router.navigate>[0])
       else router.push(url as Parameters<typeof router.push>[0])
     } catch {
       /* a route that no longer exists must not crash the launch */

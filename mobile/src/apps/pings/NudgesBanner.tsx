@@ -72,7 +72,14 @@ async function fetchMemberPhones(): Promise<Record<string, string>> {
   return out
 }
 
-export default function NudgesBanner() {
+export default function NudgesBanner({
+  openNoteId,
+  onNoteOpened,
+}: {
+  /** Open this hand-drawn note full screen once it's loaded (a tapped push). */
+  openNoteId?: string
+  onNoteOpened?: () => void
+} = {}) {
   const { c } = useTheme()
   const { t } = useI18n()
   const { profile, profiles } = useAuth()
@@ -201,6 +208,21 @@ export default function NudgesBanner() {
   }, [highIds])
 
 
+  // A tapped note push lands here with its id: open it as soon as the note
+  // and its picture are in, once.
+  const opened = useRef<string | null>(null)
+  useEffect(() => {
+    if (!openNoteId || opened.current === openNoteId) return
+    const p = pings.find((x) => x.id === openNoteId)
+    if (!p?.image_path || !noteUrls[p.image_path]) return
+    opened.current = openNoteId
+    const mine = p.sender_email === myEmail
+    setViewing({ p, mine })
+    if (!mine) void ack(p.id)
+    onNoteOpened?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openNoteId, pings, noteUrls])
+
   if (incoming.length === 0 && sent.length === 0) return null
 
   // Opening a note someone sent me counts as seeing it (owner, 2026-11-15):
@@ -243,7 +265,8 @@ export default function NudgesBanner() {
   // blue (owner, 2026-11-15: the blue under a drawing didn't feel right):
   // dark ink type, the note pinned in the middle, View / Got it in ink.
   // RECEIVED hand-drawn note (owner, 2026-11-15): the drawing bleeds off
-  // the card's left half — just the top of the sheet, edge to edge — and
+  // the card's left half — the MIDDLE of the sheet (where people draw),
+  // edge to edge — and
   // fades into the kraft; who and when sit on the right with one "View note"
   // button. The whole card opens it; "Got it" lives in the full-screen view.
   const renderIncomingNote = (p: ActivePing) => {
@@ -257,7 +280,7 @@ export default function NudgesBanner() {
         style={({ pressed }) => [styles.card, styles.kraftCard, styles.bleedCard, pressed && { opacity: 0.92 }]}
       >
         <View style={styles.bleedArt} pointerEvents="none">
-          {url ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top" transition={160} /> : null}
+          {url ? <Image source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" transition={160} /> : null}
           <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
             <Defs>
               <SvgGradient id="noteFade" x1="0" y1="0" x2="1" y2="0">
@@ -279,12 +302,12 @@ export default function NudgesBanner() {
           </View>
           <Pressable
             onPress={() => openNote(p, false)}
-            style={({ pressed }) => [styles.chipBtn, { alignSelf: 'flex-start', backgroundColor: INK, opacity: pressed ? 0.85 : 1 }]}
+            style={({ pressed }) => [styles.chipBtn, styles.viewBtn, { opacity: pressed ? 0.8 : 1 }]}
             accessibilityRole="button"
             accessibilityLabel={t('notes.viewNote')}
           >
-            <Eye size={15} strokeWidth={2.4} color="#FFFBF2" />
-            <Txt style={[styles.pillTxt, { color: '#FFFBF2' }]}>{t('notes.viewNote')}</Txt>
+            <Eye size={15} strokeWidth={2.4} color={INK} />
+            <Txt style={[styles.pillTxt, { color: INK }]}>{t('notes.viewNote')}</Txt>
           </Pressable>
         </View>
       </Pressable>
@@ -570,6 +593,12 @@ const styles = StyleSheet.create({
   },
   noteCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: sp.md },
   noteSide: { flex: 1, minWidth: 0, alignSelf: 'stretch', justifyContent: 'space-between', paddingVertical: 2 },
+  viewBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,251,242,0.7)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(120,90,50,0.35)',
+  },
   bleedCard: { padding: 0, flexDirection: 'row', backgroundColor: KRAFT_SOLID, overflow: 'hidden', gap: 0 },
   bleedArt: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '58%' },
   bleedSide: { marginLeft: '50%', flex: 1, padding: sp.md, justifyContent: 'space-between' },

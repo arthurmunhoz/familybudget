@@ -693,7 +693,7 @@ export default async function handler(req: any, res: any) {
       to: t.token,
       title: labelled(pingTitle, hhName, multi.has(t.user_email)),
       body: ping.message,
-      data: { url: ping.image_path ? '/' : '/pings', tel, household: ping.household_id },
+      data: { url: ping.image_path ? '/' : '/pings', tel, household: ping.household_id, ...(ping.image_path ? { note: ping.id } : {}) },
       sound: 'default' as const,
       ...(noteImage ? { richContent: { image: noteImage } } : {}),
       // priority is the FCM transport (beats Doze); channelId is how Android

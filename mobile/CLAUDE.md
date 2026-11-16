@@ -392,10 +392,12 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   Send = react-native-view-shot PNG (1080 wide) → `documents` bucket
   `<household>/notes/<uuid>.png` → `sendPing('drawing', '✏️', notes.pushText,
   …, { imagePath, expiresAt: +24h })`, so recipients, push and "seen by" are
-  the normal nudge ones. `pings.image_path` must start with
+  the normal nudge ones. The push carries `data.note` = the ping id (url stays
+  '/', so older builds just open Home); a tap goes to `/?note=<id>` and
+  `NudgesBanner` (prop `openNoteId` from the Hub) opens the viewer directly. `pings.image_path` must start with
   `<household_id>/notes/` (CHECK). On Home, `NudgesBanner` shows the note as a
   received note = KRAFT card (not the Nudges blue — owner) whose left half is the
-  drawing bled edge to edge (top of the sheet, cover) fading into the kraft, with
+  drawing bled edge to edge (middle of the sheet, cover) fading into the kraft, with
   "Ver recado" on the right (whole card opens it; OPENING a received note acks it —
   no Got it); sent
   note = the sheet beside "seen by"; `NoteViewer` opens it full
