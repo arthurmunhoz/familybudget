@@ -3,6 +3,8 @@
 // api/widget.ts, the same endpoints the iOS widgets use) and returns the JSX.
 // Taps that DO something (send a nudge, tick a pet task, tick a list item)
 // come back to handler.ts as click actions.
+'use no memo' // react-native-android-widget walks raw function components; the React Compiler's memo cache trips its "Invalid Hook Call" check and the widget draws nothing.
+
 import { FlexWidget, ImageWidget, TextWidget } from 'react-native-android-widget'
 import type { WidgetInfo } from 'react-native-android-widget'
 

@@ -3,6 +3,8 @@
 // Draws on add / periodic update / resize, and carries out the taps that do
 // something: send a nudge (two taps — the first asks), tick a pet task, tick a
 // list item. Each goes through api/widget.ts with the widget token.
+'use no memo' // react-native-android-widget walks raw function components; the React Compiler's memo cache trips its "Invalid Hook Call" check and the widget draws nothing.
+
 import { Platform } from 'react-native'
 import { registerWidgetTaskHandler, type WidgetTaskHandlerProps } from 'react-native-android-widget'
 

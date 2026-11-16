@@ -2,6 +2,8 @@
 // Look shared by every Android widget — the same soft look as the iOS ones
 // (targets/widgets/Kit.swift): the card colour with the app's gradient laid
 // over it at low strength, ink text, the app colour for marks and kickers.
+'use no memo' // react-native-android-widget walks raw function components; the React Compiler's memo cache trips its "Invalid Hook Call" check and the widget draws nothing.
+
 import { FlexWidget, TextWidget } from 'react-native-android-widget'
 import type { ColorProp, HexColor } from 'react-native-android-widget'
 
