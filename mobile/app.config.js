@@ -55,6 +55,47 @@ const ANDROID_LOCATION_PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE_LOCATION',
 ]
 
+/** R8 on Android release builds (2026-11-15). Play flagged release 22 (1.6.0):
+ *  "DEX code optimization is below our threshold — Obfuscation (2%)", fix by
+ *  Feb 2027 or visibility/publishing may suffer. The Expo template reads this
+ *  gradle property into `minifyEnabled`; it shrinks and obfuscates the Java/
+ *  Kotlin code (the JS bundle is untouched). Resource shrinking stays off: it
+ *  is not what Play measures and it can drop resources looked up by name.
+ *  A library missing its keep rules only fails at RUNTIME in a release build,
+ *  so every Android release must be opened on a real phone before upload. */
+const ANDROID_KEEP_RULES = `
+# One Roof (app.config.js withAndroidMinify). Classes Android loads BY NAME,
+# which R8 cannot see and renames or drops:
+# expo-modules-core's manifest names the headless app loader in a <meta-data>
+# value; expo-task-manager / expo-notifications look it up to run background
+# tasks with the app closed (pet reminders, silent pushes). Without this the
+# app works in the foreground and logs ClassNotFoundException in background.
+-keep class expo.modules.adapters.react.apploader.** { *; }
+-keep class expo.modules.apploader.** { *; }
+-keep class * implements expo.modules.apploader.HeadlessAppLoader { *; }
+`
+
+function withAndroidMinify(config) {
+  const { withGradleProperties, withDangerousMod } = require('expo/config-plugins')
+  const fs = require('fs')
+  const path = require('path')
+  config = withDangerousMod(config, [
+    'android',
+    (mod) => {
+      const file = path.join(mod.modRequest.platformProjectRoot, 'app', 'proguard-rules.pro')
+      const cur = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+      if (!cur.includes('withAndroidMinify')) fs.writeFileSync(file, cur + ANDROID_KEEP_RULES)
+      return mod
+    },
+  ])
+  return withGradleProperties(config, (mod) => {
+    const key = 'android.enableMinifyInReleaseBuilds'
+    mod.modResults = mod.modResults.filter((p) => !(p.type === 'property' && p.key === key))
+    mod.modResults.push({ type: 'property', key, value: 'true' })
+    return mod
+  })
+}
+
 /** With Whereabouts off on Android, drop expo-location's foreground service
  *  from the merged manifest. A declared `foregroundServiceType="location"`
  *  service is itself something Play asks you to justify, even if never started. */
@@ -141,6 +182,7 @@ module.exports = ({ config }) => {
         },
       ],
       ...(WHEREABOUTS_ON_ANDROID ? [] : [withoutAndroidLocationService]),
+      withAndroidMinify,
       [
         '@rnmapbox/maps',
         {

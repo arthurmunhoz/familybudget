@@ -2198,3 +2198,17 @@ Drawn notes no longer vanish after 24 h (they still leave the HOME then):
   `src/casa/notes.ts`): only notes sent to the WHOLE household — enforced by the
   restrictive policy `pings_casa_notes`, not just the client filter.
 - Not built yet: the Home-Screen widget showing the latest note.
+
+## Android release builds are minified (R8) since 2026-11-15
+
+Play flagged release 22 (1.6.0): "DEX code optimization is below our threshold —
+Obfuscation (2%)", fix by Feb 2027. `withAndroidMinify` in `app.config.js` sets
+`android.enableMinifyInReleaseBuilds=true` and appends keep rules to
+`android/app/proguard-rules.pro` (`ANDROID_KEEP_RULES`). Resource shrinking is
+OFF on purpose. A class Android loads BY NAME (manifest `<meta-data>`,
+reflection) is invisible to R8: the first minified build ran fine in the
+foreground while logging `ClassNotFoundException: …RNHeadlessAppLoader`, which
+breaks background tasks. After adding a native library, install a RELEASE build
+on a phone and scan the log before uploading:
+`adb logcat -d | grep -E "FATAL EXCEPTION|ClassNotFoundException|NoSuchMethodError|NoSuchFieldError|UnsatisfiedLinkError"`
+and add a keep rule for anything it names.
