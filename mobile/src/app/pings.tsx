@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Keyboard, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { router } from 'expo-router'
-import { ChevronLeft, ChevronRight, Images, Settings2 } from 'lucide-react-native'
+import { ChevronLeft, Settings2 } from 'lucide-react-native'
 
 import { Screen, Txt } from '@/components/ui'
 import { RoofExamples } from '@/components/RoofExamples'
@@ -104,24 +104,6 @@ export default function NudgesScreen() {
             </Txt>
           </View>
           <PingComposer presets={presets} onSent={setToast} onWriteFocus={onWriteFocus} />
-          {/* Where drawn notes live after they leave the Home (migration 113). */}
-          <Pressable
-            onPress={() => router.push('/notes' as never)}
-            accessibilityRole="button"
-            accessibilityLabel={t('notes.wall.title')}
-            style={({ pressed }) => [wallRow, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.75 : 1 }]}
-          >
-            <View style={wallTile}>
-              <Images size={20} color="#8A5A2B" strokeWidth={2.2} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Txt style={{ fontFamily: fonts.semibold, fontSize: 16, color: c.text }}>{t('notes.wall.title')}</Txt>
-              <Txt variant="faint" style={{ fontSize: 13 }} numberOfLines={1}>
-                {t('notes.wall.entrySub')}
-              </Txt>
-            </View>
-            <ChevronRight size={18} color={c.textMuted} />
-          </Pressable>
         </View>
       </Screen>
 
@@ -136,23 +118,6 @@ export default function NudgesScreen() {
       ) : null}
     </>
   )
-}
-
-const wallRow = {
-  flexDirection: 'row' as const,
-  alignItems: 'center' as const,
-  gap: sp.md,
-  padding: sp.md,
-  borderRadius: 20,
-  borderWidth: StyleSheet.hairlineWidth,
-}
-const wallTile = {
-  width: 44,
-  height: 44,
-  borderRadius: 14,
-  backgroundColor: '#F3E2C6',
-  alignItems: 'center' as const,
-  justifyContent: 'center' as const,
 }
 
 const roundBtn = {

@@ -1,15 +1,17 @@
 // "Recados" — the wall where hand-drawn notes live after they leave the Home
 // (migration 113, owner 2026-11-15: a note used to be saved to the camera roll
 // or lost). Sheets of paper taped to a wall, newest first; a heart keeps one
-// for good. Filters: all / received / sent / kept. Tap a sheet → NoteViewer.
+// for good. "New note" comes first (the Nudges screen's card opens THIS page,
+// carrying the recipients picked there in `to`), then the wall with its
+// filters: all / received / sent / kept. Tap a sheet → NoteViewer.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { Image } from 'expo-image'
-import { ChevronLeft, Heart, PenLine } from 'lucide-react-native'
+import { ChevronLeft, Heart, Plus } from 'lucide-react-native'
 
-import { EmptyState, Loader, Screen, Txt } from '@/components/ui'
-import { TintButton } from '@/components/TintButton'
+import { Loader, Screen, Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
 import { APP_GRADIENT } from '@/components/home/palette'
 import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
@@ -19,6 +21,7 @@ import { usePlus } from '@/lib/plus'
 import { getSignedUrls } from '@/lib/signedUrls'
 import { fonts, sp, useTheme } from '@/theme/theme'
 import { NoteViewer } from './NoteViewer'
+import { NoteArt } from './PingComposer'
 
 type Filter = 'all' | 'received' | 'sent' | 'kept'
 const FILTERS: Filter[] = ['all', 'received', 'sent', 'kept']
@@ -38,6 +41,8 @@ export default function NotesWall() {
   const { isPlus } = usePlus()
   const { width } = useWindowDimensions()
   const me = profile?.email
+  const { to } = useLocalSearchParams<{ to?: string }>()
+  const draw = () => router.push({ pathname: '/draw-note', params: { to: typeof to === 'string' ? to : '' } })
   const { data, revalidate } = useCachedQuery<Wall>(`notes:wall:${profile?.household_id ?? ''}`, fetchWall)
   useFocusEffect(useCallback(() => void revalidate(), [revalidate]))
   useEffect(() => onNotesChange(() => void revalidate()), [revalidate])
@@ -111,6 +116,24 @@ export default function NotesWall() {
             </Txt>
           </View>
 
+          {/* First thing on the page: draw a new one. */}
+          <Pressable onPress={draw} accessibilityRole="button" accessibilityLabel={t('notes.wall.new')} style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}>
+            <GradientBox colors={['#F8EBD6', '#EDD7B4']} radius={26} style={s.newCard}>
+              <NoteArt size={84} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt style={{ fontFamily: fonts.display, fontSize: 22, lineHeight: 26, color: '#2B2521' }}>{t('notes.wall.new')}</Txt>
+                <Txt style={{ fontSize: 14, lineHeight: 19, color: '#6B5E52', marginTop: 2 }}>{t('notes.wall.newSub')}</Txt>
+              </View>
+              <View style={s.plus}>
+                <Plus size={22} color="#FFFBF2" strokeWidth={2.6} />
+              </View>
+            </GradientBox>
+          </Pressable>
+
+          {total > 0 ? (
+            <Txt style={[s.label, { color: c.textMuted }]}>{t('notes.wall.section')}</Txt>
+          ) : null}
+
           {total > 0 ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.sm }}>
               {FILTERS.map((f) => {
@@ -139,9 +162,13 @@ export default function NotesWall() {
           {!data ? (
             <Loader />
           ) : total === 0 ? (
-            <View style={{ gap: sp.lg }}>
-              <EmptyState title={t('notes.wall.emptyTitle')} subtitle={t('notes.wall.emptyHint')} />
-              <TintButton inline tint={blue[1]} colors={blue} icon={<PenLine size={18} color="#fff" />} title={t('notes.entryTitle')} onPress={() => router.push('/draw-note')} />
+            <View style={{ alignItems: 'center', gap: 6, paddingVertical: sp.xl }}>
+              <Txt variant="h2" style={{ textAlign: 'center' }}>
+                {t('notes.wall.emptyTitle')}
+              </Txt>
+              <Txt variant="muted" style={{ textAlign: 'center' }}>
+                {t('notes.wall.emptyHint')}
+              </Txt>
             </View>
           ) : notes.length === 0 ? (
             <Txt variant="muted" style={{ textAlign: 'center', paddingVertical: sp.xl }}>
@@ -205,6 +232,9 @@ export default function NotesWall() {
 
 const s = StyleSheet.create({
   round: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  newCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: 26, padding: sp.md, minHeight: 112 },
+  plus: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#2B2521', alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 12.5, fontFamily: fonts.semibold, letterSpacing: 1, textTransform: 'uppercase', marginBottom: -sp.sm },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1.5 },
   sheet: {
     borderRadius: 10,

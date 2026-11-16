@@ -2183,8 +2183,10 @@ A household of one is how this app dies, so the invite is a first-class step:
 ## Notes wall (migration 113, 2026-11-15)
 
 Drawn notes no longer vanish after 24 h (they still leave the HOME then):
-- `/notes` → `apps/pings/NotesWall` (entry row at the foot of the Nudges
-  screen): sheets taped to a wall, filters all / received / sent / kept, tap →
+- `/notes` → `apps/pings/NotesWall`. The Nudges screen's big kraft "Recado à
+  mão" card opens THIS page (owner, 2026-11-15), not the drawing sheet; it
+  passes the picked recipients in `to`. First on the page: "Novo recado"
+  (→ `/draw-note`), then the wall: sheets taped to a wall, filters all / received / sent / kept, tap →
   `NoteViewer`. Data in `lib/notes.ts` (`fetchWall`, `isFavorite`,
   `setFavorite`, `onNotesChange`). RLS (pings_select) decides what a member sees.
 - A heart in `NoteViewer` (needs `pingId`) writes `note_favorites` — personal,

@@ -73,11 +73,16 @@ export function PersonChip({ label, initials, on, onPress, color }: { label: str
   )
 }
 
+// The drawn-notes card wears kraft paper, like a received note on the Home.
+const NOTE_KRAFT: [string, string] = ['#F8EBD6', '#EDD7B4']
+const NOTE_INK = '#2B2521'
+const NOTE_INK_SOFT = '#6B5E52'
+
 /** The little sheet on the "Hand-drawn note" card: ruled paper with a red
  *  margin, a scribbled heart and hello, and a pencil resting on it. */
-function NoteArt() {
+export function NoteArt({ size = 74 }: { size?: number }) {
   return (
-    <Svg width={74} height={74} viewBox="0 0 74 74">
+    <Svg width={size} height={size} viewBox="0 0 74 74">
       <Rect x={9} y={6} width={50} height={60} rx={7} fill="#FFFBF2" transform="rotate(-6 34 36)" />
       <Line x1={13} y1={24} x2={60} y2={19} stroke="#E9DFCB" strokeWidth={1.2} />
       <Line x1={14} y1={34} x2={61} y2={29} stroke="#E9DFCB" strokeWidth={1.2} />
@@ -264,24 +269,25 @@ export default function PingComposer({
         </View>
       ) : null}
 
-      {/* Hand-drawn note (2026-11-15): opens the sheet of paper, carrying the
-          recipients picked above. */}
+      {/* Hand-drawn notes (2026-11-15): a big kraft card that opens the notes
+          page — "new note" first, then the wall of received and sent ones —
+          carrying the recipients picked above. */}
       <Pressable
-        onPress={() => router.push({ pathname: '/draw-note', params: { to: everyone ? '' : [...selected].join(',') } })}
+        onPress={() => router.push({ pathname: '/notes', params: { to: everyone ? '' : [...selected].join(',') } } as never)}
         disabled={sending}
         accessibilityRole="button"
         accessibilityLabel={t('notes.entryTitle')}
       >
-        <View style={[styles.noteCard, { backgroundColor: c.card, borderColor: c.border }]}>
+        <GradientBox colors={NOTE_KRAFT} radius={26} style={styles.noteCard}>
           <View style={styles.noteArt}>
-            <NoteArt />
+            <NoteArt size={96} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt style={{ fontFamily: fonts.display, fontSize: 20, color: c.text }}>{t('notes.entryTitle')}</Txt>
-            <Txt style={{ fontSize: 14, color: c.textMuted, marginTop: 2 }}>{t('notes.entrySub')}</Txt>
+            <Txt style={{ fontFamily: fonts.display, fontSize: 24, lineHeight: 28, color: NOTE_INK }}>{t('notes.entryTitle')}</Txt>
+            <Txt style={{ fontSize: 14.5, lineHeight: 20, color: NOTE_INK_SOFT, marginTop: 4 }}>{t('notes.entrySub')}</Txt>
           </View>
-          <ChevronRight size={20} color={c.textFaint} />
-        </View>
+          <ChevronRight size={22} color={NOTE_INK_SOFT} />
+        </GradientBox>
       </Pressable>
 
       {/* One-tap presets as a grid of tiles */}
@@ -374,6 +380,6 @@ const styles = StyleSheet.create({
   },
   aiInput: { flex: 1, fontSize: 16, fontFamily: fonts.body, paddingVertical: 0 },
   sendBtn: { width: 42, height: 42 },
-  noteCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: 24, borderWidth: StyleSheet.hairlineWidth, padding: sp.md, paddingRight: sp.lg },
-  noteArt: { width: 74, height: 74, borderRadius: 18, backgroundColor: '#F4ECDD', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  noteCard: { flexDirection: 'row', alignItems: 'center', gap: sp.md, borderRadius: 26, padding: sp.md, paddingRight: sp.lg, minHeight: 128 },
+  noteArt: { width: 100, height: 100, alignItems: 'center', justifyContent: 'center' },
 })
