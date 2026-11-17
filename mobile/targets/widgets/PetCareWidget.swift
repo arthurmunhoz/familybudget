@@ -568,6 +568,18 @@ struct PetCareWidgetView: View {
   @Environment(\.widgetContentMargins) var margins
 
   var body: some View {
+    content.widgetURL(petURL)
+  }
+
+  /// A tap outside the task buttons opens Pet Care on THIS widget's pet.
+  private var petURL: URL? {
+    guard let state = entry.state, !state.pets.isEmpty else { return URL(string: "oneroof:///pets") }
+    let primary = state.pets.first { $0.id == entry.selectedId } ?? state.pets[0]
+    return URL(string: "oneroof:///pets?pet=\(primary.id)")
+  }
+
+  @ViewBuilder
+  private var content: some View {
     if let state = entry.state, !state.pets.isEmpty {
       let primary = state.pets.first { $0.id == entry.selectedId } ?? state.pets[0]
       switch family {

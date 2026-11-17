@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { Bone, PawPrint, Pill, Plus, Scale, Stethoscope, Syringe, type LucideIcon } from 'lucide-react-native'
 import { useScreenCorner } from '@/hooks/useScreenCorner'
+import { useLinkParam } from '@/hooks/useLinkParam'
 
 import { AppHeader, Btn, Loader, Txt } from '@/components/ui'
 import { RoofExamples } from '@/components/RoofExamples'
@@ -304,6 +305,17 @@ export default function PetCare() {
       setSelectedPet(petsSorted[0].id)
     }
   }, [petsSorted, selectedPet])
+
+  // A Pet Care widget opens ITS pet (oneroof:///pets?pet=<id>).
+  const [linkPet, clearLinkPet] = useLinkParam('pet', 'pets')
+  useEffect(() => {
+    if (!linkPet || petsSorted.length === 0) return
+    if (petsSorted.some((p) => p.id === linkPet)) {
+      setSelectedPet(linkPet)
+      setSelectedDay(todayISO())
+    }
+    clearLinkPet()
+  }, [linkPet, petsSorted, clearLinkPet])
 
   const pet = selectedPet ? (petById[selectedPet] ?? null) : null
   // The pet's own colour (the same one its photo page uses) tints its cards.

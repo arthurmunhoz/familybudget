@@ -402,10 +402,12 @@ export default function MonthDetail({
   }
 
   function startScan() {
-    Alert.alert(t('detail.scanTipTitle'), t('detail.scanTipBody'), [
+    const tips = [t('detail.scanTipStore'), t('detail.scanTipTotal'), t('detail.scanTipClear')]
+    const body = `${t('detail.scanTipBody')}\n\n${tips.map((x) => `• ${x}`).join('\n')}`
+    Alert.alert(t('detail.scanTipTitle'), body, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('detail.scanTipOpen'), onPress: () => scanReceipt(true) },
-      { text: t('common.add'), onPress: () => scanReceipt(false) },
+      { text: t('bill.scanLibrary'), onPress: () => scanReceipt(false) },
     ])
   }
 

@@ -875,7 +875,11 @@ export default async function handler(req: any, res: any) {
     const lists = [...groups.values()]
       .sort((x, y) => y.items.length - x.items.length)
       .map((g) => ({ id: g.id, name: g.name, count: g.items.length, items: g.items.slice(0, 12) }))
-    return res.status(200).json({ total: (items ?? []).length, lists })
+    // `all` = every list the household has (the widget's picker), open items or not.
+    const all = ((stores ?? []) as any[])
+      .map((st) => ({ id: st.id as string, name: st.name as string }))
+      .sort((x, y) => x.name.localeCompare(y.name))
+    return res.status(200).json({ total: (items ?? []).length, lists, all })
   }
 
   // ── petcare ───────────────────────────────────────────────────────────────

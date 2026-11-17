@@ -21,8 +21,9 @@ private func lT(_ key: String, _ n: Int = 0) -> String {
   case "more": return l == "pt" ? "mais \(n)" : l == "es" ? "\(n) más" : "\(n) more"
   case "doneTitle": return l == "pt" ? "Tudo comprado" : l == "es" ? "Todo comprado" : "All bought"
   case "doneHint": return l == "pt" ? "Nada na lista" : l == "es" ? "Nada en la lista" : "Nothing on the list"
+  case "auto": return l == "pt" ? "A mais cheia" : l == "es" ? "La más llena" : "Fullest list"
   case "name": return l == "pt" ? "Listas" : l == "es" ? "Listas" : "Lists"
-  case "desc": return l == "pt" ? "O que falta comprar, para riscar daqui." : l == "es" ? "Lo que falta comprar, para tachar desde aquí." : "What's left to buy, tick it off from here."
+  case "desc": return l == "pt" ? "O que falta comprar, para riscar daqui. Segure para escolher a lista." : l == "es" ? "Lo que falta comprar, para tachar desde aquí. Mantén pulsado para elegir la lista." : "What's left to buy, tick it off from here. Hold to pick a list."
   default: return key
   }
 }
@@ -34,7 +35,13 @@ struct ListGroup: Codable, Identifiable {
   let count: Int
   let items: [ListItem]
 }
-struct ListsInfo: Codable { let total: Int; let lists: [ListGroup] }
+struct ListRef: Codable { let id: String; let name: String }
+/// `all` = every list of the household (the picker); absent from an older server.
+struct ListsInfo: Codable {
+  let total: Int
+  let lists: [ListGroup]
+  var all: [ListRef]? = nil
+}
 
 private func loadCachedLists() -> ListsInfo? {
   guard let raw = groupDefaults()?.string(forKey: "lists_widget"), let d = raw.data(using: .utf8) else { return nil }
@@ -78,16 +85,65 @@ struct CheckListItemIntent: AppIntent {
         let left = g.items.filter { $0.id != itemId }
         return g.count <= 1 ? nil : ListGroup(id: g.id, name: g.name, count: g.count - 1, items: left)
       }
-      saveCachedLists(ListsInfo(total: max(0, cur.total - 1), lists: lists))
+      saveCachedLists(ListsInfo(total: max(0, cur.total - 1), lists: lists, all: cur.all))
     }
     await fetchLists(check: itemId)
     return .result()
   }
 }
 
+// ── Which list (configurable widget) ────────────────────────────────────────
+// "auto" = the fullest list (what the widget always showed); "general" = items
+// with no list; anything else is a list id.
+private let LIST_AUTO = "auto"
+private let LIST_GENERAL = "general"
+
+struct ListEntity: AppEntity {
+  let id: String
+  let name: String
+
+  static var typeDisplayRepresentation: TypeDisplayRepresentation { "List" }
+  var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+  static var defaultQuery = ListQuery()
+}
+
+/// Lists for the "Edit Widget" picker. Never the cache alone: it can be empty
+/// exactly when iOS runs the picker (see PetCare's petsForPicker).
+private func listsForPicker() async -> [ListEntity] {
+  var info = loadCachedLists()
+  if info?.all == nil { info = await fetchLists() ?? info }
+  var out = [ListEntity(id: LIST_AUTO, name: lT("auto"))]
+  if let all = info?.all {
+    out += all.map { ListEntity(id: $0.id, name: $0.name) }
+  } else {
+    // Older server: only the lists that have something open.
+    out += (info?.lists ?? []).filter { !$0.id.isEmpty }.map { ListEntity(id: $0.id, name: $0.name ?? lT("general")) }
+  }
+  out.append(ListEntity(id: LIST_GENERAL, name: lT("general")))
+  return out
+}
+
+struct ListQuery: EntityQuery {
+  func entities(for identifiers: [String]) async throws -> [ListEntity] {
+    await listsForPicker().filter { identifiers.contains($0.id) }
+  }
+  func suggestedEntities() async throws -> [ListEntity] { await listsForPicker() }
+  func defaultResult() async -> ListEntity? { ListEntity(id: LIST_AUTO, name: lT("auto")) }
+}
+
+struct SelectListIntent: WidgetConfigurationIntent {
+  static var title: LocalizedStringResource { "Select list" }
+  static var description: IntentDescription { "Choose which list to show." }
+
+  @Parameter(title: "List") var list: ListEntity?
+  init() {}
+}
+
 struct ListsEntry: TimelineEntry {
   let date: Date
   let info: ListsInfo?
+  /// The list this widget was set to (nil = the fullest one).
+  var pick: ListEntity? = nil
 }
 
 private let sampleLists = ListsInfo(total: 8, lists: [
@@ -95,18 +151,20 @@ private let sampleLists = ListsInfo(total: 8, lists: [
   ListGroup(id: "p", name: "Pharmacy", count: 2, items: []),
 ])
 
-struct ListsProvider: TimelineProvider {
+struct ListsProvider: AppIntentTimelineProvider {
   func placeholder(in context: Context) -> ListsEntry { ListsEntry(date: Date(), info: sampleLists) }
-  func getSnapshot(in context: Context, completion: @escaping (ListsEntry) -> Void) {
-    if context.isPreview { completion(placeholder(in: context)); return }
-    completion(ListsEntry(date: Date(), info: loadCachedLists()))
+  func snapshot(for configuration: SelectListIntent, in context: Context) async -> ListsEntry {
+    if context.isPreview { return placeholder(in: context) }
+    return ListsEntry(date: Date(), info: loadCachedLists(), pick: picked(configuration))
   }
-  func getTimeline(in context: Context, completion: @escaping (Timeline<ListsEntry>) -> Void) {
-    Task {
-      let fresh = await fetchLists()
-      let e = ListsEntry(date: Date(), info: fresh ?? loadCachedLists())
-      completion(Timeline(entries: [e], policy: .after(Date().addingTimeInterval(15 * 60))))
-    }
+  func timeline(for configuration: SelectListIntent, in context: Context) async -> Timeline<ListsEntry> {
+    let fresh = await fetchLists()
+    let e = ListsEntry(date: Date(), info: fresh ?? loadCachedLists(), pick: picked(configuration))
+    return Timeline(entries: [e], policy: .after(Date().addingTimeInterval(15 * 60)))
+  }
+  private func picked(_ configuration: SelectListIntent) -> ListEntity? {
+    guard let l = configuration.list, l.id != LIST_AUTO else { return nil }
+    return l
   }
 }
 
@@ -114,8 +172,22 @@ struct ListsWidgetView: View {
   let entry: ListsEntry
   @Environment(\.widgetFamily) var family
 
-  private var first: ListGroup? { entry.info?.lists.first }
-  private var others: [ListGroup] { Array((entry.info?.lists ?? []).dropFirst()) }
+  /// The group id the widget was set to ("" = items with no list), nil = fullest.
+  private var pickId: String? { entry.pick.map { $0.id == LIST_GENERAL ? "" : $0.id } }
+  private var first: ListGroup? {
+    let lists = entry.info?.lists ?? []
+    if let pickId { return lists.first { $0.id == pickId } }
+    return lists.first
+  }
+  private var others: [ListGroup] {
+    let shown = first?.id
+    return (entry.info?.lists ?? []).filter { $0.id != shown }
+  }
+  /// A tap outside the tick circles opens THIS list in the app.
+  private var openURL: URL {
+    let id = pickId ?? first?.id ?? ""
+    return URL(string: id.isEmpty ? "oneroof:///shopping" : "oneroof:///shopping?store=\(id)")!
+  }
 
   var body: some View {
     Group {
@@ -129,7 +201,7 @@ struct ListsWidgetView: View {
         done
       }
     }
-    .widgetURL(URL(string: "oneroof:///shopping")!)
+    .widgetURL(openURL)
     .containerBackground(for: .widget) { WSoft(WG.shopping) }
   }
 
@@ -218,7 +290,7 @@ struct ListsWidgetView: View {
     VStack(spacing: 6) {
       Image(systemName: "checkmark.circle.fill").font(.system(size: 34, weight: .semibold)).foregroundStyle(wAccent(WG.shopping))
       Text(lT("doneTitle")).font(.system(size: 16, weight: .heavy, design: .rounded)).foregroundStyle(wInk())
-      Text(lT("doneHint")).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
+      Text(entry.pick?.name ?? lT("doneHint")).lineLimit(1).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(wInkSoft())
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -227,7 +299,7 @@ struct ListsWidgetView: View {
 
 struct ListsWidget: Widget {
   var body: some WidgetConfiguration {
-    StaticConfiguration(kind: LISTS_KIND, provider: ListsProvider()) { entry in
+    AppIntentConfiguration(kind: LISTS_KIND, intent: SelectListIntent.self, provider: ListsProvider()) { entry in
       ListsWidgetView(entry: entry)
     }
     .configurationDisplayName(lT("name"))

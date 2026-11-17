@@ -381,7 +381,7 @@ async function renderLists({ L, lang, info }: Ctx) {
   const first = data.lists[0]
   const max = rowsFor(info, 30, 32)
   return (
-    <Shell g={g} L={L} uri="oneroof:///shopping">
+    <Shell g={g} L={L} uri={first?.id ? `oneroof:///shopping?store=${first.id}` : 'oneroof:///shopping'}>
       <FlexWidget style={{ flexDirection: 'row', width: 'match_parent', alignItems: 'center', marginBottom: 6 }}>
         <FlexWidget style={{ flex: 1 }}>
           <Kicker text={first ? first.name ?? wt(lang, 'general') : wt(lang, 'lists')} color={a} />

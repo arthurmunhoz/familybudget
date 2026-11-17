@@ -35,6 +35,7 @@ import { ArrowUp, Check, ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, List
 import { router } from 'expo-router'
 import { GradientBox } from '@/components/home/GradientBox'
 import { useScreenCorner } from '@/hooks/useScreenCorner'
+import { useLinkParam } from '@/hooks/useLinkParam'
 import { Swipeable } from 'react-native-gesture-handler'
 import { memberColor } from '@/lib/calendar'
 
@@ -365,6 +366,14 @@ export default function ShoppingList() {
   function selectStore(id: string | null) {
     setActiveStoreId(id)
   }
+
+  // A Lists widget opens ITS list (oneroof:///shopping?store=<id>).
+  const [linkStore, clearLinkStore] = useLinkParam('store', 'shopping')
+  useEffect(() => {
+    if (!linkStore || loading) return
+    if (stores.some((s) => s.id === linkStore)) setActiveStoreId(linkStore)
+    clearLinkStore()
+  }, [linkStore, loading, stores, clearLinkStore])
 
   // If the selected store was removed, fall back to Anywhere.
   useEffect(() => {

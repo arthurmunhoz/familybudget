@@ -289,6 +289,14 @@ struct BudgetWidgetView: View {
     // appearance): the default on the soft wash is the theme's ink.
     .foregroundStyle(wInk())
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    // A tap anywhere but Scan / Add opens THIS budget's current period.
+    .widgetURL(budgetURL(entry.budget))
+  }
+
+  private func budgetURL(_ b: BudgetInfo?) -> URL? {
+    guard let b else { return URL(string: "oneroof:///budget") }
+    if let mid = b.monthId { return URL(string: "oneroof:///budget/\(b.id)/\(mid)") }
+    return URL(string: "oneroof:///budget/\(b.id)")
   }
 
   /// Spent ÷ income, 0 when nothing came in yet.
