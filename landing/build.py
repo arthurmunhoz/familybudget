@@ -20,8 +20,8 @@ PLAY = 'https://play.google.com/store/apps/details?id=one.roof.family.organizer'
 TIKTOK = 'https://www.tiktok.com/@one.roof.app'
 # Google Analytics 4 measurement ID (G-XXXXXXX) and the Search Console HTML-tag
 # token. Empty = left out of the page.
-GA_ID = ''
-GSC_TOKEN = ''
+GA_ID = 'G-W56J5QPEWQ'
+GSC_TOKEN = 'w0fLlOktfVKQIPp__9rQAWjTvj9Ot-h4h312r0FVedo'
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TODAY = datetime.date.today().isoformat()
 e = html.escape
@@ -53,8 +53,14 @@ def jsonld(L):
            'mainEntity': [{'@type': 'Question', 'name': q, 'acceptedAnswer': {'@type': 'Answer', 'text': a}} for q, a in L['faq']]}
     return json.dumps({'@context': 'https://schema.org', '@graph': [org, page, ios, android, faq]}, ensure_ascii=False, indent=1)
 
+# Vercel Web Analytics (owner, 2026-11-17): cookieless visit counts, turned on
+# in the Vercel project; the script is served by Vercel from /_vercel/insights.
+VERCEL_ANALYTICS = True
+
 def analytics():
     out = ''
+    if VERCEL_ANALYTICS:
+        out += '<script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>\n<script defer src="/_vercel/insights/script.js"></script>\n'
     if GSC_TOKEN:
         out += f'<meta name="google-site-verification" content="{GSC_TOKEN}" />\n'
     if GA_ID:

@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://getoneroof.app/</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://getoneroof.app/"/>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://getoneroof.app/pt/"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://getoneroof.app/es/"/>
@@ -10,7 +10,7 @@
   </url>
   <url>
     <loc>https://getoneroof.app/pt/</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://getoneroof.app/"/>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://getoneroof.app/pt/"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://getoneroof.app/es/"/>
@@ -18,12 +18,12 @@
   </url>
   <url>
     <loc>https://getoneroof.app/es/</loc>
-    <lastmod>2026-11-16</lastmod>
+    <lastmod>2026-11-17</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://getoneroof.app/"/>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://getoneroof.app/pt/"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://getoneroof.app/es/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://getoneroof.app/"/>
   </url>
-  <url><loc>https://getoneroof.app/privacy.html</loc><lastmod>2026-11-16</lastmod></url>
-  <url><loc>https://getoneroof.app/support.html</loc><lastmod>2026-11-16</lastmod></url>
+  <url><loc>https://getoneroof.app/privacy.html</loc><lastmod>2026-11-17</lastmod></url>
+  <url><loc>https://getoneroof.app/support.html</loc><lastmod>2026-11-17</lastmod></url>
 </urlset>

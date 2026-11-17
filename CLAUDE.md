@@ -42,7 +42,10 @@ this doc is the contract for every agent that follows you.
   `python3 landing/build.py` from `landing/landing_copy.py` + `landing.css` —
   never hand-edit the outputs. The script also writes `public/robots.txt`,
   `sitemap.xml`, `llms.txt`; `SITE`, `GA_ID` (GA4) and `GSC_TOKEN` live at its
-  top. The React app is `casa.html` (Modo Casa at `/casa`, plus `/admin`);
+  top. Since 2026-11-17 the landing has GA4 `G-W56J5QPEWQ` (property "getoneroof.app"
+  in the owner's personal Google account; ad features and signals off), the
+  Search Console tag (URL-prefix property, verified; sitemap submitted) and
+  Vercel Web Analytics (`VERCEL_ANALYTICS`, cookieless). `privacy.html` says so. The React app is `casa.html` (Modo Casa at `/casa`, plus `/admin`);
   `vercel.json`'s catch-all rewrites to `/casa.html`, and `vite.config.ts` has
   a dev middleware doing the same. The landing's inline head script sends a
   paired Modo Casa screen (`localStorage casa.device`) or the installed PWA to
