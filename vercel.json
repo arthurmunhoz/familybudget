@@ -1,10 +1,65 @@
 {
-  "rewrites": [
-    { "source": "/api/apple-connect", "destination": "/api/apple?action=connect" },
-    { "source": "/api/apple-revoke", "destination": "/api/apple?action=revoke" },
-    { "source": "/api/widget-nudge", "destination": "/api/widget?action=nudge" },
-    { "source": "/join", "destination": "/join.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.getoneroof.app"
+        }
+      ],
+      "destination": "https://getoneroof.app/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "oneroof.casa"
+        }
+      ],
+      "destination": "https://getoneroof.app/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.oneroof.casa"
+        }
+      ],
+      "destination": "https://getoneroof.app/$1",
+      "permanent": true
+    }
   ],
-  "crons": [{ "path": "/api/send-digest", "schedule": "0 11 * * *" }]
+  "rewrites": [
+    {
+      "source": "/api/apple-connect",
+      "destination": "/api/apple?action=connect"
+    },
+    {
+      "source": "/api/apple-revoke",
+      "destination": "/api/apple?action=revoke"
+    },
+    {
+      "source": "/api/widget-nudge",
+      "destination": "/api/widget?action=nudge"
+    },
+    {
+      "source": "/join",
+      "destination": "/join.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/casa.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/send-digest",
+      "schedule": "0 11 * * *"
+    }
+  ]
 }

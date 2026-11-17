@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script>/* A paired Modo Casa screen (or the installed web app) lands here at "/": send it to the app. */try{if(localStorage.getItem('casa.device')||matchMedia('(display-mode: standalone)').matches)location.replace('/casa'+location.search+location.hash)}catch(e){}</script>
+<title>One Roof — App para organizar a família: agenda, listas e orçamento</title>
+<meta name="description" content="O app para organizar a família e a casa: agenda compartilhada, lista de compras, orçamento, cuidados com pets e o Roof, um assistente de voz. Grátis no iPhone e Android." />
+<link rel="canonical" href="https://getoneroof.app/pt/" />
+<link rel="alternate" hreflang="en" href="https://getoneroof.app/" />
+<link rel="alternate" hreflang="pt-BR" href="https://getoneroof.app/pt/" />
+<link rel="alternate" hreflang="es" href="https://getoneroof.app/es/" />
+<link rel="alternate" hreflang="x-default" href="https://getoneroof.app/" />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<meta name="theme-color" content="#fbf6f0" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#1b1714" media="(prefers-color-scheme: dark)" />
+<meta name="apple-itunes-app" content="app-id=6786347512" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="One Roof" />
+<meta property="og:url" content="https://getoneroof.app/pt/" />
+<meta property="og:locale" content="pt_BR" />
+<meta property="og:title" content="One Roof — o app para organizar tudo o que a sua casa compartilha" />
+<meta property="og:description" content="O app para organizar a família e a casa: agenda compartilhada, lista de compras, orçamento, cuidados com pets e o Roof, um assistente de voz. Grátis no iPhone e Android." />
+<meta property="og:image" content="https://getoneroof.app/img/og-pt.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="One Roof — o app para organizar tudo o que a sua casa compartilha" />
+<meta name="twitter:description" content="O app para organizar a família e a casa: agenda compartilhada, lista de compras, orçamento, cuidados com pets e o Roof, um assistente de voz. Grátis no iPhone e Android." />
+<meta name="twitter:image" content="https://getoneroof.app/img/og-pt.jpg" />
+<link rel="icon" type="image/png" href="/roof-icon-192.png?v=2" />
+<link rel="apple-touch-icon" href="/roof-icon-180.png?v=2" />
+<link rel="preload" as="image" href="/img/s-pt-hero.webp" type="image/webp" fetchpriority="high" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@400;600;700&family=Caveat:wght@700&display=swap" rel="stylesheet" />
+<style>:root{--bg:#fbf6f0;--bg2:#f4ecdf;--card:#fff;--text:#2b2521;--muted:#6f645b;--accent:#b4532f;--accent-ink:#fff;--border:rgb(43 37 33/.1);--shadow:0 18px 50px rgb(74 45 25/.16);--glow1:#ffd9b8;--glow2:#ffe9c9;--dark:#1f1915;--dark-text:#f3ebe0;--dark-muted:#b9ac9d;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1714;--bg2:#241e19;--card:#262019;--text:#f3ebe0;--muted:#b3a698;--accent:#e08a6c;--accent-ink:#1b1714;--border:rgb(243 235 224/.12);--shadow:0 18px 50px rgb(0 0 0/.5);--glow1:#5a2f1c;--glow2:#3d2a18;--dark:#120f0d}}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:var(--bg);scroll-behavior:smooth;scroll-padding-top:76px}
+body{font-family:'Hanken Grotesk',system-ui,sans-serif;color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:clip}
+img{max-width:100%;height:auto;display:block}
+a{color:var(--accent)}
+.wrap{max-width:1120px;margin-inline:auto;padding-inline:20px}
+.display{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+h2.display{font-size:clamp(1.75rem,4.4vw,2.7rem);margin-bottom:12px;text-wrap:balance}
+.sub{color:var(--muted);font-size:1.08rem;max-width:40em}
+.center{text-align:center}.center .sub{margin-inline:auto}
+section{padding-block:clamp(48px,8vw,92px)}
+section.flush{padding-top:0}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+
+.ico{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tile .ico{width:24px;height:24px;color:color-mix(in srgb,var(--tint) 78%,var(--text))}
+.doc i .ico,.tools2 i .ico{width:28px;height:28px;color:#b4532f}
+/* nav */
+.nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--border)}
+.nav .wrap{display:flex;align-items:center;gap:10px;height:60px}
+@media (min-width:860px){.nav .wrap{gap:18px}}
+
+.brand{white-space:nowrap;display:flex;align-items:center;gap:9px;font-weight:700;font-size:1.05rem;color:var(--text);text-decoration:none;margin-right:auto}
+.brand img{border-radius:8px}
+.nav-links{display:none;gap:22px}
+.nav-links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:.94rem}
+.nav-links a:hover{color:var(--text)}
+.langs{display:flex;gap:2px;font-size:.8rem;font-weight:700}
+.langs a,.langs strong{padding:5px 7px;border-radius:8px;color:var(--muted);text-decoration:none}
+.langs strong{background:var(--bg2);color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:.92rem;padding:9px 16px;border-radius:999px;text-decoration:none;white-space:nowrap;transition:transform .15s}
+.btn:hover{transform:translateY(-1px)}
+@media (min-width:860px){.nav-links{display:flex}}
+
+/* hero */
+.hero{position:relative;padding:clamp(36px,6vw,72px) 0 0;overflow:clip}
+.hero::before{content:'';position:absolute;inset:-10% -20% auto;height:820px;z-index:-1;background:radial-gradient(520px 420px at 78% 38%,var(--glow1),transparent 70%),radial-gradient(460px 380px at 12% 8%,var(--glow2),transparent 70%)}
+.hero .wrap{display:grid;gap:36px;align-items:center}
+.hero-copy{text-align:center}
+.pill{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:6px 14px 6px 8px;font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:20px}
+.pill img{border-radius:6px}
+h1{font-size:clamp(2.3rem,6.4vw,4.1rem);text-wrap:balance;margin-bottom:18px}
+h1 em{font-style:normal;color:var(--accent)}
+.tagline{font-size:clamp(1.05rem,2.2vw,1.24rem);color:var(--muted);max-width:34em;margin:0 auto 26px}
+.cta-row{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
+.badge{transition:transform .15s}.badge:hover{transform:translateY(-2px)}
+.badge img{height:52px;width:auto}
+.badge.play img{height:78px;margin:-13px -10px}
+.free{margin-top:14px;font-size:.92rem;color:var(--muted)}
+.casa-link{margin-top:6px;font-size:.88rem;color:var(--muted)}
+.casa-link a{font-weight:600}
+.phone{background:#15110e;border-radius:13.5%/6.3%;padding:2.6%;box-shadow:var(--shadow),inset 0 0 0 1.5px #4a413a}
+.phone img{border-radius:11.5%/5.3%;width:100%;background:var(--bg2)}
+.hero-art{position:relative;height:clamp(380px,108vw,600px);max-width:560px;margin:0 auto;width:100%}
+.hero-art .phone{position:absolute;bottom:-12%;left:50%;width:56%}
+.hero-art .p1{translate:-50% 0;z-index:2;animation:float 7s ease-in-out infinite}
+.hero-art .p0{width:45%;translate:-124% 4%;rotate:-7deg}
+.hero-art .p2{width:45%;translate:24% 4%;rotate:7deg}
+@keyframes float{50%{transform:translateY(-10px)}}
+@media (min-width:960px){
+  .hero .wrap{grid-template-columns:1.05fr .95fr;gap:24px}
+  .hero-copy{text-align:left;padding-bottom:72px}
+  .tagline{margin-left:0}.hero .cta-row{justify-content:flex-start;margin-left:-2px}
+  .hero-art{height:640px;max-width:none}.hero-art .phone{width:50%}.hero-art .p0,.hero-art .p2{width:41%}
+}
+
+.seal{position:absolute;z-index:4;left:2%;top:4%;width:clamp(96px,22vw,128px);rotate:-10deg;filter:drop-shadow(0 12px 22px rgb(60 30 10/.3))}
+.seal .s0{fill:#c2603a}.seal .s1{fill:#fbf6f0}
+.seal text{font:700 10.5px 'Hanken Grotesk',sans-serif;letter-spacing:.06em;fill:#fff}
+.seal .star{font-size:30px;fill:#c2603a;letter-spacing:0}
+.seal .spin{transform-origin:60px 60px;animation:spin 28s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (min-width:960px){.seal{left:-2%;top:12%}}
+/* quick facts */
+.facts{padding-block:0 0;margin-top:-1px;position:relative;z-index:3}
+.facts dl{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:22px;overflow:hidden;box-shadow:var(--shadow)}
+.facts dl div{background:var(--card);padding:18px 20px}
+.facts dt{font-size:.74rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.facts dd{font-weight:700;font-size:1.02rem;line-height:1.35;margin-top:2px}
+@media (min-width:860px){.facts dl{grid-template-columns:repeat(4,1fr)}}
+
+/* feature rows */
+.rows{display:grid;gap:clamp(56px,9vw,110px);margin-top:clamp(40px,6vw,72px)}
+.row{display:grid;gap:28px;align-items:center}
+.row-art{position:relative;display:grid;place-items:center;padding:28px 0}
+.row-art::before{content:'';position:absolute;width:min(420px,92%);aspect-ratio:1;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,var(--tint) 30%,transparent),transparent)}
+.row-art::after{content:'';position:absolute;width:min(300px,70%);aspect-ratio:1;border-radius:36% 64% 58% 42%/46% 40% 60% 54%;background:color-mix(in srgb,var(--tint) 16%,transparent);rotate:-12deg}
+.row-art .phone{position:relative;z-index:1;width:min(270px,66%)}
+.snap{position:absolute;z-index:2;width:min(150px,36%);border:5px solid #fff;border-radius:20px;box-shadow:var(--shadow)}
+.snap.s1{left:max(0px,50% - 250px);bottom:7%;rotate:-8deg}
+.snap.s2{right:max(0px,50% - 250px);top:36%;rotate:7deg}
+.aib{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;letter-spacing:.06em;padding:4px 10px;border-radius:999px;color:#fff;background:linear-gradient(120deg,#7a5cf5,#e0568f 60%,#f59a3c);vertical-align:top;margin:10px 0 0 10px;list-style:none}
+.scanbox{margin-top:22px;max-width:32em;padding:18px 20px;border-radius:20px;background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(120deg,#7a5cf5,#e0568f 60%,#f59a3c) border-box;border:2px solid transparent;box-shadow:var(--shadow)}
+.scanbox .aib{margin:0 0 8px}
+.scanbox h4{font-size:1.14rem;line-height:1.3;margin-bottom:4px}
+.scanbox p{font-size:1rem}
+.scan-row .row-art{min-height:560px}
+.scan-row .row-art::before{background:radial-gradient(closest-side,rgb(255 180 70/.34),transparent)}
+.scan-row .row-art::after{display:none}
+.scan-row .phone{translate:22% 0;width:min(250px,60%)}
+.rcpt{position:absolute;z-index:2;left:max(6px,50% - 250px);top:5%;width:min(190px,50%);rotate:-6deg;filter:drop-shadow(0 22px 34px rgb(0 0 0/.35))}
+.paper{position:relative;background:#fffdf8;padding:18px 13px 30px;font:500 10px/1 'Courier New',monospace;color:#3b332d;-webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/16px 100%;mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/16px 100%}
+.paper .rh{text-align:center;font-weight:700;font-size:14px;letter-spacing:1.5px}
+.paper .rs{text-align:center;color:#8b8077;margin-top:6px}
+.paper hr{border:0;border-top:2px dashed #cfc6bd;margin:11px 0}
+.paper .ln{display:flex;justify-content:space-between;gap:8px;margin:8px 0;white-space:nowrap;overflow:hidden}
+.paper .tot{font-weight:700;font-size:14px}
+.paper .bars{height:26px;margin-top:12px;background:repeating-linear-gradient(90deg,#3b332d 0 2px,transparent 2px 4px,#3b332d 4px 5px,transparent 5px 8px)}
+.rcpt .beam{position:absolute;left:-18px;right:-18px;top:10%;height:6px;border-radius:6px;background:linear-gradient(90deg,transparent,#ffd36b 15%,#fff6dd 50%,#ffd36b 85%,transparent);box-shadow:0 0 22px 8px rgb(255 190 60/.6),0 0 60px 22px rgb(255 170 40/.3);animation:beam 2.8s ease-in-out infinite alternate}
+@keyframes beam{to{top:84%}}
+.rcpt .c{position:absolute;width:26px;height:26px;border:4px solid #ffb648}
+.rcpt .tl{top:-10px;left:-10px;border-right:0;border-bottom:0;border-radius:10px 0 0}
+.rcpt .tr{top:-10px;right:-10px;border-left:0;border-bottom:0;border-radius:0 10px 0 0}
+.rcpt .bl{bottom:-10px;left:-10px;border-right:0;border-top:0;border-radius:0 0 0 10px}
+.rcpt .br{bottom:-10px;right:-10px;border-left:0;border-top:0;border-radius:0 0 10px}
+.spark{position:absolute;z-index:3;color:#ffcf8a;font-size:26px;line-height:1;animation:twinkle 2.4s ease-in-out infinite}
+.spark.k1{left:calc(50% - 40px);top:3%}.spark.k2{left:calc(50% - 6px);top:13%;font-size:15px;animation-delay:.8s}.spark.k3{left:max(0px,50% - 262px);bottom:16%;font-size:18px;animation-delay:1.4s}
+@keyframes twinkle{50%{opacity:.25;scale:.7}}
+.result{position:absolute;z-index:3;left:max(34px,50% - 150px);bottom:3%;width:min(215px,58%);padding:14px 16px 6px;border-radius:22px;background:#fbf6f0;color:#2b2521;rotate:3deg;box-shadow:0 24px 50px rgb(0 0 0/.35)}
+.result .rf{font-size:.78rem;font-weight:700;color:#c2603a}
+.result .ra{font-size:1.9rem;font-weight:700;letter-spacing:-.02em;line-height:1.2;color:#2b2521}
+.result div{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgb(43 37 33/.12);font-size:.82rem}
+.result div span{color:#6f645b;width:5.2em;flex:none}
+.result div b{flex:1}
+.result div::after{content:'';flex:none;width:18px;height:18px;border-radius:50%;background:#1fa873 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-6.5' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
+.aiband{border-radius:clamp(24px,4vw,40px);padding:clamp(28px,5vw,56px);background:linear-gradient(var(--bg2),var(--bg2)) padding-box,linear-gradient(120deg,#7a5cf5,#e0568f 60%,#f59a3c) border-box;border:2px solid transparent}
+.aiband .eyebrow{background:linear-gradient(120deg,#7a5cf5,#e0568f 60%,#f59a3c);-webkit-background-clip:text;background-clip:text;color:transparent}
+.aiband .tile{--tint:#7a5cf5}
+.pop{position:absolute;z-index:3;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:18px;background:#fffdfa;color:#2b2521;font-weight:700;font-size:.84rem;line-height:1.25;box-shadow:0 16px 36px rgb(40 25 12/.28);white-space:nowrap;animation:bob 6s ease-in-out infinite}
+.pop small{display:block;font-weight:600;font-size:.74rem;color:#7a6f66}
+.pop.two span{display:block}
+.pop.tl{left:max(0px,50% - 255px);top:17%;rotate:-4deg}
+.pop.tr{right:max(0px,50% - 255px);top:13%;rotate:4deg;animation-delay:-2s}
+.pop.mr{right:max(0px,50% - 260px);top:47%;rotate:3deg;animation-delay:-3s}
+.pop.ml{left:max(0px,50% - 260px);top:50%;rotate:-3deg;animation-delay:-3s}
+.pop.bl{left:max(0px,50% - 255px);bottom:13%;rotate:-3deg;animation-delay:-4s}
+.pop.br{right:max(0px,50% - 250px);bottom:16%;rotate:3deg;animation-delay:-1s}
+@keyframes bob{50%{translate:0 -7px}}
+.pop.seg{padding:5px;gap:2px;border-radius:999px}
+.pop.seg span{padding:6px 12px;border-radius:999px;color:#7a6f66}
+.pop.seg .on{background:var(--tint);color:#fff}
+.pop.ev{display:block;border-left:5px solid var(--tint);border-radius:12px 18px 18px 12px}
+.pop .ic,.pop .av,.pop .orb{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;font-style:normal;font-size:1rem;background:color-mix(in srgb,var(--tint) 20%,#fff)}
+.pop .av{background:#cfeedd;color:#1f7a55}
+.pop .orb{background:linear-gradient(135deg,#8b6cff,#20c3a6);box-shadow:0 0 0 0 rgb(139 108 255/.5);animation:pulse 2s ease-out infinite}
+@keyframes pulse{to{box-shadow:0 0 0 14px rgb(139 108 255/0)}}
+.pop .hl{color:#c27a00}.pop .hl em{font-style:normal;font-weight:600;color:#8a8078;font-size:.74rem}
+.pop.q{font-weight:600;border-radius:18px 18px 18px 5px}
+.tiles{position:absolute;z-index:3;left:max(0px,50% - 262px);top:7%;display:flex;gap:5px;rotate:-6deg}
+.tiles b{display:grid;place-items:center;width:34px;height:40px;border-radius:9px;background:#fff;color:#e0453a;font-size:1.15rem;box-shadow:0 10px 22px rgb(40 25 12/.3);animation:bob 3s ease-in-out infinite}
+.tiles b:nth-child(2){animation-delay:-.6s}.tiles b:nth-child(4){animation-delay:-1.8s}
+.tiles .gap{background:rgb(255 255 255/.55);box-shadow:inset 0 -4px 0 #e0453a;animation-delay:-1.2s}
+.note{position:relative;z-index:1;width:min(290px,74%);aspect-ratio:1/1.08;padding:44px 26px 20px;background:#fff8dc;border-radius:6px 6px 26px 6px;rotate:-3deg;box-shadow:0 26px 50px rgb(40 25 12/.32);display:grid;align-content:center;justify-items:center;gap:6px;margin:34px 0}
+.note::before{content:'';position:absolute;top:-13px;left:50%;translate:-50% 0;rotate:2deg;width:96px;height:28px;background:rgb(255 255 255/.55);box-shadow:0 2px 6px rgb(0 0 0/.12)}
+.row .note p{font-family:'Caveat',cursive;font-weight:700;font-size:clamp(2.4rem,7vw,3.3rem);line-height:1;color:#2b2521;max-width:none;rotate:-4deg;white-space:nowrap}
+.note svg{width:62%;overflow:visible}
+.note .ink{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:260;stroke-dashoffset:0}
+.note .u{stroke:#2d8fe0;stroke-width:3}
+.note .h{stroke:#e0453a;stroke-width:4;animation:draw 4.5s ease-in-out infinite}
+@keyframes draw{0%{stroke-dashoffset:260}45%,100%{stroke-dashoffset:0}}
+.pop.push img{border-radius:9px}
+.pop.tools{gap:7px;border-radius:999px;padding:9px 14px}
+.pop.tools i{width:18px;height:18px;border-radius:50%}
+.pop.tools span{margin-left:6px;padding:5px 11px;border-radius:999px;background:var(--accent);color:#fff;font-size:.76rem}
+@media (max-width:520px){.pop{font-size:.74rem;padding:8px 11px}.pop small{font-size:.68rem}.pop .ic,.pop .av,.pop .orb{width:30px;height:30px}.pop.seg span{padding:5px 9px}}
+.tile{display:inline-grid;place-items:center;width:46px;height:46px;border-radius:14px;font-size:1.4rem;background:color-mix(in srgb,var(--tint) 18%,var(--card));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--tint) 30%,transparent);margin-bottom:14px}
+.row h3{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.015em;font-size:clamp(1.5rem,3.4vw,2.1rem);line-height:1.15;margin-bottom:10px}
+.row p{color:var(--muted);font-size:1.06rem;max-width:32em}
+.ticks{list-style:none;display:grid;gap:10px;margin-top:18px}
+.ticks li{position:relative;padding-left:32px;font-weight:600}
+.ticks li::before{content:'';position:absolute;left:0;top:.18em;width:21px;height:21px;border-radius:50%;background:var(--tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-6.5' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
+.ticks.say li{padding:10px 16px;background:var(--card);border:1px solid var(--border);border-radius:16px 16px 16px 4px;width:fit-content;font-weight:600}
+.ticks.say li::before{display:none}
+@media (min-width:860px){
+  .row{grid-template-columns:1fr 1fr;gap:56px}
+  .row:nth-child(odd) .row-art{order:-1}
+}
+
+/* more features */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:32px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:24px;transition:transform .2s,box-shadow .2s}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.card h3{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.card p{font-size:.96rem;color:var(--muted)}
+
+/* bento: the rest of the apps, each with its own little scene */
+.bento{display:grid;gap:18px;margin-top:32px}
+@media (min-width:860px){.bento{grid-template-columns:1fr 1fr}}
+.bcard{background:var(--card);border:1px solid var(--border);border-radius:28px;overflow:hidden;display:flex;flex-direction:column;transition:transform .2s,box-shadow .2s}
+.bcard:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.bart{position:relative;height:250px;overflow:hidden;background:radial-gradient(120% 90% at 80% 0%,color-mix(in srgb,var(--tint) 34%,transparent),transparent 70%),color-mix(in srgb,var(--tint) 10%,var(--bg2))}
+.bbody{padding:22px 24px 26px}
+.bbody .tile{margin-bottom:10px}
+.bbody h3{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:1.45rem;letter-spacing:-.015em;line-height:1.2;margin-bottom:4px}
+.bbody p{color:var(--muted)}
+.bbody .ticks{margin-top:14px;gap:8px}.bbody .ticks li{font-size:.95rem}
+.bart .peek{position:absolute;right:6%;top:20px;width:214px;rotate:4deg}
+.chips2{position:absolute;z-index:2;left:6%;top:50%;translate:0 -50%;display:grid;gap:9px;justify-items:start}
+.chip2{padding:9px 14px;border-radius:14px;background:#fffdfa;color:#2b2521;font-weight:700;font-size:.86rem;box-shadow:0 10px 24px rgb(40 25 12/.22);white-space:nowrap}
+.chip2.hot{background:#e0453a;color:#fff}
+.chip2.seen{background:color-mix(in srgb,var(--tint) 18%,#fffdfa);font-weight:600;font-size:.78rem}
+.fan{position:absolute;inset:0}
+.doc{position:absolute;left:50%;top:44px;width:150px;height:186px;margin-left:-75px;padding:16px 14px;border-radius:16px;background:#fffdfa;color:#2b2521;box-shadow:0 14px 30px rgb(40 25 12/.25);display:grid;align-content:start;gap:8px}
+.doc i{font-style:normal;font-size:1.7rem}.doc b{font-size:.84rem;line-height:1.2}
+.doc u{height:7px;border-radius:4px;background:#e4dcd2}.doc u:last-child{width:60%}
+.doc.d0{translate:-120px 12px;rotate:-10deg}.doc.d1{z-index:1}.doc.d2{translate:120px 12px;rotate:10deg}
+.chip2.lock{position:absolute;z-index:2;left:50%;bottom:16px;translate:-50% 0;background:#2b2521;color:#fff}
+.tools2{position:absolute;inset:22px 22px auto;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.tools2 div{padding:14px 10px;border-radius:18px;background:#fffdfa;color:#2b2521;box-shadow:0 8px 20px rgb(40 25 12/.16);display:grid;gap:6px;justify-items:center;text-align:center}
+.tools2 i{font-style:normal;font-size:1.6rem}.tools2 b{font-size:.78rem;line-height:1.2}
+.pcard{position:absolute;left:50%;top:26px;translate:-50% 0;rotate:-2deg;width:min(270px,84%);padding:16px 18px 8px;border-radius:22px;background:#fffdfa;color:#2b2521;box-shadow:0 16px 34px rgb(40 25 12/.25)}
+.pcard .who{display:flex;align-items:center;gap:10px;padding-bottom:10px}
+.pcard .who i{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#cfeedd;color:#1f7a55;font-style:normal;font-weight:700}
+.pcard .who b{font-size:1.1rem}
+.pcard div+div{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid rgb(43 37 33/.1);font-size:.88rem}
+.pcard span{color:#6f645b}
+.wg{position:absolute;inset:0;display:flex;gap:12px;align-items:center;justify-content:center;padding:0 14px}
+.wg .w{flex:0 1 150px;aspect-ratio:1;padding:13px;border-radius:24px;background:#fffdfa;color:#2b2521;box-shadow:0 14px 30px rgb(40 25 12/.24);display:grid;align-content:start;gap:7px;font-size:.76rem;overflow:hidden}
+.wg small{font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a8078;font-size:.64rem}
+.wg .w1 b{padding:6px 8px;border-radius:9px;background:#ffe3e6;border-left:4px solid #ef5a6f;line-height:1.2}
+.wg .w1 b+b{background:#dff3ea;border-color:#1fa873}
+.wg .w2 span{padding:7px 8px;border-radius:10px;background:#f1edff;font-weight:700;text-align:center;line-height:1.2}
+.wg .w3 b{position:relative;padding-left:22px;line-height:1.5}
+.wg .w3 b::before{content:'';position:absolute;left:0;top:2px;width:15px;height:15px;border-radius:50%;border:2px solid #c9bfb4}
+.wg .w3 .ok{text-decoration:line-through;color:#8a8078}.wg .w3 .ok::before{background:#f2793d;border-color:#f2793d}
+.wg .w1{rotate:-4deg}.wg .w3{rotate:4deg}
+@media (max-width:520px){.bart .peek{width:150px;right:4%}.chip2{font-size:.76rem;padding:7px 11px}.doc{width:122px;height:160px;margin-left:-61px}.doc.d0{translate:-88px 12px}.doc.d2{translate:88px 12px}.tools2{inset:16px 14px auto;gap:8px}.tools2 div{padding:11px 6px}.wg{gap:8px}.wg .w{padding:10px;font-size:.68rem}}
+/* casa */
+.casa{background:var(--dark);color:var(--dark-text);border-radius:clamp(24px,4vw,40px);padding:clamp(28px,5vw,64px);display:grid;gap:32px;align-items:center;overflow:hidden;position:relative}
+.casa::before{content:'';position:absolute;inset:auto -10% -40% 30%;height:420px;background:radial-gradient(closest-side,rgb(224 138 108/.28),transparent)}
+.casa>*{position:relative}
+.casa .eyebrow{color:#f0a184}
+.casa p{color:var(--dark-muted);font-size:1.06rem;max-width:30em}
+.casa .btn{margin-top:22px;background:#f3ebe0;color:#1f1915}
+.screen{border-radius:14px;overflow:hidden;box-shadow:0 30px 70px rgb(0 0 0/.55),0 0 0 1px rgb(255 255 255/.12)}
+.screen-bar{display:flex;gap:6px;padding:9px 12px;background:#2c2622}
+.screen-bar i{width:9px;height:9px;border-radius:50%;background:#5b5048}
+@media (min-width:900px){.casa{grid-template-columns:.8fr 1.2fr}}
+
+/* how */
+.steps{display:grid;gap:16px;margin-top:36px;counter-reset:s;list-style:none}
+.steps li{counter-increment:s;background:var(--card);border:1px solid var(--border);border-radius:22px;padding:26px 24px;text-align:left}
+.steps li::before{content:counter(s);display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:1.2rem;margin-bottom:14px}
+.steps h3{font-size:1.14rem;margin-bottom:4px}
+.steps p{color:var(--muted)}
+@media (min-width:800px){.steps{grid-template-columns:repeat(3,1fr)}}
+
+/* compare */
+.band{background:var(--bg2)}
+.table-wrap{margin-top:32px;border:1px solid var(--border);border-radius:22px;background:var(--card);overflow:hidden;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:.98rem}
+th,td{text-align:left;padding:16px 20px;border-bottom:1px solid var(--border);vertical-align:top}
+thead th{font-size:.76rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+tbody tr:last-child>*{border-bottom:0}
+td:nth-child(2){color:var(--muted)}
+th:last-child,td:last-child{background:color-mix(in srgb,var(--accent) 9%,var(--card));font-weight:700}
+thead th:last-child{color:var(--accent)}
+.fine{font-size:.78rem;color:var(--muted);margin-top:14px}
+@media (max-width:640px){
+  thead{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+  tr{display:block;padding:16px 18px;border-bottom:1px solid var(--border)}tbody tr:last-child{border-bottom:0}
+  th,td{display:block;padding:0;border:0}
+  tbody th{font-size:1.05rem;margin-bottom:6px}
+  td::before{content:attr(data-l);display:block;font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+  td:last-child{margin-top:10px;padding:10px 12px;border-radius:12px}
+  td:last-child::before{margin-top:0;color:var(--accent)}
+  th:last-child{background:none}
+}
+
+/* privacy */
+.privacy{text-align:center}.privacy .sub{margin-inline:auto}
+.chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:22px 0 18px;list-style:none}
+.chips li{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:9px 18px;font-weight:700}
+.chips li::before{content:'';width:9px;height:9px;border-radius:50%;background:#2fa56f}
+
+/* faq */
+.faq-grid{display:grid;gap:28px}
+.faq{display:grid;gap:10px}
+details{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:2px 20px}
+details[open]{box-shadow:var(--shadow)}
+summary{cursor:pointer;list-style:none;padding:16px 0;display:flex;justify-content:space-between;align-items:center;gap:14px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:'+';flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--bg2);font-size:1.2rem;line-height:1;color:var(--text);transition:rotate .2s}
+details[open] summary::after{rotate:45deg}
+summary h3{font-size:1.05rem;font-weight:700}
+details p{color:var(--muted);padding-bottom:18px;max-width:46em}
+@media (min-width:900px){.faq-grid{grid-template-columns:.7fr 1.3fr;gap:56px}.faq-grid>div:first-child{position:sticky;top:96px;align-self:start}}
+
+/* story + cta */
+.story{max-width:780px}
+.story p{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:clamp(1.2rem,2.6vw,1.6rem);line-height:1.45;letter-spacing:-.01em}
+.final{background:linear-gradient(135deg,#c2603a,#8f3d20);color:#fff;border-radius:clamp(24px,4vw,40px);padding:clamp(36px,6vw,72px) 24px;text-align:center;position:relative;overflow:hidden}
+.final::before{content:'';position:absolute;inset:-40% 50% auto -10%;height:400px;background:radial-gradient(closest-side,rgb(255 220 180/.35),transparent)}
+.final>*{position:relative}
+.final img.icon{width:76px;height:76px;border-radius:19px;margin:0 auto 20px;box-shadow:0 10px 30px rgb(0 0 0/.25)}
+.final .free{color:rgb(255 255 255/.85)}
+.final .cta-row{margin-top:26px}
+footer{padding:36px 0 48px;text-align:center;color:var(--muted);font-size:.9rem}
+footer p+p{margin-top:8px}
+footer a{color:var(--muted)}
+
+/* Roof carousel: one group of three per app, sliding every few seconds, faded at both edges */
+.row>div{min-width:0}
+.says{margin-top:20px;overflow:hidden;-webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.says ul{display:flex;list-style:none;margin-left:10%;animation:says 36s cubic-bezier(.6,0,.3,1) infinite}
+.says:hover ul{animation-play-state:paused}
+.says li{flex:0 0 80%;display:grid;gap:9px;align-content:start;justify-items:start;padding:0 10px}
+.says b{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.says q{quotes:'“' '”';padding:10px 16px;background:var(--card);border:1px solid var(--border);border-radius:16px 16px 16px 4px;font-weight:600;font-size:.98rem;line-height:1.35}
+@keyframes says{0.00%,10.00%{transform:translateX(-80%)}12.50%,22.50%{transform:translateX(-160%)}25.00%,35.00%{transform:translateX(-240%)}37.50%,47.50%{transform:translateX(-320%)}50.00%,60.00%{transform:translateX(-400%)}62.50%,72.50%{transform:translateX(-480%)}75.00%,85.00%{transform:translateX(-560%)}87.50%,97.50%{transform:translateX(-640%)}100%{transform:translateX(-720%)}}
+@media (prefers-reduced-motion:reduce){.says{overflow-x:auto}.says ul{transform:translateX(-80%)}}
+/* motion: scroll reveal where supported, no JS */
+@media (prefers-reduced-motion:no-preference){@supports (animation-timeline:view()){
+  .row,.card,.bcard,.steps li,.casa,.table-wrap,.final{animation:rise linear both;animation-timeline:view();animation-range:entry 0% entry 38%}
+  @keyframes rise{from{opacity:0;transform:translateY(36px)}}
+}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+@media (max-width:440px){.brand span{display:none}.pill{display:none}}
+</style>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "Organization",
+   "@id": "https://getoneroof.app/#org",
+   "name": "One Roof",
+   "url": "https://getoneroof.app/",
+   "logo": "https://getoneroof.app/roof-icon-512.png",
+   "sameAs": [
+    "https://apps.apple.com/app/id6786347512",
+    "https://play.google.com/store/apps/details?id=one.roof.family.organizer",
+    "https://www.tiktok.com/@one.roof.app"
+   ],
+   "email": "one.roof.family.organizer@gmail.com"
+  },
+  {
+   "@type": "WebPage",
+   "@id": "https://getoneroof.app/pt/",
+   "url": "https://getoneroof.app/pt/",
+   "name": "One Roof — App para organizar a família: agenda, listas e orçamento",
+   "description": "O app para organizar a família e a casa: agenda compartilhada, lista de compras, orçamento, cuidados com pets e o Roof, um assistente de voz. Grátis no iPhone e Android.",
+   "inLanguage": "pt-BR",
+   "isPartOf": {
+    "@type": "WebSite",
+    "@id": "https://getoneroof.app/#site",
+    "name": "One Roof",
+    "url": "https://getoneroof.app/"
+   },
+   "about": [
+    {
+     "@id": "https://getoneroof.app/#ios"
+    },
+    {
+     "@id": "https://getoneroof.app/#android"
+    }
+   ],
+   "primaryImageOfPage": "https://getoneroof.app/img/og-pt.jpg",
+   "dateModified": "2026-11-16"
+  },
+  {
+   "@type": "MobileApplication",
+   "@id": "https://getoneroof.app/#ios",
+   "name": "One Roof",
+   "applicationCategory": "LifestyleApplication",
+   "description": "O app para organizar a família e a casa: agenda compartilhada, lista de compras, orçamento, cuidados com pets e o Roof, um assistente de voz. Grátis no iPhone e Android.",
+   "inLanguage": [
+    "en",
+    "es",
+    "pt-BR"
+   ],
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "publisher": {
+    "@id": "https://getoneroof.app/#org"
+   },
+   "image": "https://getoneroof.app/roof-icon-512.png",
+   "screenshot": [
+    "https://getoneroof.app/img/s-pt-hero.webp",
+    "https://getoneroof.app/img/s-pt-calendar.webp",
+    "https://getoneroof.app/img/s-pt-lists.webp",
+    "https://getoneroof.app/img/s-pt-money.webp"
+   ],
+   "featureList": [
+    "Agenda familiar compartilhada",
+    "Lista de compras e do mercado",
+    "Orçamento da casa",
+    "Roof, o assistente de voz",
+    "Cuidados com os pets",
+    "Jogos em família",
+    "Avisos",
+    "Localização (iPhone)",
+    "Documentos",
+    "Modo Casa",
+    "Utilidades",
+    "Perfis da família",
+    "Recados à mão",
+    "Widgets na tela de início"
+   ],
+   "operatingSystem": "iOS",
+   "url": "https://apps.apple.com/app/id6786347512",
+   "installUrl": "https://apps.apple.com/app/id6786347512"
+  },
+  {
+   "@type": "MobileApplication",
+   "@id": "https://getoneroof.app/#android",
+   "name": "One Roof",
+   "applicationCategory": "LifestyleApplication",
+   "description": "O app para organizar a família e a casa: agenda compartilhada, lista de compras, orçamento, cuidados com pets e o Roof, um assistente de voz. Grátis no iPhone e Android.",
+   "inLanguage": [
+    "en",
+    "es",
+    "pt-BR"
+   ],
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "publisher": {
+    "@id": "https://getoneroof.app/#org"
+   },
+   "image": "https://getoneroof.app/roof-icon-512.png",
+   "screenshot": [
+    "https://getoneroof.app/img/s-pt-hero.webp",
+    "https://getoneroof.app/img/s-pt-calendar.webp",
+    "https://getoneroof.app/img/s-pt-lists.webp",
+    "https://getoneroof.app/img/s-pt-money.webp"
+   ],
+   "featureList": [
+    "Agenda familiar compartilhada",
+    "Lista de compras e do mercado",
+    "Orçamento da casa",
+    "Roof, o assistente de voz",
+    "Cuidados com os pets",
+    "Jogos em família",
+    "Avisos",
+    "Localização (iPhone)",
+    "Documentos",
+    "Modo Casa",
+    "Utilidades",
+    "Perfis da família",
+    "Recados à mão",
+    "Widgets na tela de início"
+   ],
+   "operatingSystem": "Android",
+   "url": "https://play.google.com/store/apps/details?id=one.roof.family.organizer",
+   "installUrl": "https://play.google.com/store/apps/details?id=one.roof.family.organizer"
+  },
+  {
+   "@type": "FAQPage",
+   "@id": "https://getoneroof.app/pt/#faq",
+   "inLanguage": "pt-BR",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "O que é o One Roof?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "O One Roof é um app para organizar a família que reúne a agenda compartilhada, a lista de compras, o orçamento, os cuidados com os pets, os documentos e os avisos do dia a dia da casa num só lugar. Todos da casa veem as mesmas informações, sincronizadas, no iPhone e no Android."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Qual é o melhor app de família para a casa inteira?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "O melhor app de família é aquele que todo mundo em casa realmente abre. O One Roof é feito para isso: agenda compartilhada, lista de compras, orçamento da casa, cuidados com pets, documentos, avisos e o Roof, um assistente de voz, sincronizados em todos os celulares. É grátis para baixar no iPhone e no Android."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "O One Roof é grátis?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Sim, o One Roof é grátis para baixar e usar, e toda casa nova ganha 30 dias de One Roof Plus inclusos, sem cartão. Depois disso, no plano grátis, alguns recursos têm limite de uso, como os pedidos ao Roof e a leitura de recibos. O One Roof Plus é uma assinatura opcional que tira esses limites e traz sincronização com o Google Agenda, vários orçamentos e mais — e uma assinatura cobre a casa inteira, nunca por pessoa."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "O One Roof é uma boa alternativa ao Cozi, TimeTree ou FamilyWall?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Sim. O One Roof faz num app só as principais coisas para as quais as famílias usam esses apps: agenda familiar compartilhada (Cozi, TimeTree), lista de compras (AnyList), mapa da família (Life360) e orçamento da casa, mais cuidados com pets, documentos e o Roof, um assistente de voz. É grátis para baixar e usar, uma assinatura opcional cobre a casa inteira em vez de cobrar por pessoa, e não precisa comprar nenhum aparelho: o Modo Casa roda em qualquer tablet, notebook ou navegador de TV que você já tem."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Preciso comprar um aparelho como o Skylight Calendar para ter uma tela da família em casa?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Não. O Modo Casa transforma um tablet, notebook ou navegador de TV que você já tem na tela inicial da família, com agenda, listas, pets e fotos. Você pareia pelo app em poucos segundos."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "O One Roof funciona no Android?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Sim. O One Roof está na App Store e no Google Play, com widgets da tela de início nos dois. Dois recursos ainda são só do iPhone: Localização (o mapa da família) e a sincronização com o Calendário da Apple."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Dá para dividir o orçamento com o meu parceiro ou parceira?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Sim. Os orçamentos são compartilhados com todos da casa, por mês, semana ou dia, com categorias que vocês controlam. O Plus também permite orçamentos privados que só você vê."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "A lista de compras sincroniza entre os celulares?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Sim. Os itens aparecem no celular de todos assim que são adicionados, organizados por loja. Dá para adicionar sem sinal e as mudanças sobem quando a conexão volta."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "O que é o Roof?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "O Roof é o assistente de voz do One Roof. Diga \"Oi Casa\" e peça com as suas palavras para adicionar à lista, lançar um gasto, ver ou mudar compromissos na agenda ou mandar um aviso para a família. Ele mostra o que mudou e deixa desfazer."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "O One Roof usa IA?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Sim. O Roof, o assistente de voz, entende pedidos com as suas palavras e faz por você. No Dinheiro, você fotografa um recibo e a IA preenche o valor, a data e a categoria. No Plus, também dá para dividir uma conta por item a partir de uma foto."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "O que é o Modo Casa?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "O Modo Casa transforma um tablet, notebook ou navegador da TV numa tela inicial da família com agenda, listas, dinheiro e fotos. Você pareia pelo app em poucos segundos."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Os dados da minha família ficam privados?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Sim. O One Roof não tem anúncios nem rastreamento e não vende dados. As informações de cada casa ficam isoladas no banco de dados e só os membros dela veem."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Em quais idiomas o One Roof funciona?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Português, espanhol e inglês."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
+</head>
+<body>
+<nav class="nav" aria-label="One Roof">
+  <div class="wrap">
+    <a class="brand" href="/pt/"><img src="/roof-icon-192.png?v=2" alt="" width="30" height="30" /> <span>One Roof</span></a>
+    <span class="nav-links"><a href="#features">Recursos</a><a href="#compare">Comparar</a><a href="#faq">Dúvidas</a></span>
+    <span class="langs"><a href="/" hreflang="en" lang="en" title="English">EN</a><strong aria-current="page">PT</strong><a href="/es/" hreflang="es" lang="es" title="Español">ES</a></span>
+    <a class="btn" href="#download">Baixar o app</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <p class="pill"><img src="/roof-icon-192.png?v=2" alt="" width="22" height="22" /> App para organizar a família · iPhone e Android</p>
+      <h1 class="display">O app para organizar a família e <em>tudo o que a casa compartilha</em></h1>
+      <p class="tagline">Agenda familiar compartilhada, lista de compras, orçamento da casa, cuidados com os pets e o Roof — um assistente de voz que faz por você. Um app para a casa inteira, sincronizado em todos os celulares.</p>
+      <div class="cta-row">
+    <a href="https://apps.apple.com/app/id6786347512" class="badge" rel="noopener"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" width="156" height="52" /></a>
+    <a href="https://play.google.com/store/apps/details?id=one.roof.family.organizer&hl=pt_BR" class="badge play" rel="noopener"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/pt-br_badge_web_generic.png" alt="Get it on Google Play" width="201" height="78" /></a>
+  </div>
+      <p class="free">Grátis para baixar · 30 dias de Plus inclusos, sem cartão</p>
+      <p class="casa-link">Configurando o Modo Casa nesta tela? <a href="/casa">Abrir o Modo Casa →</a></p>
+    </div>
+    <div class="hero-art">
+      <svg class="seal" viewBox="0 0 120 120" role="img" aria-label="One Roof: feito para ser o melhor app de família"><defs><path id="ring" d="M60 60m-43 0a43 43 0 1 1 86 0a43 43 0 1 1-86 0" /></defs>
+        <circle cx="60" cy="60" r="58" class="s0" /><circle cx="60" cy="60" r="30" class="s1" />
+        <g class="spin"><text><textPath href="#ring" textLength="268">FEITO PARA SER O MELHOR APP DE FAMÍLIA · </textPath></text></g>
+        <text x="60" y="71" text-anchor="middle" class="star">★</text></svg>
+      <div class="phone p0"><img src="/img/s-pt-pets.webp" alt="" width="600" height="1304" loading="lazy" decoding="async" /></div>
+      <div class="phone p1"><img src="/img/s-pt-hero.webp" alt="Tela inicial do One Roof: a agenda da família de hoje e os apps da casa" width="600" height="1304" fetchpriority="high" decoding="async" /></div>
+      <div class="phone p2"><img src="/img/s-pt-money.webp" alt="" width="600" height="1304" loading="lazy" decoding="async" /></div>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="facts" aria-label="O One Roof em resumo">
+  <div class="wrap"><dl><div><dt>Preço</dt><dd>Grátis · Plus opcional, um plano por casa</dd></div><div><dt>Funciona em</dt><dd>iPhone e Android</dd></div><div><dt>Idiomas</dt><dd>Português, espanhol e inglês</dd></div><div><dt>Privacidade</dt><dd>Sem anúncios, sem rastreamento</dd></div></dl></div>
+</section>
+
+<section class="wrap" id="features">
+  <div class="center">
+    <h2 class="display">Tudo o que um app de família deveria fazer, num só lugar</h2>
+    <p class="sub">Abra um app, não cinco. Todo mundo em casa vê a mesma agenda, as mesmas listas e o mesmo orçamento — ao vivo, em todos os celulares.</p>
+  </div>
+  <div class="rows">
+<article class="row" id="calendar" style="--tint:#ef5a6f">
+  <div><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg></span>
+    <h3>Agenda familiar compartilhada</h3>
+    <p>Uma agenda que a família inteira vê.</p>
+    <ul class="ticks"><li>Visões de dia, semana e mês, com cor por pessoa</li><li>Aniversários, datas especiais e lembretes</li><li>Sincroniza com o Calendário da Apple no iPhone e, no Plus, nos dois sentidos com o Google Agenda</li></ul></div>
+  <div class="row-art"><div class="phone "><img src="/img/s-pt-calendar.webp" alt="Agenda familiar compartilhada no One Roof" width="600" height="1304" loading="lazy" decoding="async" /></div><div class="pop tr seg" aria-hidden="true"><span>Dia</span><span>Semana</span><span class=on>Mês</span></div><div class="pop mr ev" aria-hidden="true"><b>Veterinário · Lola</b><small>Hoje · 16:30</small></div><div class="pop bl two" aria-hidden="true"><i class="ic"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></i><span><b>Sincroniza nos dois sentidos</b><small>Google e Apple Calendar</small></span></div></div>
+</article>
+<article class="row" id="lists" style="--tint:#f0a020">
+  <div><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg></span>
+    <h3>Lista de compras e do mercado</h3>
+    <p>Adicione um item e ele aparece no celular de todos.</p>
+    <ul class="ticks"><li>Mercado organizado por loja, mais tarefas, uma viagem, a escola</li><li>Ao vivo em todos os celulares da casa</li><li>Dá para adicionar sem sinal; sincroniza quando a conexão volta</li></ul></div>
+  <div class="row-art"><div class="phone "><img src="/img/s-pt-lists.webp" alt="Lista de compras compartilhada no One Roof, organizada por loja" width="600" height="1304" loading="lazy" decoding="async" /></div><div class="pop tr" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> Mercado · Tarefas · Viagens · Escola</div><div class="pop bl two slide" aria-hidden="true"><i class="av">S</i><span><small>Sam adicionou em Tarefas</small><b class="hl">Dobrar a roupa <em>· agora</em></b></span></div></div>
+</article>
+<article class="row scan-row" id="budget" style="--tint:#1fa873">
+  <div><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span><span class="aib"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> IA</span>
+    <h3>Orçamento da casa</h3>
+    <p>Saiba o que entrou, o que saiu e para onde foi.</p>
+    <ul class="ticks"><li>Orçamentos compartilhados por mês, semana ou dia</li><li>Categorias que vocês controlam</li></ul><div class="scanbox"><span class="aib"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> IA</span><h4>Escaneie o recibo e pule a digitação</h4><p>Fotografe um recibo e a IA lê para você: o valor, a data e a categoria se preenchem sozinhos.</p></div></div>
+  <div class="row-art"><div class="phone "><img src="/img/s-pt-money.webp" alt="Orçamento da casa no One Roof" width="600" height="1304" loading="lazy" decoding="async" /></div><div class="rcpt" role="img" aria-label="Um recibo sendo escaneado"><div class="paper" aria-hidden="true"><div class="rh">CORNER MARKET</div><div class="rs">14/11 · 10:42</div><hr /><div class="ln"><span>MORANGOS</span><span>4,99</span></div><div class="ln"><span>PÃO DE FERMENTAÇÃO</span><span>5,49</span></div><div class="ln"><span>PETISCO DE CACHORRO</span><span>8,99</span></div><div class="ln"><span>SORVETE</span><span>6,29</span></div><div class="ln"><span>BANANAS</span><span>1,47</span></div><div class="ln"><span>CAFÉ MOÍDO</span><span>9,99</span></div><hr /><div class="ln tot"><span>TOTAL</span><span>54,46</span></div><div class="bars"></div></div><i class="beam"></i><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i></div><span class="spark k1" aria-hidden="true">✦</span><span class="spark k2" aria-hidden="true">✦</span><span class="spark k3" aria-hidden="true">✦</span><div class="result" aria-hidden="true"><p class="rf"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> Preenchido para você</p><p class="ra">R$ 54,46</p><div><span>Categoria</span><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg> Mercado</b></div><div><span>Data</span><b>14/11</b></div></div></div>
+</article>
+<article class="row" id="roof" style="--tint:#6d63f5">
+  <div><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></span><span class="aib"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> IA</span>
+    <h3>Roof, o assistente de voz</h3>
+    <p>Diga &quot;Oi Casa&quot; e peça com as suas palavras. O Roof faz e mostra o que mudou, com Desfazer.</p>
+    <div class="says" role="group" aria-label="Coisas que você pode pedir ao Roof"><ul><li aria-hidden="true"><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg> Utilidades</b><q>Divide 58,71 em 3</q><q>Qual compensa: 2 litros por 8 ou 3 litros por 11?</q><q>Quanto fica 80 com 30% de desconto?</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg> Listas</b><q>Põe leite e ovos na lista</q><q>Já comprei o leite</q><q>O que tem na lista do mercado?</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg> Agenda</b><q>O que tem amanhã pra todos?</q><q>Muda o dentista para segunda às 10h</q><q>Quais são os próximos aniversários?</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg> Dinheiro</b><q>Gastei 50 no mercado</q><q>Quanto gastei com mercado este mês?</q><q>Recebi 3.000 de salário</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> Pets</b><q>O que os pets precisam hoje?</q><q>Quando é a próxima vacina?</q><q>Já dei a comida da manhã</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg> Família</b><q>Qual o número do sapato de Sam?</q><q>Quando é o aniversário de Sam?</q><q>Qual o tipo sanguíneo de Sam?</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="8" height="5" x="14" y="17" rx="1"/><path d="M10 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v2.5"/><path d="M20 17v-2a2 2 0 1 0-4 0v2"/></svg> Documentos</b><q>Abre o passaporte de Sam</q><q>Mostra o seguro do carro</q><q>Abre a carteira de vacinação</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg> Avisos</b><q>Avisa todo mundo que o jantar está pronto</q><q>Avisa Sam que chego às 19h</q></li><li><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg> Utilidades</b><q>Divide 58,71 em 3</q><q>Qual compensa: 2 litros por 8 ou 3 litros por 11?</q><q>Quanto fica 80 com 30% de desconto?</q></li><li aria-hidden="true"><b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg> Listas</b><q>Põe leite e ovos na lista</q><q>Já comprei o leite</q><q>O que tem na lista do mercado?</q></li></ul></div></div>
+  <div class="row-art"><div class="phone "><img src="/img/s-pt-roof.webp" alt="Roof, o assistente de voz do One Roof, respondendo sobre a rotina do pet" width="600" height="1304" loading="lazy" decoding="async" /></div><div class="pop tl q" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> &quot;Muda o dentista pra segunda&quot;</div><div class="pop mr q" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> &quot;Avisa que o jantar está pronto&quot;</div><div class="pop bl two" aria-hidden="true"><i class="orb"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></i><span><b>Fale ou digite</b><small>do seu jeito</small></span></div></div>
+</article>
+<article class="row" id="pets" style="--tint:#f2793d">
+  <div><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg></span>
+    <h3>Cuidados com os pets</h3>
+    <p>Uma rotina diária compartilhada, para ninguém dar comida ao cachorro duas vezes.</p>
+    <ul class="ticks"><li>Rotina diária com horários, marcada uma vez para todos</li><li>Veterinário e vacinas num histórico só</li><li>Lembrete antes da próxima</li></ul></div>
+  <div class="row-art"><div class="phone "><img src="/img/s-pt-pets.webp" alt="Cuidados com os pets no One Roof: rotina diária, veterinário e vacinas" width="600" height="1304" loading="lazy" decoding="async" /></div><img class="snap s1" src="/img/pet-park.webp" alt="Uma cachorrinha branca sentada na grama ao lado de uma bolinha de tênis" width="440" height="550" loading="lazy" decoding="async" /><img class="snap s2" src="/img/pet-beach.webp" alt="A mesma cachorrinha numa canga na praia, perto da água" width="440" height="550" loading="lazy" decoding="async" /></div>
+</article>
+<article class="row" id="games" style="--tint:#f2645a">
+  <div><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg></span>
+    <h3>Jogos em família</h3>
+    <p>Noite de jogos, em cada celular.</p>
+    <ul class="ticks"><li>Forca: adivinhe a palavra antes de a casa ficar pronta</li><li>Batalha Naval em times</li><li>Um quiz com campainha para a família toda</li></ul></div>
+  <div class="row-art"><div class="phone "><img src="/img/s-en-games.webp" alt="Jogos em família no One Roof: Forca, Batalha Naval e quiz com campainha" width="600" height="1304" loading="lazy" decoding="async" /></div><div class="pop tr" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Desafios de Forca</div><div class="pop ml" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Batalha naval em times</div><div class="pop br" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978"/><path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978"/><path d="M18 9h1.5a1 1 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6 9H4.5a1 1 0 0 1 0-5H6"/></svg> Perguntas &amp; Tortadas</div><div class="tiles" aria-hidden="true"><b>R</b><b>O</b><b class="gap"></b><b>F</b></div></div>
+</article>
+<article class="row" id="notes" style="--tint:#d99a00">
+  <div><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span>
+    <h3>Recados à mão</h3>
+    <p>Escreva ou desenhe com o dedo e mande para a família.</p>
+    <ul class="ticks"><li>Escolha a cor e a espessura da caneta</li><li>Envie para uma pessoa ou para todos</li><li>Os recados que você guarda ficam no seu mural</li></ul></div>
+  <div class="row-art"><div class="note" role="img" aria-label="Um recado escrito à mão que diz: Volto às 7"><p aria-hidden="true">Volto às 7!</p><svg viewBox="0 0 120 60" aria-hidden="true"><path class="ink u" d="M8 12c18-8 36 6 54-2s30-4 50 0" /><path class="ink h" d="M60 54C30 36 34 16 48 16c7 0 11 5 12 9 1-4 5-9 12-9 14 0 18 20-12 38z" /></svg></div><div class="pop tr two push" aria-hidden="true"><img src="/roof-icon-192.png?v=2" alt="" width="34" height="34" loading="lazy" /><span><b>Sam desenhou um recado <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></b><small>Toque para ver</small></span></div><div class="pop bl tools" aria-hidden="true"><i style="background:#2b2521"></i><i style="background:#e0453a"></i><i style="background:#2d8fe0"></i><i style="background:#1fa873"></i><span>Enviar para todos <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></span></div></div>
+</article>
+  </div>
+</section>
+
+<section class="wrap flush" id="ai">
+  <div class="aiband">
+    <p class="eyebrow"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg> IA</p>
+    <h2 class="display">IA que digita por você</h2>
+    <p class="sub">O One Roof usa IA onde ela poupa trabalho de verdade, não como enfeite.</p>
+    <div class="grid"><article class="card"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></span><h3>Roof, o assistente com IA</h3><p>Peça com as suas palavras. O Roof adiciona à lista, lança um gasto ou consulta a agenda, e mostra o que mudou, com Desfazer.</p></article><article class="card"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span><h3>Leitura de recibo com IA</h3><p>Fotografe um recibo e o valor, a data e a categoria se preenchem sozinhos.</p></article><article class="card"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></span><h3>Divida a conta por foto</h3><p>Tire uma foto da conta e a IA divide por item. No Plus.</p></article></div>
+  </div>
+</section>
+
+<section class="wrap flush" id="modo-casa">
+  <div class="casa">
+    <div>
+      <p class="eyebrow">Para a cozinha, o corredor, a TV</p>
+      <h2 class="display">Modo Casa</h2>
+      <p>Transforme um tablet ou notebook parado na tela inicial da família: agenda, listas, dinheiro e fotos num relance.</p>
+      <a class="btn" href="/casa">Abrir o Modo Casa →</a>
+    </div>
+    <div class="screen"><div class="screen-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="/img/casa-web.webp" alt="Modo Casa: a tela inicial da família num notebook, com agenda, listas e pets" width="1600" height="1000" loading="lazy" decoding="async" /></div>
+  </div>
+</section>
+
+<section class="wrap" id="more">
+  <h2 class="display">E o resto da vida em família</h2>
+  <p class="sub">Coisas menores que antes ficavam em grupos de mensagem, gavetas e capturas de tela.</p>
+  <div class="bento">
+<article class="bcard" id="nudges" style="--tint:#ef5a6f"><div class="bart"><div class="chips2"><span class="chip2 hot"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/></svg> Preciso de ajuda</span><span class="chip2 ">Tô indo</span><span class="chip2 ">Comida pronta</span><span class="chip2 ">Pensando em você</span><span class="chip2 seen"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> visto por Sam</span></div><div class="phone peek"><img src="/img/s-pt-nudges.webp" alt="Avisos no One Roof: recados rápidos para a família" width="600" height="1304" loading="lazy" decoding="async" /></div></div><div class="bbody"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg></span><h3>Avisos</h3><p>Um toque avisa. Todo mundo vê.</p><ul class="ticks"><li>Avisos rápidos, ou escreva o seu</li><li>Veja quem já leu</li><li>Um aviso urgente vem com botão de ligar</li><li>Envie direto do widget da tela de início</li></ul></div></article>
+<article class="bcard" id="map" style="--tint:#2d8fe0"><div class="bart"><div class="chips2"><span class="chip2 "><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg> Alertas de chegada e saída</span><span class="chip2 seen"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Desligado por padrão</span></div><div class="phone peek"><img src="/img/s-pt-map.webp" alt="Localização no One Roof: o mapa privado da família" width="600" height="1304" loading="lazy" decoding="async" /></div></div><div class="bbody"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span><h3>Localização (iPhone)</h3><p>Um mapa privado da família, só para a sua casa.</p><ul class="ticks"><li>Localização ao vivo, desligada por padrão</li><li>Alertas de chegada e saída nos lugares que você escolher</li><li>Raio de segurança para passeios</li></ul></div></article>
+<article class="bcard" id="docs" style="--tint:#7a8699"><div class="bart"><div class="fan" aria-hidden="true"><div class="doc d0"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 13a3 3 0 1 0-6 0"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><circle cx="12" cy="8" r="2"/></svg></i><b>Passaporte</b><u></u><u></u></div><div class="doc d1"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></i><b>Seguro do carro</b><u></u><u></u></div><div class="doc d2"><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 10h2"/><path d="M16 14h2"/><path d="M6.17 15a3 3 0 0 1 5.66 0"/><circle cx="9" cy="11" r="2"/><rect x="2" y="5" width="20" height="14" rx="2"/></svg></i><b>CNH</b><u></u><u></u></div><span class="chip2 lock"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Com trava · Plus</span></div></div><div class="bbody"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="8" height="5" x="14" y="17" rx="1"/><path d="M10 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v2.5"/><path d="M20 17v-2a2 2 0 1 0-4 0v2"/></svg></span><h3>Documentos</h3><p>RG, seguros e registros guardados juntos.</p><ul class="ticks"><li>Escaneie com a câmera ou envie um arquivo</li><li>Prévia de PDF</li><li>Trava por rosto ou digital no Plus</li><li>Peça ao Roof: &quot;Abre o passaporte do Sam&quot;</li></ul></div></article>
+<article class="bcard" id="tools" style="--tint:#1fa873"><div class="bart"><div class="tools2" aria-hidden="true"><div><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="6" r="1"/><line x1="5" x2="19" y1="12" y2="12"/><circle cx="12" cy="18" r="1"/></svg></i><b>Dividir igualmente</b></div><div><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></i><b>Dividir por item</b></div><div><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg></i><b>Melhor preço</b></div><div><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></i><b>Desconto</b></div><div><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2"/><path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14"/><path d="M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg></i><b>Etiqueta de bagagem</b></div><div><i><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></i><b>Porta-retrato</b></div></div></div><div class="bbody"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg></span><h3>Utilidades</h3><p>Pequenas ferramentas para as contas do dia a dia.</p><ul class="ticks"><li>Divida a conta por igual, ou por item a partir de uma foto (Plus)</li><li>Compare preços por unidade e calcule descontos</li><li>Imprima etiquetas de bagagem</li><li>Transforme um tablet parado num porta-retrato da família</li></ul></div></article>
+<article class="bcard" id="family" style="--tint:#f0a020"><div class="bart"><div class="pcard" aria-hidden="true"><div class="who"><i>S</i><b>Sam</b></div><div><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/><path d="M7 4h.01"/><path d="M12 4h.01"/><path d="M17 4h.01"/></svg> Aniversário</span><b>12 mar</b></div><div><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg> Calçado</span><b>38</b></div><div><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg> Tipo sanguíneo</span><b>O+</b></div></div></div><div class="bbody"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span><h3>Perfis da família</h3><p>Os dados de cada um num cartão.</p><ul class="ticks"><li>Aniversários e telefones</li><li>Tamanhos de roupa e calçado</li><li>Tipo sanguíneo e alergias</li></ul></div></article>
+<article class="bcard" id="widgets" style="--tint:#6d63f5"><div class="bart"><div class="wg" aria-hidden="true"><div class="w w1"><small>Hoje</small><b>Veterinário</b><b>Treino de futebol</b></div><div class="w w2"><small>Avisos</small><span>Tô indo</span><span>Comida pronta</span></div><div class="w w3"><small>Pets</small><b class="ok">Café da manhã</b><b>Jantar</b></div></div></div><div class="bbody"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span><h3>Widgets na tela de início</h3><p>O dia num relance, sem abrir o app.</p><ul class="ticks"><li>Hoje, Avisos, Pets, Recados e Listas</li><li>No iPhone e no Android</li></ul></div></article>
+  </div>
+</section>
+
+<section class="band" id="compare">
+  <div class="wrap">
+    <h2 class="display">Usando Cozi, TimeTree, AnyList e Life360 ao mesmo tempo?</h2>
+    <p class="sub">A maioria das casas acaba com um app para a agenda, outro para o mercado, outro para a localização e uma planilha para o dinheiro. O One Roof junta tudo debaixo do mesmo teto — um convite para todos, um plano por casa.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th scope="col">O que a família precisa</th><th scope="col">O que muita gente usa</th><th scope="col">No One Roof</th></tr></thead>
+      <tbody>
+<tr><th scope="row">Agenda familiar compartilhada</th><td data-l="O que muita gente usa">Cozi, TimeTree, Google Agenda</td><td data-l="No One Roof">Agenda com sincronização com o Google (Plus)</td></tr>
+<tr><th scope="row">Lista de compras</th><td data-l="O que muita gente usa">AnyList, OurGroceries, app de notas</td><td data-l="No One Roof">Listas por loja, ao vivo em todos os celulares</td></tr>
+<tr><th scope="row">Localização da família</th><td data-l="O que muita gente usa">Life360, Buscar</td><td data-l="No One Roof">Localização (iPhone, opcional)</td></tr>
+<tr><th scope="row">Orçamento da casa</th><td data-l="O que muita gente usa">Planilha ou app de finanças</td><td data-l="No One Roof">Dinheiro, com leitura de recibos</td></tr>
+<tr><th scope="row">Agenda da família numa tela em casa</th><td data-l="O que muita gente usa">Skylight Calendar, calendário de parede</td><td data-l="No One Roof">Modo Casa em qualquer tablet, notebook ou TV que você já tem</td></tr>
+<tr><th scope="row">Central da família</th><td data-l="O que muita gente usa">FamilyWall, grupo de WhatsApp</td><td data-l="No One Roof">Tudo isso, mais pets, documentos e o Roof</td></tr>
+      </tbody>
+    </table></div>
+    <p class="fine">Cozi, TimeTree, AnyList, OurGroceries, Life360, Buscar, FamilyWall, Skylight, Google Agenda e WhatsApp são marcas de seus respectivos donos. O One Roof não tem afiliação nem endosso deles.</p>
+  </div>
+</section>
+
+<section class="wrap center" id="how">
+  <h2 class="display">Como o One Roof funciona</h2>
+  <ol class="steps"><li><h3>Baixe o One Roof</h3><p>Grátis na App Store e no Google Play.</p></li><li><h3>Crie a sua casa</h3><p>A agenda, as listas e o orçamento começam ali.</p></li><li><h3>Convide a família</h3><p>Um convite para todos. Eles veem a mesma agenda, as mesmas listas e o mesmo orçamento, sincronizados.</p></li></ol>
+</section>
+
+<section class="band privacy" id="privacy">
+  <div class="wrap">
+    <h2 class="display">Os dados da sua família não são o produto</h2>
+    <ul class="chips"><li>Sem anúncios</li><li>Sem rastreamento</li><li>Não vendemos seus dados</li></ul>
+    <p class="sub">As informações de cada casa ficam isoladas no banco de dados, visíveis só para os membros dela.</p>
+  </div>
+</section>
+
+<section class="wrap" id="faq">
+  <div class="faq-grid">
+    <div><h2 class="display">Perguntas frequentes</h2></div>
+    <div class="faq">
+<details open><summary><h3>O que é o One Roof?</h3></summary><p>O One Roof é um app para organizar a família que reúne a agenda compartilhada, a lista de compras, o orçamento, os cuidados com os pets, os documentos e os avisos do dia a dia da casa num só lugar. Todos da casa veem as mesmas informações, sincronizadas, no iPhone e no Android.</p></details>
+<details><summary><h3>Qual é o melhor app de família para a casa inteira?</h3></summary><p>O melhor app de família é aquele que todo mundo em casa realmente abre. O One Roof é feito para isso: agenda compartilhada, lista de compras, orçamento da casa, cuidados com pets, documentos, avisos e o Roof, um assistente de voz, sincronizados em todos os celulares. É grátis para baixar no iPhone e no Android.</p></details>
+<details><summary><h3>O One Roof é grátis?</h3></summary><p>Sim, o One Roof é grátis para baixar e usar, e toda casa nova ganha 30 dias de One Roof Plus inclusos, sem cartão. Depois disso, no plano grátis, alguns recursos têm limite de uso, como os pedidos ao Roof e a leitura de recibos. O One Roof Plus é uma assinatura opcional que tira esses limites e traz sincronização com o Google Agenda, vários orçamentos e mais — e uma assinatura cobre a casa inteira, nunca por pessoa.</p></details>
+<details><summary><h3>O One Roof é uma boa alternativa ao Cozi, TimeTree ou FamilyWall?</h3></summary><p>Sim. O One Roof faz num app só as principais coisas para as quais as famílias usam esses apps: agenda familiar compartilhada (Cozi, TimeTree), lista de compras (AnyList), mapa da família (Life360) e orçamento da casa, mais cuidados com pets, documentos e o Roof, um assistente de voz. É grátis para baixar e usar, uma assinatura opcional cobre a casa inteira em vez de cobrar por pessoa, e não precisa comprar nenhum aparelho: o Modo Casa roda em qualquer tablet, notebook ou navegador de TV que você já tem.</p></details>
+<details><summary><h3>Preciso comprar um aparelho como o Skylight Calendar para ter uma tela da família em casa?</h3></summary><p>Não. O Modo Casa transforma um tablet, notebook ou navegador de TV que você já tem na tela inicial da família, com agenda, listas, pets e fotos. Você pareia pelo app em poucos segundos.</p></details>
+<details><summary><h3>O One Roof funciona no Android?</h3></summary><p>Sim. O One Roof está na App Store e no Google Play, com widgets da tela de início nos dois. Dois recursos ainda são só do iPhone: Localização (o mapa da família) e a sincronização com o Calendário da Apple.</p></details>
+<details><summary><h3>Dá para dividir o orçamento com o meu parceiro ou parceira?</h3></summary><p>Sim. Os orçamentos são compartilhados com todos da casa, por mês, semana ou dia, com categorias que vocês controlam. O Plus também permite orçamentos privados que só você vê.</p></details>
+<details><summary><h3>A lista de compras sincroniza entre os celulares?</h3></summary><p>Sim. Os itens aparecem no celular de todos assim que são adicionados, organizados por loja. Dá para adicionar sem sinal e as mudanças sobem quando a conexão volta.</p></details>
+<details><summary><h3>O que é o Roof?</h3></summary><p>O Roof é o assistente de voz do One Roof. Diga &quot;Oi Casa&quot; e peça com as suas palavras para adicionar à lista, lançar um gasto, ver ou mudar compromissos na agenda ou mandar um aviso para a família. Ele mostra o que mudou e deixa desfazer.</p></details>
+<details><summary><h3>O One Roof usa IA?</h3></summary><p>Sim. O Roof, o assistente de voz, entende pedidos com as suas palavras e faz por você. No Dinheiro, você fotografa um recibo e a IA preenche o valor, a data e a categoria. No Plus, também dá para dividir uma conta por item a partir de uma foto.</p></details>
+<details><summary><h3>O que é o Modo Casa?</h3></summary><p>O Modo Casa transforma um tablet, notebook ou navegador da TV numa tela inicial da família com agenda, listas, dinheiro e fotos. Você pareia pelo app em poucos segundos.</p></details>
+<details><summary><h3>Os dados da minha família ficam privados?</h3></summary><p>Sim. O One Roof não tem anúncios nem rastreamento e não vende dados. As informações de cada casa ficam isoladas no banco de dados e só os membros dela veem.</p></details>
+<details><summary><h3>Em quais idiomas o One Roof funciona?</h3></summary><p>Português, espanhol e inglês.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="wrap flush" id="story">
+  <div class="story">
+    <p class="eyebrow">Por que criamos o One Roof</p>
+    <p>Um caderno de papel no balcão da cozinha para as compras. E-mails do veterinário e recibos do banco como prontuário dos cachorros. &quot;Você deu comida para os cachorros?&quot; duas vezes por dia. O One Roof substituiu tudo isso — feito por um desenvolvedor mobile em Tampa, na Flórida, primeiro para a própria casa (ele, a esposa e os dois cachorros), e compartilhado quando realmente pegou.</p>
+  </div>
+</section>
+
+<section class="wrap flush" id="download">
+  <div class="final">
+    <img class="icon" src="/roof-icon-192.png?v=2" alt="One Roof app icon" width="76" height="76" loading="lazy" />
+    <h2 class="display">Coloque a casa inteira debaixo do mesmo teto</h2>
+    <div class="cta-row">
+    <a href="https://apps.apple.com/app/id6786347512" class="badge" rel="noopener"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" width="156" height="52" /></a>
+    <a href="https://play.google.com/store/apps/details?id=one.roof.family.organizer&hl=pt_BR" class="badge play" rel="noopener"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/pt-br_badge_web_generic.png" alt="Get it on Google Play" width="201" height="78" /></a>
+  </div>
+    <p class="free">Grátis para baixar · 30 dias de Plus inclusos, sem cartão</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><a href="/" hreflang="en" lang="en">English</a> · <strong>Português</strong> · <a href="/es/" hreflang="es" lang="es">Español</a></p>
+    <p><a href="/privacy.html">Privacidade</a> · <a href="/support.html">Suporte</a> · <a href="https://apps.apple.com/app/id6786347512">App Store</a> · <a href="https://play.google.com/store/apps/details?id=one.roof.family.organizer">Google Play</a> · <a href="https://www.tiktok.com/@one.roof.app">TikTok</a></p>
+    <p>One Roof · feito com <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/></svg> em Tampa, FL</p>
+  </div>
+</footer>
+</body>
+</html>

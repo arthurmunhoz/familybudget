@@ -3,7 +3,7 @@
   "name": "One Roof",
   "short_name": "One Roof",
   "description": "Everything your family runs on — budget, shopping, pets, and documents under one roof",
-  "start_url": "/",
+  "start_url": "/casa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

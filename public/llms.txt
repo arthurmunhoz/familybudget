@@ -1,0 +1,73 @@
+# One Roof
+
+> One Roof is a family organizer app that keeps a household's shared calendar, shopping lists, budget, pet care, documents and everyday messages in one place. Everyone in the household sees the same information, in sync, on iPhone and Android.
+
+- Website: https://getoneroof.app/ (also in Portuguese: https://getoneroof.app/pt/ and Spanish: https://getoneroof.app/es/)
+- App Store (iPhone): https://apps.apple.com/app/id6786347512
+- Google Play (Android): https://play.google.com/store/apps/details?id=one.roof.family.organizer
+- Price: free to download; One Roof Plus is an optional subscription per household. Every new household gets 30 days of Plus included, no card needed; after that, on the free plan, some features have usage limits.
+- Languages: English, Spanish, Portuguese.
+- Made by an independent developer in Tampa, Florida, USA.
+
+## Features
+- **Shared family calendar**: Day, week and month views, color-coded by person, with birthdays, anniversaries and reminders. Syncs with Apple Calendar on iPhone, and two-way with Google Calendar on Plus.
+- **Shopping & grocery lists**: Groceries by store, chores, a trip, school. Add an item and it appears on everyone's phone — keep adding with no signal; it syncs when you're back online.
+- **Household budget**: Shared budgets by month, week or day, with your own categories. Photograph a receipt and the amount, date and category fill themselves in.
+- **Roof, the voice assistant**: Say "Hey Roof": "milk and eggs on the list", "I spent 50 at the supermarket", "what's on tomorrow?". Roof does it and shows what changed, with Undo.
+- **Pet care**: A shared daily routine with times, so nobody feeds the dog twice. Vet visits and vaccines, with a reminder before the next one is due.
+- **Family games**: Hangman challenges, Battleship and a buzzer quiz — each person playing on their own phone.
+- **Nudges**: One tap for "on my way" or "dinner's ready", and see who has read it. An urgent nudge carries a call button, and you can send one straight from the Home Screen widget.
+- **Whereabouts (iPhone)**: A private family map with live locations and arrive/leave alerts for places you choose. Off by default, visible only to your household.
+- **Documents**: IDs, insurance and registrations kept together, with PDF previews — and a face or fingerprint lock on Plus.
+- **Home Mode**: Turn a spare tablet or laptop into the family's home screen: agenda, lists, money and photos at a glance.
+- **Utilities**: Split a bill (by item from a photo, on Plus), compare unit prices, work out a discount, print luggage tags, and run a family photo frame.
+- **Family profiles**: Everyone's details on one card: birthdays, phone numbers, clothing and shoe sizes, blood types.
+- **Hand-drawn notes**: Write or draw a note with your finger and send it to one person or the whole family. The ones you keep stay on your wall.
+- **Home Screen widgets**: Today, Nudges, Pet care, Notes and Lists on your Home Screen, on iPhone and Android.
+
+## How it compares
+Families often combine several apps: Cozi or TimeTree for a shared calendar, AnyList or OurGroceries for groceries, Life360 for location and a spreadsheet for the budget. One Roof combines a shared calendar, shopping lists, a household budget with receipt scanning, pet care, documents, nudges, family games, a voice assistant (Roof) and, on iPhone, a private family map, in one app with one plan per household. One Roof is not affiliated with those products.
+
+## FAQ
+### What is One Roof?
+One Roof is a family organizer app that keeps a household's shared calendar, shopping lists, budget, pet care, documents and everyday messages in one place. Everyone in the household sees the same information, in sync, on iPhone and Android.
+
+### What is the best family app for a whole household?
+The best family app is the one everyone at home actually opens. One Roof is made for that: one shared calendar, shopping lists, a household budget, pet care, documents, nudges and Roof, a voice assistant, in sync on every phone. It is free to download on iPhone and Android.
+
+### Is One Roof free?
+Yes, One Roof is free to download and use, and every new household gets 30 days of One Roof Plus included, with no card needed. After that, on the free plan, some features have usage limits, such as Roof requests and receipt scans. One Roof Plus is an optional subscription that removes those limits and adds two-way Google Calendar sync, multiple budgets and more — and one subscription covers the whole household, never per person.
+
+### Is One Roof a good alternative to Cozi, TimeTree or FamilyWall?
+Yes. One Roof does in a single app the main things families use those apps for: a shared family calendar (Cozi, TimeTree), grocery and shopping lists (AnyList), a family map (Life360) and a household budget, plus pet care, documents and Roof, a voice assistant. It is free to download and use, one optional subscription covers the whole household instead of charging per person, and there is no extra device to buy: Home Mode runs on any tablet, laptop or TV browser you already have.
+
+### Do I need to buy a device like a Skylight Calendar to have a family screen at home?
+No. Home Mode turns a spare tablet, laptop or TV browser you already own into the family's home screen, with the agenda, lists, pets and photos. You pair it from the app in a few seconds.
+
+### Does One Roof work on Android?
+Yes. One Roof is on the App Store and Google Play, with Home Screen widgets on both. Two features are iPhone-only for now: Whereabouts (the family map) and Apple Calendar sync.
+
+### Can my partner and I share a budget?
+Yes. Budgets are shared with everyone in the household by default, by month, week or day, with categories you control. Plus also allows private budgets only you can see.
+
+### Does the shopping list sync between phones?
+Yes. Items appear on everyone's phone as soon as they are added, organized by store. You can keep adding with no signal and the changes upload once you're back online.
+
+### What is Roof?
+Roof is One Roof's voice assistant. Say "Hey Roof" and ask in your own words to add to a list, log an expense, check or move calendar events, or send a message to the family. It shows what it changed and lets you undo it.
+
+### Does One Roof use AI?
+Yes. Roof, the voice assistant, understands requests in your own words and does them for you. In Money, you photograph a receipt and AI fills in the amount, date and category. On Plus, a bill can also be split by item from a photo.
+
+### What is Home Mode?
+Home Mode turns a spare tablet, laptop or TV browser into a shared family home screen with the agenda, lists, money and photos. Pair it from the app in a few seconds.
+
+### Is my family's data private?
+Yes. One Roof has no ads and no tracking, and does not sell data. Each household's information is isolated at the database level and visible only to its members.
+
+### Which languages does One Roof support?
+English, Spanish and Portuguese.
+
+## Pages
+- [Privacy policy](https://getoneroof.app/privacy.html)
+- [Support](https://getoneroof.app/support.html)

@@ -1,0 +1,9 @@
+# One Roof — search engines and AI assistants are welcome on the public pages.
+User-agent: *
+Allow: /
+Disallow: /casa
+Disallow: /admin
+Disallow: /join
+Disallow: /api/
+
+Sitemap: https://getoneroof.app/sitemap.xml

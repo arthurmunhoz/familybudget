@@ -11,8 +11,11 @@
 
 // v4: the manifest + icon set are cached here cache-first, so the Android icon
 // work (maskable icons, shortcuts) only reaches installed users on a bump.
-const CACHE = 'one-roof-shell-v5'
-const SHELL = '/index.html'
+// v6: the React app moved to /casa.html (/, /pt/, /es/ are now the static
+// marketing landing) — the landing must never be cached as the app shell.
+const CACHE = 'one-roof-shell-v6'
+const SHELL = '/casa.html'
+const LANDING = new Set(['/', '/index.html', '/pt', '/pt/', '/es', '/es/'])
 
 self.addEventListener('install', (event) => {
   // Activate immediately so a freshly-registered worker can receive pushes
@@ -48,6 +51,8 @@ self.addEventListener('fetch', (event) => {
 
   // Navigations → network-first, fall back to the cached shell offline.
   if (req.mode === 'navigate') {
+    // The landing pages are plain static HTML: straight to the network.
+    if (LANDING.has(url.pathname)) return
     event.respondWith(
       (async () => {
         try {
@@ -57,7 +62,7 @@ self.addEventListener('fetch', (event) => {
           return fresh
         } catch {
           const cache = await caches.open(CACHE)
-          return (await cache.match(SHELL)) || (await cache.match('/')) || Response.error()
+          return (await cache.match(SHELL)) || Response.error()
         }
       })(),
     )
@@ -97,7 +102,7 @@ self.addEventListener('push', (event) => {
     // indistinct blob in the status bar.
     badge: '/roof-badge-96.png',
     tag: payload.tag || 'one-roof-digest',
-    data: { url: payload.url || '/', tel: payload.tel || null },
+    data: { url: payload.url || '/casa', tel: payload.tel || null },
   }
   // A "Call" action when the sender has a phone on file. NOTE: action buttons
   // are ignored by iOS web-push today; the in-app Call button is the fallback.
@@ -124,7 +129,7 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(self.clients.openWindow(`tel:${data.tel}`))
     return
   }
-  const url = data.url || '/'
+  const url = data.url || '/casa'
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
