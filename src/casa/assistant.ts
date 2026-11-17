@@ -110,6 +110,8 @@ export interface PendingMoney {
 }
 
 export interface AskEnv {
+  /** How this request was made (for the admin's gap list). */
+  via: () => 'voice' | 'typed'
   /** Money is unlocked on this device right now (the PIN was typed). */
   unlocked: boolean
   t: T
@@ -155,6 +157,9 @@ async function buildContext(env: AskEnv, text: string) {
       (o, i) => `v${i + 1} = ${o.event.title} · ${o.start}${o.event.start_time ? ` ${o.event.start_time.slice(0, 5)}` : ''}${o.event.owner_email ? ` · ${nameOf(o.event.owner_email)}` : ''}`,
     ),
     documents: [] as string[],
+    // Context for a request Roof can't do (migration 119): codes only.
+    where: 'casa',
+    via: env.via(),
     me: env.me.name,
     history: env.history.slice(-6),
   }

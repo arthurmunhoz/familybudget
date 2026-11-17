@@ -110,7 +110,7 @@ export default function Roof({
   useEffect(() => openCb.current?.(open), [open])
 
   const envRef = useRef<AskEnv | null>(null)
-  envRef.current = { t, lang, today, data, me, unlocked, history: history.current, refresh }
+  envRef.current = { t, lang, today, data, me, unlocked, history: history.current, refresh, via: () => (viaVoice.current ? 'voice' : 'typed') }
   // What Roof last showed: "sim" / "o segundo" / "desfaz isso" answer IT.
   const lastDone = useRef<Done | null>(null)
   const pendingPick = useRef<Extract<Outcome, { kind: 'pick' }> | null>(null)
