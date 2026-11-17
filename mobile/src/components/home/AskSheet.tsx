@@ -80,6 +80,7 @@ import {
 import type { TKey } from '@/lib/i18n'
 import { CHIME_MS, playChime, useVoice, voiceSupported } from '@/lib/voice'
 import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
+import { track } from '@/lib/analytics'
 import { isGoodbye, meaningfulRequest } from '@/lib/roofWake'
 import { clockAsk, isNo, isRepeatAsk, isYes, pickByVoice } from '@/lib/assistantTalk'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
@@ -108,6 +109,7 @@ import { isCapabilitiesAsk, nextTip, type Tip } from './roofTips'
 import { ListeningBars } from './ListeningBars'
 import {
   actMore,
+  moneyOverview,
   eventWho,
   moveAnswer,
   recurrenceLabel,
@@ -171,7 +173,7 @@ type Answer =
   | { kind: 'moved'; ev: CalendarEvent; before: CalendarEvent; undone: boolean }
   | { kind: 'removedEvent'; ev: CalendarEvent; undone: boolean }
   | { kind: 'money'; res: Extract<MoneyResult, { ok: true }>; type: 'expense' | 'income'; amount: number; title: string; undone: boolean }
-  | { kind: 'summary'; lines: MoneyLine[] }
+  | { kind: 'summary'; lines: MoneyLine[]; head?: string }
   | { kind: 'nudge'; message: string; to: Profile | null; sent: boolean; sending: boolean; emoji: string; urgent: boolean; pingKind: string }
   | ActionAnswer
   | { kind: 'pets'; p: PetsAnswer }
@@ -183,6 +185,9 @@ type Answer =
   | { kind: 'capabilities' }
   | { kind: 'unknown'; text: string }
   | { kind: 'error' }
+
+/** A finished turn of the conversation. */
+type Turn = { q: string; a: string; card?: Answer }
 
 /** The context the sheet loads for the model (see loadContext). */
 interface Loaded {
@@ -286,13 +291,16 @@ export function AskSheet({
   // screen as the question + a one-line account of the answer, and the same
   // lines go to Claude as context — so "o que tem no Walmart?" → "tira o
   // leite" works. Kept in a ref too: submit() reads it right after a commit.
-  const [past, setPast] = useState<{ q: string; a: string }[]>([])
-  const pastRef = useRef<{ q: string; a: string }[]>([])
+  // `card`: the first result of a two-task request keeps its FULL card (Undo
+  // and all) up in the conversation until the next new request (owner,
+  // 2026-11-17: a wrong add must be removable right there).
+  const [past, setPast] = useState<Turn[]>([])
+  const pastRef = useRef<Turn[]>([])
   const inputRef = useRef<TextInput>(null)
   const scrollRef = useRef<ScrollView>(null)
   // The recogniser's callback is created before submit() exists; it reaches
   // the latest one through this ref (refreshed after every render).
-  const submitRef = useRef<((q?: string) => Promise<void>) | null>(null)
+  const submitRef = useRef<((q?: string, chain?: boolean) => Promise<void>) | null>(null)
   // Voice: speak, watch the words appear, and the final transcript is sent.
   const canVoice = voiceSupported()
   // The household's own words, handed to the recogniser as hints.
@@ -574,16 +582,20 @@ export function AskSheet({
       case 'money':
         return undone(t(a.type === 'income' ? 'ask.sumMoneyIncome' : 'ask.sumMoney', { title: a.title, amount: formatMoney(a.amount) }), a.undone)
       case 'summary':
-        return a.lines
-          .map((l) =>
-            t('ask.sumMoneyLine', {
-              // The period goes in the history, so "and the month before?" knows where it was.
-              budget: l.month ? `${l.budget.name} (${periodLabel(l.budget.period, l.month.start_date)})` : l.budget.name,
-              income: formatMoney(l.income),
-              spent: formatMoney(l.spent),
-            }),
-          )
-          .join('; ')
+        return (
+          (a.head ? `${a.head}. ` : '') +
+          a.lines
+            .map(
+              (l) =>
+                `${t('ask.sumMoneyLine', {
+                  // The period goes in the history, so "and the month before?" knows where it was.
+                  budget: l.month ? `${l.budget.name} (${periodLabel(l.budget.period, l.month.start_date)})` : l.budget.name,
+                  income: formatMoney(l.income),
+                  spent: formatMoney(l.spent),
+                })}, ${t('ask.sumBalance', { amount: formatMoney(l.income - l.spent) })}`,
+            )
+            .join('; ')
+        )
       case 'nudge':
         return t('ask.sumNudge', { to: a.to?.display_name.split(' ')[0] ?? t('ask.everyoneLower'), message: a.message })
       case 'pets': {
@@ -696,7 +708,7 @@ export function AskSheet({
 
   function commitTurn() {
     if (query && answer) {
-      pastRef.current = [...pastRef.current, { q: query, a: summarize(answer) }].slice(-8)
+      pastRef.current = [...pastRef.current.map(({ q, a }) => ({ q, a })), { q: query, a: summarize(answer) }].slice(-8)
       setPast(pastRef.current)
     }
     setQuery('')
@@ -711,7 +723,12 @@ export function AskSheet({
     setAnswer(null)
   }
 
-  async function submit(raw?: string) {
+  /** `chain`: the second task of one request ("…e marca dentista sexta"). The
+   *  first answer STAYS on screen with "now: <second task>" under it while
+   *  this one is worked out, then moves up into the conversation and this
+   *  answer shows below it (owner, 2026-11-17: the first result was replaced
+   *  before it could be read). */
+  async function submit(raw?: string, chain = false) {
     const q = (raw ?? text).trim()
     if (!q || busy) return
     turnSeq.current++
@@ -723,8 +740,16 @@ export function AskSheet({
     // What was on screen when this was said: "sim" / "o segundo" answer IT.
     const prev = lastAnswer.current
     const replying = awaiting(prev) && (isYes(q) || isNo(q))
-    commitTurn()
-    setQuery(q)
+    const held = chain && !!query && !!answer
+    if (held) {
+      // In the history the model sees now; on screen only when this one lands.
+      const first = lastAnswer.current ?? answer!
+      pastRef.current = [...pastRef.current, { q: query, a: summarize(first), card: first }].slice(-8)
+      setChainQ(q)
+    } else {
+      commitTurn()
+      setQuery(q)
+    }
     setText('')
     // "Obrigado" / "até mais" — the end of the conversation: answer here
     // (nothing sent, nothing spent), say it, then close instead of listening
@@ -750,13 +775,32 @@ export function AskSheet({
       })
       return
     }
-    setAnswer(null)
+    if (!held) setAnswer(null)
     setBusy(true)
     try {
       // "What can you do?" — the capabilities screen, right here (instant,
       // nothing sent or spent).
       thenRef.current = ''
-      const a: Answer = (await answerHere(q, prev)) ?? (isCapabilitiesAsk(q) ? { kind: 'capabilities' } : await understandAndAct(q))
+      // What this request turned out to be, for the usage count (never the words).
+      askedRef.current = 'reply'
+      const here = await answerHere(q, prev)
+      if (!here && isCapabilitiesAsk(q)) askedRef.current = 'capabilities'
+      const a: Answer = here ?? (isCapabilitiesAsk(q) ? { kind: 'capabilities' } : await understandAndAct(q))
+      track('roof.asked', {
+        intent: askedRef.current,
+        via: viaVoice.current ? 'voice' : 'typed',
+        where: 'phone',
+        ok: a.kind !== 'error' && a.kind !== 'unknown' && askedRef.current !== 'unknown' && askedRef.current !== 'none',
+        chained: chain,
+      })
+      if (held) {
+        // The first result gets at least a few seconds on screen in full.
+        const wait = 3000 - (Date.now() - shownAt.current)
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+        setPast(pastRef.current)
+        setQuery(q)
+        setChainQ('')
+      }
       setAnswer(a)
       // A second task said in the same breath ("…e marca dentista sexta"): asked
       // next, as its own request — unless this answer is itself a question.
@@ -776,7 +820,7 @@ export function AskSheet({
           setTimeout(() => {
             if (!openRef.current || turn !== turnSeq.current || textRef.current.trim()) return
             if (next) {
-              void submitRef.current?.(next)
+              void submitRef.current?.(next, true)
               return
             }
             setFollow(true)
@@ -792,14 +836,19 @@ export function AskSheet({
       else if (next) {
         const turn = turnSeq.current
         setTimeout(() => {
-          if (openRef.current && turn === turnSeq.current && !textRef.current.trim()) void submitRef.current?.(next)
-        }, 1400)
+          if (openRef.current && turn === turnSeq.current && !textRef.current.trim()) void submitRef.current?.(next, true)
+        }, 600)
       }
       // The answer may have changed what the model should see next turn.
       void loadContext().catch(() => {})
     } catch {
+      if (held) {
+        setPast(pastRef.current)
+        setQuery(q)
+      }
       setAnswer({ kind: 'error' })
     } finally {
+      setChainQ('')
       setBusy(false)
     }
   }
@@ -824,10 +873,11 @@ export function AskSheet({
         recentEntries: ctx.recent.entries,
         events: ctx.recent.events,
         me: profile?.display_name ?? '',
-        history: pastRef.current,
+        history: pastRef.current.map(({ q, a }) => ({ q, a })),
       })
       if (q2) setQuota(q2)
       thenRef.current = then ?? ''
+      askedRef.current = intent?.intent ?? 'none'
       // How often the app had to guess or ask (codes only, never the words).
       if (intent && source === 'local') reportGap(intent.intent, 'local_guess', lang)
       if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
@@ -842,11 +892,20 @@ export function AskSheet({
   // The latest answer shown — kept after it moves up into the conversation —
   // so "desfaz isso" can press its Undo by voice (undo_last, review M9).
   const lastAnswer = useRef<Answer | null>(null)
+  // When the answer on screen appeared, and the second task being worked out under it.
+  const shownAt = useRef(0)
+  const [chainQ, setChainQ] = useState('')
+  const chainRef = useRef(false)
+  chainRef.current = !!chainQ
   const thenRef = useRef('')
+  const askedRef = useRef('')
   const chained = useRef(0)
   useEffect(() => {
     if (answer) lastAnswer.current = answer
   }, [answer])
+  useEffect(() => {
+    if (answer?.kind) shownAt.current = Date.now()
+  }, [answer?.kind, query])
 
   /** The Undo behind an answer's button, or null (none, or already undone).
    *  The answer views' Undo buttons and "desfaz isso" both run this. */
@@ -899,14 +958,26 @@ export function AskSheet({
   }
 
   /** Run an answer's Undo and show it undone (a failure says so). */
+  /** Replace `old` where it is shown: the answer on screen, or a card kept up
+   *  in the conversation (then its one-line summary follows). */
+  function swap(old: Answer | null, next: Answer | null) {
+    const i = old ? pastRef.current.findIndex((p) => p.card === old) : -1
+    if (i < 0) {
+      setAnswer(next)
+      return
+    }
+    pastRef.current = pastRef.current.map((p, k) => (k !== i ? p : next ? { q: p.q, a: summarize(next), card: next } : { q: p.q, a: p.a }))
+    setPast(pastRef.current)
+  }
+
   async function undoAnswer(a: Answer) {
     const run = undoOf(a)
     if (!run) return
     try {
       await run()
-      setAnswer({ ...a, undone: true } as Answer)
+      swap(a, { ...a, undone: true } as Answer)
     } catch {
-      setAnswer({ kind: 'error' })
+      swap(a, { kind: 'error' })
     }
   }
 
@@ -1045,7 +1116,14 @@ export function AskSheet({
       }
       case 'money_summary':
         // Narrowed to a category or one thing: the newer per-category answer.
-        if (intent.category || intent.title || intent.person || intent.kind === 'income' || intent.range) return (await actMore(intent, env)) ?? { kind: 'error' }
+        if (intent.category || intent.title || intent.kind === 'income' || (intent.kind === 'expense' && (intent.person || intent.range)))
+          return (await actMore(intent, env)) ?? { kind: 'error' }
+        // The budget as a whole over a span or for one member: the same card
+        // (received, spent, balance) — it used to answer the spending alone.
+        if (intent.person || intent.range) {
+          const o = await moneyOverview(intent, env)
+          return o.lines.length ? { kind: 'summary', lines: o.lines, head: o.head } : { kind: 'say', text: t('ask.moneyNoneYet') }
+        }
         {
           // An earlier period asked about: only budgets that HAD that period.
           const lines = (await moneySummary(intent.budget, today, intent.at)).filter((l) => !intent.at || l.month)
@@ -1176,11 +1254,12 @@ export function AskSheet({
     }
   }
 
-  async function rescope(a: AgendaAnswer, scope: Scope) {
+  async function rescope(old: Extract<Answer, { kind: 'agenda' }>, scope: Scope) {
+    const a = old.a
     try {
-      setAnswer({ kind: 'agenda', a: await agendaFor(a.date, a.end, a.label, scope, '', profile ?? null, profiles, today) })
+      swap(old, { kind: 'agenda', a: await agendaFor(a.date, a.end, a.label, scope, '', profile ?? null, profiles, today) })
     } catch {
-      setAnswer({ kind: 'error' })
+      swap(old, { kind: 'error' })
     }
   }
 
@@ -1260,6 +1339,169 @@ export function AskSheet({
 
   const canSend = text.trim().length > 0 && !busy
 
+  /** The card for one answer — the one on screen, or one kept in the conversation. */
+  const card = (answer: Answer | null) =>
+            answer?.kind === 'added' ? (
+              <AddedView
+                res={answer.res}
+                undone={answer.undone}
+                onUndo={() => undoAnswer(answer)}
+                onOpen={() => go('/shopping')}
+              />
+            ) : answer?.kind === 'agenda' ? (
+              <AgendaView
+                a={answer.a}
+                today={today}
+                locale={locale}
+                memberEmails={memberEmails}
+                dayWords={dayWords}
+                onScope={(sc) => rescope(answer, sc)}
+                onOpen={() => go(`/calendar?date=${answer.a.date}`)}
+              />
+            ) : answer?.kind === 'chooseBudget' ? (
+              <ChooseBudgetView
+                amount={answer.pending.amount}
+                type={answer.pending.type}
+                title={answer.pending.title}
+                budgets={answer.budgets}
+                onPick={(b) => budgetChosen(answer, b)}
+              />
+            ) : answer?.kind === 'chooseStore' ? (
+              <ChooseStoreView
+                items={answer.items}
+                stores={answer.stores}
+                suggested={answer.suggested}
+                onPick={(st) => storeChosen(answer.items, st)}
+                onCreate={(name) => storeChosen(answer.items, null, name)}
+              />
+            ) : answer?.kind === 'list' ? (
+              <ListView groups={answer.groups} store={answer.store} onOpen={() => go('/shopping')} />
+            ) : answer?.kind === 'found' ? (
+              <FoundView reply={answer.reply} found={answer.found} onOpen={() => go('/shopping')} />
+            ) : answer?.kind === 'marked' ? (
+              <MarkedView
+                mode={answer.mode}
+                hits={answer.hits}
+                missing={answer.missing}
+                undone={answer.undone}
+                onUndo={() => undoAnswer(answer)}
+                onOpen={() => go('/shopping')}
+              />
+            ) : answer?.kind === 'event' ? (
+              <EventView
+                title={answer.ev.title}
+                when={whenLabel(answer.ev)}
+                who={answer.who}
+                undone={answer.undone}
+                onUndo={() => undoAnswer(answer)}
+                onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
+              />
+            ) : answer?.kind === 'moved' ? (
+              <EventView
+                headline={answer.undone ? t('ask.moveUndone') : t('ask.eventMoved')}
+                title={answer.ev.title}
+                when={whenLabel(answer.ev)}
+                who={null}
+                undone={answer.undone}
+                onUndo={() => undoAnswer(answer)}
+                onOpen={() => go(`/calendar?date=${answer.undone ? answer.before.start_date : answer.ev.start_date}`)}
+              />
+            ) : answer?.kind === 'removedEvent' ? (
+              <EventView
+                headline={answer.undone ? t('ask.removeUndone') : t('ask.eventRemoved')}
+                title={answer.ev.title}
+                when={whenLabel(answer.ev)}
+                who={null}
+                undone={answer.undone}
+                onUndo={() => undoAnswer(answer)}
+                onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
+              />
+            ) : answer?.kind === 'money' ? (
+              <MoneyView
+                type={answer.type}
+                amount={answer.amount}
+                title={answer.title || t(answer.type === 'income' ? 'entry.income' : 'entry.expense').replace(/^[−+＋-]\s*/, '')}
+                where={`${answer.res.budget.name} · ${periodLabel(answer.res.budget.period, answer.res.month.start_date)}`}
+                icon={answer.type === 'income' ? '💵' : categoryById(answer.res.category, [], []).icon}
+                undone={answer.undone}
+                onUndo={() => undoAnswer(answer)}
+                onOpen={() => go(`/budget/${answer.res.budget.id}/${answer.res.month.id}`)}
+              />
+            ) : answer?.kind === 'summary' ? (
+              <SummaryView
+                lines={answer.lines}
+                head={answer.head}
+                label={(l) => (l.month ? `${l.budget.name} · ${periodLabel(l.budget.period, l.month.start_date)}` : l.budget.name)}
+                onOpen={() => go('/budget')}
+              />
+            ) : answer?.kind === 'nudge' ? (
+              <NudgeView
+                emoji={answer.emoji}
+                urgent={answer.urgent}
+                message={answer.message}
+                to={answer.to?.display_name.split(' ')[0] ?? t('ask.everyoneLower')}
+                sent={answer.sent}
+                sending={answer.sending}
+                onSend={() => sendNudge(answer)}
+                onCancel={() => swap(answer, null)}
+              />
+            ) : answer?.kind === 'action' ? (
+              <ActionView
+                headline={answer.undone && answer.undo ? answer.undo.headline : answer.headline}
+                sub={answer.undone ? null : answer.sub}
+                rows={answer.undone ? [] : answer.rows.map((r) => (r.pick ? { ...r, onPress: () => void runChoice(r.pick!) } : r))}
+                filters={answer.undone ? null : answer.filters}
+                quiet={
+                  answer.undo && !answer.undone
+                    ? {
+                        label: t('ask.undo'),
+                        undo: true,
+                        onPress: () => undoAnswer(answer),
+                      }
+                    : answer.choices?.[1]
+                      ? { label: answer.choices[1].label, onPress: () => runChoice(answer.choices![1].run) }
+                      : answer.choices?.[0] && answer.open
+                        ? { label: answer.open.label, onPress: () => go(answer.open!.path) }
+                        : null
+                }
+                main={
+                  answer.choices?.[0]
+                    ? { label: answer.choices[0].label, onPress: () => runChoice(answer.choices![0].run) }
+                    : answer.open
+                      ? { label: answer.open.label, onPress: () => go(answer.open!.path) }
+                      : null
+                }
+              />
+            ) : answer?.kind === 'pets' ? (
+              <PetsView p={answer.p} onOpen={() => go('/pets')} onToggle={(id, done) => setDailyDone(id, today, done)} />
+            ) : answer?.kind === 'family' ? (
+              <FamilyView text={answer.text} onOpen={() => go('/family')} />
+            ) : answer?.kind === 'split' ? (
+              <SplitView
+                amount={answer.amount}
+                people={answer.people}
+                tip={answer.tip}
+                mode={answer.mode}
+                onEven={() =>
+                  answer.amount > 0 && answer.people > 0
+                    ? swap(answer, { ...answer, mode: 'even' })
+                    : openEvenSplit(answer.amount, answer.people, answer.tip)
+                }
+                onItems={openItemSplit}
+                onOpenEven={() => openEvenSplit(answer.amount, answer.people, answer.tip)}
+              />
+            ) : answer?.kind === 'discount' ? (
+              <DiscountView amount={answer.amount} percent={answer.percent} onOpen={() => go('/calc/discount')} />
+            ) : answer?.kind === 'capabilities' ? (
+              <CapabilitiesView onTry={(p) => void submit(p)} />
+            ) : answer?.kind === 'help' ? (
+              <HelpView topic={answer.topic} text={answer.text} onOpen={(r) => go(r)} />
+            ) : answer?.kind === 'say' ? (
+              answer.text ? <Headline text={answer.text} /> : null
+            ) : answer ? (
+              <Headline text={t('ask.error')} />
+            ) : null
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={closeSheet} onShow={autoListen}>
       <View style={{ flex: 1 }} onLayout={onRootLayout}>
@@ -1304,7 +1546,7 @@ export function AskSheet({
             keyboardShouldPersistTaps="handled"
             // A conversation grows downwards: keep the newest turn in view.
             onContentSizeChange={() => {
-              if (pastRef.current.length) scrollRef.current?.scrollToEnd({ animated: true })
+              if (pastRef.current.length || chainRef.current) scrollRef.current?.scrollToEnd({ animated: true })
             }}
           >
             {past.length ? (
@@ -1325,7 +1567,9 @@ export function AskSheet({
                     <View style={[s.bubble, { backgroundColor: c.surface }]}>
                       <Txt style={{ fontSize: 15, lineHeight: 20 }}>{turn.q}</Txt>
                     </View>
-                    {turn.a ? (
+                    {turn.card ? (
+                      <View style={{ marginTop: sp.sm }}>{card(turn.card)}</View>
+                    ) : turn.a ? (
                       <View style={[s.answerRow, { marginTop: sp.sm }]}>
                         <Orb size={22} />
                         <Txt style={{ flex: 1, fontSize: 14.5, lineHeight: 20, color: c.textMuted }}>{turn.a}</Txt>
@@ -1401,7 +1645,7 @@ export function AskSheet({
               </View>
             ) : null}
 
-            {fullHearing ? null : busy ? (
+            {fullHearing ? null : busy && !chainQ ? (
               <View style={s.answerRow}>
                 <Orb />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingTop: 4 }}>
@@ -1409,164 +1653,9 @@ export function AskSheet({
                   <Txt variant="muted">{t('ask.thinking')}</Txt>
                 </View>
               </View>
-            ) : answer?.kind === 'added' ? (
-              <AddedView
-                res={answer.res}
-                undone={answer.undone}
-                onUndo={() => undoAnswer(answer)}
-                onOpen={() => go('/shopping')}
-              />
-            ) : answer?.kind === 'agenda' ? (
-              <AgendaView
-                a={answer.a}
-                today={today}
-                locale={locale}
-                memberEmails={memberEmails}
-                dayWords={dayWords}
-                onScope={(sc) => rescope(answer.a, sc)}
-                onOpen={() => go(`/calendar?date=${answer.a.date}`)}
-              />
-            ) : answer?.kind === 'chooseBudget' ? (
-              <ChooseBudgetView
-                amount={answer.pending.amount}
-                type={answer.pending.type}
-                title={answer.pending.title}
-                budgets={answer.budgets}
-                onPick={(b) => budgetChosen(answer, b)}
-              />
-            ) : answer?.kind === 'chooseStore' ? (
-              <ChooseStoreView
-                items={answer.items}
-                stores={answer.stores}
-                suggested={answer.suggested}
-                onPick={(st) => storeChosen(answer.items, st)}
-                onCreate={(name) => storeChosen(answer.items, null, name)}
-              />
-            ) : answer?.kind === 'list' ? (
-              <ListView groups={answer.groups} store={answer.store} onOpen={() => go('/shopping')} />
-            ) : answer?.kind === 'found' ? (
-              <FoundView reply={answer.reply} found={answer.found} onOpen={() => go('/shopping')} />
-            ) : answer?.kind === 'marked' ? (
-              <MarkedView
-                mode={answer.mode}
-                hits={answer.hits}
-                missing={answer.missing}
-                undone={answer.undone}
-                onUndo={() => undoAnswer(answer)}
-                onOpen={() => go('/shopping')}
-              />
-            ) : answer?.kind === 'event' ? (
-              <EventView
-                title={answer.ev.title}
-                when={whenLabel(answer.ev)}
-                who={answer.who}
-                undone={answer.undone}
-                onUndo={() => undoAnswer(answer)}
-                onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
-              />
-            ) : answer?.kind === 'moved' ? (
-              <EventView
-                headline={answer.undone ? t('ask.moveUndone') : t('ask.eventMoved')}
-                title={answer.ev.title}
-                when={whenLabel(answer.ev)}
-                who={null}
-                undone={answer.undone}
-                onUndo={() => undoAnswer(answer)}
-                onOpen={() => go(`/calendar?date=${answer.undone ? answer.before.start_date : answer.ev.start_date}`)}
-              />
-            ) : answer?.kind === 'removedEvent' ? (
-              <EventView
-                headline={answer.undone ? t('ask.removeUndone') : t('ask.eventRemoved')}
-                title={answer.ev.title}
-                when={whenLabel(answer.ev)}
-                who={null}
-                undone={answer.undone}
-                onUndo={() => undoAnswer(answer)}
-                onOpen={() => go(`/calendar?date=${answer.ev.start_date}`)}
-              />
-            ) : answer?.kind === 'money' ? (
-              <MoneyView
-                type={answer.type}
-                amount={answer.amount}
-                title={answer.title || t(answer.type === 'income' ? 'entry.income' : 'entry.expense').replace(/^[−+＋-]\s*/, '')}
-                where={`${answer.res.budget.name} · ${periodLabel(answer.res.budget.period, answer.res.month.start_date)}`}
-                icon={answer.type === 'income' ? '💵' : categoryById(answer.res.category, [], []).icon}
-                undone={answer.undone}
-                onUndo={() => undoAnswer(answer)}
-                onOpen={() => go(`/budget/${answer.res.budget.id}/${answer.res.month.id}`)}
-              />
-            ) : answer?.kind === 'summary' ? (
-              <SummaryView
-                lines={answer.lines}
-                label={(l) => (l.month ? `${l.budget.name} · ${periodLabel(l.budget.period, l.month.start_date)}` : l.budget.name)}
-                onOpen={() => go('/budget')}
-              />
-            ) : answer?.kind === 'nudge' ? (
-              <NudgeView
-                emoji={answer.emoji}
-                urgent={answer.urgent}
-                message={answer.message}
-                to={answer.to?.display_name.split(' ')[0] ?? t('ask.everyoneLower')}
-                sent={answer.sent}
-                sending={answer.sending}
-                onSend={() => sendNudge(answer)}
-                onCancel={() => setAnswer(null)}
-              />
-            ) : answer?.kind === 'action' ? (
-              <ActionView
-                headline={answer.undone && answer.undo ? answer.undo.headline : answer.headline}
-                sub={answer.undone ? null : answer.sub}
-                rows={answer.undone ? [] : answer.rows.map((r) => (r.pick ? { ...r, onPress: () => void runChoice(r.pick!) } : r))}
-                quiet={
-                  answer.undo && !answer.undone
-                    ? {
-                        label: t('ask.undo'),
-                        undo: true,
-                        onPress: () => undoAnswer(answer),
-                      }
-                    : answer.choices?.[1]
-                      ? { label: answer.choices[1].label, onPress: () => runChoice(answer.choices![1].run) }
-                      : answer.choices?.[0] && answer.open
-                        ? { label: answer.open.label, onPress: () => go(answer.open!.path) }
-                        : null
-                }
-                main={
-                  answer.choices?.[0]
-                    ? { label: answer.choices[0].label, onPress: () => runChoice(answer.choices![0].run) }
-                    : answer.open
-                      ? { label: answer.open.label, onPress: () => go(answer.open!.path) }
-                      : null
-                }
-              />
-            ) : answer?.kind === 'pets' ? (
-              <PetsView p={answer.p} onOpen={() => go('/pets')} onToggle={(id, done) => setDailyDone(id, today, done)} />
-            ) : answer?.kind === 'family' ? (
-              <FamilyView text={answer.text} onOpen={() => go('/family')} />
-            ) : answer?.kind === 'split' ? (
-              <SplitView
-                amount={answer.amount}
-                people={answer.people}
-                tip={answer.tip}
-                mode={answer.mode}
-                onEven={() =>
-                  answer.amount > 0 && answer.people > 0
-                    ? setAnswer({ ...answer, mode: 'even' })
-                    : openEvenSplit(answer.amount, answer.people, answer.tip)
-                }
-                onItems={openItemSplit}
-                onOpenEven={() => openEvenSplit(answer.amount, answer.people, answer.tip)}
-              />
-            ) : answer?.kind === 'discount' ? (
-              <DiscountView amount={answer.amount} percent={answer.percent} onOpen={() => go('/calc/discount')} />
-            ) : answer?.kind === 'capabilities' ? (
-              <CapabilitiesView onTry={(p) => void submit(p)} />
-            ) : answer?.kind === 'help' ? (
-              <HelpView topic={answer.topic} text={answer.text} onOpen={(r) => go(r)} />
-            ) : answer?.kind === 'say' ? (
-              answer.text ? <Headline text={answer.text} /> : null
-            ) : answer ? (
-              <Headline text={t('ask.error')} />
-            ) : null}
+            ) : (
+              card(answer)
+            )}
             {followUp ? (
               <View style={[s.followStrip, { backgroundColor: c.accentSoft }]}>
                 <Orb size={22} />
@@ -1577,6 +1666,23 @@ export function AskSheet({
                   <Txt numberOfLines={2} style={{ fontSize: 15.5, lineHeight: 21, color: voice.transcript ? c.text : c.textFaint }}>
                     {voice.transcript || t('ask.followHint')}
                   </Txt>
+                </View>
+              </View>
+            ) : null}
+            {chainQ ? (
+              // The second task of the same request, being worked out under the
+              // first result (which stays up until this one lands).
+              <View style={{ marginTop: sp.lg, gap: sp.sm }}>
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 1, color: c.textMuted, textTransform: 'uppercase' }}>{t('ask.chainNext')}</Txt>
+                <View style={[s.bubble, { backgroundColor: c.surface }]}>
+                  <Txt style={{ fontSize: 15.5, lineHeight: 21 }}>{chainQ}</Txt>
+                </View>
+                <View style={s.answerRow}>
+                  <Orb />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm, paddingTop: 4 }}>
+                    <ActivityIndicator color={c.textMuted} size="small" />
+                    <Txt variant="muted">{t('ask.thinking')}</Txt>
+                  </View>
                 </View>
               </View>
             ) : null}

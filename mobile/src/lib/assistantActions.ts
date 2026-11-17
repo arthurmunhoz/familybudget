@@ -25,6 +25,7 @@ import type {
   CategoryOverride,
   CustomCategory,
   Entry,
+  EventRecurrence,
   FamilyDocument,
   MemberProfile,
   Month,
@@ -44,6 +45,8 @@ export interface EventEdit {
   notes: string
   /** Minutes before; -1 = leave as is, -2 = remove the reminder. */
   reminder: number
+  /** Make it repeat ("repete todo mês"); absent = leave as is. */
+  recurrence?: EventRecurrence
 }
 
 /** Apply the edit; returns the updated row (Undo = restoreEvent(before)). */
@@ -54,6 +57,7 @@ export async function editEvent(ev: CalendarEvent, e: EventEdit): Promise<Calend
   if (e.notes.trim()) patch.notes = ev.notes ? `${ev.notes}\n${e.notes.trim()}` : e.notes.trim()
   if (e.reminder === -2) patch.reminder_minutes = null
   else if (e.reminder >= 0) patch.reminder_minutes = e.reminder
+  if (e.recurrence) patch.recurrence = e.recurrence
   const { data, error } = await supabase.from('calendar_events').update(patch).eq('id', ev.id).select('*').single()
   return error ? null : (data as CalendarEvent)
 }

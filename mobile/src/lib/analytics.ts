@@ -43,6 +43,8 @@ export type EventName =
   | 'pet.weight_logged'
   // Nudges
   | 'nudge.sent'
+  // Roof: one per request (intent / via / where / ok — never what was said)
+  | 'roof.asked'
   // Diagnostics, NOT domain actions — deliberately left out of SEMANTIC_EVENTS
   // so they never appear in the family activity feed. These exist because the
   // push fan-out failed silently for two months (see lib/pushFanout.ts); this
@@ -100,6 +102,7 @@ export const SEMANTIC_EVENTS: EventName[] = [
   'petcare.task_deleted',
   'pet.weight_logged',
   'nudge.sent',
+  'roof.asked',
   'doc.uploaded',
   'doc.replaced',
   'doc.opened',

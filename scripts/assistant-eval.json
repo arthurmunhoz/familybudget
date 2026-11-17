@@ -1314,6 +1314,377 @@
           "Leite integral"
         ]
       }
+    },
+    {
+      "text": "como está o orçamento desse mês?",
+      "expect": {
+        "intent": "money_summary",
+        "money_type": "all",
+        "money_range": "month"
+      }
+    },
+    {
+      "text": "how is the budget this month?",
+      "expect": {
+        "intent": "money_summary",
+        "money_type": "all",
+        "money_range": "month"
+      }
+    },
+    {
+      "text": "e quais foram os últimos gastos?",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        }
+      ],
+      "expect": {
+        "intent": "list_money",
+        "money_type": "expense",
+        "money_sort": "recent"
+      }
+    },
+    {
+      "text": "e os da Ana?",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        },
+        {
+          "q": "quais foram os últimos gastos?",
+          "a": "Ford's Garage R$ 54,20 (Arthur), Publix R$ 132,80 (Ana), Uber R$ 18,40 (Arthur)"
+        }
+      ],
+      "expect": {
+        "intent": "list_money",
+        "person": "Ana Munhoz"
+      }
+    },
+    {
+      "text": "só os meus",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        },
+        {
+          "q": "quais foram os últimos gastos?",
+          "a": "Ford's Garage R$ 54,20 (Arthur), Publix R$ 132,80 (Ana), Uber R$ 18,40 (Arthur)"
+        }
+      ],
+      "expect": {
+        "intent": "list_money",
+        "person": "Arthur Munhoz"
+      }
+    },
+    {
+      "text": "e mês passado?",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        }
+      ],
+      "expect": {
+        "intent": "money_summary",
+        "money_type": "all",
+        "money_range": "month",
+        "date": "2026-10-09"
+      }
+    },
+    {
+      "text": "e com mercado?",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        }
+      ],
+      "expect": {
+        "intent": "money_summary",
+        "category": "groceries"
+      }
+    },
+    {
+      "text": "qual foi o maior gasto?",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        },
+        {
+          "q": "quais foram os últimos gastos?",
+          "a": "Ford's Garage R$ 54,20 (Arthur), Publix R$ 132,80 (Ana), Uber R$ 18,40 (Arthur)"
+        }
+      ],
+      "expect": {
+        "intent": "list_money",
+        "money_sort": "largest"
+      }
+    },
+    {
+      "text": "apaga o do Uber",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        },
+        {
+          "q": "quais foram os últimos gastos?",
+          "a": "Ford's Garage R$ 54,20 (Arthur), Publix R$ 132,80 (Ana), Uber R$ 18,40 (Arthur)"
+        }
+      ],
+      "expect": {
+        "intent": "remove_money",
+        "ref": "e3"
+      }
+    },
+    {
+      "text": "o da Publix na verdade foi 142",
+      "history": [
+        {
+          "q": "como está o orçamento desse mês?",
+          "a": "O orçamento em novembro de 2026. Casa: entrou R$ 3.000,00, saiu R$ 205,40, saldo R$ 2.794,60"
+        },
+        {
+          "q": "quais foram os últimos gastos?",
+          "a": "Ford's Garage R$ 54,20 (Arthur), Publix R$ 132,80 (Ana), Uber R$ 18,40 (Arthur)"
+        }
+      ],
+      "expect": {
+        "intent": "fix_money",
+        "ref": "e2",
+        "amount": 142
+      }
+    },
+    {
+      "text": "tira os ovos",
+      "history": [
+        {
+          "q": "o que tem no Costco?",
+          "a": "Costco: Leite integral, Ovos (30)."
+        }
+      ],
+      "expect": {
+        "intent": "remove_items",
+        "items": [
+          "Ovos (30)"
+        ]
+      }
+    },
+    {
+      "text": "põe pão também",
+      "history": [
+        {
+          "q": "o que tem no Costco?",
+          "a": "Costco: Leite integral, Ovos (30)."
+        }
+      ],
+      "expect": {
+        "intent": "add_items",
+        "store": "Costco"
+      }
+    },
+    {
+      "text": "e no Publix?",
+      "history": [
+        {
+          "q": "o que tem no Costco?",
+          "a": "Costco: Leite integral, Ovos (30)."
+        }
+      ],
+      "expect": {
+        "intent": "list_items",
+        "store": "Publix"
+      }
+    },
+    {
+      "text": "limpa essa lista",
+      "history": [
+        {
+          "q": "o que tem no Costco?",
+          "a": "Costco: Leite integral, Ovos (30)."
+        }
+      ],
+      "expect": {
+        "intent": "clear_checked",
+        "store": "Costco"
+      }
+    },
+    {
+      "text": "e depois de amanhã?",
+      "history": [
+        {
+          "q": "o que tem amanhã?",
+          "a": "amanhã: Unha 14:00, Natação 18:00."
+        }
+      ],
+      "expect": {
+        "intent": "agenda",
+        "date": "2026-11-11"
+      }
+    },
+    {
+      "text": "e a Ana?",
+      "history": [
+        {
+          "q": "o que tem amanhã?",
+          "a": "amanhã: Unha 14:00, Natação 18:00."
+        }
+      ],
+      "expect": {
+        "intent": "agenda",
+        "scope": "person",
+        "date": "2026-11-10"
+      }
+    },
+    {
+      "text": "me lembra uma hora antes da unha",
+      "history": [
+        {
+          "q": "o que tem amanhã?",
+          "a": "amanhã: Unha 14:00, Natação 18:00."
+        }
+      ],
+      "expect": {
+        "intent": "edit_event",
+        "ref": "v1",
+        "reminder": 60
+      }
+    },
+    {
+      "text": "na verdade é às 16",
+      "history": [
+        {
+          "q": "marca dentista sexta às 15h",
+          "a": "Marquei Dentista sex., 13 de nov., 15:00"
+        }
+      ],
+      "expect": {
+        "time": "16:00"
+      }
+    },
+    {
+      "text": "repete todo mês",
+      "history": [
+        {
+          "q": "marca dentista sexta às 15h",
+          "a": "Marquei Dentista sex., 13 de nov., 15:00"
+        }
+      ],
+      "expect": {
+        "intent": "edit_event",
+        "recurrence": "monthly"
+      }
+    },
+    {
+      "text": "já dei a comida",
+      "history": [
+        {
+          "q": "o que a Lola precisa hoje?",
+          "a": "Lola: Comida, Passeio, Remédio."
+        }
+      ],
+      "expect": {
+        "intent": "pet_done",
+        "pet": "Lola",
+        "items": [
+          "Comida"
+        ]
+      }
+    },
+    {
+      "text": "e a Chloe?",
+      "history": [
+        {
+          "q": "o que a Lola precisa hoje?",
+          "a": "Lola: Comida, Passeio, Remédio."
+        }
+      ],
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Chloe"
+      }
+    },
+    {
+      "text": "quem deu o remédio?",
+      "history": [
+        {
+          "q": "o que a Lola precisa hoje?",
+          "a": "Lola: Comida, Passeio, Remédio."
+        }
+      ],
+      "expect": {
+        "intent": "pet_who",
+        "pet": "Lola"
+      }
+    },
+    {
+      "text": "ela viu?",
+      "history": [
+        {
+          "q": "avisa a Ana que chego às 19h",
+          "a": "Aviso enviado para Ana: Chego às 19h"
+        }
+      ],
+      "expect": {
+        "intent": "nudge_seen"
+      }
+    },
+    {
+      "text": "manda pro Léo também",
+      "history": [
+        {
+          "q": "avisa a Ana que chego às 19h",
+          "a": "Aviso enviado para Ana: Chego às 19h"
+        }
+      ],
+      "expect": {
+        "intent": "send_nudge",
+        "title": "Chego às 19h"
+      }
+    },
+    {
+      "text": "muda pra 37",
+      "history": [
+        {
+          "q": "quanto a Ana calça?",
+          "a": "Calçado — Ana: 36"
+        }
+      ],
+      "expect": {
+        "intent": "family_update",
+        "field": "shoe_size",
+        "value": "37"
+      }
+    },
+    {
+      "text": "põe protetor solar nela",
+      "history": [
+        {
+          "q": "cria uma lista Viagem",
+          "a": "Criei a lista Viagem."
+        }
+      ],
+      "expect": {
+        "intent": "add_items",
+        "store": "Viagem"
+      }
+    },
+    {
+      "text": "pede pra ela atualizar",
+      "history": [
+        {
+          "q": "onde está a Ana?",
+          "a": "Ana está em Casa."
+        }
+      ],
+      "expect": {
+        "intent": "ask_location",
+        "person": "Ana Munhoz"
+      }
     }
   ]
 }

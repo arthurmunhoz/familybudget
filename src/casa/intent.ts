@@ -26,7 +26,7 @@ export type Intent =
   | { intent: 'add_event'; title: string; date: string; time: string; person: string; opts?: EventOpts }
   /** `person` (move / remove / edit / find): whose event was named ("o dentista
    *  do Pedro") — narrows locateEvent; absent = anyone's. */
-  | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; ref?: string; person?: string }
+  | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; recurrence?: EventRecurrence; ref?: string; person?: string }
   | { intent: 'find_event'; title: string; date: string; ref?: string; person?: string }
   | { intent: 'move_event'; title: string; date: string; newDate: string; time: string; ref?: string; person?: string }
   /** `date` is "" when no day was said: the coming weeks are searched. */
@@ -189,7 +189,13 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     }
     case 'edit_event': {
       const reminder = typeof j.reminder === 'number' ? (j.reminder as number) : -1
-      if (!str('new_title') && !str('location') && !str('notes') && reminder === -1) return null
+      const rec = str('recurrence')
+      const repeat = rec === 'daily' || rec === 'weekly' || rec === 'monthly' || rec === 'yearly' ? { recurrence: rec as EventRecurrence } : {}
+      if (!str('new_title') && !str('location') && !str('notes') && reminder === -1 && !repeat.recurrence) {
+        // Only a new TIME ("na verdade é às 16"): that's a move on the same day.
+        const time = /^\d{2}:\d{2}$/.test(str('time')) ? str('time') : ''
+        return time ? { intent: 'move_event', title: str('title'), date: isoOr('date'), newDate: '', time, ...ref, ...whose } : null
+      }
       return {
         intent: 'edit_event',
         title: str('title'),
@@ -198,6 +204,7 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
         location: str('location'),
         notes: str('notes'),
         reminder,
+        ...repeat,
         ...ref,
         ...whose,
       }

@@ -185,13 +185,13 @@ export default function Admin() {
       ])
       const merged = new Map<string, AppStat>()
       for (const row of (use.data ?? []) as { root: string; views: number }[]) {
-        const meta = APP_META[row.root] ?? { name: row.root, icon: LayoutGrid }
+        const meta = APP_META[row.root] ?? APP_META[row.root.split('/')[0]] ?? { name: row.root, icon: LayoutGrid }
         const s = merged.get(meta.name) ?? { name: meta.name, icon: meta.icon, views: 0, seconds: 0 }
         s.views += Number(row.views)
         merged.set(meta.name, s)
       }
       for (const row of (time.data ?? []) as { root: string; seconds: number }[]) {
-        const meta = APP_META[row.root] ?? { name: row.root, icon: LayoutGrid }
+        const meta = APP_META[row.root] ?? APP_META[row.root.split('/')[0]] ?? { name: row.root, icon: LayoutGrid }
         const s = merged.get(meta.name) ?? { name: meta.name, icon: meta.icon, views: 0, seconds: 0 }
         s.seconds += Number(row.seconds)
         merged.set(meta.name, s)
@@ -226,6 +226,28 @@ export default function Admin() {
         counts.set(k, cur)
       }
       return [...counts.values()].sort((a, b) => b.n - a.n).slice(0, 20)
+    },
+  )
+  // How Roof is used (migration 117): one row per intent · via · where, and a
+  // total row (intent null) that carries the distinct people.
+  const { data: roof = { total: 0, people: 0, voice: 0, casa: 0, failed: 0, top: [] as { intent: string; n: number }[] } } = useCachedQuery(
+    `admin:roof:${days}`,
+    async () => {
+      const { data } = await supabase.rpc('admin_roof_usage', { days })
+      const rows = (data ?? []) as { intent: string | null; via: string | null; place: string | null; n: number; people: number; failed: number }[]
+      const all = rows.find((r) => r.intent === null && r.via === null && r.place === null)
+      const groups = rows.filter((r) => r !== all)
+      const by = new Map<string, number>()
+      for (const r of groups) by.set(r.intent ?? '?', (by.get(r.intent ?? '?') ?? 0) + Number(r.n))
+      const sum = (pick: (r: (typeof groups)[number]) => boolean) => groups.filter(pick).reduce((x, r) => x + Number(r.n), 0)
+      return {
+        total: Number(all?.n ?? 0),
+        people: Number(all?.people ?? 0),
+        failed: Number(all?.failed ?? 0),
+        voice: sum((r) => r.via === 'voice'),
+        casa: sum((r) => r.place === 'casa'),
+        top: [...by.entries()].map(([intent, n]) => ({ intent, n })).sort((a, b) => b.n - a.n).slice(0, 15),
+      }
     },
   )
   const usageRows = SEMANTIC_EVENTS.map((type) => ({ type, n: usageData.usage[type] ?? 0 })).sort((a, b) => b.n - a.n)
@@ -539,6 +561,42 @@ export default function Admin() {
                     <Txt style={{ fontSize: 13.5, fontFamily: fonts.semibold, color: r.n === 0 ? c.textFaint : c.text }}>{r.n}</Txt>
                   </View>
                 ))}
+              </View>
+            </View>
+
+            <View>
+              <Label>{t('admin.roofUsage')}</Label>
+              <View style={[s.card, { backgroundColor: c.card, borderColor: c.border, paddingVertical: 6 }]}>
+                {roof.total === 0 ? (
+                  <View style={{ padding: sp.lg }}>
+                    <Txt variant="faint">{t('admin.roofNone')}</Txt>
+                  </View>
+                ) : (
+                  <>
+                    {(
+                      [
+                        [t('admin.roofAsks'), roof.total],
+                        [t('admin.roofPeople'), roof.people],
+                        [t('admin.roofVoice'), roof.voice],
+                        [t('admin.roofTyped'), roof.total - roof.voice],
+                        [t('admin.roofCasa'), roof.casa],
+                        [t('admin.roofFailed'), roof.failed],
+                      ] as const
+                    ).map(([label, n]) => (
+                      <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: sp.md, paddingVertical: 6 }}>
+                        <Txt style={{ fontSize: 13.5, fontFamily: fonts.semibold, color: c.text }}>{label}</Txt>
+                        <Txt style={{ fontSize: 13.5, fontFamily: fonts.semibold, color: c.text }}>{n}</Txt>
+                      </View>
+                    ))}
+                    <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border, marginVertical: 6 }} />
+                    {roof.top.map((r) => (
+                      <View key={r.intent} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: sp.md, paddingVertical: 6 }}>
+                        <Txt style={{ fontSize: 13.5, color: c.text }}>{humanizeEvent(r.intent)}</Txt>
+                        <Txt style={{ fontSize: 13.5, fontFamily: fonts.semibold, color: c.text }}>{r.n}</Txt>
+                      </View>
+                    ))}
+                  </>
+                )}
               </View>
             </View>
 

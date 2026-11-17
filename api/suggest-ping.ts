@@ -124,7 +124,7 @@ const ASSISTANT_SCHEMA = {
         'remove_items = take items off the shopping list. ONLY shopping-list items: never when the user talks about a gasto / despesa / lançamento / expense / charge, or names a place that is not in KNOWN STORES but was just logged as an expense — that is remove_money.',
         'agenda = asks what is on the calendar for a day.',
         'add_event = schedule something on the calendar, including repeating events ("natação toda terça às 18h") and special dates (birthdays, anniversaries, renewals). A pet\'s vet / vaccine / grooming appointment on a FUTURE day (tomorrow or later: "agenda o veterinário da Lola sexta às 10") is add_event too, titled with the care and the pet ("Veterinário Lola"); the same thing TODAY or in the past is pet_log.',
-        'edit_event = change an EXISTING event other than its day/time: rename it, set its place or a note, add or remove a reminder ("me lembra 1h antes do dentista", "põe o endereço na reunião").',
+        'edit_event = change an EXISTING event other than its day/time (a new time alone — "na verdade é às 16" — is move_event with that time): rename it, set its place or a note, add or remove a reminder, or make it repeat ("me lembra 1h antes do dentista", "põe o endereço na reunião", "repete todo mês" → recurrence monthly).',
         'find_event = asks WHEN a named event is, or how long until it ("quando é o próximo dentista?", "when is Ana\'s recital?", "quantos dias faltam pro aniversário da Ana?").',
         'move_event = move / reschedule / postpone an EXISTING calendar event to another day or time ("muda o dentista para amanhã", "muda o dentista do Pedro para sexta", "move it to Friday at 3", "passa a reunião de hoje pra quinta"). Never add_event or agenda for these. The day it is moved TO goes in new_date; `date` is only the day it is on NOW and stays "" unless that day is said ("a reunião de hoje" → today; "o dentista para sexta" → date ""). Needs a move word (muda, passa, move, adia, remarca, reschedule): a name with a day/time and no such word ("dentista sexta às 15h") is add_event, even when an event with that name exists.',
         'remove_event = delete / cancel / take off an EXISTING calendar event ("remove unha do calendário", "cancela o dentista de amanhã", "cancela a consulta da Ana amanhã", "delete the meeting"). Never remove_items for these: remove_items is only for shopping-list items.',
@@ -183,7 +183,7 @@ const ASSISTANT_SCHEMA = {
     store: {
       type: 'string',
       description:
-        'List intents (for move_items: the list to move TO): the LIST named — a store ("Costco") or any list ("Tarefas", "Viagem") — matched to KNOWN STORES (the household\'s lists) when it is the same one (return that exact spelling), else as written. A generic list ("lista de compras", "shopping list", "a lista", "mercado" without a name) is no particular list: return "". "" when none was named.',
+        'List intents (for move_items: the list to move TO): the LIST named — a store ("Costco") or any list ("Tarefas", "Viagem") — matched to KNOWN STORES (the household\'s lists) when it is the same one (return that exact spelling), else as written. A follow-up that points at the list of the conversation ("essa lista", "nela", "that list", "limpa essa lista" right after "o que tem no Costco?") = that list. A generic list ("lista de compras", "shopping list", "a lista", "mercado" without a name) is no particular list: return "". "" when none was named.',
     },
     scope: {
       type: 'string',
@@ -292,12 +292,17 @@ const ASSISTANT_SCHEMA = {
         'week = "essa semana" / "semana passada"; month = "esse mês" / "mês passado" / "em setembro"; ' +
         'period = no span named (the budget\'s own current period). add_money and everything else: period.',
     },
+    money_sort: {
+      type: 'string',
+      enum: ['recent', 'largest'],
+      description: 'list_money: largest when the biggest entries are asked for ("qual foi o maior gasto?", "os maiores gastos do mês", "biggest expenses"); recent otherwise and for every other intent.',
+    },
     money_type: {
       type: 'string',
       enum: ['expense', 'income', 'all'],
       description:
         'add_money: spent = expense, received = income. money_summary / list_money: expense for "gastos / despesas / quanto gastei / expenses", ' +
-        'income for "receitas / entradas / o que entrou / income", all for "lançamentos / movimentações / entries" or the balance.',
+        'income for "receitas / entradas / o que entrou / income", all for "lançamentos / movimentações / entries", the balance, or an OVERVIEW of the budget / the money in general — no word for spending or income alone ("como está o orçamento?", "como está o orçamento desse mês?", "como estamos de dinheiro?", "quanto sobrou?", "qual o saldo?", "how is the budget this month?", "¿cómo va el presupuesto?").',
     },
     budget: {
       type: 'string',
@@ -399,6 +404,7 @@ const ASSISTANT_SCHEMA = {
     'delta',
     'percent',
     'money_type',
+    'money_sort',
     'money_range',
     'budget',
     'category',
@@ -435,7 +441,7 @@ const GROUPS: Record<string, { keys: string[]; for: string; note?: string }> = {
     for: 'agenda, add_event, edit_event, find_event, move_event, remove_event, free_check',
   },
   money: {
-    keys: ['title', 'amount', 'money_type', 'money_range', 'budget', 'category', 'new_title', 'delta', 'tip_pct'],
+    keys: ['title', 'amount', 'money_type', 'money_sort', 'money_range', 'budget', 'category', 'new_title', 'delta', 'tip_pct'],
     for: 'add_money, money_summary, list_money, fix_money, remove_money',
   },
   calc: { keys: ['amount', 'people', 'split_mode', 'tip_pct', 'percent', 'deals'], for: 'split_bill, discount, better_deal' },
@@ -691,6 +697,7 @@ export async function parseAssistant(
     // reads anything but 'income' as expense, which is right for add_money).
     money_type: p.money_type === 'income' ? 'income' : p.money_type === 'all' ? 'all' : 'expense',
     money_range: ['day', 'week', 'month'].includes(p.money_range) ? p.money_range : 'period',
+    money_sort: p.money_sort === 'largest' ? 'largest' : 'recent',
     budget: str(p.budget),
     category: str(p.category, 60),
     pet_event_type: PET_EVENT_TYPES.includes(p.pet_event_type) ? p.pet_event_type : '',

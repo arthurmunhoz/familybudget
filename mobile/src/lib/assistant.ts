@@ -56,7 +56,7 @@ export type Intent =
   | { intent: 'add_event'; title: string; date: string; time: string; person: string; opts?: EventOpts }
   /** `person` (move / remove / edit / find): whose event was named ("o dentista
    *  do Pedro") — narrows locateEvent; absent = anyone's. */
-  | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; ref?: string; person?: string }
+  | { intent: 'edit_event'; title: string; date: string; newTitle: string; location: string; notes: string; reminder: number; recurrence?: EventRecurrence; ref?: string; person?: string }
   | { intent: 'find_event'; title: string; date: string; ref?: string; person?: string }
   /** `date` / `newDate` are "" when not said: the coming occurrence / its own day. */
   | { intent: 'move_event'; title: string; date: string; newDate: string; time: string; ref?: string; person?: string }
@@ -67,7 +67,8 @@ export type Intent =
   /** `kind`: only expenses or only income ("meus gastos"); absent = both. */
   /** `range`: an explicit day / week / month asked about ("hoje"), inclusive ISO days. */
   | { intent: 'money_summary'; budget: string; category?: string; title?: string; at?: string; person?: string; kind?: 'expense' | 'income'; range?: MoneyRange }
-  | { intent: 'list_money'; budget: string; category: string; title: string; at?: string; person?: string; kind?: 'expense' | 'income'; range?: MoneyRange }
+  /** `sort`: 'largest' = biggest amounts first ("qual foi o maior gasto?"); absent = newest first. */
+  | { intent: 'list_money'; budget: string; category: string; title: string; at?: string; person?: string; kind?: 'expense' | 'income'; range?: MoneyRange; sort?: 'largest' }
   | { intent: 'fix_money'; title: string; amount: number; newTitle: string; delta: number; tipPct: number; ref?: string }
   | { intent: 'remove_money'; title: string; ref?: string }
   /** The server knew what was meant but a detail was missing: ask, never guess. */
@@ -339,7 +340,13 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     }
     case 'edit_event': {
       const reminder = typeof j.reminder === 'number' ? (j.reminder as number) : -1
-      if (!str('new_title') && !str('location') && !str('notes') && reminder === -1) return null
+      const rec = str('recurrence')
+      const repeat = rec === 'daily' || rec === 'weekly' || rec === 'monthly' || rec === 'yearly' ? { recurrence: rec as EventRecurrence } : {}
+      if (!str('new_title') && !str('location') && !str('notes') && reminder === -1 && !repeat.recurrence) {
+        // Only a new TIME ("na verdade é às 16"): that's a move on the same day.
+        const time = /^\d{2}:\d{2}$/.test(str('time')) ? str('time') : ''
+        return time ? { intent: 'move_event', title: str('title'), date: isoOr('date'), newDate: '', time, ...ref, ...whose } : null
+      }
       return {
         intent: 'edit_event',
         title: str('title'),
@@ -348,6 +355,7 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
         location: str('location'),
         notes: str('notes'),
         reminder,
+        ...repeat,
         ...ref,
         ...whose,
       }
@@ -398,7 +406,7 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
       const span = str('money_range')
       const range = span === 'day' || span === 'week' || span === 'month' ? { range: moneyRange(span, date) } : {}
       const base = { budget: str('budget'), category: str('category'), title: str('title'), ...(range.range ? {} : at), ...who, ...kind, ...range }
-      return j.intent === 'money_summary' ? { intent: 'money_summary', ...base } : { intent: 'list_money', ...base }
+      return j.intent === 'money_summary' ? { intent: 'money_summary', ...base } : { intent: 'list_money', ...base, ...(str('money_sort') === 'largest' ? { sort: 'largest' as const } : {}) }
     }
     case 'fix_money':
     {

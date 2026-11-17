@@ -13,6 +13,7 @@ import { chime, speak, stopSpeaking, tick } from './sound'
 import { CheckMark, Grow, Orb, PlusTag, type GrowHandle } from './ui'
 import { isGoodbye, RoofEars, speechSupported, type EarsState } from './wake'
 import { clockAsk, isNo, isRepeatAsk, isUndoAsk, isYes, pickByVoice } from './talk'
+import { track } from '../lib/analytics'
 import { Capabilities, isCapabilitiesAsk, nextTip, type Tip } from './roofTips'
 import WhoPicker from './WhoPicker'
 import { GRAD, LOCALE, grad, lsGet, lsSet } from './util'
@@ -250,7 +251,10 @@ export default function Roof({
       const env = envRef.current!
       clearTimer()
       const plain = (title: string): Done => ({ kind: 'done', tone: 'orb', title, speak: title, check: false })
-      const carry = async (run: () => Promise<Outcome>) => {
+      // One usage event per request: what it was, never what was said.
+      const note = (intent: string, ok = true) => track('roof.asked', { meta: { intent, via: viaVoice.current ? 'voice' : 'typed', where: 'casa', ok } })
+      const carry = async (run: () => Promise<Outcome>, what = 'reply') => {
+        note(what)
         setStage({ k: 'think', q })
         setHeard(q)
         try {
@@ -281,10 +285,11 @@ export default function Roof({
       }
       if (isUndoAsk(q)) return show(plain(t('casa.roof.nothingToUndo')), q)
       const clock = clockAsk(q)
+      if (clock === 'time' || clock === 'date') note('clock')
       if (clock === 'time') return show(plain(t('casa.roof.timeIs', { time: new Date().toLocaleTimeString(LOCALE[lang], { hour: 'numeric', minute: '2-digit' }) })), q)
       if (clock === 'date')
         return show(plain(t('casa.roof.dateIs', { date: new Date().toLocaleDateString(LOCALE[lang], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) })), q)
-      if (clock === 'morning') return carry(() => act(env, { intent: 'day_summary', date: env.today }, full))
+      if (clock === 'morning') return carry(() => act(env, { intent: 'day_summary', date: env.today }, full), 'day_summary')
       if (isGoodbye(q)) {
         await show({ kind: 'bye', text: t('casa.roof.bye') }, q)
         return
@@ -302,12 +307,14 @@ export default function Roof({
       }
       const target = localOpen(q)
       if (target) {
+        note('open_app')
         await show({ kind: 'open', target }, q)
         return
       }
       setStage({ k: 'think', q })
       setHeard(q)
       const u = await understand(env, q)
+      note(u.ok ? u.intent.intent : u.reason, u.ok && u.intent.intent !== 'unknown')
       if (!openRef.current) return
       let o: Outcome
       if (!u.ok) {

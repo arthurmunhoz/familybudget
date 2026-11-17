@@ -3,7 +3,7 @@
 // data work lives in lib/assistantActions.ts (and lib/assistant.ts); this file
 // only decides what to do and how to say it. AskSheet calls actMore() for any
 // intent it doesn't handle itself, and the recurring-event choices from there.
-import type { ActionRowData } from './AnswerViews'
+import type { ActionFilters, ActionRowData } from './AnswerViews'
 import {
   endSeries,
   familyInfo,
@@ -22,6 +22,7 @@ import {
   petsDue,
   type EventWho,
   type Intent,
+  type MoneyLine,
   type MoneyRange,
 } from '@/lib/assistant'
 import type { Occurrence } from '@/lib/calendar'
@@ -78,6 +79,8 @@ export interface ActionAnswer {
   /** One line for the conversation history (and Claude's context). */
   summary: string
   undo?: { run: () => Promise<void>; headline: string }
+  /** Chips that filter the rows (money lists: one per member). */
+  filters?: ActionFilters
   /** [main, second]: buttons that carry on (e.g. "Remove the whole series"). */
   choices?: { label: string; run: () => Promise<ActionAnswer> }[]
   open?: { label: string; path: string }
@@ -272,6 +275,25 @@ export function recurringChoice(
   return say(t('ask.seriesRemoveAsk', { title: ev.title }), { rows: [row], choices })
 }
 
+/** "How is the budget this month / for Ana?" — received, spent and balance
+ *  per budget over an explicit span and/or one member's entries (the plain
+ *  current-period overview is lib/assistant moneySummary). */
+export async function moneyOverview(intent: Extract<Intent, { intent: 'money_summary' }>, env: ActEnv): Promise<{ lines: MoneyLine[]; head: string }> {
+  const { t, today, profiles, locale } = env
+  const owner = intent.person ? findMember(intent.person, profiles) : null
+  const rows = (await periodEntries(intent.budget, '', '', today, intent.at, owner?.email, intent.range)).filter((r) => r.entry.entry_date <= today)
+  const by = new Map<string, MoneyLine>()
+  for (const r of rows) {
+    const cur = by.get(r.budget.id) ?? { budget: r.budget, month: intent.range ? null : r.month, income: 0, spent: 0 }
+    if (r.entry.type === 'income') cur.income += Number(r.entry.amount)
+    else cur.spent += Number(r.entry.amount)
+    by.set(r.budget.id, cur)
+  }
+  const when = intent.range ? rangeLabel(intent.range, today, locale, t) : ''
+  const head = [when ? t('ask.budgetWhen', { when }) : t('ask.summaryHead').replace(/[.:]$/, ''), owner ? first(owner) : ''].filter(Boolean).join(' · ')
+  return { lines: [...by.values()], head }
+}
+
 /** Carry out one of the newer intents; null when it isn't one of them. */
 export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer | null> {
   const { t, today, me, profiles, locale } = env
@@ -284,7 +306,7 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
       const edit = async (occ: Occurrence): Promise<ActionAnswer> => {
         const before = occ.event
         if (isExternal(before)) return say(t('ask.editExternal', { title: before.title }))
-        const ev = await editEvent(before, { newTitle: intent.newTitle, location: intent.location, notes: intent.notes, reminder: intent.reminder })
+        const ev = await editEvent(before, { newTitle: intent.newTitle, location: intent.location, notes: intent.notes, reminder: intent.reminder, recurrence: intent.recurrence })
         if (!ev) return say(t('ask.error'))
         env.invalidate('hub:today')
         const changes = [
@@ -292,6 +314,7 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
           intent.location ? `📍 ${ev.location}` : '',
           intent.notes ? `📝 ${intent.notes}` : '',
           intent.reminder === -2 ? t('ask.editNoReminder') : intent.reminder >= 0 ? `⏰ ${reminderLabel(t, intent.reminder)}` : '',
+          intent.recurrence ? `🔁 ${t(`ask.repeat.${intent.recurrence}` as TKey)}` : '',
         ].filter(Boolean)
         return say(t('ask.eventEdited'), {
           rows: [{ emoji: KIND_EMOJI[ev.kind] ?? '🗓️', title: ev.title, sub: [shortDay(occ.start, locale), ...changes].join(' · ') }],
@@ -349,7 +372,10 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
       const thing = intent.title ?? ''
       // Whose money: "meus gastos" = the asker; a named member; else everyone.
       const owner = intent.person ? findMember(intent.person, profiles) : null
-      const rows = await periodEntries(intent.budget, category, thing, today, intent.at, owner?.email, intent.range)
+      // A list loads EVERYONE's entries: the member asked about is only the
+      // chip selected at first, so the others are one tap away (owner, 2026-11-17).
+      const listing = intent.intent === 'list_money'
+      const rows = await periodEntries(intent.budget, category, thing, today, intent.at, listing ? undefined : owner?.email, intent.range)
       // The span said ("hoje", "nesta semana", "em outubro"), when there was one.
       const when = intent.range ? rangeLabel(intent.range, today, locale, t) : ''
       const what = category ? categoryById(category, [], []).name : thing
@@ -360,20 +386,40 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
       }
       if (intent.intent === 'list_money') {
         // "meus gastos" = expenses only; "receitas" = income only; else both.
-        const ofKind = intent.kind ? rows.filter((r) => r.entry.type === intent.kind) : rows
-        const latest = ofKind.slice(0, 15)
+        const ofKind = (intent.kind ? rows.filter((r) => r.entry.type === intent.kind) : rows).slice()
+        if (intent.sort === 'largest') ofKind.sort((a, b) => Number(b.entry.amount) - Number(a.entry.amount))
+        const latest = ofKind.slice(0, 60)
         if (!latest.length) return say(t('ask.moneyNoneYet'))
-        const listHead = intent.kind === 'expense' ? t('ask.moneyLatestSpent') : intent.kind === 'income' ? t('ask.moneyLatestIncome') : t('ask.moneyLatest')
+        const people = profiles.filter((p) => ofKind.some((r) => r.entry.person_email === p.email))
+        const totalOf = (email: string | null) => {
+          const mine = ofKind.filter((r) => !email || r.entry.person_email === email)
+          const net = mine.reduce((x, r) => x + (intent.kind || r.entry.type === 'expense' ? 1 : -1) * Number(r.entry.amount), 0)
+          return t('ask.moneyListTotal', { amount: formatMoney(Math.abs(net)), n: mine.length })
+        }
+        const listHead = intent.sort === 'largest' ? t('ask.moneyLargest') : intent.kind === 'expense' ? t('ask.moneyLatestSpent') : intent.kind === 'income' ? t('ask.moneyLatestIncome') : t('ask.moneyLatest')
         const sum = ofKind.reduce((x, r) => x + Number(r.entry.amount), 0)
         const listTitle = what ? t('ask.moneyLatestOf', { what }) : listHead
-        return say(byWho(when ? `${listTitle.replace(/:$/, '')} ${when}:` : listTitle), {
+        return say(when ? `${listTitle.replace(/:$/, '')} ${when}:` : listTitle, {
           sub: intent.kind ? t('ask.moneyListTotal', { amount: formatMoney(sum), n: ofKind.length }) : undefined,
+          filters: {
+            chips: people.map((p) => ({ id: p.email, label: first(p) })),
+            initial: owner && people.some((p) => p.email === owner.email) ? owner.email : null,
+            allLabel: t('ask.everyone'),
+            sub: intent.kind ? totalOf : undefined,
+            limit: 15,
+            more: t('ask.showMore'),
+          },
           rows: latest.map((r) => ({
+            group: r.entry.person_email ?? undefined,
             emoji: r.entry.type === 'income' ? '💵' : categoryById(r.entry.category, [], []).icon,
             title: `${r.entry.type === 'income' ? '+' : '−'}${formatMoney(Number(r.entry.amount))} · ${r.entry.label}`,
             sub: [shortDay(r.entry.entry_date, locale), r.budget.name, first(profiles.find((p) => p.email === r.entry.person_email))].filter(Boolean).join(' · '),
           })),
-          summary: latest.map((r) => `${r.entry.label} ${formatMoney(Number(r.entry.amount))}`).join(', '),
+          summary: latest
+            .filter((r) => !owner || r.entry.person_email === owner.email)
+            .slice(0, 15)
+            .map((r) => `${r.entry.label} ${formatMoney(Number(r.entry.amount))}${owner ? '' : ` (${first(profiles.find((p) => p.email === r.entry.person_email))})`}`)
+            .join(', '),
           open: latest.length ? { label: t('ask.openMoney'), path: `/budget/${latest[0].budget.id}/${latest[0].month.id}` } : undefined,
         })
       }

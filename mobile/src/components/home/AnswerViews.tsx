@@ -3,8 +3,8 @@
 // summary, a nudge waiting for confirmation, pet care due, a family detail.
 // All share one shape — the orb + a one-line answer, a panel with the detail,
 // and at most two buttons (Undo / Open …) — so every action reads the same.
-import { useState, type ReactNode } from 'react'
-import { StyleSheet, TextInput, View } from 'react-native'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Animated, Easing, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { CalendarDays, Check, ChevronRight, PawPrint, Plus, ReceiptText, RotateCcw, Send, Sparkles, Store, UsersRound, Wallet } from 'lucide-react-native'
 import { evenSplit } from '@/apps/calc/splitMath'
 
@@ -90,6 +90,22 @@ export interface ActionRowData {
   strong?: boolean
   /** A tappable option ("which one?"): the row is a button with a chevron. */
   onPress?: () => void
+  /** Which filter chip this row belongs to (a member's email on money lists). */
+  group?: string
+}
+
+/** Filter chips over an ActionView's rows ("Todos · Arthur · Ana"). */
+export interface ActionFilters {
+  chips: { id: string; label: string }[]
+  /** The chip selected at first; null = everything. */
+  initial: string | null
+  allLabel: string
+  /** The quieter line under the headline for a chip (null = everything). */
+  sub?: (id: string | null) => string
+  /** Rows shown at once. */
+  limit: number
+  /** "Show more": reveals the next `limit` rows. */
+  more?: string
 }
 
 /** The shape every newer action shares (components/home/askActions.ts): the
@@ -98,20 +114,47 @@ export interface ActionRowData {
 export function ActionView({
   headline,
   sub,
-  rows,
+  rows: allRows,
+  filters,
   quiet,
   main,
 }: {
   headline: string
   sub?: string | null
   rows: ActionRowData[]
+  filters?: ActionFilters | null
   quiet?: { label: string; undo?: boolean; onPress: () => void } | null
   main?: { label: string; onPress: () => void } | null
 }) {
   const { c } = useTheme()
+  const [pick, setPick] = useState<string | null>(filters?.initial ?? null)
+  const [pages, setPages] = useState(1)
+  const matching = filters ? allRows.filter((r) => !pick || r.group === pick) : allRows
+  const rows = filters ? matching.slice(0, filters.limit * pages) : allRows
   return (
     <>
-      <Headline text={headline} sub={sub} />
+      <Headline text={headline} sub={filters?.sub ? filters.sub(pick) : sub} />
+      {filters && filters.chips.length > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: sp.sm, paddingTop: sp.md }}>
+          {[{ id: null as string | null, label: filters.allLabel }, ...filters.chips].map((ch) => {
+            const on = pick === ch.id
+            return (
+              <Pressable
+                key={ch.id ?? '*'}
+                onPress={() => {
+                  setPick(ch.id)
+                  setPages(1)
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                style={({ pressed }) => [v.chip, { backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : c.border, opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Txt style={{ fontFamily: fonts.semibold, fontSize: 14, color: on ? '#fff' : c.text }}>{ch.label}</Txt>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      ) : null}
       {rows.length ? (
         <Panel>
           {rows.map((r, i) => {
@@ -147,6 +190,13 @@ export function ActionView({
             )
           })}
         </Panel>
+      ) : null}
+      {filters?.more && matching.length > rows.length ? (
+        <Pressable onPress={() => setPages((n) => n + 1)} accessibilityRole="button" hitSlop={8} style={({ pressed }) => ({ alignSelf: 'center', paddingVertical: sp.sm, opacity: pressed ? 0.6 : 1 })}>
+          <Txt style={{ fontFamily: fonts.semibold, fontSize: 14.5, color: c.accent }}>
+            {filters.more} ({matching.length - rows.length})
+          </Txt>
+        </Pressable>
       ) : null}
       {quiet || main ? (
         <Actions
@@ -477,34 +527,57 @@ export function MoneyView({
   )
 }
 
-export function SummaryView({ lines, label, onOpen }: { lines: MoneyLine[]; label: (l: MoneyLine) => string; onOpen: () => void }) {
+/** One bar of the budget card: grows in from the left to its share of `max`. */
+function MoneyBar({ value, max, color, delay }: { value: number; max: number; color: string; delay: number }) {
+  const { c } = useTheme()
+  const [grow] = useState(() => new Animated.Value(0))
+  const share = max > 0 ? Math.max(value > 0 ? 0.03 : 0, Math.min(1, value / max)) : 0
+  useEffect(() => {
+    Animated.timing(grow, { toValue: share, duration: 650, delay, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start()
+  }, [grow, share, delay])
+  return (
+    <View style={{ flex: 1, height: 12, borderRadius: 6, backgroundColor: c.surface, overflow: 'hidden' }}>
+      <Animated.View style={{ height: 12, borderRadius: 6, backgroundColor: color, width: grow.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} />
+    </View>
+  )
+}
+
+/** "How is the budget?" — per budget: received (green) and spent (red) as two
+ *  bars on one scale, their amounts, and the balance (owner, 2026-11-17). */
+export function SummaryView({ lines, head, label, onOpen }: { lines: MoneyLine[]; head?: string; label: (l: MoneyLine) => string; onOpen: () => void }) {
   const { c } = useTheme()
   const { t } = useI18n()
   return (
     <>
-      <Headline text={lines.length ? t('ask.summaryHead') : t('ask.noBudget')} />
+      <Headline text={lines.length ? (head ?? t('ask.summaryHead')) : t('ask.noBudget')} />
       {lines.map((l) => {
         const bal = l.income - l.spent
         return (
           <Panel key={l.budget.id}>
             <View style={{ paddingVertical: sp.sm, gap: 6 }}>
-              <Txt style={{ fontFamily: fonts.semibold, fontSize: 15 }}>{label(l)}</Txt>
-              <View style={{ flexDirection: 'row', gap: sp.lg }}>
-                <View>
-                  <Txt variant="faint" style={{ fontSize: 12 }}>↑ {t('chart.received')}</Txt>
-                  <Txt style={{ fontFamily: fonts.semibold, color: c.income, fontSize: 16 }}>{formatMoney(l.income)}</Txt>
-                </View>
-                <View>
-                  <Txt variant="faint" style={{ fontSize: 12 }}>↓ {t('chart.spent')}</Txt>
-                  <Txt style={{ fontFamily: fonts.semibold, color: c.expense, fontSize: 16 }}>{formatMoney(l.spent)}</Txt>
-                </View>
-                <View style={{ marginLeft: 'auto', alignItems: 'flex-end' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: sp.md }}>
+                <Txt style={{ flex: 1, fontFamily: fonts.semibold, fontSize: 15 }}>{label(l)}</Txt>
+                <View style={{ alignItems: 'flex-end' }}>
                   <Txt variant="faint" style={{ fontSize: 12 }}>{t('common.balance')}</Txt>
-                  <Txt style={{ fontFamily: fonts.display, color: bal >= 0 ? c.income : c.expense, fontSize: 19 }}>
-                    {formatMoney(bal)}
-                  </Txt>
+                  <Txt style={{ fontFamily: fonts.display, color: bal >= 0 ? c.income : c.expense, fontSize: 24, lineHeight: 29 }}>{formatMoney(bal)}</Txt>
                 </View>
               </View>
+              {(
+                [
+                  ['↑', t('chart.received'), l.income, c.income, 0],
+                  ['↓', t('chart.spent'), l.spent, c.expense, 120],
+                ] as const
+              ).map(([arrow, name, value, color, delay]) => (
+                <View key={name} style={{ gap: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Txt variant="faint" style={{ fontSize: 12.5 }}>
+                      {arrow} {name}
+                    </Txt>
+                    <Txt style={{ fontFamily: fonts.semibold, color, fontSize: 15 }}>{formatMoney(value)}</Txt>
+                  </View>
+                  <MoneyBar value={value} max={Math.max(l.income, l.spent)} color={color} delay={delay} />
+                </View>
+              ))}
             </View>
           </Panel>
         )
@@ -841,6 +914,7 @@ const v = StyleSheet.create({
   smallBtn: { height: 46, paddingHorizontal: 18, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: sp.md, paddingBottom: 4 },
   item: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 9 },
+  chip: { height: 36, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   tick: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   box: { width: 20, height: 20, borderRadius: 6, borderWidth: 2 },
   tile: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

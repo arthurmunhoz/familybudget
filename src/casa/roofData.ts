@@ -13,7 +13,7 @@ import { routineOrder, taskTime } from '../lib/petCare'
 import { fetchActivePings } from '../lib/pings'
 import { STORE_CATALOG } from '../lib/stores'
 import { supabase } from '../lib/supabase'
-import type { CalendarEvent, MemberProfile, PetCareTask, PetEvent, PetEventType, ShoppingItem, ShoppingStore } from '../lib/types'
+import type { CalendarEvent, EventRecurrence, MemberProfile, PetCareTask, PetEvent, PetEventType, ShoppingItem, ShoppingStore } from '../lib/types'
 import { loadHomeLocation } from '../lib/weather'
 import type { Member } from './data'
 import type { Deal, FamilyField } from './intent'
@@ -387,6 +387,8 @@ export interface EventEdit {
   notes: string
   /** Minutes before; -1 = leave as is, -2 = remove the reminder. */
   reminder: number
+  /** Make it repeat ("repete todo mês"); absent = leave as is. */
+  recurrence?: EventRecurrence
 }
 
 export async function editEvent(ev: CalendarEvent, e: EventEdit): Promise<CalendarEvent | null> {
@@ -396,6 +398,7 @@ export async function editEvent(ev: CalendarEvent, e: EventEdit): Promise<Calend
   if (e.notes.trim()) patch.notes = ev.notes ? `${ev.notes}\n${e.notes.trim()}` : e.notes.trim()
   if (e.reminder === -2) patch.reminder_minutes = null
   else if (e.reminder >= 0) patch.reminder_minutes = e.reminder
+  if (e.recurrence) patch.recurrence = e.recurrence
   const { data, error } = await supabase.from('calendar_events').update(patch).eq('id', ev.id).select('*').single()
   return error ? null : (data as CalendarEvent)
 }

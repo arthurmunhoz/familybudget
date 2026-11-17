@@ -712,7 +712,7 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
       const edit = async (occ: Occurrence): Promise<Outcome> => {
         const before = occ.event
         if (R.isExternal(before)) return say('calendar', t('ask.editExternal', { title: before.title }))
-        const ev = await R.editEvent(before, { newTitle: intent.newTitle, location: intent.location, notes: intent.notes, reminder: intent.reminder })
+        const ev = await R.editEvent(before, { newTitle: intent.newTitle, location: intent.location, notes: intent.notes, reminder: intent.reminder, recurrence: intent.recurrence })
         if (!ev) return say('orb', t('ask.error'))
         env.refresh()
         const changes = [
@@ -720,6 +720,7 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
           intent.location ? `📍 ${ev.location}` : '',
           intent.notes ? `📝 ${intent.notes}` : '',
           intent.reminder === -2 ? t('ask.editNoReminder') : intent.reminder >= 0 ? `⏰ ${reminderLabel(t, intent.reminder)}` : '',
+          intent.recurrence ? `🔁 ${t(`ask.repeat.${intent.recurrence}` as TKey)}` : '',
         ].filter(Boolean)
         return say('event', t('ask.eventEdited'), {
           check: true,

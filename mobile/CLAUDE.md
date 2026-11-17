@@ -218,6 +218,13 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     `pet_who` (`pet_task_done.done_by`), `call_member` (`tel:` via `go()`),
     `days_until`. An `unknown` answer is NOT counted against the free month.
     The server logs `roof_ms` per request (Vercel logs).
+  - **Usage (migration 117):** every request logs ONE `roof.asked` web_event
+    (phone: AskSheet `submit`; Modo Casa: `note()` in Roof.tsx `ask`). meta =
+    `intent` (or `reply` / `clock` / `capabilities` for what the device
+    settled itself), `via` voice|typed, `where` phone|casa, `ok`, `chained` —
+    never the words. Admin › Usage › "Uso do Roof" reads
+    `admin_roof_usage(days)` (per intent·via·where + a total row); like every
+    admin count it leaves out admin accounts and internal households.
   - Modo Casa money (owner, 2026-11-17, replaces "money lives on the phone"):
     `add_money` by voice is allowed — unlocked it writes (with Undo); locked
     it opens Money on the PIN screen and `Hub` writes the `PendingMoney` when
