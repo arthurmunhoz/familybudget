@@ -106,7 +106,7 @@ function weightRows(kg: number, unit: WeightUnit): ConvRow[] {
 }
 
 // ── Shoe ─────────────────────────────────────────────────────────────────────
-export type ShoeSystem = 'US' | 'EU' | 'UK'
+export type ShoeSystem = 'BR' | 'MX' | 'US' | 'EU' | 'UK'
 export type ShoeGender = 'M' | 'W'
 interface ShoeRow {
   us: number
@@ -149,16 +149,26 @@ const SHOE_W: ShoeRow[] = [
   { us: 11, eu: 42, uk: 8.5, cm: 28.0 },
 ]
 
-const shoeKey = (s: ShoeSystem): keyof ShoeRow =>
-  s === 'US' ? 'us' : s === 'EU' ? 'eu' : 'uk'
+const shoeKey = (s: Exclude<ShoeSystem, 'BR'>): keyof ShoeRow =>
+  s === 'US' ? 'us' : s === 'EU' ? 'eu' : s === 'MX' ? 'cm' : 'uk'
+
+// Brazil numbers adult shoes about two below Europe (EU 40 = BR 38), whole
+// sizes only — that's how a Brazilian store labels them.
+const euToBr = (eu: number) => Math.round(eu) - 2
+const brToEu = (br: number) => br + 2
+// Mexico sizes shoes by foot length in centimetres ("talla 26" = 26 cm).
+/** A size in `system` read off a table row. */
+const sizeIn = (row: ShoeRow, s: ShoeSystem) => (s === 'BR' ? euToBr(row.eu) : row[shoeKey(s)])
 
 function nearestShoe(gender: ShoeGender, system: ShoeSystem, value: number): ShoeRow | null {
   const table = gender === 'W' ? SHOE_W : SHOE_M
-  const key = shoeKey(system)
+  const sys = system === 'BR' ? 'EU' : system
+  const v = system === 'BR' ? brToEu(value) : value
+  const key = shoeKey(sys)
   let best: ShoeRow | null = null
   let bestD = Infinity
   for (const row of table) {
-    const d = Math.abs(row[key] - value)
+    const d = Math.abs(row[key] - v)
     if (d < bestD) {
       bestD = d
       best = row
@@ -171,7 +181,7 @@ export function parseShoe(
   raw: string,
 ): { system: ShoeSystem; gender: ShoeGender; value: number } | null {
   const s = raw.trim()
-  const sys = s.match(/\b(US|EU|UK)\b/i)
+  const sys = s.match(/\b(BR|MX|US|EU|UK)\b/i)
   const num = s.match(/(\d+(?:\.\d+)?)/)
   if (!sys || !num) return null
   const gen = s.match(/\b(M|W)\b/i)
@@ -187,7 +197,7 @@ export function composeShoe(system: ShoeSystem, gender: ShoeGender, v: string): 
   return isFinite(n) ? `${system} ${gender} ${fmtSize(n)}` : ''
 }
 
-/** Convert a typed size between US/EU/UK (for the editor's system toggle). */
+/** Convert a typed size between BR/MX/US/EU/UK (for the editor's system toggle). */
 export function shoeConvert(
   n: number,
   gender: ShoeGender,
@@ -196,16 +206,18 @@ export function shoeConvert(
 ): number | null {
   if (from === to) return n
   const row = nearestShoe(gender, from, n)
-  return row ? row[shoeKey(to)] : null
+  return row ? sizeIn(row, to) : null
 }
 
 function shoeRows(p: { system: ShoeSystem; gender: ShoeGender; value: number }): ConvRow[] | null {
   const row = nearestShoe(p.gender, p.system, p.value)
   if (!row) return null
   return [
+    { value: `BR ${fmtSize(euToBr(row.eu))}`, primary: p.system === 'BR' },
     { value: `US ${fmtSize(row.us)}`, primary: p.system === 'US' },
     { value: `EU ${fmtSize(row.eu)}`, primary: p.system === 'EU' },
     { value: `UK ${fmtSize(row.uk)}`, primary: p.system === 'UK' },
+    { value: `MX ${fmtSize(row.cm)}`, primary: p.system === 'MX' },
     { value: `${row.cm.toFixed(1)} cm` },
   ]
 }

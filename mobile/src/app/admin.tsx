@@ -713,7 +713,7 @@ function ActivityFeed({
             <Txt variant="faint" style={{ fontSize: 12 }}>
               {[householdName(f.household_id), f.app, timeAgo(f.created_at)].filter(Boolean).join(' · ')}
             </Txt>
-            {f.detail ? <Txt style={{ color: c.expense, fontSize: 12 }}>{f.detail}</Txt> : null}
+            {f.detail ? <Txt style={{ color: f.isError ? c.expense : c.textMuted, fontSize: 12 }}>{f.detail}</Txt> : null}
           </View>
         </View>
       ))}

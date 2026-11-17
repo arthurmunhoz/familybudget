@@ -109,7 +109,12 @@ export async function sendPing(
   message: string,
   recipients: string[] | null = null,
   highPriority: boolean = false,
-  extra: { imagePath?: string; expiresAt?: string } = {},
+  extra: {
+    imagePath?: string
+    expiresAt?: string
+    /** For the admin feed: how it was made (a ready one, typed, AI, Roof, a drawing). */
+    source?: 'preset' | 'custom_preset' | 'typed' | 'ai' | 'assistant' | 'drawing' | 'location'
+  } = {},
 ): Promise<void> {
   const { data, error } = await supabase
     .from('pings')
@@ -127,7 +132,15 @@ export async function sendPing(
   if (error || !data) throw error ?? new Error('Could not send ping')
   // Log shape, not content: nudge text is user content and web_events is
   // readable by the GLOBAL super-admin across every household.
-  track('nudge.sent', { messageLength: message.length, kind, recipients: recipients?.length ?? null, drawing: !!extra.imagePath })
+  // `kind` is a preset key ("omw", "dinner"…) or a category word — never text.
+  track('nudge.sent', {
+    messageLength: message.length,
+    kind,
+    source: extra.source ?? (extra.imagePath ? 'drawing' : null),
+    urgent: highPriority,
+    recipients: highPriority ? null : (recipients?.length ?? null),
+    drawing: !!extra.imagePath,
+  })
   // Best-effort, but no longer INVISIBLE: this call silently failed for every
   // nudge for two months. See lib/pushFanout.ts.
   await requestPushFanout({ ping_id: data.id }, 'nudge')
@@ -162,7 +175,7 @@ export async function sendCustomPing(
   const emoji = (result.emoji || '📣').trim()
   const message = (result.message || text).trim()
   const kind = result.kind || 'custom'
-  await sendPing(kind, emoji, message, recipients)
+  await sendPing(kind, emoji, message, recipients, false, { source: 'ai' })
   return { emoji, message }
 }
 

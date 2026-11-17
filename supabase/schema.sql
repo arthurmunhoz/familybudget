@@ -281,3 +281,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-113-note-wall.sql (note_favorites: a member keeps a drawn note with a heart; notes stay on the wall; Modo Casa only reads notes sent to the whole household)
 --   migration-114-note-hide.sql (note_hidden: a recipient takes a drawn note off THEIR wall; the sender deletes it for everyone via pings_delete)
 --   migration-115-transfer-ownership.sql (transfer_ownership(email): the active household's owner hands it to another member and becomes a member; refused with plus_owner while a linked Plus depends on them)
+--   migration-116-admin-feed-screens.sql (admin_household_events includes screen_view so the household feed shows screens visited; capped at 400 rows)

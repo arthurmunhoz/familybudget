@@ -471,7 +471,16 @@ export function RoutineSheet({
       Alert.alert(t('pets.saveFailed'))
       return
     }
-    if (editing === 'new') track('petcare.task_added', { title: trimmed, pet: pet.name })
+    if (editing === 'new')
+      track('petcare.task_added', {
+        title: trimmed,
+        pet: pet.name,
+        source: 'own',
+        kind,
+        everyDays: kind === 'interval' ? days : null,
+        atTime: !!atTime,
+        reminder: !!remindAt,
+      })
     setEditing(null)
     // A time was set: this is the moment to ask for notifications (once), and
     // BEFORE onChanged re-syncs the reminders, which never prompts.
@@ -524,7 +533,7 @@ export function RoutineSheet({
       Alert.alert(t('pets.saveFailed'))
       return
     }
-    track('petcare.task_added', { title: 'template', pet: pet.name })
+    track('petcare.task_added', { pet: pet.name, source: 'template', count: rows.length })
     onChanged()
   }
 

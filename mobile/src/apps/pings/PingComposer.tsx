@@ -214,7 +214,9 @@ export default function PingComposer({
       const toEveryone = p.high_priority || everyone
       const recipients = toEveryone ? null : [...selected]
       const label = presetText(p, t)
-      await sendPing(p.preset_key ?? 'custom', p.emoji, label, recipients, p.high_priority)
+      await sendPing(p.preset_key ?? 'custom', p.emoji, label, recipients, p.high_priority, {
+        source: p.preset_key && !p.label ? 'preset' : 'custom_preset',
+      })
       onSent({ emoji: p.emoji, text: t('pings.sentToast', { label, who: toEveryone ? t('pings.everyone') : toLabel }) })
     } catch {
       Alert.alert(t('pings.failed'))
@@ -229,7 +231,7 @@ export default function PingComposer({
     if (!message || sending) return
     setAiBusy(true)
     try {
-      await sendPing('custom', '💬', message, everyone ? null : [...selected], false)
+      await sendPing('custom', '💬', message, everyone ? null : [...selected], false, { source: 'typed' })
       onSent({ emoji: '💬', text: t('pings.sentToast', { label: message, who: toLabel }) })
       setText('')
     } catch {

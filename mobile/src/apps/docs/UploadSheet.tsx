@@ -101,7 +101,13 @@ export default function UploadSheet({
       Alert.alert(t('docs.saveFailed'))
       return
     }
-    track('doc.uploaded', { title: title.trim(), category })
+    track('doc.uploaded', {
+      title: title.trim(),
+      category,
+      fileType: file.mime === 'application/pdf' ? 'pdf' : file.mime.startsWith('image/') ? 'image' : 'other',
+      sizeKb: Math.round(file.size / 1024),
+      forWhom: owner === 'shared' ? 'household' : owner === profile.email ? 'self' : 'member',
+    })
     onSaved()
   }
 

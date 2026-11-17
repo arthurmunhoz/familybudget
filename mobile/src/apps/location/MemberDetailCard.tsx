@@ -177,7 +177,7 @@ function StaleChip({ email, name, ago }: { email: string; name: string; ago: str
   }
   async function nudge() {
     try {
-      await sendPing('location-request', '📍', t('location.stale.nudgeMessage'), [email])
+      await sendPing('location-request', '📍', t('location.stale.nudgeMessage'), [email], false, { source: 'location' })
       setPhase('nudged')
     } catch {
       // keep the button; they can try again

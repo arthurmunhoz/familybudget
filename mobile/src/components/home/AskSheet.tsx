@@ -1138,7 +1138,7 @@ export function AskSheet({
   async function sendNudge(a: Extract<Answer, { kind: 'nudge' }>) {
     setAnswer({ ...a, sending: true })
     try {
-      await sendPing(a.pingKind, a.emoji, a.message, a.to ? [a.to.email] : null, a.urgent)
+      await sendPing(a.pingKind, a.emoji, a.message, a.to ? [a.to.email] : null, a.urgent, { source: 'assistant' })
       setAnswer({ ...a, sent: true, sending: false })
     } catch {
       setAnswer({ kind: 'error' })

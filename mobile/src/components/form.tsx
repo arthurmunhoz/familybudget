@@ -156,8 +156,9 @@ export function TextRow({
   label,
   placeholder,
   icon,
+  accessory,
   ...input
-}: TextInputProps & { label: string; icon?: ReactNode }) {
+}: TextInputProps & { label: string; icon?: ReactNode; /** Shown before the field (the phone's country pill). */ accessory?: ReactNode }) {
   const { c } = useTheme()
   const { t } = useI18n()
   const reveal = useRevealOnFocus()
@@ -165,6 +166,7 @@ export function TextRow({
   return (
     <View ref={row}>
       <FormRow label={label} icon={icon}>
+        {accessory}
         <TextInput
           placeholder={placeholder ?? t('form.add')}
           placeholderTextColor={c.textFaint}
@@ -218,7 +220,7 @@ export function NoteRow({ label, placeholder, icon, ...input }: TextInputProps &
   )
 }
 
-export type Option<T extends string> = { value: T; label: string; hint?: string }
+export type Option<T extends string> = { value: T; label: string; hint?: string; /** What UnitButton's pill shows, when the label is too long for it. */ short?: string }
 
 /** A value picked from a list: the row shows the choice, the list opens in a
  *  sheet. Replaces long chip rows. `allowNone` adds a "Not set" option. */
@@ -483,7 +485,7 @@ export function UnitButton<T extends string>({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <Txt style={{ fontSize: 13, color: tint ?? c.accent, fontFamily: fonts.semibold }}>{current?.label ?? value}</Txt>
+        <Txt style={{ fontSize: 13, color: tint ?? c.accent, fontFamily: fonts.semibold }}>{current?.short ?? current?.label ?? value}</Txt>
         <ChevronsUpDown size={12} color={tint ?? c.accent} />
       </Pressable>
       <SelectSheet

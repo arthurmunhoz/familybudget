@@ -283,6 +283,7 @@ export default function DrawNote({ initialTo }: { initialTo: string[] }) {
       })
       if (error) throw error
       await sendPing('drawing', '✏️', t('notes.pushText'), everyone ? null : [...selected], false, {
+        source: 'drawing',
         imagePath: path,
         expiresAt: new Date(Date.now() + NOTE_TTL_MS).toISOString(),
       })

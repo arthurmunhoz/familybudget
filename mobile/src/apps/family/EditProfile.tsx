@@ -33,7 +33,8 @@ import { supabase } from '@/lib/supabase'
 import { getSignedUrl } from '@/lib/signedUrls'
 import * as Localization from 'expo-localization'
 import { formatDay } from '@/lib/format'
-import { formatPhone, formatPhoneTyping } from '@/lib/phone'
+import { fieldsUsed, track } from '@/lib/analytics'
+import { PHONE_COUNTRIES, composePhone, defaultPhoneCountry, formatLocalTyping, splitStoredPhone } from '@/lib/phone'
 import { useI18n } from '@/hooks/useI18n'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
@@ -72,7 +73,7 @@ import {
   type WeightUnit,
 } from './units'
 
-const REGION = Localization.getLocales()[0]?.regionCode ?? null
+const DEVICE_REGION = Localization.getLocales()[0]?.regionCode ?? null
 
 type Form = {
   avatar_path: string
@@ -241,24 +242,29 @@ function WeightRow({
   )
 }
 
-type ShoeKey = `${ShoeSystem}-${ShoeGender}`
+/** The size system someone in this language most likely uses. */
+function defaultShoeSystem(lang: string): ShoeSystem {
+  if (lang === 'pt') return 'BR'
+  if (lang === 'es') return DEVICE_REGION?.toUpperCase() === 'MX' ? 'MX' : 'EU'
+  return 'US'
+}
 
+// Country and fit are two small pickers side by side ("BR ▾" "Fem. ▾"), not
+// one long list repeating every country twice (2026-11-16).
 function ShoeRow({
   label,
   initial,
-  metric,
   onChange,
   icon,
 }: {
   label: string
   icon?: React.ReactNode
   initial: string
-  metric: boolean
   onChange: (v: string) => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const p0 = parseShoe(initial)
-  const [system, setSystem] = useState<ShoeSystem>(p0?.system ?? (metric ? 'EU' : 'US'))
+  const [system, setSystem] = useState<ShoeSystem>(p0?.system ?? defaultShoeSystem(lang))
   const [gender, setGender] = useState<ShoeGender>(p0?.gender ?? 'M')
   const [v, setV] = useState(() => (p0 ? String(p0.value) : ''))
 
@@ -266,10 +272,7 @@ function ShoeRow({
     setV(next)
     onChange(composeShoe(system, gender, next))
   }
-  // System and fit used to be two pill groups crammed into one row; they're
-  // one choice now ("US · Men's"), picked from a list.
-  function pick(key: ShoeKey) {
-    const [s, g] = key.split('-') as [ShoeSystem, ShoeGender]
+  function apply(s: ShoeSystem, g: ShoeGender) {
     if (s === system && g === gender) return
     const n = parseFloat(v)
     const conv = isFinite(n) && s !== system ? shoeConvert(n, g, system, s) : null
@@ -279,24 +282,90 @@ function ShoeRow({
     setV(nv)
     onChange(composeShoe(s, g, nv))
   }
-  const men = t('family.shoeMenFull')
-  const women = t('family.shoeWomenFull')
-  const options = (['US', 'EU', 'UK'] as ShoeSystem[]).flatMap((s) => [
-    { value: `${s}-M` as ShoeKey, label: `${s} · ${men}` },
-    { value: `${s}-W` as ShoeKey, label: `${s} · ${women}` },
-  ])
+  const first = defaultShoeSystem(lang)
+  const systems = [first, ...(['BR', 'MX', 'EU', 'US', 'UK'] as ShoeSystem[]).filter((s) => s !== first)]
+  const tint = APP_GRADIENT.family[1]
 
   return (
     <FormRow label={label} icon={icon}>
       <NumberBox value={v} onChangeText={changeV} width={52} />
       <UnitButton
-        tint={APP_GRADIENT.family[1]}
-        title={t('family.unit')}
-        value={`${system}-${gender}` as ShoeKey}
-        onChange={pick}
-        options={options}
+        tint={tint}
+        title={t('family.shoeSystem')}
+        value={system}
+        onChange={(s) => apply(s, gender)}
+        options={systems.map((s) => ({ value: s, label: s }))}
+      />
+      <UnitButton
+        tint={tint}
+        title={t('family.shoeFit')}
+        value={gender}
+        onChange={(g) => apply(system, g)}
+        options={[
+          { value: 'M' as ShoeGender, label: t('family.shoeMenFull'), short: t('family.shoeMen') },
+          { value: 'W' as ShoeGender, label: t('family.shoeWomenFull'), short: t('family.shoeWomen') },
+        ]}
       />
     </FormRow>
+  )
+}
+
+// The phone: a country pill ("🇺🇸 +1") and the national number. Where the
+// NUMBER is from is the person's to say — not the device region, not the app
+// language (2026-11-16: a Brazilian in the US has a US number).
+function PhoneRow({
+  label,
+  icon,
+  initial,
+  onChange,
+}: {
+  label: string
+  icon?: React.ReactNode
+  initial: string
+  onChange: (v: string) => void
+}) {
+  const { t, lang } = useI18n()
+  const [s0] = useState(() => splitStoredPhone(initial, defaultPhoneCountry(lang, DEVICE_REGION)))
+  const [country, setCountry] = useState(s0.country)
+  const [local, setLocal] = useState(s0.local)
+
+  function changeLocal(next: string) {
+    const v = formatLocalTyping(next, local, country)
+    setLocal(v)
+    onChange(composePhone(country, v))
+  }
+  function pick(id: string) {
+    const stored = composePhone(id, local.replace(/^\s*\+\d+\s*/, ''))
+    setCountry(id)
+    setLocal(stored ? splitStoredPhone(stored, id).local : local)
+    onChange(stored)
+  }
+  return (
+    <TextRow
+      icon={icon}
+      label={label}
+      accessory={
+        <UnitButton
+          tint={APP_GRADIENT.family[1]}
+          title={t('family.phoneCountry')}
+          value={country}
+          onChange={pick}
+          options={PHONE_COUNTRIES.map((c) => ({ value: c.id, label: `${c.flag}  ${c.id} +${c.cc}`, short: `${c.flag} +${c.cc}` }))}
+        />
+      }
+      value={local}
+      onChangeText={changeLocal}
+      onBlur={() => {
+        const stored = composePhone(country, local)
+        const split = stored.startsWith('+') ? splitStoredPhone(stored, country) : null
+        if (split) {
+          setCountry(split.country)
+          setLocal(split.local)
+        }
+        onChange(stored)
+      }}
+      keyboardType="phone-pad"
+    />
   )
 }
 
@@ -423,6 +492,28 @@ export function EditProfile({
       Alert.alert(t('family.saveFailed'))
       return
     }
+    // Which fields are filled — names only (health/sizes are personal), plus the
+    // shoe system and phone country, which say whether those pickers fit people.
+    const shoe = clean(form.shoe_size)
+    const phone = clean(form.phone)
+    track(mine ? 'profile.updated' : 'profile.created', {
+      ...fieldsUsed({
+        photo: newAvatar,
+        birthday: clean(form.birthday),
+        phone,
+        bloodType: clean(form.blood_type),
+        height: clean(form.height),
+        weight: clean(form.weight),
+        shoe,
+        pants: clean(form.pants_size),
+        shirt: clean(form.shirt_size),
+        allergies: clean(form.allergies),
+        notes: clean(form.notes),
+      }),
+      shoeSystem: shoe ? (shoe.match(/^(BR|MX|US|EU|UK)\b/)?.[1] ?? 'other') : null,
+      phoneCode: phone?.match(/^\+(\d{1,3})\b/)?.[1] ?? null,
+      renamed: dn !== profile.display_name,
+    })
     // Remove the previous photo file if it was replaced or cleared.
     if (oldAvatar && oldAvatar !== newAvatar) {
       await supabase.storage.from('documents').remove([oldAvatar])
@@ -527,14 +618,7 @@ export function EditProfile({
                 maximumDate={new Date()}
                 wheels
               />
-              <TextRow
-                icon={icon(Phone)}
-                label={t('family.phone')}
-                value={form.phone}
-                onChangeText={(v) => set('phone', formatPhoneTyping(v, form.phone, REGION))}
-                onBlur={() => set('phone', formatPhone(form.phone, REGION))}
-                keyboardType="phone-pad"
-              />
+              <PhoneRow icon={icon(Phone)} label={t('family.phone')} initial={form.phone} onChange={(v) => set('phone', v)} />
             </FormSection>
 
             <FormSection title={t('family.section.health')}>
@@ -557,7 +641,7 @@ export function EditProfile({
             <FormSection title={t('family.section.sizes')}>
               <HeightRow icon={icon(Ruler)} label={t('family.height')} initial={form.height} metric={metric} onChange={(v) => set('height', v)} />
               <WeightRow icon={icon(Scale)} label={t('family.weight')} initial={form.weight} metric={metric} onChange={(v) => set('weight', v)} />
-              <ShoeRow icon={icon(Footprints)} label={t('family.shoeSize')} initial={form.shoe_size} metric={metric} onChange={(v) => set('shoe_size', v)} />
+              <ShoeRow icon={icon(Footprints)} label={t('family.shoeSize')} initial={form.shoe_size} onChange={(v) => set('shoe_size', v)} />
               <TextRow
                 icon={icon(PersonStanding)}
                 label={t('family.pantsSize')}

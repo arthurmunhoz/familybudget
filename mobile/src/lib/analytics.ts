@@ -60,6 +60,8 @@ export type EventName =
   | 'calendar.deleted'
   // Family / admin
   | 'member.added'
+  | 'profile.created'
+  | 'profile.updated'
   // The invite funnel (2026-11-15): a household is only alive once a second
   // person joins, so each step from "created" to "joined" is counted.
   | 'household.created'
@@ -106,6 +108,8 @@ export const SEMANTIC_EVENTS: EventName[] = [
   'calendar.updated',
   'calendar.deleted',
   'member.added',
+  'profile.created',
+  'profile.updated',
   'household.created',
   'household.joined',
   'invite.shown',
@@ -188,6 +192,19 @@ function scrubMeta(meta?: Record<string, unknown>): Record<string, unknown> | un
     else if (typeof v === 'string') out[`${k}_len`] = v.length
   }
   return out
+}
+
+/** Which fields of a form were filled and which were left empty — the field
+ *  NAMES only, never what was typed (admin feed: "filled photo, birthday;
+ *  left breed, weight empty"). */
+export function fieldsUsed(obj: Record<string, unknown>): { filled: string[]; empty: string[] } {
+  const filled: string[] = []
+  const empty: string[] = []
+  for (const [k, v] of Object.entries(obj)) {
+    const has = v != null && v !== '' && v !== false && !(Array.isArray(v) && v.length === 0)
+    ;(has ? filled : empty).push(k)
+  }
+  return { filled, empty }
 }
 
 export function track(type: EventName, meta?: Record<string, unknown>): void {

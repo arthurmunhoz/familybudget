@@ -46,7 +46,7 @@ function guess(digits: string, region: string | null): { cc: string; national: s
   if (digits.length === 11 && digits[2] === '9' && isBrazil(digits)) return { cc: '55', national: digits }
   if (digits.length === 10) {
     if (r === 'BR' && isBrazil(digits)) return { cc: '55', national: digits }
-    if (isNanp(digits)) return { cc: '1', national: digits }
+    if (isNanp(digits) && (r === '' || r === 'US' || r === 'CA')) return { cc: '1', national: digits }
   }
   return null
 }
@@ -137,7 +137,88 @@ export function formatPhoneTyping(next: string, prev = '', region: string | null
   }
   const r = (region ?? '').toUpperCase()
   if (r === 'BR') return digits[0] === '0' ? groups(digits) : partialBrazil(digits)
-  if (digits[0] === '1') return digits.length === 1 ? '1' : `1 ${partialNanp(digits.slice(1))}`
-  if (r === 'US' || r === 'CA' || r === '') return digits.length <= 10 ? partialNanp(digits) : groups(digits)
+  const nanp = r === 'US' || r === 'CA' || r === ''
+  if (nanp && digits[0] === '1') return digits.length === 1 ? '1' : `1 ${partialNanp(digits.slice(1))}`
+  if (nanp) return digits.length <= 10 ? partialNanp(digits) : groups(digits)
   return groups(digits)
+}
+
+// ── Picked country (2026-11-16) ─────────────────────────────────────────────
+// Neither the device region nor the app language says where a NUMBER is from
+// (a Brazilian in the US with the app in Portuguese has a US number; her
+// sister in Brazil has a Brazilian one). So the profile's phone field has a
+// country pill in front, and the field holds only the national part.
+
+/** `max`: the longest national number there, without a trunk 0 / leading 1. */
+export type PhoneCountry = { id: string; cc: string; flag: string; max: number }
+export const PHONE_COUNTRIES: PhoneCountry[] = [
+  { id: 'US', cc: '1', flag: '🇺🇸', max: 10 },
+  { id: 'BR', cc: '55', flag: '🇧🇷', max: 11 },
+  { id: 'MX', cc: '52', flag: '🇲🇽', max: 10 },
+  { id: 'ES', cc: '34', flag: '🇪🇸', max: 9 },
+  { id: 'CA', cc: '1', flag: '🇨🇦', max: 10 },
+  { id: 'PT', cc: '351', flag: '🇵🇹', max: 9 },
+  { id: 'AR', cc: '54', flag: '🇦🇷', max: 11 },
+  { id: 'CO', cc: '57', flag: '🇨🇴', max: 10 },
+  { id: 'CL', cc: '56', flag: '🇨🇱', max: 9 },
+  { id: 'PE', cc: '51', flag: '🇵🇪', max: 9 },
+  { id: 'GB', cc: '44', flag: '🇬🇧', max: 10 },
+]
+const byId = (id: string) => PHONE_COUNTRIES.find((c) => c.id === id)
+
+/** The country to start an empty field on: the device's region if we list it,
+ *  else the app language's most likely one. */
+export function defaultPhoneCountry(lang: string, deviceRegion: string | null): string {
+  const r = (deviceRegion ?? '').toUpperCase()
+  if (byId(r)) return r
+  return lang === 'pt' ? 'BR' : lang === 'es' ? 'MX' : 'US'
+}
+
+/** A stored number → the country it's from + the national part to edit. */
+export function splitStoredPhone(raw: string, fallback: string): { country: string; local: string } {
+  let text = raw.trim()
+  if (text && !/^(\+|00)/.test(text)) {
+    const guessed = formatPhone(text, fallback === 'CA' ? 'US' : fallback)
+    if (guessed.startsWith('+')) text = guessed
+  }
+  if (!/^(\+|00)/.test(text)) return { country: fallback, local: text }
+  const digits = text.replace(/\D/g, '')
+  const { cc, national: n } = splitCountry(text.startsWith('00') ? digits.slice(2) : digits)
+  const fb = byId(fallback)
+  const c = fb?.cc === cc ? fb : PHONE_COUNTRIES.find((x) => x.cc === cc)
+  if (!c) return { country: fallback, local: text }
+  return { country: c.id, local: national(cc, n) }
+}
+
+const typingRegion = (country: string) => (country === 'US' || country === 'CA' ? 'US' : country === 'BR' ? 'BR' : 'ZZ')
+
+/** The national part as it's being typed, in the picked country's shape. */
+export function formatLocalTyping(next: string, prev: string, country: string): string {
+  const digits = next.replace(/\D/g, '')
+  // Past the longest number the country has, the keystroke is refused (2026-11-16:
+  // "it takes infinite digits"). A trunk 0 or a US leading 1 gets one more; a
+  // number typed with its +code is capped at E.164's 15.
+  if (/^\s*(\+|00)/.test(next)) {
+    const d = next.trim().startsWith('00') ? digits.slice(2) : digits
+    return d.length > 15 ? prev : formatPhoneTyping(next, prev, null)
+  }
+  const c = byId(country)
+  const extra = digits[0] === '0' || (c?.cc === '1' && digits[0] === '1') ? 1 : 0
+  if (c && digits.length > c.max + extra) return prev
+  return formatPhoneTyping(next, prev, typingRegion(country))
+}
+
+/** Country + national part → the stored number, "+1 (415) 123-1234". A
+ *  national part typed with its own +code keeps that code. */
+export function composePhone(country: string, local: string): string {
+  const text = local.trim()
+  if (!text) return ''
+  if (/^(\+|00)/.test(text)) return formatPhone(text)
+  if (/[a-z]/i.test(text)) return text
+  const c = byId(country)
+  let n = text.replace(/\D/g, '')
+  if (!c || n.length < 4) return text
+  if (c.cc === '1' && n.length === 11 && n[0] === '1') n = n.slice(1)
+  if (c.cc !== '1' && n[0] === '0') n = n.replace(/^0+/, '')
+  return `+${c.cc} ${national(c.cc, n)}`
 }

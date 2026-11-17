@@ -43,7 +43,9 @@ export function NudgePicker({
     if (sending) return
     setSending(true)
     try {
-      await sendPing(p.preset_key ?? 'custom', p.emoji, presetText(p, t), [profile.email])
+      await sendPing(p.preset_key ?? 'custom', p.emoji, presetText(p, t), [profile.email], false, {
+        source: p.preset_key && !p.label ? 'preset' : 'custom_preset',
+      })
       onSent(t('location.nudge.sent', { name: profile.display_name }))
     } catch {
       // swallow — the picker closes either way

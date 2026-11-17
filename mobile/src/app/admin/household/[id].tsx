@@ -67,7 +67,7 @@ export default function AdminHousehold() {
         .order('display_name'),
       supabase.rpc('admin_user_activity', { days: 30 }),
       supabase.rpc('admin_household_is_plus', { p_household: id }),
-      supabase.rpc('admin_household_events', { p_household: id, lim: 40 }),
+      supabase.rpc('admin_household_events', { p_household: id, lim: 200 }),
     ])
     const rows = (u.data ?? []) as (Omit<Profile, 'is_admin' | 'display_name'> & { display_name: string | null })[]
     const { data: admins } = rows.length
@@ -423,7 +423,7 @@ export default function AdminHousehold() {
                       <Txt variant="faint" style={{ fontSize: 12 }}>
                         {[f.app, timeAgo(f.created_at)].filter(Boolean).join(' · ')}
                       </Txt>
-                      {f.detail ? <Txt style={{ color: c.expense, fontSize: 12 }}>{f.detail}</Txt> : null}
+                      {f.detail ? <Txt style={{ color: f.isError ? c.expense : c.textMuted, fontSize: 12 }}>{f.detail}</Txt> : null}
                     </View>
                   </View>
                 ))

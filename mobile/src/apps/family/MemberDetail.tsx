@@ -23,7 +23,9 @@ import {
   type LucideIcon,
 } from 'lucide-react-native'
 
-import { formatPhone, formatDay, todayISO } from '@/lib/format'
+import { formatDay, todayISO } from '@/lib/format'
+import { formatPhone } from '@/lib/phone'
+import * as Localization from 'expo-localization'
 import { useI18n } from '@/hooks/useI18n'
 import { useTheme, sp, fonts } from '@/theme/theme'
 import { BirthdayCake } from '@/components/BirthdayCake'
@@ -133,7 +135,7 @@ export function MemberDetails({
       icon: look.icon,
       colors: look.colors,
       label: t(labelKey),
-      value: key === 'phone' ? formatPhone(raw) : kind === 'shoe' ? displayValue('shoe', raw) : raw,
+      value: key === 'phone' ? formatPhone(raw, Localization.getLocales()[0]?.regionCode ?? null) : kind === 'shoe' ? displayValue('shoe', raw) : raw,
       ...(kind && canConvert(kind, raw) ? { convert: { kind, raw } } : {}),
     })
   }

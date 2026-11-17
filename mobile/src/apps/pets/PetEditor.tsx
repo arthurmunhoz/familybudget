@@ -22,7 +22,7 @@ import { TintButton } from '@/components/TintButton'
 import { KeyboardScroll } from '@/components/KeyboardScroll'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
-import { track } from '@/lib/analytics'
+import { fieldsUsed, track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { Pet } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
@@ -222,8 +222,9 @@ export function PetEditor({
       Alert.alert(t('pets.addPetFailed'))
       return
     }
-    if (!pet) track('pet.created', { name: fields.name, species: fields.species })
-    else track('pet.updated', { name: fields.name, species: fields.species })
+    const { name: _n, emoji: _e, species: _s, photo_path: photo, ...rest } = fields
+    const used = fieldsUsed({ photo, ...rest })
+    track(pet ? 'pet.updated' : 'pet.created', { name: fields.name, species: fields.species, ...used })
     // Clean up a replaced/removed photo file.
     const oldPhoto = pet?.photo_path ?? null
     if (oldPhoto && oldPhoto !== (photoPath || null)) {

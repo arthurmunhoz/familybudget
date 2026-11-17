@@ -27,7 +27,7 @@ import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { HOUSEHOLD_COLOR, KIND_EMOJI, memberColor } from '@/lib/calendar'
-import { track } from '@/lib/analytics'
+import { fieldsUsed, track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
 import type { CalendarEvent, EventKind, EventRecurrence, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
@@ -182,8 +182,15 @@ export default function EventForm({
       Alert.alert(t('calendar.saveFailed'))
       return
     }
-    if (!editing) track('calendar.created', { title: fields.title, kind: draft.kind })
-    else track('calendar.updated', { title: fields.title, kind: draft.kind })
+    track(editing ? 'calendar.updated' : 'calendar.created', {
+      title: fields.title,
+      kind: draft.kind,
+      allDay: draft.allDay,
+      multiDay: end > draft.start,
+      repeat: draft.repeat,
+      forWhom: draft.owner ? 'member' : 'household',
+      ...fieldsUsed({ reminder: draft.remind, location: fields.location, notes: fields.notes }),
+    })
     onSaved(draft.start)
   }
 
