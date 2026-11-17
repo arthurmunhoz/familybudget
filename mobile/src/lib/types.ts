@@ -374,5 +374,9 @@ export interface MemberLocation {
   sharing: boolean
   /** ISO timestamp; while in the future, this member has paused sharing. */
   paused_until: string | null
+  /** What location permission the sharing phone last reported (migration
+   *  120): 'always' = background works; 'while_using' / 'denied' = it only
+   *  updates while the app is open (or never). null = an older app. */
+  bg_permission?: 'always' | 'while_using' | 'denied' | null
   updated_at: string
 }

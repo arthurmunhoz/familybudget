@@ -17,6 +17,7 @@ import { Settings } from 'lucide-react-native'
 
 import { Txt } from './ui'
 import SafetyBanner from '../apps/location/SafetyBanner'
+import LocationPermissionBanner from '../apps/location/LocationPermissionBanner'
 import NudgesBanner from '../apps/pings/NudgesBanner'
 import GamesBanner from '../apps/games/GamesBanner'
 import TodaySection, { SectionLabel } from './TodaySection'
@@ -26,7 +27,7 @@ import { AskSheet } from './home/AskSheet'
 import { RoofDock, ROOF_DOCK_H } from './home/RoofDock'
 import { FamilyStrip } from './home/FamilyStrip'
 import { useRoofPrefs, useRoofPrefsReady } from '../lib/roof'
-import { turnOnRoofWake, useRoofWake } from '../lib/roofWake'
+import { onDeviceOk, turnOnRoofWake, useRoofWake } from '../lib/roofWake'
 import { CHIME_MS, playChime, voiceSupported } from '../lib/voice'
 import { usePlus } from '../lib/plus'
 import { APP_GRADIENT } from './home/palette'
@@ -262,6 +263,8 @@ export default function Hub() {
           <NudgesBanner openNoteId={typeof noteParam === 'string' ? noteParam : undefined} onNoteOpened={() => router.setParams({ note: undefined })} />
           {/* An active safety radius — tap to manage or stop it. */}
           {WHEREABOUTS_ENABLED && <SafetyBanner />}
+          {/* Sharing on, but the phone can only report with the app open. */}
+          {WHEREABOUTS_ENABLED && <LocationPermissionBanner />}
           {/* Household of one — where to find the invite code. Last: a live
               nudge or a running safety watch is time-sensitive and should sit
               above a standing suggestion. */}
@@ -311,7 +314,9 @@ export default function Hub() {
         style={[styles.dockWrap, { bottom: dockGap }, corner ? { left: corner.side, right: corner.side } : null]}
       >
         <RoofDock
-          wake={!isPlus ? 'needsPlus' : !roof.wake ? 'off' : roofPaused ? 'paused' : wake}
+          // A phone that can't listen on-device never offers "Oi Casa" (no mic
+          // button that only opens an alert — owner, 2026-11-17).
+          wake={!isPlus ? 'needsPlus' : !onDeviceOk() ? 'unsupported' : !roof.wake ? 'off' : roofPaused ? 'paused' : wake}
           onOpen={() => openAsk(voiceSupported(), true)}
           onWakeTap={() => {
             if (roof.wake) {

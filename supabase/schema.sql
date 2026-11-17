@@ -281,6 +281,8 @@ create policy documents_storage_rw on storage.objects
 --   migration-113-note-wall.sql (note_favorites: a member keeps a drawn note with a heart; notes stay on the wall; Modo Casa only reads notes sent to the whole household)
 --   migration-114-note-hide.sql (note_hidden: a recipient takes a drawn note off THEIR wall; the sender deletes it for everyone via pings_delete)
 --   migration-115-transfer-ownership.sql (transfer_ownership(email): the active household's owner hands it to another member and becomes a member; refused with plus_owner while a linked Plus depends on them)
+--   migration-120-location-bg-permission.sql (member_locations.bg_permission always|while_using|denied — what the sharing phone's location permission really is, re-checked on every foreground; watchers say "only updates while the app is open")
+--   migration-119-assistant-gap-context.sql (assistant_gaps: user_email, via, place, screen, prev — who asked and in what context; still never the words)
 --   migration-118-admin-utilities-tools.sql (admin_app_usage / admin_app_time return `calc/<tool>` for Utilities paths so the admin names the tool)
 --   migration-117-roof-usage.sql (admin_roof_usage(days): how Roof is used — `roof.asked` web_events grouped by intent / voice-or-typed / phone-or-casa, plus a total row)
 --   migration-116-admin-feed-screens.sql (admin_household_events includes screen_view so the household feed shows screens visited; capped at 400 rows)

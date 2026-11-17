@@ -21,7 +21,7 @@ import { AppState } from 'react-native'
 
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/hooks/useI18n'
-import { captureAndUpload } from '@/lib/location'
+import { captureAndUpload, fetchMyLocation, reportBgPermission } from '@/lib/location'
 import { WHEREABOUTS_ENABLED } from '@/lib/features'
 import { resumeBackgroundUpdatesIfSharing, stopBackgroundUpdates } from '@/lib/locationTask'
 
@@ -46,9 +46,16 @@ export function useLocationSync(): void {
     const resume = async () => {
       try {
         const restarted = await resumeBackgroundUpdatesIfSharing(labels)
-        // Only after an actual restart: the pin is stale by definition at that
-        // point, and the task's own first report can be a cadence away.
-        if (restarted) await captureAndUpload().catch(() => {})
+        // Re-check the permission on every foreground: iOS can turn "Always"
+        // down to "While Using" behind our back, and then nothing reports in
+        // the background — see reportBgPermission (2026-11-17).
+        const mine = await fetchMyLocation().catch(() => null)
+        const perm = await reportBgPermission(mine)
+        // Opening the app must always put my pin right. On iOS a registered
+        // task counts as "not restarted", so a phone whose background
+        // reporting had died sent NOTHING on open (60 m filter) and the family
+        // kept a fix from hours ago. Foreground permission only — never a prompt.
+        if (restarted || (perm != null && perm !== 'denied')) await captureAndUpload().catch(() => {})
       } catch {
         // Never let this throw into the app — it runs on every foreground.
       }

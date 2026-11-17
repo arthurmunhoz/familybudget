@@ -116,6 +116,12 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   code, reported by the app via `reportGap()` → `suggest-ping?action=assistant-gap`.
   Keep it that way: web-style analytics are readable by the global admin across
   every household.
+  **Since migration 119 (owner, 2026-11-17)** each row also has WHO and the
+  context — `user_email` (set by the server from the JWT), `via` voice|typed,
+  `place` phone|casa, `screen` (the path Roof was opened on) and `prev` (the
+  intent just before) — sent by the app as codes (`setGapContext` in
+  lib/assistant; Modo Casa's `buildContext`). The admin lists them one by one,
+  newest first, without internal households. Still never the words.
 - **Assistant events** (`locateEvent` in lib/assistant): finds the event by
   loose title on a day, or its NEXT occurrence (recurring series expanded).
   `move_event` keeps the length; `remove_event` / `edit_event` (rename, place,
@@ -1986,6 +1992,19 @@ map (`@rnmapbox/maps`) and background location (`expo-location` +
   once; a phone that doesn't move doesn't report (its pin is right anyway);
   Android doesn't relaunch on fences at all (Expo docs) — there it only helps
   while the process lives.
+- **Lost "Always" permission (migration 120, 2026-11-17).** iOS asks every
+  so often whether to keep allowing background location; "keep only while
+  using" leaves `sharing = true` while the phone reports ONLY with the app
+  open and no place / leash geofence fires (`startGeofencingAsync` throws
+  without Always). Seen on Patricia's iPhone: pin "at Home" 20 h while out,
+  no `place_events` since 2026-11-06; edge logs showed GET+POST only on opens.
+  `useLocationSync` now, on every foreground while sharing: reads the real
+  permission (`readBgPermission`), writes `member_locations.bg_permission`
+  (always | while_using | denied) when it changed (`reportBgPermission`), and
+  uploads a fresh fix (iOS used to send nothing on open when the task was
+  registered). The phone shows `LocationPermissionBanner` on the Home (→ iOS
+  Settings); watchers' `StaleChip` says "only updates while the app is open"
+  and its nudge asks for Always. Older apps leave the column null.
 - **Watching a member follows them.** Opening a card arms `followRef` in
   Whereabouts and every position they report re-centres the camera (holding the
   watcher's zoom, offset by the roster height); a drag or pinch — detected via

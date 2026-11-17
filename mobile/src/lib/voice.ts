@@ -185,8 +185,16 @@ export function playChime(which: 'start' | 'stop') {
   chime(which)
 }
 
+/** Can this phone take a SPOKEN request at all (tap to talk)? A phone with no
+ *  speech service gets the keyboard instead (owner, 2026-11-17). */
 export function voiceSupported(): boolean {
-  return speech() !== null
+  const m = speech() as (SpeechModule & { isRecognitionAvailable?: () => boolean }) | null
+  if (!m) return false
+  try {
+    return m.isRecognitionAvailable ? !!m.isRecognitionAvailable() : true
+  } catch {
+    return true
+  }
 }
 
 /** Join a new result onto what's been heard. iOS 18 resets its transcript

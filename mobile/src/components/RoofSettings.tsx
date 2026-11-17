@@ -15,7 +15,7 @@ import { useI18n } from '@/hooks/useI18n'
 import type { TKey } from '@/lib/i18n'
 import { usePlus } from '@/lib/plus'
 import { setRoofPref, useRoofPrefs, type RoofPrefs } from '@/lib/roof'
-import { onRoofHeard, roofLastHeard, turnOnRoofWake } from '@/lib/roofWake'
+import { onDeviceOk, onRoofHeard, roofLastHeard, turnOnRoofWake } from '@/lib/roofWake'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
 
 const ROOF_GRADIENT: [string, string] = ['#E58A63', '#B9532F']
@@ -27,6 +27,9 @@ export function RoofSettings() {
   const { isPlus } = usePlus()
   const prefs = useRoofPrefs()
   const heard = useSyncExternalStore(onRoofHeard, roofLastHeard)
+  // "Oi Casa" needs on-device recognition; without it the row says why and
+  // has no switch (Roof itself still works with a tap).
+  const wakeOk = onDeviceOk()
 
   async function set(k: keyof RoofPrefs, v: boolean) {
     if (!isPlus) {
@@ -42,11 +45,13 @@ export function RoofSettings() {
   }
 
   const row = (k: keyof RoofPrefs, Icon: typeof Volume2, title: TKey, hint: TKey, first = false) => {
-    const on = isPlus && prefs[k]
+    const blocked = k === 'wake' && !wakeOk
+    const on = isPlus && !blocked && prefs[k]
     return (
       <Pressable
         accessibilityRole="switch"
         accessibilityState={{ checked: on }}
+        disabled={blocked && isPlus}
         onPress={() => void set(k, !on)}
         style={[styles.row, first ? null : { paddingTop: sp.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}
       >
@@ -55,9 +60,9 @@ export function RoofSettings() {
         </GradientBox>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt style={{ fontFamily: fonts.semibold }}>{t(title)}</Txt>
-          <Txt variant="faint">{t(hint)}</Txt>
+          <Txt variant="faint">{t(blocked ? 'settings.roofNoDevice' : hint)}</Txt>
         </View>
-        {isPlus ? (
+        {blocked && isPlus ? null : isPlus ? (
           <Toggle value={on} onValueChange={(v) => void set(k, v)} />
         ) : (
           <View style={[styles.plus, { backgroundColor: c.accentSoft }]}>

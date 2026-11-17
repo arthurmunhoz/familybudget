@@ -154,9 +154,21 @@ function isStale(updatedAt: string | null | undefined): boolean {
  *  (keyed on updated_at). If nothing comes back (app force-quit, Low Power
  *  Mode, iOS rationing silent pushes) it offers a VISIBLE nudge asking them to
  *  open the app, plus a retry. */
-function StaleChip({ email, name, ago }: { email: string; name: string; ago: string }) {
+function StaleChip({
+  email,
+  name,
+  ago,
+  limited,
+}: {
+  email: string
+  name: string
+  ago: string
+  /** Their phone said it lacks the background permission (migration 120):
+   *  a wake can't help, so say why and offer the nudge straight away. */
+  limited?: 'while_using' | 'denied' | null
+}) {
   const { t } = useI18n()
-  const [phase, setPhase] = useState<'waiting' | 'noAnswer' | 'nudged'>('waiting')
+  const [phase, setPhase] = useState<'waiting' | 'noAnswer' | 'nudged'>(limited ? 'noAnswer' : 'waiting')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function wait() {
@@ -165,10 +177,11 @@ function StaleChip({ email, name, ago }: { email: string; name: string; ago: str
     timer.current = setTimeout(() => setPhase('noAnswer'), WAKE_WAIT_MS)
   }
   useEffect(() => {
-    wait()
+    if (!limited) wait()
     return () => {
       if (timer.current) clearTimeout(timer.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount (keyed on updated_at)
   }, [])
 
   function retry() {
@@ -177,7 +190,14 @@ function StaleChip({ email, name, ago }: { email: string; name: string; ago: str
   }
   async function nudge() {
     try {
-      await sendPing('location-request', '📍', t('location.stale.nudgeMessage'), [email], false, { source: 'location' })
+      await sendPing(
+        'location-request',
+        '📍',
+        t(limited ? 'location.stale.limitedMessage' : 'location.stale.nudgeMessage'),
+        [email],
+        false,
+        { source: 'location' },
+      )
       setPhase('nudged')
     } catch {
       // keep the button; they can try again
@@ -212,7 +232,11 @@ function StaleChip({ email, name, ago }: { email: string; name: string; ago: str
             ? t('location.stale.asking')
             : phase === 'nudged'
               ? t('location.stale.nudged', { name })
-              : t('location.stale.noAnswer')}
+              : limited === 'denied'
+                ? t('location.stale.limitedOff')
+                : limited
+                  ? t('location.stale.limited')
+                  : t('location.stale.noAnswer')}
         </Txt>
       </View>
       {phase === 'noAnswer' ? (
@@ -408,6 +432,7 @@ export function MemberDetailCard({
                 email={profile.email}
                 name={profile.display_name.trim().split(/\s+/)[0] ?? profile.display_name}
                 ago={timeAgo(live.updated_at, t)}
+                limited={live.bg_permission === 'always' ? null : live.bg_permission}
               />
             ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', height: 43 }}>

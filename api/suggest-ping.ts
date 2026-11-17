@@ -517,10 +517,19 @@ async function recordGap(
   db: any,
   household: string | null,
   g: { kind: 'unknown' | 'failed'; intent?: string; reason?: string; summary?: string; lang?: string },
+  // Who asked and in what context (migration 119): codes only, never the words.
+  who: { email?: string; body?: any } = {},
 ) {
   if (!db) return
+  const b = who.body ?? {}
+  const code = (v: unknown) => (typeof v === 'string' && /^[a-z_]{1,40}$/.test(v) ? v : '')
   try {
     await db.from('assistant_gaps').insert({
+      user_email: who.email ?? null,
+      via: b.via === 'voice' || b.via === 'typed' ? b.via : '',
+      place: b.where === 'phone' || b.where === 'casa' ? b.where : '',
+      screen: typeof b.screen === 'string' && /^\/[a-z0-9/_-]{0,40}$/.test(b.screen) ? b.screen : '',
+      prev: code(b.prev),
       household_id: household,
       kind: g.kind,
       intent: (g.intent ?? '').slice(0, 40),
@@ -752,7 +761,7 @@ async function assistant(body: any, db: any, household: string | null, res: any,
     }
     if (out.intent === 'unknown') {
       // The model's anonymised rewrite only — never `text` (see migration 088).
-      await recordGap(db, household, { kind: 'unknown', summary: gap, lang: str(body?.lang, 8) })
+      await recordGap(db, household, { kind: 'unknown', summary: gap, lang: str(body?.lang, 8) }, { email, body })
     }
     return res.status(200).json(q ? { ...out, quota: q } : out)
   } catch (err: any) {
@@ -866,7 +875,7 @@ export default async function handler(req: any, res: any) {
       hh = caller?.household_id ?? null
     }
     const code = (v: unknown) => (typeof v === 'string' && /^[a-z_]{1,40}$/.test(v) ? v : '')
-    await recordGap(dbGap, hh, { kind: 'failed', intent: code(req.body?.intent), reason: code(req.body?.reason), lang: code(req.body?.lang) })
+    await recordGap(dbGap, hh, { kind: 'failed', intent: code(req.body?.intent), reason: code(req.body?.reason), lang: code(req.body?.lang) }, { email, body: req.body })
     return res.status(200).json({ ok: true })
   }
 

@@ -19,7 +19,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, usePathname } from 'expo-router'
 import { ArrowUp, CalendarDays, ChevronRight, Mic, PawPrint, RotateCcw, Sparkles } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
@@ -46,6 +46,7 @@ import {
   moveEvent,
   removeEvent,
   reportGap,
+  setGapContext,
   restoreEvent,
   unremoveEvent,
   familyInfo,
@@ -781,6 +782,8 @@ export function AskSheet({
       // "What can you do?" — the capabilities screen, right here (instant,
       // nothing sent or spent).
       thenRef.current = ''
+      // Who / where / after what, for a request Roof can't do (codes only).
+      setGapContext({ via: viaVoice.current ? 'voice' : 'typed', screen: pathname, prev: /^[a-z_]{1,40}$/.test(askedRef.current) ? askedRef.current : '' })
       // What this request turned out to be, for the usage count (never the words).
       askedRef.current = 'reply'
       const here = await answerHere(q, prev)
@@ -899,6 +902,7 @@ export function AskSheet({
   chainRef.current = !!chainQ
   const thenRef = useRef('')
   const askedRef = useRef('')
+  const pathname = usePathname()
   const chained = useRef(0)
   useEffect(() => {
     if (answer) lastAnswer.current = answer

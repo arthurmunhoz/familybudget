@@ -28,7 +28,7 @@ import { useCachedQuery } from '@/hooks/useCachedQuery'
 import { useI18n } from '@/hooks/useI18n'
 import { SEMANTIC_EVENTS, track } from '@/lib/analytics'
 import { APP_META } from '@/lib/appRoutes'
-import { buildFeed, type EventRow, type FeedItem } from '@/lib/activityFeed'
+import { buildFeed, screenName, type EventRow, type FeedItem } from '@/lib/activityFeed'
 import { formatDuration, timeAgo } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
@@ -73,6 +73,7 @@ interface AppStat {
 }
 type ErrorRow = { id: number; user_email: string; target: string | null; path: string | null; created_at: string }
 type UsageData = { stats: AppStat[]; errors: ErrorRow[]; usage: Record<string, number> }
+type GapRow = { id: number; failed: boolean; label: string; who: string; home: string; at: string; via: string; place: string; screen: string; prev: string }
 
 const TZ = (() => {
   try {
@@ -206,26 +207,58 @@ export default function Admin() {
   // What the Home assistant couldn't do (migration 088): anonymised rewrites
   // for requests it didn't understand, intent · reason for ones it couldn't
   // carry out — grouped and counted, the most asked first.
-  const { data: gaps = [] } = useCachedQuery<{ label: string; failed: boolean; n: number }[]>(
-    `admin:gaps:${days}`,
+  // Each one on its own, newest first, with WHO asked, when and in what context
+  // (migration 119) — never the words. Internal households are left out.
+  const { data: gaps = [] } = useCachedQuery<GapRow[]>(
+    `admin:gaps2:${days}`,
     async () => {
       const since = new Date(Date.now() - days * 86_400_000).toISOString()
       const { data } = await supabase
         .from('assistant_gaps')
-        .select('kind, intent, reason, summary')
+        .select('id, created_at, kind, intent, reason, summary, user_email, household_id, via, place, screen, prev')
         .gte('created_at', since)
         .order('created_at', { ascending: false })
-        .limit(500)
-      const counts = new Map<string, { label: string; failed: boolean; n: number }>()
-      for (const g of (data ?? []) as { kind: string; intent: string; reason: string; summary: string }[]) {
-        const failed = g.kind === 'failed'
-        const label = failed ? `${humanizeEvent(g.intent)} · ${humanizeEvent(g.reason)}` : g.summary.trim().toLowerCase() || '—'
-        const k = `${g.kind}:${label}`
-        const cur = counts.get(k) ?? { label, failed, n: 0 }
-        cur.n++
-        counts.set(k, cur)
-      }
-      return [...counts.values()].sort((a, b) => b.n - a.n).slice(0, 20)
+        .limit(120)
+      const rows = (data ?? []) as {
+        id: number
+        created_at: string
+        kind: string
+        intent: string
+        reason: string
+        summary: string
+        user_email: string | null
+        household_id: string | null
+        via: string | null
+        place: string | null
+        screen: string | null
+        prev: string | null
+      }[]
+      const emails = [...new Set(rows.map((r) => r.user_email).filter((x): x is string => !!x))]
+      const hids = [...new Set(rows.map((r) => r.household_id).filter((x): x is string => !!x))]
+      const [people, homes] = await Promise.all([
+        emails.length ? supabase.from('allowed_users').select('email, display_name').in('email', emails) : Promise.resolve({ data: [] }),
+        hids.length ? supabase.from('households').select('id, name, is_internal').in('id', hids) : Promise.resolve({ data: [] }),
+      ])
+      const nameOf = new Map(((people.data ?? []) as { email: string; display_name: string | null }[]).map((u) => [u.email, u.display_name || u.email.split('@')[0]]))
+      const homeOf = new Map(((homes.data ?? []) as { id: string; name: string; is_internal: boolean }[]).map((h) => [h.id, h]))
+      return rows
+        .filter((r) => !(r.household_id && homeOf.get(r.household_id)?.is_internal))
+        .slice(0, 60)
+        .map((r) => {
+          const failed = r.kind === 'failed'
+          return {
+            id: r.id,
+            failed,
+            label: failed ? `${humanizeEvent(r.intent)} · ${humanizeEvent(r.reason)}` : r.summary.trim() || '—',
+            who: r.user_email ? (nameOf.get(r.user_email) ?? r.user_email.split('@')[0]) : '',
+            home: r.household_id ? (homeOf.get(r.household_id)?.name ?? '') : '',
+            at: r.created_at,
+            via: r.via ?? '',
+            place: r.place ?? '',
+            screen: r.screen ? screenName(r.screen) : '',
+            prev: r.prev ? humanizeEvent(r.prev) : '',
+          }
+        })
     },
   )
   // How Roof is used (migration 117): one row per intent · via · where, and a
@@ -609,19 +642,31 @@ export default function Admin() {
                   </View>
                 ) : (
                   gaps.map((g, i) => (
-                    <View key={`${g.failed}:${g.label}`} style={[s.row, { borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: c.border }]}>
+                    <View key={g.id} style={[s.row, { alignItems: 'flex-start', borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: c.border }]}>
                       <View style={[s.tile, { backgroundColor: g.failed ? c.expense + '1F' : TINT + (dark ? '2E' : '1A') }]}>
                         {g.failed ? <Bug size={16} color={c.expense} /> : <Sparkles size={16} color={TINT} />}
                       </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Txt style={{ fontSize: 14.5, color: c.text }} numberOfLines={2}>
+                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                        <Txt style={{ fontSize: 14.5, color: c.text }} numberOfLines={3}>
                           {g.label}
                         </Txt>
-                        <Txt variant="faint" style={{ fontSize: 12 }}>
-                          {g.failed ? t('admin.gapFailed') : t('admin.gapUnknown')}
+                        <Txt style={{ fontSize: 12.5, fontFamily: fonts.semibold, color: c.textMuted }} numberOfLines={1}>
+                          {[g.who || t('admin.gapNoUser'), g.home, new Date(g.at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Txt>
+                        <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={2}>
+                          {[
+                            g.failed ? t('admin.gapFailed') : t('admin.gapUnknown'),
+                            g.via === 'voice' ? t('admin.roofVoice') : g.via === 'typed' ? t('admin.gapTyped') : '',
+                            g.place === 'casa' ? t('admin.roofCasa') : g.place === 'phone' ? t('admin.gapPhone') : '',
+                            g.screen ? t('admin.gapOn', { screen: g.screen }) : '',
+                            g.prev ? t('admin.gapAfter', { what: g.prev }) : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </Txt>
                       </View>
-                      <Txt style={{ fontSize: 14, fontFamily: fonts.semibold, color: c.text }}>{g.n}×</Txt>
                     </View>
                   ))
                 )}

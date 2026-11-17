@@ -214,6 +214,65 @@ export async function ensureForegroundPermission(): Promise<boolean> {
   return req.granted
 }
 
+// ---------------------------------------------------------------------------
+// Background permission — re-checked on every foreground (migration 120)
+// ---------------------------------------------------------------------------
+
+export type BgPermission = 'always' | 'while_using' | 'denied'
+
+/** What this phone's location permission really is right now. iOS asks every
+ *  so often whether to keep allowing location in the background; answering
+ *  "keep only while using" leaves `sharing` on in the database while the
+ *  phone reports only with the app open and no geofence (place or leash) ever
+ *  fires again. That is exactly how a member sat "at Home" for 20 h while out
+ *  (2026-11-17). */
+export async function readBgPermission(): Promise<BgPermission> {
+  const fg = await Location.getForegroundPermissionsAsync().catch(() => null)
+  if (!fg?.granted) return 'denied'
+  const bg = await Location.getBackgroundPermissionsAsync().catch(() => null)
+  return bg?.granted ? 'always' : 'while_using'
+}
+
+// A tiny external store so the Home banner follows what useLocationSync last
+// found, without a second permission check per screen.
+let bgPermNow: BgPermission | null = null
+const bgPermListeners = new Set<() => void>()
+export function getBgPermissionSnapshot(): BgPermission | null {
+  return bgPermNow
+}
+export function subscribeBgPermission(fn: () => void): () => void {
+  bgPermListeners.add(fn)
+  return () => {
+    bgPermListeners.delete(fn)
+  }
+}
+function setBgPermissionSnapshot(v: BgPermission | null): void {
+  if (v === bgPermNow) return
+  bgPermNow = v
+  bgPermListeners.forEach((fn) => fn())
+}
+
+/** Write my permission to my row (only when it changed) so the family's cards
+ *  can say "only updates while the app is open" instead of a bare stale chip.
+ *  `null` clears the Home banner (not sharing). Never throws; a database
+ *  without migration 120 just rejects the column and nothing else changes. */
+export async function reportBgPermission(mine: MemberLocation | null): Promise<BgPermission | null> {
+  if (!isSharingEnabled(mine)) {
+    setBgPermissionSnapshot(null)
+    return null
+  }
+  const perm = await readBgPermission()
+  setBgPermissionSnapshot(perm)
+  if (mine && mine.bg_permission !== perm) {
+    await supabase
+      .from('member_locations')
+      .update({ bg_permission: perm })
+      .eq('user_email', mine.user_email)
+      .then(() => undefined, () => undefined)
+  }
+  return perm
+}
+
 /** Grab a single fix now (foreground) and persist it, so my dot is fresh the
  *  moment I open the map. Returns the fix, or null if permission was denied. */
 export async function captureAndUpload(): Promise<Fix | null> {

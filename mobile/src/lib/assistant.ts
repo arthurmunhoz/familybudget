@@ -532,7 +532,7 @@ async function askServer(text: string, ctx: AskContext): Promise<ServerReply> {
     const res = await fetch(`${API_BASE}/api/suggest-ping?action=assistant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ text, ...ctx }),
+      body: JSON.stringify({ text, ...ctx, ...gapCtx }),
     })
     if (res.status === 402) {
       const j = (await res.json().catch(() => null)) as { error?: string; used?: number; cap?: number } | null
@@ -558,6 +558,14 @@ async function askServer(text: string, ctx: AskContext): Promise<ServerReply> {
 /** Tell the server the app understood a request but couldn't carry it out —
  *  the intent and a reason CODE only, never what was said (migration 088).
  *  Fire-and-forget. */
+/** Where the current request comes from — rides along on every request and
+ *  gap report so the admin sees who / where / after what (migration 119).
+ *  Codes only. AskSheet sets it on each submit. */
+let gapCtx: { via: 'voice' | 'typed'; where: 'phone'; screen: string; prev: string } = { via: 'typed', where: 'phone', screen: '', prev: '' }
+export function setGapContext(c: { via: 'voice' | 'typed'; screen: string; prev: string }): void {
+  gapCtx = { ...c, where: 'phone' }
+}
+
 export function reportGap(intent: string, reason: string, lang: string): void {
   if (!API_BASE) return
   void (async () => {
@@ -568,7 +576,7 @@ export function reportGap(intent: string, reason: string, lang: string): void {
       await fetch(`${API_BASE}/api/suggest-ping?action=assistant-gap`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ intent, reason, lang }),
+        body: JSON.stringify({ intent, reason, lang, ...gapCtx }),
       })
     } catch {
       /* best-effort */
