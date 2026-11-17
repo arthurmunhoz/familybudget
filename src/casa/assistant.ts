@@ -14,7 +14,8 @@ import { overdueEvents } from '../lib/petCare'
 import { fetchPingPresets, presetText, sendPing } from '../lib/pings'
 import type { TKey } from '../lib/i18n'
 import { supabase } from '../lib/supabase'
-import type { CalendarEvent, EventRecurrence, PetEventType, ShoppingItem, ShoppingStore } from '../lib/types'
+import type { Budget, CalendarEvent, EventRecurrence, PetEventType, ShoppingItem, ShoppingStore } from '../lib/types'
+import { addEntry, deleteEntry, listBudgets, pickBudget } from './money'
 import { petsDue, setChecked, deleteItems, restoreItems, type HubData, type Member } from './data'
 import { cutWrite, fromServer, KNOWN_INTENTS, PET_SWAPPABLE, petsAsked, type Intent } from './intent'
 import * as R from './roofData'
@@ -92,11 +93,25 @@ export type Done = {
 export type Outcome =
   | Done
   | { kind: 'pick'; question: string; options: PickOption[]; onPick: (id: string) => Promise<Outcome> }
-  | { kind: 'open'; target: OpenTarget }
+  /** `say`: said (and shown) before it opens; `money`: an entry to record once the PIN is in. */
+  | { kind: 'open'; target: OpenTarget; say?: string; money?: PendingMoney }
   | { kind: 'caps' }
   | { kind: 'bye'; text: string }
 
+/** An expense / income said to Roof while Money was locked: written when the PIN unlocks it. */
+export interface PendingMoney {
+  budget: Budget
+  type: 'expense' | 'income'
+  amount: number
+  label: string
+  date: string
+  /** "R$ 50,00 · Mercado", for the PIN screen. */
+  line: string
+}
+
 export interface AskEnv {
+  /** Money is unlocked on this device right now (the PIN was typed). */
+  unlocked: boolean
   t: T
   lang: 'en' | 'es' | 'pt'
   today: string
@@ -145,7 +160,7 @@ async function buildContext(env: AskEnv, text: string) {
   }
 }
 
-export type Understood = { ok: true; intent: Intent } | { ok: false; reason: 'offline' | 'limit' }
+export type Understood = { ok: true; intent: Intent; then?: string } | { ok: false; reason: 'offline' | 'limit' }
 
 /** Ask the server and settle on one intent, like the phone's
  *  understandWithSource: a missing detail is asked for (never guessed), a cut
@@ -173,7 +188,9 @@ export async function understand(env: AskEnv, text: string): Promise<Understood>
     const view = remote.intent === 'pets_due' && remote.view ? { view: remote.view } : {}
     if (asked.length > 1) return { ok: true, intent: { intent: 'pets_due', pet: asked.join(', '), ...view } }
     if (asked[0] && (remote.intent !== 'pets_due' || !remote.pet)) return { ok: true, intent: { intent: 'pets_due', pet: asked[0], ...view } }
-    return { ok: true, intent: remote }
+    // A second task said in the same breath: Roof asks it next.
+    const then = typeof j.then === 'string' ? j.then.trim().slice(0, 200) : ''
+    return { ok: true, intent: remote, ...(then ? { then } : {}) }
   } catch {
     return { ok: false, reason: 'offline' }
   }
@@ -270,6 +287,7 @@ const MONEY = new Set(['add_money', 'money_summary', 'list_money', 'fix_money', 
 const WRITES = new Set([
   'add_items', 'check_items', 'remove_items', 'move_items', 'clear_checked', 'uncheck_items',
   'add_event', 'move_event', 'remove_event', 'edit_event', 'pet_done', 'pet_log', 'pet_weight', 'family_update', 'send_nudge',
+  'add_money', 'create_list', 'edit_item',
 ])
 
 // ── calendar answers (shared by the "which one?" rows) ───────────────────────
@@ -399,6 +417,34 @@ function recurringChoice(env: AskEnv, mode: 'remove' | 'move', ev: CalendarEvent
   return say('calendar', t('ask.seriesRemoveAsk', { title: ev.title }), { rows: [row], choices })
 }
 
+async function addMoney(env: AskEnv, intent: Extract<Intent, { intent: 'add_money' }>): Promise<Outcome> {
+  const { t, me } = env
+  if (!(intent.amount > 0)) return say('money', t('ask.need.addMoney'))
+  const budgets = await listBudgets()
+  if (!budgets.length) return say('money', t('casa.ra.moneyNoBudget'))
+  const amount = formatMoney(intent.amount)
+  const label = intent.title.trim()
+  const line = [amount, label].filter(Boolean).join(' · ')
+  const put = async (b: Budget): Promise<Outcome> => {
+    if (!env.unlocked)
+      return { kind: 'open', target: 'money', say: t('casa.ra.moneyPinAdd', { line }), money: { budget: b, type: intent.type, amount: intent.amount, label, date: intent.date, line } }
+    const r = await addEntry({ budget: b, type: intent.type, amount: intent.amount, label, person: me.email, date: intent.date })
+    return say('money', t(intent.type === 'income' ? 'casa.ra.moneyIn' : 'casa.ra.moneyOut', { line, budget: b.name }), {
+      check: true,
+      view: 'money',
+      undo: () => deleteEntry(r.id, r.createdMonth),
+    })
+  }
+  const b = pickBudget(budgets, intent.budget)
+  if (b) return put(b)
+  return {
+    kind: 'pick',
+    question: t('casa.ra.whichBudget', { line }),
+    options: budgets.map((x) => ({ id: x.id, label: x.name, gradient: GRAD.money })),
+    onPick: async (id) => put(budgets.find((x) => x.id === id) ?? budgets[0]),
+  }
+}
+
 // ── doing ────────────────────────────────────────────────────────────────────
 
 /** Carry out what the server understood. `full` = the plan lets this device act. */
@@ -407,7 +453,11 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
   const general = t('casa.list.general')
 
   // Refused on the home device, whatever the plan (owner, 2026-11-14).
-  if (MONEY.has(intent.intent)) return say('money', t('casa.ra.moneyPhone'), { sub: t('casa.ra.moneyPhoneSub'), view: 'money' })
+  // MONEY (owner, 2026-11-17): an expense / income can be SAID here — it only
+  // writes — but anything that SHOWS money goes to the Money panel, which
+  // asks for the PIN. Locked, the entry waits for the PIN and is written then.
+  if (intent.intent === 'add_money') return full ? addMoney(env, intent) : say('orb', t('casa.plan.lockedAction'))
+  if (MONEY.has(intent.intent)) return { kind: 'open', target: 'money', say: t(env.unlocked ? 'casa.ra.moneyOpen' : 'casa.ra.moneyPin') }
   if (intent.intent === 'start_game') return say('orb', t('casa.ra.gamesPhone'))
   if (intent.intent === 'open_document') return say('orb', t('casa.ra.docsPhone'))
   if (!full && WRITES.has(intent.intent)) return say('orb', t('casa.plan.lockedAction'))
@@ -895,22 +945,11 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
         view: 'family',
       })
     }
-    case 'where_is': {
-      const person = intent.person ? R.findMember(intent.person, data.members) : null
-      if (!person) return say('family', t('ask.whoNotFound', { name: intent.person }))
-      const r = await R.whereIs(person.email, intent.place)
-      const name = person.first
-      if (!r.ok) return say('family', r.reason === 'paused' ? t('ask.wherePaused', { name }) : r.reason === 'not_sharing' ? t('ask.whereNotSharing', { name }) : t('ask.whereNoFix', { name }))
-      const ago = r.minutesAgo < 2 ? t('ask.justNow') : r.minutesAgo < 60 ? t('ask.minutesAgo', { n: r.minutesAgo }) : t('ask.hoursAgo', { n: Math.round(r.minutesAgo / 60) })
-      const head = r.place
-        ? r.atAsked === true
-          ? t('ask.whereYes', { name, place: r.place })
-          : r.atAsked === false
-            ? t('ask.whereNo', { name, place: r.place })
-            : t('ask.whereAt', { name, place: r.place })
-        : t('casa.ra.whereOut', { name })
-      return say('family', head, { sub: [ago, r.battery != null ? `🔋 ${Math.round(r.battery)}%` : ''].filter(Boolean).join(' · ') })
-    }
+    case 'where_is':
+    case 'ask_location':
+      // A home device can't read where the family is (migration 111): say so
+      // instead of "isn't sharing", which was simply wrong.
+      return say('family', t('casa.ra.wherePhone'))
 
     // ── weather, utilities ───────────────────────────────────────────────────
     case 'weather': {
@@ -972,6 +1011,125 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
       if (['games', 'hangman', 'battleship', 'quiz'].includes(intent.topic))
         return say('orb', intent.reply || t('casa.ra.gamesPhone'), { sub: intent.reply ? t('casa.ra.gamesPhone') : undefined })
       return say('orb', intent.reply || t('casa.roof.notSure'))
+    case 'undo_last':
+      return say('orb', t('casa.roof.nothingToUndo'))
+
+    // ── newer (2026-11-17) ───────────────────────────────────────────────────
+    case 'create_list': {
+      const hit = data.stores.find((x) => norm(x.name) === norm(intent.name))
+      if (hit) return say('lists', t('ask.listExists', { name: hit.name }), { view: 'lists' })
+      const made = await R.createStore(intent.name)
+      env.refresh()
+      return say('lists', t('ask.listCreated', { name: made.name }), {
+        check: true,
+        view: 'lists',
+        undo: async () => {
+          await R.undoAdd([], made.id)
+          env.refresh()
+        },
+      })
+    }
+    case 'edit_item': {
+      const item = R.matchLabels([intent.item], data.open).hits[0]
+      if (!item) return say('lists', t('ask.notFoundList', { items: intent.item }), { view: 'lists' })
+      const relabel = async (label: string) => {
+        await supabase.from('shopping_items').update({ label }).eq('id', item.id)
+        env.refresh()
+      }
+      await relabel(intent.label)
+      return say('lists', t('ask.itemRenamed', { before: item.label, after: intent.label }), { check: true, view: 'lists', undo: () => relabel(item.label) })
+    }
+    case 'my_nudges': {
+      const list = await R.unseenNudges(me.email)
+      const name = me.name.split(' ')[0]
+      if (!list.length) return say('nudge', t('casa.ra.nudgesNone', { name }))
+      const from = (email: string) => data.members.find((m) => m.email === email)?.first ?? ''
+      const title = t('casa.ra.nudgesSome', { name, n: list.length })
+      return say('nudge', title, {
+        rows: list.slice(0, 6).map((n) => ({ emoji: n.emoji, title: `“${n.message}”`, sub: from(n.from) })),
+        speak: `${title} ${list
+          .slice(0, 3)
+          .map((n) => `${from(n.from)}: ${n.message}`)
+          .join('. ')}`,
+      })
+    }
+    case 'free_check': {
+      const who = intent.scope === 'person' ? R.findMember(intent.person, data.members) : null
+      if (intent.scope === 'person' && !who) return say('family', t('ask.whoNotFound', { name: intent.person }))
+      const mins = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5))
+      const from = intent.from ? mins(intent.from) : 0
+      const to = intent.from ? (intent.to && mins(intent.to) > from ? mins(intent.to) : from + 60) : 24 * 60
+      // Timed events only: an all-day row (a birthday) doesn't make anyone busy.
+      const busy = occurrencesInRange(data.events, intent.date, intent.date)
+        .filter((o) => {
+          const ev = o.event
+          if (ev.all_day || !ev.start_time) return false
+          if (who && ev.owner_email && ev.owner_email !== who.email) return false
+          const a = mins(ev.start_time)
+          const b = ev.end_time && mins(ev.end_time) > a ? mins(ev.end_time) : a + 60
+          return a < to && b > from
+        })
+        .sort(compareOccurrences)
+      const day = whenLabel(env, intent.date, intent.date)
+      const hm = (m: number) => formatTime(`${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`, LOCALE[lang])
+      const when = intent.from ? t('ask.freeWindow', { day, from: hm(from), to: hm(to) }) : day
+      const rows: AnswerRow[] = busy.slice(0, 6).map((o) => ({
+        emoji: KIND_EMOJI[o.event.kind] || '🗓️',
+        title: o.event.title,
+        sub: [timeOf(o.event, lang), data.members.find((m) => m.email === o.event.owner_email)?.first ?? ''].filter(Boolean).join(' · '),
+      }))
+      let title: string
+      if (intent.scope === 'all') {
+        const everyone = busy.some((o) => !o.event.owner_email)
+        const free = everyone ? [] : data.members.filter((m) => !busy.some((o) => o.event.owner_email === m.email)).map((m) => m.first)
+        title = free.length ? t('ask.freeAll', { when, names: joinList(free, lang) }) : t('ask.freeNobody', { when })
+      } else if (who) {
+        title = busy.length ? t('ask.freeNo', { name: who.first, n: busy.length, when }) : t('ask.freeYes', { name: who.first, when })
+      } else {
+        // "Am I free?" — a shared screen doesn't know who is asking: the house's day.
+        title = busy.length ? t('casa.ra.freeSome', { n: busy.length, when }) : t('casa.ra.freeNone', { when })
+      }
+      return say('calendar', title, {
+        rows,
+        view: 'calendar',
+        speak: busy.length && intent.scope !== 'all' ? `${title} ${joinList(busy.slice(0, 4).map((o) => o.event.title), lang)}.` : title,
+      })
+    }
+    case 'pet_who': {
+      const pets = intent.pet ? data.pets.filter((p) => intent.pet.split(',').some((n) => norm(n) === norm(p.name))) : data.pets
+      const wanted = intent.tasks.map(norm).filter(Boolean)
+      const mine = data.tasks.filter(
+        (x) => x.kind === 'daily' && pets.some((p) => p.id === x.pet_id) && (!wanted.length || wanted.some((w) => norm(x.title).includes(w) || w.includes(norm(x.title)))),
+      )
+      if (!mine.length) return say('pets', t('ask.petWhoNoTask'), { view: 'pets' })
+      const done = await supabase.from('pet_task_done').select('task_id, done_by').eq('done_on', today).in('task_id', mine.map((x) => x.id))
+      const by = new Map(((done.data ?? []) as { task_id: string; done_by: string }[]).map((d) => [d.task_id, d.done_by]))
+      const nameOf = (email: string) => data.members.find((m) => m.email === email)?.first ?? email.split('@')[0]
+      const petOf = (id: string) => data.pets.find((p) => p.id === id)?.name ?? ''
+      if (mine.length === 1) {
+        const who = by.get(mine[0].id)
+        const vars = { task: mine[0].title, pet: petOf(mine[0].pet_id) }
+        return say('pets', who ? t('ask.petWhoOne', { name: nameOf(who), ...vars }) : t('ask.petWhoNone', vars), { view: 'pets' })
+      }
+      const rows: AnswerRow[] = mine.slice(0, 10).map((x) => ({
+        emoji: by.has(x.id) ? '✅' : '⏳',
+        title: `${x.title} · ${petOf(x.pet_id)}`,
+        sub: by.has(x.id) ? nameOf(by.get(x.id)!) : t('ask.petWhoNotYet'),
+      }))
+      const title = t('ask.petWhoHead')
+      return say('pets', title, { rows, view: 'pets', speak: `${title}: ${rows.slice(0, 5).map((r) => `${r.title}, ${r.sub}`).join('; ')}.` })
+    }
+    case 'call_member': {
+      const person = R.findMember(intent.person, data.members)
+      if (!person) return say('family', t('ask.whoNotFound', { name: intent.person }))
+      const phone = (await R.familyRow(person.email))?.phone
+      return say('family', phone ? t('casa.ra.phoneOf', { name: person.first, phone }) : t('ask.callNoPhone', { name: person.first }), { view: 'family' })
+    }
+    case 'days_until': {
+      const n = Math.round((dateOf(intent.date).getTime() - dateOf(today).getTime()) / 86_400_000)
+      const title = intent.title || shortDay(intent.date, lang)
+      return say('calendar', n <= 0 ? t('ask.daysToday', { title }) : n === 1 ? t('ask.daysOne', { title }) : t('ask.daysUntil', { n, title, day: shortDay(intent.date, lang) }))
+    }
     default:
       return say('orb', t('casa.roof.phone'))
   }
@@ -982,6 +1140,6 @@ export function summarize(o: Outcome): string {
   if (o.kind === 'done') return [o.title, o.sub ?? '', ...(o.rows ?? []).slice(0, 6).map((r) => [r.title, r.sub].filter(Boolean).join(' '))].filter(Boolean).join('; ').slice(0, 400)
   if (o.kind === 'pick') return o.question
   if (o.kind === 'bye') return o.text
-  if (o.kind === 'open') return `open ${o.target}`
+  if (o.kind === 'open') return o.say || `open ${o.target}`
   return 'capabilities'
 }

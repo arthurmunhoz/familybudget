@@ -6,6 +6,7 @@
 //    stays the boundary — the server never writes household data for this.
 // Anything that reaches OTHER people (a nudge) is never done straight away: the
 // sheet shows it and waits for a tap. Writes come back with what Undo needs.
+import { isUndoAsk } from './assistantTalk'
 import { supabase } from './supabase'
 import { STORE_CATALOG } from './stores'
 import { compareOccurrences, occurrencesByDay, occurrencesInRange, upcomingOccurrences, type Occurrence } from './calendar'
@@ -104,6 +105,21 @@ export type Intent =
    *  Undo button, by voice). Recognised on the phone (localParse) and from a
    *  server that knows it; an older server never sends it. */
   | { intent: 'undo_last' }
+  /** A new, empty list. */
+  | { intent: 'create_list'; name: string }
+  /** Relabel an item already on a list ("muda o leite para 2 leites"). */
+  | { intent: 'edit_item'; item: string; label: string }
+  /** Nudges sent TO the asker that they haven't seen. */
+  | { intent: 'my_nudges' }
+  /** Ask a member to share / refresh where they are (a location-request nudge). */
+  | { intent: 'ask_location'; person: string }
+  /** Free or busy on `date`, in the window `from`–`to` (HH:MM, "" = the whole day). */
+  | { intent: 'free_check'; scope: Scope; person: string; date: string; from: string; to: string }
+  /** Who ticked a pet's routine task today. */
+  | { intent: 'pet_who'; pet: string; tasks: string[] }
+  | { intent: 'call_member'; person: string }
+  /** Days until a date that isn't a calendar event ("Natal"). */
+  | { intent: 'days_until'; date: string; title: string }
   | { intent: 'unknown'; reply: string }
 
 /** add_event's extras beyond title/day/time (all optional). */
@@ -185,7 +201,9 @@ const KNOWN_INTENTS = new Set([
   'agenda', 'add_event', 'edit_event', 'find_event', 'move_event', 'remove_event', 'birthdays', 'day_summary',
   'add_money', 'money_summary', 'list_money', 'fix_money', 'remove_money', 'split_bill', 'discount', 'better_deal',
   'send_nudge', 'nudge_seen', 'pets_due', 'pet_done', 'pet_log', 'pet_next', 'pet_weight',
-  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'start_game', 'app_help', 'undo_last', 'unknown',
+  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'start_game', 'app_help', 'undo_last',
+  'create_list', 'edit_item', 'my_nudges', 'ask_location', 'free_check', 'pet_who', 'call_member', 'days_until',
+  'unknown',
 ])
 
 /** What the server said: an intent, an intent with a detail missing, an
@@ -194,7 +212,7 @@ const KNOWN_INTENTS = new Set([
 export type Quota = { plus: true } | { used: number; cap: number }
 
 type ServerReply =
-  | { kind: 'ok'; intent: Intent; quota?: Quota }
+  | { kind: 'ok'; intent: Intent; quota?: Quota; then?: string }
   | { kind: 'limit'; used: number; cap: number }
   | { kind: 'incomplete'; name: string }
   | { kind: 'unsupported'; name: string }
@@ -206,7 +224,7 @@ export type Source = 'server' | 'local' | 'asked' | 'none'
 export async function understandWithSource(
   text: string,
   ctx: AskContext,
-): Promise<{ intent: Intent | null; source: Source; quota?: Quota }> {
+): Promise<{ intent: Intent | null; source: Source; quota?: Quota; then?: string }> {
   // "Desfaz isso" is answered here, before the server: an older server filed
   // it as remove_items — a WRITE (review M9). Instant and nothing spent.
   if (isUndoAsk(text)) return { intent: { intent: 'undo_last' }, source: 'local' }
@@ -216,7 +234,8 @@ export async function understandWithSource(
   if (r.kind === 'limit') return { intent: { intent: 'limit_reached', cap: r.cap }, source: 'asked', quota: { used: r.used, cap: r.cap } }
   const quota = r.kind === 'ok' ? r.quota : undefined
   const res = await pick()
-  return quota ? { ...res, quota } : res
+  const then = r.kind === 'ok' && r.then && res.source === 'server' && res.intent?.intent === r.intent.intent ? { then: r.then } : {}
+  return { ...res, ...(quota ? { quota } : {}), ...then }
   async function pick(): Promise<{ intent: Intent | null; source: Source }> {
     const remote = r.kind === 'ok' ? r.intent : null
     const local = localParse(text, ctx.today)
@@ -471,6 +490,24 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     }
     case 'app_help':
       return { intent: 'app_help', topic: str('topic'), reply: str('reply') }
+    case 'create_list':
+      return str('store').trim() ? { intent: 'create_list', name: str('store').trim() } : null
+    case 'edit_item':
+      return items[0] && str('title').trim() ? { intent: 'edit_item', item: items[0], label: str('title').trim() } : null
+    case 'my_nudges':
+      return { intent: 'my_nudges' }
+    case 'ask_location':
+      return str('person').trim() ? { intent: 'ask_location', person: str('person').trim() } : null
+    case 'free_check': {
+      const hm = (k: string) => (/^\d{2}:\d{2}$/.test(str(k)) ? str(k) : '')
+      return { intent: 'free_check', scope: (str('scope') as Scope) || 'me', person: str('person'), date, from: hm('time'), to: hm('end_time') }
+    }
+    case 'pet_who':
+      return { intent: 'pet_who', pet: str('pet'), tasks: items }
+    case 'call_member':
+      return str('person').trim() ? { intent: 'call_member', person: str('person').trim() } : null
+    case 'days_until':
+      return isoOr('date') ? { intent: 'days_until', date: isoOr('date'), title: str('title') } : null
     case 'unknown':
       return { intent: 'unknown', reply: str('reply') }
     default:
@@ -501,7 +538,9 @@ async function askServer(text: string, ctx: AskContext): Promise<ServerReply> {
     const intent = fromServer(j, ctx.today)
     const q = j.quota as Quota | undefined
     const quota = q && ('plus' in q || (typeof q.used === 'number' && typeof q.cap === 'number')) ? q : undefined
-    if (intent) return { kind: 'ok', intent, ...(quota ? { quota } : {}) }
+    // A second task said in the same breath: the sheet asks it next.
+    const then = typeof j.then === 'string' ? j.then.trim().slice(0, 200) : ''
+    if (intent) return { kind: 'ok', intent, ...(quota ? { quota } : {}), ...(then ? { then } : {}) }
     return KNOWN_INTENTS.has(j.intent) ? { kind: 'incomplete', name: j.intent } : { kind: 'unsupported', name: j.intent }
   } catch {
     return { kind: 'offline' }
@@ -600,13 +639,7 @@ function oneSlip(a: string, b: string): boolean {
 const NOT_LIST = /\b(gastos?|despesas?|lan[cç]amentos?|expenses?|charges?|gast[eé]|calend[aá]rio|calendar|eventos?|events?|compromissos?|agenda|or[cç]amento|budget|presupuesto)\b/i
 const LIST_INTENTS = new Set(['add_items', 'check_items', 'remove_items', 'move_items', 'uncheck_items'])
 
-/** The WHOLE request is "undo that" (pt / en / es) — never a request that
- *  merely contains "volta" or "undo" ("volta a lista do Walmart"). */
-const UNDO_ASK =
-  /^(?:(?:ei|hey|oi|ok|roof|casa|por favor|please|porfa)[\s,]+)*(?:desfa(?:z|ça|zer|ca)|desfazer|undo|deshaz|deshacer)(?:\s+(?:isso|isto|o que (?:voc[eê] )?fez|a [uú]ltima|o [uú]ltimo|that|it|this|the last one|what you did|eso|esto|lo [uú]ltimo|la [uú]ltima))?(?:[\s,]+(?:por favor|please|porfa))?[\s.!?]*$/i
-export function isUndoAsk(text: string): boolean {
-  return UNDO_ASK.test(text.trim().toLowerCase())
-}
+export { isUndoAsk } from './assistantTalk'
 
 export function localParse(raw: string, today: string): Intent | null {
   const r = parseLocal(raw, today)

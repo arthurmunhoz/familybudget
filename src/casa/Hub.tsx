@@ -19,6 +19,8 @@ import FamilyPanel from './panels/FamilyPanel'
 import ListsPanel from './panels/ListsPanel'
 import { lockMoney } from './money'
 import MoneyPanel from './panels/MoneyPanel'
+import { addEntry } from './money'
+import type { PendingMoney } from './assistant'
 import { NotesWidget } from './NotesWall'
 import { useCasaNotes } from './notes'
 import PetsPanel from './panels/PetsPanel'
@@ -92,6 +94,8 @@ export default function Hub() {
   const [sheet, setSheet] = useState<{ k: 'settings' | 'plan'; origin: DOMRect | null } | null>(null)
   const sheetRef = useRef<GrowHandle>(null)
   const [unlocked, setUnlocked] = useState(false)
+  // An expense said to Roof while Money was locked: written when the PIN unlocks it.
+  const [pendingMoney, setPendingMoney] = useState<PendingMoney | null>(null)
   const [roofOpen, setRoofOpen] = useState(false)
   const [frame, setFrame] = useState(false)
   const lastTouch = useRef(Date.now())
@@ -289,12 +293,16 @@ export default function Hub() {
                 full={plan.full}
                 today={today}
                 me={me}
+                unlocked={unlocked}
                 refresh={refresh}
                 hidden={!!panel || !!sheet}
-                onOpenPanel={(id) => {
+                onOpenPanel={(id, money) => {
                   // The frame closes itself while Roof is up; open it once Roof has gone.
                   if (id === 'frame') setTimeout(() => setFrame(true), 80)
-                  else openPanel(id)
+                  else {
+                    setPendingMoney(id === 'money' && plan.full ? (money ?? null) : null)
+                    openPanel(id)
+                  }
                 }}
                 onLocked={() => setSheet({ k: 'plan', origin: null })}
                 onOpenChange={setRoofOpen}
@@ -389,11 +397,21 @@ export default function Hub() {
             <MoneyPanel
               data={data}
               unlocked={unlocked}
+              note={pendingMoney ? t('casa.ra.moneyPinNote', { line: pendingMoney.line }) : undefined}
               onUnlock={() => {
                 lastTouch.current = Date.now()
-                setUnlocked(true)
+                const m = pendingMoney
+                setPendingMoney(null)
+                // Write what Roof heard BEFORE the board loads, so it's already there.
+                const write = m
+                  ? addEntry({ budget: m.budget, type: m.type, amount: m.amount, label: m.label, person: me.email, date: m.date }).catch(() => null)
+                  : Promise.resolve(null)
+                void write.then(() => setUnlocked(true))
               }}
-              onClose={() => void closePanel()}
+              onClose={() => {
+                setPendingMoney(null)
+                void closePanel()
+              }}
             />
           )}
         </Grow>

@@ -6,6 +6,7 @@
 import type { ActionRowData } from './AnswerViews'
 import {
   endSeries,
+  familyInfo,
   findMember,
   locateEvent,
   isExternal,
@@ -15,6 +16,7 @@ import {
   removeSeries,
   restoreEvent,
   restoreItems,
+  undoAdd,
   unremoveEvent,
   agendaFor,
   petsDue,
@@ -25,6 +27,10 @@ import {
 import type { Occurrence } from '@/lib/calendar'
 import {
   clearChecked,
+  createList,
+  petWho,
+  renameItem,
+  setItemLabel,
   compareDeals,
   deletePetEvent,
   deletePetWeight,
@@ -58,6 +64,7 @@ import { categoryById } from '@/lib/categories'
 import { formatMoney, periodLabel } from '@/lib/format'
 import { formatTime, KIND_EMOJI } from '@/lib/calendar'
 import type { TKey } from '@/lib/i18n'
+import { sendPing } from '@/lib/pings'
 import type { CalendarEvent, EventRecurrence, PetEventType, Profile } from '@/lib/types'
 
 /** A row of the answer; `pick` makes it tappable ("which one?" lists). */
@@ -743,6 +750,141 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
         summary: `${head} ${agenda.rows.map((r) => r.title).join(', ')}`,
         open: { label: t('ask.openCalendar'), path: `/calendar?date=${date}` },
       })
+    }
+    // ── newer (2026-11-17) ────────────────────────────────────────────────────
+    case 'create_list': {
+      const r = await createList(intent.name)
+      if (!r.created) return say(t('ask.listExists', { name: r.store.name }), { open: { label: t('ask.openList'), path: `/shopping?store=${r.store.id}` } })
+      env.invalidate('hub:shopping')
+      return say(t('ask.listCreated', { name: r.store.name }), {
+        open: { label: t('ask.openList'), path: `/shopping?store=${r.store.id}` },
+        undo: {
+          run: async () => {
+            await undoAdd([], r.store.id)
+            env.invalidate('hub:shopping')
+          },
+          headline: t('ask.undoneGeneric'),
+        },
+      })
+    }
+    case 'edit_item': {
+      const r = await renameItem(intent.item, intent.label)
+      if (!r) return say(t('ask.notFoundList', { items: intent.item }))
+      env.invalidate('hub:shopping')
+      return say(t('ask.itemRenamed', { before: r.before, after: intent.label }), {
+        open: { label: t('ask.openList'), path: '/shopping' },
+        undo: {
+          run: async () => {
+            await setItemLabel(r.id, r.before)
+            env.invalidate('hub:shopping')
+          },
+          headline: t('ask.undoneGeneric'),
+        },
+      })
+    }
+    case 'my_nudges': {
+      const list = await unseenNudges(myEmail)
+      if (!list.length) return say(t('ask.nudgesNone'), { open: { label: t('ask.openNudges'), path: '/pings' } })
+      const head = t('ask.nudgesSome', { n: list.length })
+      return say(head, {
+        rows: list.slice(0, 6).map((n) => ({ emoji: n.emoji, title: `“${n.message}”`, sub: first(profiles.find((p) => p.email === n.from)) })),
+        summary: `${head} ${list
+          .slice(0, 3)
+          .map((n) => `${first(profiles.find((p) => p.email === n.from))}: ${n.message}`)
+          .join('. ')}`,
+        open: { label: t('ask.openNudges'), path: '/pings' },
+      })
+    }
+    case 'ask_location': {
+      const who = findMember(intent.person, profiles)
+      if (!who || who.email === myEmail) return say(t('ask.whoNotFound', { name: intent.person }))
+      const name = first(who)
+      return say(t('ask.locAsk', { name }), {
+        choices: [
+          {
+            label: t('ask.locAskBtn'),
+            run: async () => {
+              await sendPing('location-request', '📍', t('location.stale.nudgeMessage'), [who.email], false, { source: 'location' })
+              return say(t('ask.locAsked', { name }))
+            },
+          },
+        ],
+      })
+    }
+    case 'free_check': {
+      const who = intent.scope === 'person' ? findMember(intent.person, profiles) : null
+      if (intent.scope === 'person' && !who) return say(t('ask.whoNotFound', { name: intent.person }))
+      const agenda = await agendaFor(intent.date, intent.date, '', intent.scope, intent.person, me, profiles, today)
+      const mins = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5))
+      const from = intent.from ? mins(intent.from) : 0
+      const to = intent.from ? (intent.to && mins(intent.to) > from ? mins(intent.to) : from + 60) : 24 * 60
+      // All-day rows (birthdays, trips) are shown but don't make anyone busy.
+      const busy = agenda.rows.filter((r) => {
+        if (r.kind !== 'event' || !r.start) return false
+        const a = mins(r.start)
+        const b = r.end && mins(r.end) > a ? mins(r.end) : a + 60
+        return a < to && b > from
+      })
+      const day = env.dayWords(intent.date)
+      const when = intent.from
+        ? t('ask.freeWindow', { day, from: formatTime(intent.from, locale), to: formatTime(`${String(Math.floor(to / 60) % 24).padStart(2, '0')}:${String(to % 60).padStart(2, '0')}`, locale) })
+        : day
+      const rows = busy.slice(0, 6).map((r) => ({
+        emoji: '🗓️',
+        title: r.title,
+        sub: [formatTime(r.start!, locale), first(profiles.find((p) => p.email === r.ownerEmail))].filter(Boolean).join(' · '),
+      }))
+      const open = { label: t('ask.openCalendar'), path: `/calendar?date=${intent.date}` }
+      if (intent.scope === 'all') {
+        const everyone = busy.some((r) => !r.ownerEmail)
+        const free = everyone ? [] : profiles.filter((p) => !busy.some((r) => r.ownerEmail === p.email)).map(first)
+        const head = free.length ? t('ask.freeAll', { when, names: free.join(', ') }) : t('ask.freeNobody', { when })
+        return say(head, { rows, open })
+      }
+      const name = who && who.email !== myEmail ? first(who) : ''
+      const head = busy.length
+        ? name
+          ? t('ask.freeNo', { name, n: busy.length, when })
+          : t('ask.freeNoMe', { n: busy.length, when })
+        : name
+          ? t('ask.freeYes', { name, when })
+          : t('ask.freeYesMe', { when })
+      return say(head, { rows, summary: busy.length ? `${head} ${busy.map((r) => `${r.title} ${r.start}`).join(', ')}` : head, open })
+    }
+    case 'pet_who': {
+      const list = await petWho(intent.pet, intent.tasks, today)
+      if (!list.length) return say(t('ask.petWhoNoTask'), { open: { label: t('ask.openPets'), path: '/pets' } })
+      const nameOf = (email: string | null) => (email ? first(profiles.find((p) => p.email === email)) || email.split('@')[0] : '')
+      const one = list.length === 1 ? list[0] : null
+      const head = one
+        ? one.by
+          ? t('ask.petWhoOne', { name: nameOf(one.by), task: one.task, pet: one.pet })
+          : t('ask.petWhoNone', { task: one.task, pet: one.pet })
+        : t('ask.petWhoHead')
+      return say(head, {
+        rows: one ? [] : list.slice(0, 10).map((x) => ({ emoji: x.by ? '✅' : '⏳', title: `${x.task} · ${x.pet}`, sub: x.by ? nameOf(x.by) : t('ask.petWhoNotYet') })),
+        summary: one
+          ? head
+          : `${head}: ${list
+              .slice(0, 6)
+              .map((x) => `${x.task} (${x.pet}) ${x.by ? nameOf(x.by) : t('ask.petWhoNotYet')}`)
+              .join('; ')}`,
+        open: { label: t('ask.openPets'), path: '/pets' },
+      })
+    }
+    case 'call_member': {
+      const who = findMember(intent.person, profiles)
+      if (!who) return say(t('ask.whoNotFound', { name: intent.person }))
+      const phone = String((await familyInfo(who.display_name, me, profiles)).row?.phone ?? '')
+      const digits = phone.replace(/[^\d+]/g, '')
+      if (!digits) return say(t('ask.callNoPhone', { name: first(who) }))
+      return say(t('ask.callHead', { name: first(who) }), { sub: phone, open: { label: t('ask.callBtn'), path: `tel:${digits}` } })
+    }
+    case 'days_until': {
+      const n = Math.round((new Date(intent.date + 'T12:00:00').getTime() - new Date(today + 'T12:00:00').getTime()) / 86_400_000)
+      const title = intent.title || shortDay(intent.date, locale)
+      const day = shortDay(intent.date, locale)
+      return say(n <= 0 ? t('ask.daysToday', { title }) : n === 1 ? t('ask.daysOne', { title }) : t('ask.daysUntil', { n, title, day }))
     }
     default:
       return null

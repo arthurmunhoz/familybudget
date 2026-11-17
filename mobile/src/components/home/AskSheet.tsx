@@ -11,6 +11,7 @@ import {
   Alert,
   Animated,
   Keyboard,
+  Linking,
   Modal,
   PanResponder,
   ScrollView,
@@ -80,6 +81,7 @@ import type { TKey } from '@/lib/i18n'
 import { CHIME_MS, playChime, useVoice, voiceSupported } from '@/lib/voice'
 import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
 import { isGoodbye, meaningfulRequest } from '@/lib/roofWake'
+import { clockAsk, isNo, isRepeatAsk, isYes, pickByVoice } from '@/lib/assistantTalk'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import {
   ActionView,
@@ -611,6 +613,87 @@ export function AskSheet({
   }
 
   /** Move the finished question + answer into the conversation above. */
+  /** What Roof SAYS for an answer: the summary, but a long list or agenda is
+   *  cut to its first few rows + "and N more" — nobody listens to 12 items. */
+  function spokenText(a: Answer): string {
+    const cut = (xs: string[], keep: number) => (xs.length > keep + 1 ? `${xs.slice(0, keep).join(', ')} ${t('ask.sayMore', { n: xs.length - keep })}` : xs.join(', '))
+    if (a.kind === 'list' && a.groups.length) {
+      const total = a.groups.reduce((n, g) => n + g.items.length, 0)
+      if (total <= 5) return summarize(a)
+      return a.groups
+        .slice(0, 3)
+        .map((g) => t('ask.sayList', { n: g.items.length, store: g.store?.name ?? t('ask.anyStore'), items: cut(g.items.map((i) => i.label), 3) }))
+        .join(' ')
+    }
+    if (a.kind === 'agenda' && a.a.rows.length > 5) {
+      const when = a.a.label || dayWords(a.a.date)
+      return t('ask.sayAgenda', { n: a.a.rows.length, when, items: cut(a.a.rows.map((r) => r.title), 4) })
+    }
+    if (a.kind === 'action' && a.rows.length > 5 && a.summary.length > 220) return a.headline
+    return summarize(a)
+  }
+
+  /** The answer on screen is a question only a tap could answer until now. */
+  function awaiting(a: Answer | null): boolean {
+    if (!a) return false
+    if (a.kind === 'nudge') return !a.sent && !a.sending
+    if (a.kind === 'chooseBudget' || a.kind === 'chooseStore') return true
+    return a.kind === 'action' && !a.undone && (!!a.choices?.length || a.rows.some((r) => r.pick))
+  }
+
+  /** Settled on the phone, nothing sent or spent: an answer to Roof's own
+   *  question ("sim", "cancela", "o segundo", "Costco"), "repete", the clock,
+   *  the date, and a bare "bom dia" (→ the day's overview). null = not one. */
+  async function answerHere(q: string, last: Answer | null): Promise<Answer | null> {
+    const cancelled: Answer = { kind: 'say', text: t('ask.cancelled') }
+    if (last && awaiting(last)) {
+      if (last.kind === 'nudge') {
+        if (isYes(q)) {
+          await sendPing(last.pingKind, last.emoji, last.message, last.to ? [last.to.email] : null, last.urgent, { source: 'assistant' })
+          return { ...last, sent: true, sending: false }
+        }
+        if (isNo(q)) return cancelled
+      } else if (last.kind === 'chooseBudget') {
+        const i = pickByVoice(q, last.budgets.map((b) => b.name))
+        if (i >= 0) {
+          const p = last.pending
+          const res = await addMoney(p.title, p.amount, p.type, p.date, '', profile?.email ?? '', last.budgets[i].id)
+          if (!res.ok) return { kind: 'say', text: res.reason === 'no_period' ? t('ask.noPeriod', { budget: last.budgets[i].name }) : t('ask.noBudget') }
+          return { kind: 'money', res, type: p.type, amount: p.amount, title: p.title, undone: false }
+        }
+        if (isNo(q)) return cancelled
+      } else if (last.kind === 'chooseStore') {
+        const create = last.suggested.trim()
+        const labels = [...last.stores.map((x) => x.name), t('ask.anyStore'), ...(create ? [create] : [])]
+        const i = pickByVoice(q, labels)
+        if (i >= 0) {
+          const made = i > last.stores.length
+          const target = made ? await createStore(create) : (last.stores[i] ?? null)
+          const res = await addItems(last.items, target, profile?.email ?? '', made)
+          invalidateCache('hub:shopping')
+          return { kind: 'added', res, undone: false }
+        }
+        if (isNo(q)) return cancelled
+      } else if (last.kind === 'action') {
+        const choices = last.choices ?? []
+        const picks = last.rows.filter((r) => r.pick)
+        if (choices.length === 1 && isYes(q)) return choices[0].run()
+        const c = pickByVoice(q, choices.map((x) => x.label))
+        if (c >= 0) return choices[c].run()
+        const r = pickByVoice(q, picks.map((x) => x.title))
+        if (r >= 0) return picks[r].pick!()
+        if (isNo(q)) return cancelled
+      }
+    }
+    if (last && isRepeatAsk(q)) return last
+    const clock = clockAsk(q)
+    if (clock === 'time') return { kind: 'say', text: t('ask.timeIs', { time: new Date().toLocaleTimeString(LOCALE[lang] ?? 'pt-BR', { hour: 'numeric', minute: '2-digit' }) }) }
+    if (clock === 'date')
+      return { kind: 'say', text: t('ask.dateIs', { date: new Date().toLocaleDateString(LOCALE[lang] ?? 'pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }) }
+    if (clock === 'morning') return act({ intent: 'day_summary', date: today }, [])
+    return null
+  }
+
   function commitTurn() {
     if (query && answer) {
       pastRef.current = [...pastRef.current, { q: query, a: summarize(answer) }].slice(-8)
@@ -621,6 +704,7 @@ export function AskSheet({
   }
 
   function newChat() {
+    lastAnswer.current = null
     pastRef.current = []
     setPast([])
     setQuery('')
@@ -636,13 +720,16 @@ export function AskSheet({
     if (raw === undefined) viaVoice.current = false
     roofHush()
     Keyboard.dismiss()
+    // What was on screen when this was said: "sim" / "o segundo" answer IT.
+    const prev = lastAnswer.current
+    const replying = awaiting(prev) && (isYes(q) || isNo(q))
     commitTurn()
     setQuery(q)
     setText('')
     // "Obrigado" / "até mais" — the end of the conversation: answer here
     // (nothing sent, nothing spent), say it, then close instead of listening
     // again (owner, 2026-11).
-    if (isGoodbye(q)) {
+    if (!replying && isGoodbye(q)) {
       const turn = turnSeq.current
       const bye = t('ask.bye')
       setAnswer({ kind: 'say', text: bye })
@@ -668,13 +755,19 @@ export function AskSheet({
     try {
       // "What can you do?" — the capabilities screen, right here (instant,
       // nothing sent or spent).
-      const a: Answer = isCapabilitiesAsk(q) ? { kind: 'capabilities' } : await understandAndAct(q)
+      thenRef.current = ''
+      const a: Answer = (await answerHere(q, prev)) ?? (isCapabilitiesAsk(q) ? { kind: 'capabilities' } : await understandAndAct(q))
       setAnswer(a)
+      // A second task said in the same breath ("…e marca dentista sexta"): asked
+      // next, as its own request — unless this answer is itself a question.
+      const next = !awaiting(a) && a.kind !== 'error' && a.kind !== 'unknown' && chained.current < 2 ? thenRef.current : ''
+      thenRef.current = ''
+      chained.current = next ? chained.current + 1 : 0
       // Plus only (review 2026-11-14 M10): a free household's spoken request
       // gets its answer on screen and the mic stays off until tapped.
       if (viaVoice.current && !isFree) {
         const turn = ++turnSeq.current
-        const said = roof.speak ? roofSay(summarize(a), lang) : Promise.resolve()
+        const said = roof.speak ? roofSay(spokenText(a), lang) : Promise.resolve()
         // Then listen for the next thing — unless the sheet closed, something
         // newer started, or the person is typing. 350 ms: Roof's voice player
         // lets expo-audio deactivate the iOS session ~0.1 s after it ends;
@@ -682,6 +775,10 @@ export function AskSheet({
         void said.then(() => {
           setTimeout(() => {
             if (!openRef.current || turn !== turnSeq.current || textRef.current.trim()) return
+            if (next) {
+              void submitRef.current?.(next)
+              return
+            }
             setFollow(true)
             // Until the sheet closes or a goodbye — not a few seconds. QUIET:
             // it's the same conversation carrying on, so no new chime (a
@@ -691,6 +788,12 @@ export function AskSheet({
             void voice.start({ quiet: true, untilCancel: true })
           }, 350)
         })
+      }
+      else if (next) {
+        const turn = turnSeq.current
+        setTimeout(() => {
+          if (openRef.current && turn === turnSeq.current && !textRef.current.trim()) void submitRef.current?.(next)
+        }, 1400)
       }
       // The answer may have changed what the model should see next turn.
       void loadContext().catch(() => {})
@@ -705,7 +808,7 @@ export function AskSheet({
     {
       const ctx = await (ctxRef.current ?? loadContext()).catch(() => loadContext())
       const [y, m, d] = today.split('-').map(Number)
-      const { intent, source, quota: q2 } = await understandWithSource(q, {
+      const { intent, source, quota: q2, then } = await understandWithSource(q, {
         openItems: ctx.open.lines,
         today,
         weekday: new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long' }),
@@ -724,6 +827,7 @@ export function AskSheet({
         history: pastRef.current,
       })
       if (q2) setQuota(q2)
+      thenRef.current = then ?? ''
       // How often the app had to guess or ask (codes only, never the words).
       if (intent && source === 'local') reportGap(intent.intent, 'local_guess', lang)
       if (intent && (intent.intent === 'need_detail' || intent.intent === 'needs_update')) reportGap(intent.about, intent.intent, lang)
@@ -738,6 +842,8 @@ export function AskSheet({
   // The latest answer shown — kept after it moves up into the conversation —
   // so "desfaz isso" can press its Undo by voice (undo_last, review M9).
   const lastAnswer = useRef<Answer | null>(null)
+  const thenRef = useRef('')
+  const chained = useRef(0)
   useEffect(() => {
     if (answer) lastAnswer.current = answer
   }, [answer])
@@ -1080,7 +1186,9 @@ export function AskSheet({
 
   function go(path: string) {
     closeSheet()
-    router.push(path as never)
+    // "liga pro Léo" hands the number to the phone's dialer.
+    if (path.startsWith('tel:')) void Linking.openURL(path).catch(() => {})
+    else router.push(path as never)
   }
 
   /** The even-split wizard, prefilled with whatever was said (it opens on the

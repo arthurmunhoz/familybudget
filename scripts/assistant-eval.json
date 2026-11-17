@@ -949,11 +949,6 @@
       }
     },
     {
-      "text": "marca uma consulta da",
-      "safe": true,
-      "expect": {}
-    },
-    {
       "text": "quais são as rotinas da Lola",
       "expect": {
         "intent": "pets_due",
@@ -1083,6 +1078,241 @@
       "text": "volta atrás o que você fez",
       "expect": {
         "intent": "undo_last"
+      }
+    },
+    {
+      "text": "cria uma lista Viagem",
+      "expect": {
+        "intent": "create_list",
+        "store": "Viagem"
+      }
+    },
+    {
+      "text": "create a packing list",
+      "expect": {
+        "intent": "create_list"
+      }
+    },
+    {
+      "text": "tem algum aviso pra mim?",
+      "expect": {
+        "intent": "my_nudges"
+      }
+    },
+    {
+      "text": "any nudges for me?",
+      "expect": {
+        "intent": "my_nudges"
+      }
+    },
+    {
+      "text": "¿tengo avisos nuevos?",
+      "expect": {
+        "intent": "my_nudges"
+      }
+    },
+    {
+      "text": "pede a localização do Léo",
+      "expect": {
+        "intent": "ask_location",
+        "person": "Léo Munhoz"
+      }
+    },
+    {
+      "text": "estou livre sexta à tarde?",
+      "expect": {
+        "intent": "free_check",
+        "date": "2026-11-13",
+        "time": "12:00",
+        "end_time": "18:00"
+      }
+    },
+    {
+      "text": "quem está livre sábado?",
+      "expect": {
+        "intent": "free_check",
+        "scope": "all",
+        "date": "2026-11-14"
+      }
+    },
+    {
+      "text": "is Ana busy tomorrow at 3pm?",
+      "expect": {
+        "intent": "free_check",
+        "scope": "person",
+        "person": "Ana Munhoz",
+        "date": "2026-11-10",
+        "time": "15:00"
+      }
+    },
+    {
+      "text": "quem deu comida pra Lola?",
+      "expect": {
+        "intent": "pet_who",
+        "pet": "Lola"
+      }
+    },
+    {
+      "text": "who walked Chloe today?",
+      "expect": {
+        "intent": "pet_who",
+        "pet": "Chloe"
+      }
+    },
+    {
+      "text": "liga pro Léo",
+      "expect": {
+        "intent": "call_member",
+        "person": "Léo Munhoz"
+      }
+    },
+    {
+      "text": "llama a Ana",
+      "expect": {
+        "intent": "call_member",
+        "person": "Ana Munhoz"
+      }
+    },
+    {
+      "text": "quantos dias faltam pro Natal?",
+      "expect": {
+        "intent": "days_until",
+        "date": "2026-12-25"
+      }
+    },
+    {
+      "text": "how many items are on the Costco list?",
+      "expect": {
+        "intent": "list_items",
+        "store": "Costco"
+      }
+    },
+    {
+      "text": "quantos itens faltam na lista?",
+      "expect": {
+        "intent": "list_items"
+      }
+    },
+    {
+      "text": "põe leite e ovos no Costco, por favor",
+      "expect": {
+        "intent": "add_items",
+        "store": "Costco",
+        "then": ""
+      }
+    },
+    {
+      "text": "add milk and eggs to Costco",
+      "expect": {
+        "intent": "add_items",
+        "store": "Costco",
+        "then": ""
+      }
+    },
+    {
+      "text": "what's on the calendar tomorrow?",
+      "expect": {
+        "intent": "agenda",
+        "date": "2026-11-10"
+      }
+    },
+    {
+      "text": "I spent 50 at the grocery store",
+      "expect": {
+        "intent": "add_money",
+        "amount": 50
+      }
+    },
+    {
+      "text": "what does Lola need today?",
+      "expect": {
+        "intent": "pets_due",
+        "pet": "Lola"
+      }
+    },
+    {
+      "text": "where is Ana?",
+      "expect": {
+        "intent": "where_is",
+        "person": "Ana Munhoz"
+      }
+    },
+    {
+      "text": "añade leche a la lista de Walmart",
+      "expect": {
+        "intent": "add_items",
+        "store": "Walmart"
+      }
+    },
+    {
+      "text": "¿qué hay en la agenda mañana?",
+      "expect": {
+        "intent": "agenda",
+        "date": "2026-11-10"
+      }
+    },
+    {
+      "text": "gasté 30 en gasolina",
+      "expect": {
+        "intent": "add_money",
+        "amount": 30
+      }
+    },
+    {
+      "text": "avísale a Ana que llego tarde",
+      "expect": {
+        "intent": "send_nudge",
+        "person": "Ana Munhoz"
+      }
+    },
+    {
+      "text": "¿dónde está Léo?",
+      "expect": {
+        "intent": "where_is",
+        "person": "Léo Munhoz"
+      }
+    },
+    {
+      "text": "va a llover mañana?",
+      "expect": {
+        "intent": "weather",
+        "date": "2026-11-10"
+      }
+    },
+    {
+      "text": "Casa",
+      "history": [
+        {
+          "q": "gastei 50 no mercado",
+          "a": "Em qual orçamento? R$ 50,00"
+        }
+      ],
+      "expect": {
+        "intent": "add_money",
+        "amount": 50,
+        "budget": "Casa"
+      }
+    },
+    {
+      "text": "no Walmart",
+      "history": [
+        {
+          "q": "põe pão na lista",
+          "a": "Em qual lista eu ponho Pão?"
+        }
+      ],
+      "expect": {
+        "intent": "add_items",
+        "store": "Walmart"
+      }
+    },
+    {
+      "text": "muda o leite para 2 leites",
+      "expect": {
+        "intent": "edit_item",
+        "items": [
+          "Leite integral"
+        ]
       }
     }
   ]

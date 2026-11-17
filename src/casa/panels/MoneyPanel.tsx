@@ -15,7 +15,20 @@ import { GRAD, budgetGradient, grad } from '../util'
 import { PanelHeader } from './Shell'
 import { MoneyBoard } from './MoneyBoard'
 
-export default function MoneyPanel({ data, unlocked, onUnlock, onClose }: { data: HubData; unlocked: boolean; onUnlock: () => void; onClose: () => void }) {
+export default function MoneyPanel({
+  data,
+  unlocked,
+  note,
+  onUnlock,
+  onClose,
+}: {
+  data: HubData
+  unlocked: boolean
+  /** Why the PIN is being asked ("type the PIN to record R$ 50 · Mercado"). */
+  note?: string
+  onUnlock: () => void
+  onClose: () => void
+}) {
   const { t } = useI18n()
   const { profile } = useAuth()
   const hid = profile?.household_id ?? ''
@@ -39,7 +52,7 @@ export default function MoneyPanel({ data, unlocked, onUnlock, onClose }: { data
         icon={Wallet}
         g={GRAD.money}
         title={t('app.budget.name')}
-        sub={unlocked ? t('casa.money.thisPeriod') : t('casa.money.pinSub')}
+        sub={unlocked ? t('casa.money.thisPeriod') : (note ?? t('casa.money.pinSub'))}
         onClose={onClose}
         closeLabel={t('casa.close')}
       />

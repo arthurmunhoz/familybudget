@@ -7,14 +7,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowUp, Check, ChevronRight, Eye, Keyboard, Mic, MicOff, SendHorizontal, Undo2, X } from 'lucide-react'
 import { useI18n } from '../hooks/useI18n'
-import { act, localClose, localOpen, summarize, understand, type AnswerRow, type AskEnv, type Done, type OpenTarget, type Outcome, type Tone } from './assistant'
+import { act, localClose, localOpen, summarize, understand, type AnswerRow, type AskEnv, type Done, type OpenTarget, type Outcome, type PendingMoney, type Tone } from './assistant'
 import type { HubData } from './data'
 import { chime, speak, stopSpeaking, tick } from './sound'
 import { CheckMark, Grow, Orb, PlusTag, type GrowHandle } from './ui'
 import { isGoodbye, RoofEars, speechSupported, type EarsState } from './wake'
+import { clockAsk, isNo, isRepeatAsk, isUndoAsk, isYes, pickByVoice } from './talk'
 import { Capabilities, isCapabilitiesAsk, nextTip, type Tip } from './roofTips'
 import WhoPicker from './WhoPicker'
-import { GRAD, grad, lsGet, lsSet } from './util'
+import { GRAD, LOCALE, grad, lsGet, lsSet } from './util'
 
 const WAKE_KEY = 'casa.wake'
 const GREEN = '#3f8f6a'
@@ -54,6 +55,7 @@ export default function Roof({
   full,
   today,
   me,
+  unlocked,
   refresh,
   onOpenPanel,
   onLocked,
@@ -64,8 +66,11 @@ export default function Roof({
   full: boolean
   today: string
   me: { email: string; name: string }
+  /** Money is unlocked on this device (the PIN was typed). */
+  unlocked: boolean
   refresh: () => void
-  onOpenPanel: (id: OpenTarget) => void
+  /** `money`: an entry Roof heard while Money was locked — written once the PIN is in. */
+  onOpenPanel: (id: OpenTarget, money?: PendingMoney) => void
   onLocked: () => void
   /** A panel is open: don't take the call (it would open over it). */
   hidden: boolean
@@ -104,7 +109,13 @@ export default function Roof({
   useEffect(() => openCb.current?.(open), [open])
 
   const envRef = useRef<AskEnv | null>(null)
-  envRef.current = { t, lang, today, data, me, history: history.current, refresh }
+  envRef.current = { t, lang, today, data, me, unlocked, history: history.current, refresh }
+  // What Roof last showed: "sim" / "o segundo" / "desfaz isso" answer IT.
+  const lastDone = useRef<Done | null>(null)
+  const pendingPick = useRef<Extract<Outcome, { kind: 'pick' }> | null>(null)
+  const stageK = useRef<Stage['k']>('listen')
+  stageK.current = stage.k
+  const askRef = useRef<(q: string) => Promise<void>>(async () => {})
 
   const clearTimer = () => {
     if (timer.current) clearTimeout(timer.current)
@@ -125,6 +136,8 @@ export default function Roof({
     setHeard('')
     setText('')
     history.current = []
+    lastDone.current = null
+    pendingPick.current = null
     earsRef.current?.release()
   }, [])
 
@@ -152,22 +165,43 @@ export default function Roof({
   }
 
   const show = useCallback(
-    async (o: Outcome, q: string) => {
+    async (o: Outcome, q: string, next = '') => {
       if (!openRef.current) return
       history.current = [...history.current, { q, a: summarize(o) }].slice(-6)
+      pendingPick.current = o.kind === 'pick' ? o : null
+      if (o.kind === 'done') lastDone.current = o
       if (o.kind === 'caps') {
         await showCaps()
         return
       }
       if (o.kind === 'open') {
+        // Say where we're going first ("type the PIN and I'll record it").
+        if (o.say) {
+          setStage({ k: 'answer', o: { kind: 'done', tone: o.target === 'money' ? 'money' : 'orb', title: o.say, speak: o.say, check: false }, follow: false })
+          if (viaVoice.current) {
+            earsRef.current?.pause()
+            await speak(o.say, lang)
+          } else await new Promise((r) => setTimeout(r, 1600))
+          if (!openRef.current) return
+        }
         chime('done')
         await close()
-        onOpenPanel(o.target)
+        onOpenPanel(o.target, o.money)
         return
       }
       if (o.kind === 'pick') {
         chime('start')
         setStage({ k: 'pick', o })
+        // Asked by voice → ask aloud and listen for "Costco" / "o segundo"
+        // (owner, 2026-11-17: nobody crosses the kitchen to tap).
+        if (viaVoice.current && supported && full) {
+          earsRef.current?.pause()
+          await speak(o.question, lang)
+          if (openRef.current && pendingPick.current === o) {
+            setHeard('')
+            earsRef.current?.capture()
+          }
+        }
         return
       }
       if (o.kind === 'done' && o.check) chime('done')
@@ -185,6 +219,11 @@ export default function Roof({
           }, 600)
           return
         }
+        // A second task said in the same breath is asked next.
+        if (next && o.kind === 'done' && !o.choices?.length) {
+          void askRef.current(next)
+          return
+        }
         // Keep listening for the next thing (its own 8 s → close when quiet).
         if (follow) {
           setHeard('')
@@ -193,6 +232,10 @@ export default function Roof({
         }
       }
       clearTimer()
+      if (next && o.kind === 'done' && !o.choices?.length) {
+        timer.current = setTimeout(() => void askRef.current(next), 1600)
+        return
+      }
       timer.current = setTimeout(() => {
         if (o.kind === 'bye') chime('done')
         void close()
@@ -206,6 +249,42 @@ export default function Roof({
     async (q: string) => {
       const env = envRef.current!
       clearTimer()
+      const plain = (title: string): Done => ({ kind: 'done', tone: 'orb', title, speak: title, check: false })
+      const carry = async (run: () => Promise<Outcome>) => {
+        setStage({ k: 'think', q })
+        setHeard(q)
+        try {
+          await show(await run(), q)
+        } catch {
+          await show(plain(t('casa.roof.failed')), q)
+        }
+      }
+      // An answer to Roof's own question, settled here (nothing sent or spent).
+      const pp = pendingPick.current
+      if (pp) {
+        const i = pickByVoice(q, pp.options.map((x) => x.label))
+        if (i >= 0) return carry(() => pp.onPick(pp.options[i].id))
+        if (isNo(q)) return show(plain(t('casa.roof.cancelled')), q)
+      }
+      const ld = lastDone.current
+      if (ld && !pp) {
+        const choices = ld.choices ?? []
+        const picks = (ld.rows ?? []).filter((r) => r.pick)
+        if (choices.length === 1 && isYes(q)) return carry(choices[0].run)
+        const c = pickByVoice(q, choices.map((x) => x.label))
+        if (c >= 0) return carry(choices[c].run)
+        const r = pickByVoice(q, picks.map((x) => x.title))
+        if (r >= 0) return carry(picks[r].pick!)
+        if ((choices.length || picks.length) && isNo(q)) return show(plain(t('casa.roof.cancelled')), q)
+        if (isUndoAsk(q) && ld.undo) return undoRef.current(ld)
+        if (isRepeatAsk(q)) return show(ld, q)
+      }
+      if (isUndoAsk(q)) return show(plain(t('casa.roof.nothingToUndo')), q)
+      const clock = clockAsk(q)
+      if (clock === 'time') return show(plain(t('casa.roof.timeIs', { time: new Date().toLocaleTimeString(LOCALE[lang], { hour: 'numeric', minute: '2-digit' }) })), q)
+      if (clock === 'date')
+        return show(plain(t('casa.roof.dateIs', { date: new Date().toLocaleDateString(LOCALE[lang], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) })), q)
+      if (clock === 'morning') return carry(() => act(env, { intent: 'day_summary', date: env.today }, full))
       if (isGoodbye(q)) {
         await show({ kind: 'bye', text: t('casa.roof.bye') }, q)
         return
@@ -241,10 +320,12 @@ export default function Roof({
           o = { kind: 'done', tone: 'orb', title: t('casa.roof.failed'), speak: t('casa.roof.failed'), check: false }
         }
       }
-      await show(o, q)
+      await show(o, q, u.ok ? u.then : '')
     },
-    [full, show, t],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [full, show, t, lang],
   )
+  askRef.current = ask
 
   // ── the ears ───────────────────────────────────────────────────────────────
 
@@ -268,8 +349,9 @@ export default function Roof({
   handlers.current.onDone = (req: string) => {
     if (!openRef.current) return
     if (!req) {
-      // Nothing (more) said → done talking.
-      void close()
+      // A "which one?" stays up for a tap; anything else → done talking.
+      if (stageK.current === 'pick') earsRef.current?.pause()
+      else void close()
       return
     }
     viaVoice.current = true
@@ -371,9 +453,13 @@ export default function Roof({
     } catch {
       /* best effort */
     }
+    lastDone.current = null
     setStage({ k: 'undone' })
     timer.current = setTimeout(() => void close(), 2200)
   }
+
+  const undoRef = useRef(undo)
+  undoRef.current = undo
 
   async function view(id: OpenTarget) {
     await close()

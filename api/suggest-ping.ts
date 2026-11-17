@@ -89,6 +89,14 @@ const INTENTS = [
   'split_bill',
   'discount',
   'app_help',
+  'create_list',
+  'edit_item',
+  'my_nudges',
+  'ask_location',
+  'free_check',
+  'pet_who',
+  'call_member',
+  'days_until',
   'unknown',
 ] as const
 const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'frame', 'games', 'settings', '']
@@ -110,14 +118,14 @@ const ASSISTANT_SCHEMA = {
         'move_items = move items that are already on a list to another list ("passa o leite pro Costco").',
         'clear_checked = clear / delete the done (checked) items from the lists or one list ("limpa os feitos", "limpa os comprados do Costco").',
         'uncheck_items = put a done item back as still to do ("desmarca o leite", "o leite eu não comprei ainda").',
-        'list_items = asks what is on the lists (all of them, or one list).',
+        'list_items = asks what is on the lists (all of them, or one list), or HOW MANY items are left ("quantos itens faltam?", "how many things on the Costco list?").',
         'find_items = asks whether specific things are on the list ("is there coconut water on the list?", "tem leite na lista?").',
         'check_items = STATES items were bought / done ("já comprei o leite", "terminei a redação"). A question is never check_items, and "acabou o X" (ran out) is add_items, not check_items.',
         'remove_items = take items off the shopping list. ONLY shopping-list items: never when the user talks about a gasto / despesa / lançamento / expense / charge, or names a place that is not in KNOWN STORES but was just logged as an expense — that is remove_money.',
         'agenda = asks what is on the calendar for a day.',
         'add_event = schedule something on the calendar, including repeating events ("natação toda terça às 18h") and special dates (birthdays, anniversaries, renewals). A pet\'s vet / vaccine / grooming appointment on a FUTURE day (tomorrow or later: "agenda o veterinário da Lola sexta às 10") is add_event too, titled with the care and the pet ("Veterinário Lola"); the same thing TODAY or in the past is pet_log.',
         'edit_event = change an EXISTING event other than its day/time: rename it, set its place or a note, add or remove a reminder ("me lembra 1h antes do dentista", "põe o endereço na reunião").',
-        'find_event = asks WHEN a named event is ("quando é o próximo dentista?", "when is Ana\'s recital?").',
+        'find_event = asks WHEN a named event is, or how long until it ("quando é o próximo dentista?", "when is Ana\'s recital?", "quantos dias faltam pro aniversário da Ana?").',
         'move_event = move / reschedule / postpone an EXISTING calendar event to another day or time ("muda o dentista para amanhã", "muda o dentista do Pedro para sexta", "move it to Friday at 3", "passa a reunião de hoje pra quinta"). Never add_event or agenda for these. The day it is moved TO goes in new_date; `date` is only the day it is on NOW and stays "" unless that day is said ("a reunião de hoje" → today; "o dentista para sexta" → date ""). Needs a move word (muda, passa, move, adia, remarca, reschedule): a name with a day/time and no such word ("dentista sexta às 15h") is add_event, even when an event with that name exists.',
         'remove_event = delete / cancel / take off an EXISTING calendar event ("remove unha do calendário", "cancela o dentista de amanhã", "cancela a consulta da Ana amanhã", "delete the meeting"). Never remove_items for these: remove_items is only for shopping-list items.',
         'add_money = record money spent or received ("gastei 50 no mercado", "recebi o salário 3000").',
@@ -146,8 +154,21 @@ const ASSISTANT_SCHEMA = {
         'split_bill = split a bill / restaurant check / total among people ("divide 58,71 em 3", "split the check").',
         'discount = the price after a percentage off ("quanto fica 80 com 30% de desconto").',
         'app_help = asks about One Roof ITSELF: what it can do, what a part or feature is, which games there are, how a game or feature works ("quais jogos tem no app?", "como funciona a forca?", "explica a batalha naval", "o que o Plus dá?", "o que você sabe fazer?"). Answered from the APP GUIDE.',
+        'create_list = make a NEW, empty list ("cria uma lista Viagem", "nova lista de tarefas", "create a packing list"); its name goes in store. Adding items to a list (new or not) is add_items.',
+        'edit_item = change the label / quantity of an item ALREADY on a list ("muda o leite para 2 leites", "troca maçã por pera", "make it 3 dozen eggs"): items = its EXACT label from OPEN ITEMS, title = the new label.',
+        'my_nudges = asks whether there are nudges / messages / notices FOR the asker, or what the family sent ("tem algum aviso pra mim?", "alguém me mandou alguma coisa?", "any nudges for me?", "¿tengo avisos?"). Who saw the asker\'s OWN nudge is nudge_seen.',
+        'ask_location = asks the app to REQUEST a member\'s current location / ask them to share or update it ("pede a localização do Léo", "pergunta pra Ana onde ela está", "ask Sam to share his location"). Just asking where someone is = where_is.',
+        'free_check = asks whether someone is FREE / busy / available at a time or on a day, or who is free ("estou livre sexta à tarde?", "a Ana está ocupada amanhã às 15h?", "quem está livre sábado?", "am I free Tuesday morning?"). date = the day; time / end_time = the window when one is said (manhã 06:00–12:00, tarde 12:00–18:00, noite 18:00–23:00; "às 15h" = 15:00–16:00), else "". scope me ("estou livre?") / person (a member is named: "a Ana está ocupada?", "is Ana busy?" → scope person AND person = that member, MEMBERS spelling — never leave person "" then) / all ("quem está livre").',
+        'pet_who = asks WHO did a pet\'s routine task today ("quem deu comida pra Lola?", "quem passeou com a Chloe?", "who fed the dog?"); items = the task names from PET TASKS meant ([] = any task).',
+        'call_member = wants to phone a family member ("liga pro Léo", "call Ana", "llama a mamá").',
+        'days_until = asks how many days / how long until a date that is NOT a calendar event of UPCOMING EVENTS ("quantos dias faltam pro Natal?", "how long until New Year?", "falta quanto para as férias de julho?"): date = that day (the next one coming), title = what it is, in the user language ("Natal"). For an event or a birthday in UPCOMING EVENTS use find_event.',
         'unknown = anything else.',
       ].join(' '),
+    },
+    then: {
+      type: 'string',
+      description:
+        'ONLY when the request holds a SECOND, different task after the first ("põe leite no Costco E marca dentista sexta às 15h", "add eggs and remind Ana I am late"): that second task rewritten as a complete standalone request in the user language ("marca dentista sexta às 15h"). Several items for one list, or several details of one task, are ONE task: "". "" in every other case.',
     },
     items: {
       type: 'array',
@@ -167,12 +188,12 @@ const ASSISTANT_SCHEMA = {
     scope: {
       type: 'string',
       enum: ['me', 'all', 'person'],
-      description: 'agenda: me = the asker, all = everyone/the family, person = one named member. Default me.',
+      description: 'agenda / free_check: me = the asker, all = everyone/the family, person = one named member. Default me.',
     },
     person: {
       type: 'string',
       description:
-        'agenda (scope=person) / send_nudge (recipient) / family_info + family_update (whose detail) / add_event (whose event) / where_is (who) / open_document (whose document): a member name exactly as in MEMBERS. "" = the asker for family_info, family_update and add_event, everyone for send_nudge, any member for open_document. ' +
+        'agenda (scope=person) / send_nudge (recipient) / family_info + family_update (whose detail) / add_event (whose event) / where_is / ask_location / call_member (who) / free_check (scope=person) / open_document (whose document): a member name exactly as in MEMBERS. "" = the asker for family_info, family_update and add_event, everyone for send_nudge, any member for open_document. ' +
         'move_event / remove_event / edit_event / find_event: WHOSE event the request names ("o dentista do Pedro" → "Pedro", "Sam\'s dentist" → "Sam", "a consulta da Ana" → "Ana") — the MEMBERS spelling when it is a member, else the first name EXACTLY as said (a child may not be a member — "Dentista Pedro" owned by Arthur is still person "Pedro"); NEVER replace the named person with the event\'s owner shown after the last "·". That name then stays out of `title`. "" when no one is named. ' +
         'money_summary / list_money (whose money): the ASKER\'s name for "meus gastos" / "quanto eu gastei" / "my expenses", the member named (MEMBERS spelling) for "gastos da Ana" / "Ana\'s"; "" for the whole household ("nossos", "da casa", "quanto gastamos", or no owner said).',
     },
@@ -234,7 +255,7 @@ const ASSISTANT_SCHEMA = {
     title: {
       type: 'string',
       description:
-        'add_event: the event title ("Dentista", "Aniversário da Ana"). move_event / remove_event / edit_event / find_event: the event as the user names it, or as named earlier in the conversation for "it"/"that" ("" when it is the only one on that day). add_money: what it was ("Mercado", "Salário"). fix_money / remove_money: which entry, as said ("Uber", "Ford\'s Garage"), or as logged earlier in the conversation for "esse/that one"; "" = the last one the asker logged. Never "gorjeta"/"tip" or the correction itself. money_summary / list_money: a specific thing spent on that is NOT a category ("quanto gastei de Uber?" → "Uber", "farmácia"), else "". pet_log: what it was ("Antirrábica", "Consulta"). where_is: the place asked about ("o Léo já chegou na escola?" → "escola", "casa"), else "". open_document: the document meant, matched to DOCUMENTS by meaning in ANY language ("seguro da moto" / "motorcycle insurance" → "Insurance card (motorcycle) - front"); when several are the same thing in parts (front/back, page 1/2), the part they share ("Insurance card (motorcycle)"); not in DOCUMENTS → as said ("passaporte"). send_nudge: the message to send, in the user language, first person, short ("Chego às 19h"). "" otherwise.',
+        'add_event: the event title ("Dentista", "Aniversário da Ana"). edit_item: the item\'s NEW label ("2 Leites"). days_until: what the day is ("Natal"). move_event / remove_event / edit_event / find_event: the event as the user names it, or as named earlier in the conversation for "it"/"that" ("" when it is the only one on that day). add_money: what it was ("Mercado", "Salário"). fix_money / remove_money: which entry, as said ("Uber", "Ford\'s Garage"), or as logged earlier in the conversation for "esse/that one"; "" = the last one the asker logged. Never "gorjeta"/"tip" or the correction itself. money_summary / list_money: a specific thing spent on that is NOT a category ("quanto gastei de Uber?" → "Uber", "farmácia"), else "". pet_log: what it was ("Antirrábica", "Consulta"). where_is: the place asked about ("o Léo já chegou na escola?" → "escola", "casa"), else "". open_document: the document meant, matched to DOCUMENTS by meaning in ANY language ("seguro da moto" / "motorcycle insurance" → "Insurance card (motorcycle) - front"); when several are the same thing in parts (front/back, page 1/2), the part they share ("Insurance card (motorcycle)"); not in DOCUMENTS → as said ("passaporte"). send_nudge: the message to send, in the user language, first person, short ("Chego às 19h"). "" otherwise.',
     },
     ref: {
       type: 'string',
@@ -354,6 +375,7 @@ const ASSISTANT_SCHEMA = {
   },
   required: [
     'intent',
+    'then',
     'items',
     'store',
     'scope',
@@ -405,12 +427,12 @@ const ASSISTANT_SCHEMA = {
 // DEFAULT since 2026-11-09: eval 56/56 vs flat 54–56/56, ~45% fewer output
 // tokens, and flat once ran past max_tokens (truncated JSON). Set Vercel env
 // ASSISTANT_SCHEMA=flat to fall back.
-const TOP = ['intent', 'date', 'person', 'title', 'ref', 'reply', 'gap']
+const TOP = ['intent', 'then', 'date', 'person', 'title', 'ref', 'reply', 'gap']
 const GROUPS: Record<string, { keys: string[]; for: string; note?: string }> = {
-  shop: { keys: ['items', 'store'], for: 'add_items, move_items, clear_checked, uncheck_items, list_items, find_items, check_items, remove_items' },
+  shop: { keys: ['items', 'store'], for: 'add_items, move_items, clear_checked, uncheck_items, list_items, find_items, check_items, remove_items, create_list, edit_item' },
   cal: {
     keys: ['scope', 'date_end', 'time', 'end_time', 'recurrence', 'event_kind', 'location', 'notes', 'reminder', 'new_title', 'new_date'],
-    for: 'agenda, add_event, edit_event, find_event, move_event, remove_event',
+    for: 'agenda, add_event, edit_event, find_event, move_event, remove_event, free_check',
   },
   money: {
     keys: ['title', 'amount', 'money_type', 'money_range', 'budget', 'category', 'new_title', 'delta', 'tip_pct'],
@@ -419,7 +441,7 @@ const GROUPS: Record<string, { keys: string[]; for: string; note?: string }> = {
   calc: { keys: ['amount', 'people', 'split_mode', 'tip_pct', 'percent', 'deals'], for: 'split_bill, discount, better_deal' },
   pet: {
     keys: ['pet', 'pet_view', 'items', 'pet_event_type', 'new_date', 'amount'],
-    for: 'pets_due, pet_done, pet_log, pet_next, pet_weight',
+    for: 'pets_due, pet_done, pet_log, pet_next, pet_weight, pet_who',
     note: 'Any shot (antirrábica, V10, rabies) is pet_event_type "vaccine", never "medication".',
   },
   family: { keys: ['field', 'value'], for: 'family_info, family_update' },
@@ -686,16 +708,24 @@ export async function parseAssistant(
     topic: TOPICS.includes(p.topic) ? p.topic : '',
     reply: str(p.reply, intent === 'app_help' ? 420 : 240),
     ref: typeof p.ref === 'string' && /^[ev]\d{1,2}$/.test(p.ref) ? p.ref : '',
+    // A second task in the same breath; the app asks it as its own request.
+    then: str(p.then, 200),
   }
   return { out, gap: intent === 'unknown' ? str(p.gap, 160) : '', usage: response.usage }
 }
 
 async function assistant(body: any, db: any, household: string | null, res: any, email: string, quota: any) {
   try {
+    const t0 = Date.now()
     const { out, gap, usage } = await parseAssistant(body, process.env.ASSISTANT_SCHEMA === 'flat' ? 'flat' : 'grouped')
+    // How long the understanding took — the number that decides how voice feels.
+    console.log(JSON.stringify({ roof_ms: Date.now() - t0, intent: out.intent, in: (usage as any)?.input_tokens ?? 0, out: (usage as any)?.output_tokens ?? 0 }))
     // Count it, and tell the app where the member stands (free plan only).
     let q: { plus: true } | { used: number; cap: number } | null = null
-    if (db && quota) {
+    if (db && quota && out.intent === 'unknown') {
+      // Not understood = not counted against the free month (owner, 2026-11-17).
+      q = quota.plus ? { plus: true } : { used: quota.used ?? 0, cap: ASSISTANT_FREE_MONTHLY }
+    } else if (db && quota) {
       try {
         const { data: n } = await db.rpc('assistant_use', { p_email: email })
         q = quota.plus ? { plus: true } : { used: typeof n === 'number' ? n : (quota.used ?? 0) + 1, cap: ASSISTANT_FREE_MONTHLY }

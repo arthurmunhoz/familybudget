@@ -70,6 +70,22 @@ export type Intent =
   | { intent: 'discount'; amount: number; percent: number }
   /** About One Roof itself (what it does, the games and their rules). */
   | { intent: 'app_help'; topic: string; reply: string }
+  | { intent: 'undo_last' }
+  /** A new, empty list. */
+  | { intent: 'create_list'; name: string }
+  /** Relabel an item already on a list ("muda o leite para 2 leites"). */
+  | { intent: 'edit_item'; item: string; label: string }
+  /** Nudges sent TO the asker that they haven't seen. */
+  | { intent: 'my_nudges' }
+  /** Ask a member to share / refresh where they are (a location-request nudge). */
+  | { intent: 'ask_location'; person: string }
+  /** Free or busy on `date`, in the window `from`–`to` (HH:MM, "" = the whole day). */
+  | { intent: 'free_check'; scope: Scope; person: string; date: string; from: string; to: string }
+  /** Who ticked a pet's routine task today. */
+  | { intent: 'pet_who'; pet: string; tasks: string[] }
+  | { intent: 'call_member'; person: string }
+  /** Days until a date that isn't a calendar event ("Natal"). */
+  | { intent: 'days_until'; date: string; title: string }
   | { intent: 'unknown'; reply: string }
 
 /** add_event's extras beyond title/day/time (all optional). */
@@ -118,7 +134,9 @@ export const KNOWN_INTENTS = new Set([
   'agenda', 'add_event', 'edit_event', 'find_event', 'move_event', 'remove_event', 'birthdays', 'day_summary',
   'add_money', 'money_summary', 'list_money', 'fix_money', 'remove_money', 'split_bill', 'discount', 'better_deal',
   'send_nudge', 'nudge_seen', 'pets_due', 'pet_done', 'pet_log', 'pet_next', 'pet_weight',
-  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'start_game', 'app_help', 'unknown',
+  'family_info', 'family_update', 'where_is', 'weather', 'open_document', 'open_app', 'start_game', 'app_help', 'undo_last',
+  'create_list', 'edit_item', 'my_nudges', 'ask_location', 'free_check', 'pet_who', 'call_member', 'days_until',
+  'unknown',
 ])
 
 /** The server's JSON → a typed intent (null when it isn't usable). */
@@ -317,6 +335,26 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     }
     case 'app_help':
       return { intent: 'app_help', topic: str('topic'), reply: str('reply') }
+    case 'undo_last':
+      return { intent: 'undo_last' }
+    case 'create_list':
+      return str('store').trim() ? { intent: 'create_list', name: str('store').trim() } : null
+    case 'edit_item':
+      return items[0] && str('title').trim() ? { intent: 'edit_item', item: items[0], label: str('title').trim() } : null
+    case 'my_nudges':
+      return { intent: 'my_nudges' }
+    case 'ask_location':
+      return str('person').trim() ? { intent: 'ask_location', person: str('person').trim() } : null
+    case 'free_check': {
+      const hm = (k: string) => (/^\d{2}:\d{2}$/.test(str(k)) ? str(k) : '')
+      return { intent: 'free_check', scope: (str('scope') as Scope) || 'me', person: str('person'), date, from: hm('time'), to: hm('end_time') }
+    }
+    case 'pet_who':
+      return { intent: 'pet_who', pet: str('pet'), tasks: items }
+    case 'call_member':
+      return str('person').trim() ? { intent: 'call_member', person: str('person').trim() } : null
+    case 'days_until':
+      return isoOr('date') ? { intent: 'days_until', date: isoOr('date'), title: str('title') } : null
     case 'unknown':
       return { intent: 'unknown', reply: str('reply') }
     default:

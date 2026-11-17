@@ -10,7 +10,7 @@ import * as Location from 'expo-location'
 
 import { supabase } from './supabase'
 import { upcomingOccurrences } from './calendar'
-import { budgetsWithMonths, matchStore, norm, periodForBudget, pickBudget, refTo, type Deal, type FamilyField } from './assistant'
+import { budgetsWithMonths, createStore, fetchOpenList, fetchStores, matchStore, norm, periodForBudget, pickBudget, refTo, type Deal, type FamilyField } from './assistant'
 import { categoryById } from './categories'
 import { nextBirthday } from './birthday'
 import { fetchMemberLocations, isPaused, isSharingLive } from './location'
@@ -755,3 +755,41 @@ export async function unseenNudges(me: string): Promise<{ emoji: string; message
     .map((p) => ({ emoji: p.emoji, message: p.message, from: p.sender_email }))
 }
 
+
+// ── newer list / pet reads (2026-11-17) ──────────────────────────────────────
+
+/** A new, empty list — or the one that already has that name. */
+export async function createList(name: string): Promise<{ store: ShoppingStore; created: boolean }> {
+  const hit = matchStore(name, await fetchStores())
+  if (hit && norm(hit.name) === norm(name)) return { store: hit, created: false }
+  return { store: await createStore(name), created: true }
+}
+
+export async function setItemLabel(id: string, label: string): Promise<void> {
+  const { error } = await supabase.from('shopping_items').update({ label }).eq('id', id)
+  if (error) throw error
+}
+
+/** Relabel an open item ("muda o leite para 2 leites"); null when it isn't on a list. */
+export async function renameItem(said: string, label: string): Promise<{ id: string; before: string } | null> {
+  const { open } = await fetchOpenList()
+  const n = norm(said)
+  const item = open.find((i) => norm(i.label) === n) ?? open.find((i) => norm(i.label).includes(n) || n.includes(norm(i.label)))
+  if (!item) return null
+  await setItemLabel(item.id, label)
+  return { id: item.id, before: item.label }
+}
+
+/** Who ticked each daily routine task today (`by` null = not done yet). */
+export async function petWho(petName: string, said: string[], today: string): Promise<{ pet: string; task: string; by: string | null }[]> {
+  const { pets, tasks } = await petsAndTasks()
+  const chosen = petsNamed(pets, petName)
+  const wanted = said.map(norm).filter(Boolean)
+  const mine = tasks.filter(
+    (t) => t.kind === 'daily' && chosen.some((p) => p.id === t.pet_id) && (!wanted.length || wanted.some((w) => norm(t.title).includes(w) || w.includes(norm(t.title)))),
+  )
+  if (!mine.length) return []
+  const { data } = await supabase.from('pet_task_done').select('task_id, done_by').eq('done_on', today).in('task_id', mine.map((t) => t.id))
+  const by = new Map(((data ?? []) as { task_id: string; done_by: string }[]).map((d) => [d.task_id, d.done_by]))
+  return mine.map((t) => ({ pet: pets.find((p) => p.id === t.pet_id)?.name ?? '', task: t.title, by: by.get(t.id) ?? null }))
+}

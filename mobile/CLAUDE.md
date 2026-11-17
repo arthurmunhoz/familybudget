@@ -194,6 +194,37 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   Claude also has `PET TASKS` and `CATEGORIES`. Each new intent ships in the
   APP (the server only understands), so it needs a store release; older apps
   get null from `fromServer` and fall back.
+- **Roof review (2026-11-17) — talk rules, new intents, Modo Casa money.**
+  - `lib/assistantTalk.ts` = what is settled ON THE DEVICE before any server
+    call: `isYes` / `isNo` / `pickByVoice` (answers to Roof's own question —
+    "sim", "cancela", "o segundo", "Costco"), `isUndoAsk`, `isRepeatAsk`,
+    `clockAsk` (time, date, bare "bom dia" → day_summary). `src/casa/talk.ts`
+    is a BYTE COPY; `__tests__/assistantTalk.test.ts` fails when the two (or
+    the two `KNOWN_INTENTS` lists) drift — edit the phone file, then `cp`.
+  - AskSheet `answerHere()` runs those against the answer on screen
+    (`awaiting()`): an unsent nudge, chooseBudget, chooseStore, an action's
+    choices / pick rows. A yes/no to a waiting answer beats `isGoodbye` ("ok").
+    Modo Casa does the same in `Roof.tsx` `ask()` (`pendingPick`, `lastDone`),
+    asks a "which one?" ALOUD and listens; silence leaves the pick up for a tap.
+  - `then` (server, top-level): a SECOND task said in the same breath, as a
+    standalone request; both apps ask it right after the first answer (max 2
+    chained, never after an answer that is itself a question).
+  - Spoken text ≠ history text: `spokenText()` cuts long lists / agendas to a
+    few rows + "e mais N"; `summarize()` stays the full line sent to Claude.
+  - New intents (need THIS app version; older apps answer `needs_update`):
+    `create_list`, `edit_item` (items = old label, title = new), `my_nudges`,
+    `ask_location` (a location-request nudge, sent on a tap / "sim"),
+    `free_check` (timed events only; all-day rows never make anyone busy),
+    `pet_who` (`pet_task_done.done_by`), `call_member` (`tel:` via `go()`),
+    `days_until`. An `unknown` answer is NOT counted against the free month.
+    The server logs `roof_ms` per request (Vercel logs).
+  - Modo Casa money (owner, 2026-11-17, replaces "money lives on the phone"):
+    `add_money` by voice is allowed — unlocked it writes (with Undo); locked
+    it opens Money on the PIN screen and `Hub` writes the `PendingMoney` when
+    the PIN unlocks (RLS only opens `entries` then). Every money READ / fix /
+    delete just opens the PIN screen. Location (`where_is`, `ask_location`)
+    answers "only on the phone" — a Casa session can't read locations
+    (migration 111); it used to say "isn't sharing".
 - **Nudges carousel (Home, 2026-11-15):** one nudge shows full width; two or more
   sit in a horizontal snap carousel (next card peeks, dots under it). Card height
   is FIXED (`CARD_H`) for every kind — text, urgent, sent, drawing — so Home never
