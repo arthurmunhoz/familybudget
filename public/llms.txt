@@ -71,3 +71,5 @@ English, Spanish and Portuguese.
 ## Pages
 - [Privacy policy](https://getoneroof.app/privacy.html)
 - [Support](https://getoneroof.app/support.html)
+- [One Roof vs Cozi](https://getoneroof.app/vs/cozi/)
+- [One Roof vs FamilyWall](https://getoneroof.app/vs/familywall/)

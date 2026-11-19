@@ -13,6 +13,8 @@ import html, json, os, datetime
 import re
 from landing_copy import LANGS, ROOF_GROUPS
 from icons import ICONS
+from vs_copy import PAGES as VS_PAGES, CHECKED as VS_CHECKED
+from edge_copy import EDGE, COLS as EDGE_COLS
 
 SITE = 'https://getoneroof.app'
 APP_STORE = 'https://apps.apple.com/app/id6786347512'
@@ -330,13 +332,9 @@ def page(L):
   <div class="wrap">
     <h2 class="display">{e(L['vs_h2'])}</h2>
     <p class="sub">{e(L['vs_sub'])}</p>
-    <div class="table-wrap"><table>
-      <thead><tr>{th}</tr></thead>
-      <tbody>
-{trs}
-      </tbody>
-    </table></div>
-    <p class="fine">{e(L['vs_note'])}</p>
+    {only_cards(L['lang'][:2])}
+    {edge_matrix(L['lang'][:2])}
+    {vs_links(L)}<p class="fine">{e(L['vs_note'])}</p>
   </div>
 </section>
 
@@ -382,7 +380,180 @@ def page(L):
 <footer>
   <div class="wrap">
     <p>{langfoot}</p>
-    <p><a href="/privacy.html">{e(L['privacy_link'])}</a> · <a href="/support.html">{e(L['support_link'])}</a> · <a href="{APP_STORE}">App Store</a> · <a href="{PLAY}">Google Play</a> · <a href="{TIKTOK}">TikTok</a></p>
+    <p><a href="/privacy.html">{e(L['privacy_link'])}</a> · <a href="/support.html">{e(L['support_link'])}</a> · {vs_foot(L)}<a href="{APP_STORE}">App Store</a> · <a href="{PLAY}">Google Play</a> · <a href="{TIKTOK}">TikTok</a></p>
+    <p>{e(L['footer'])}</p>
+  </div>
+</footer>
+</body>
+</html>
+"""
+
+_MK = {'y': '<path d="M20 6 9 17l-5-5"/>', 'n': '<path d="M6 12h12"/>', 'p': '<path d="M20 6 9 17l-5-5"/>'}
+
+def only_cards(code):
+    D = EDGE[code]
+    cards = ''.join(f'<article class="only" style="--tint:{t}"><span class="tile" aria-hidden="true">{em}</span><h4>{e(h)}</h4><p>{e(d)}</p></article>'
+                    for em, t, h, d in D['only'])
+    return f'<h3 class="edge-h">{e(D["only_h3"])}</h3>\n<div class="onlys">{cards}</div>'
+
+def edge_matrix(code):
+    D = EDGE[code]
+    def cell(v, col):
+        st, note = (v if isinstance(v, tuple) else (v, ''))
+        label = {'y': D['yes'], 'n': D['no'], 'p': D['part']}[st]
+        sm = f'<small>{e(note)}</small>' if note else ''
+        return (f'<td data-l="{e(col)}" class="{st}"><span class="mk {st}" role="img" aria-label="{e(label)}">'
+                f'<svg viewBox="0 0 24 24" aria-hidden="true">{_MK[st]}</svg></span>{sm}</td>')
+    head = '<th scope="col"></th>' + ''.join(f'<th scope="col">{e(c)}</th>' for c in EDGE_COLS)
+    body = '\n'.join('<tr><th scope="row">' + e(r[0]) + '</th>' + ''.join(cell(v, c) for v, c in zip(r[1:], EDGE_COLS)) + '</tr>' for r in D['rows'])
+    return (f'<h3 class="edge-h">{e(D["matrix_h3"])}</h3>\n<div class="table-wrap mx"><table>\n<thead><tr>{head}</tr></thead>\n<tbody>\n{body}\n</tbody></table></div>'
+            f'\n<p class="fine">{e(D["note"])}</p>')
+
+def vs_links(L):
+    return f'<p class="vs-links">{e(EDGE[L["lang"][:2]]["links"])} ' + ' · '.join(f'<a href="/vs/{P["slug"]}/">One Roof vs {e(P["name"])}</a>' for P in VS_PAGES) + '</p>\n    '
+
+def vs_foot(L):
+    if L['path'] != '/': return ''
+    return ''.join(f'<a href="/vs/{P["slug"]}/">vs {e(P["name"])}</a> · ' for P in VS_PAGES)
+
+def vs_page(P):
+    L = LANGS[0]; url = f'{SITE}/vs/{P["slug"]}/'
+    them, D = P['name'], EDGE['en']
+    def mark(st, note, col):
+        label = {'y': D['yes'], 'n': D['no'], 'p': D['part']}[st]
+        sm = f'<small>{e(note)}</small>' if note else ''
+        return (f'<td data-l="{e(col)}" class="{st}"><span class="mk {st}" role="img" aria-label="{e(label)}">'
+                f'<svg viewBox="0 0 24 24" aria-hidden="true">{_MK[st]}</svg></span>{sm}</td>')
+    def row(ic, f, t, u):
+        win = u[0] != 'n' and t[0] == 'n'
+        badge = '<em class="win-b">Only One Roof</em>' if win else ''
+        return (f'<tr{" class=win" if win else ""}><th scope="row"><span class="fi">{ic}</span>{e(f)}{badge}</th>'
+                + mark(*u, 'One Roof') + mark(*t, them) + '</tr>')
+    # what only One Roof has first, then what both have, then where they're ahead
+    rank = lambda r: 0 if (r[3][0] != 'n' and r[2][0] == 'n') else (2 if r[3][0] == 'n' else 1)
+    trs = '\n'.join(row(*r) for r in sorted(P['rows'], key=rank))
+    n = len(P['rows'])
+    has = lambda i: sum(1 for r in P['rows'] if r[i][0] != 'n')
+    def board(name, i, us):
+        chips = ''.join(f'<li class="{r[i][0]}"><span class="fi">{r[0]}</span>{e(r[1])}</li>' for r in P['rows'])
+        return (f'<div class="board{" us" if us else ""}"><p class="bname">{e(name)}</p>'
+                f'<p class="bcount"><b>{has(i)}</b> of {n}</p>'
+                f'<div class="bbar"><i style="width:{has(i) / n * 100:.0f}%"></i></div><ul class="bchips">{chips}</ul></div>')
+    boards = board('One Roof', 3, True) + board(them, 2, False)
+    faq = '\n'.join(f'<details{" open" if i == 0 else ""}><summary><h3>{e(q)}</h3></summary><p>{e(a)}</p></details>' for i, (q, a) in enumerate(P['faq']))
+    src = ', '.join(f'<a href="{u}" rel="nofollow noopener">{e(t)}</a>' for t, u in P['sources'])
+    others = ' · '.join(f'<a href="/vs/{Q["slug"]}/">One Roof vs {e(Q["name"])}</a>' for Q in VS_PAGES if Q is not P)
+    ld = {'@context': 'https://schema.org', '@graph': [
+        {'@type': 'WebPage', '@id': url, 'url': url, 'name': P['title'], 'description': P['description'], 'inLanguage': 'en',
+         'isPartOf': {'@type': 'WebSite', '@id': SITE + '/#site', 'name': 'One Roof', 'url': SITE + '/'},
+         'about': [{'@id': SITE + '/#ios'}, {'@id': SITE + '/#android'}], 'dateModified': TODAY},
+        {'@type': 'BreadcrumbList', 'itemListElement': [
+            {'@type': 'ListItem', 'position': 1, 'name': 'One Roof', 'item': SITE + '/'},
+            {'@type': 'ListItem', 'position': 2, 'name': P['h1'], 'item': url}]},
+        {'@type': 'FAQPage', '@id': url + '#faq', 'inLanguage': 'en',
+         'mainEntity': [{'@type': 'Question', 'name': q, 'acceptedAnswer': {'@type': 'Answer', 'text': a}} for q, a in P['faq']]}]}
+    badges = f"""<div class="cta-row">
+    <a href="{APP_STORE}" class="badge" rel="noopener"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" width="156" height="52" /></a>
+    <a href="{PLAY}&hl=en_US" class="badge play" rel="noopener"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="201" height="78" /></a>
+  </div>"""
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{e(P['title'])}</title>
+<meta name="description" content="{e(P['description'])}" />
+<link rel="canonical" href="{url}" />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<meta name="theme-color" content="#fbf6f0" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#1b1714" media="(prefers-color-scheme: dark)" />
+<meta name="apple-itunes-app" content="app-id=6786347512" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="One Roof" />
+<meta property="og:url" content="{url}" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:title" content="{e(P['title'])}" />
+<meta property="og:description" content="{e(P['description'])}" />
+<meta property="og:image" content="{SITE}/img/og-en.jpg" />
+<meta name="twitter:card" content="summary_large_image" />
+{analytics()}<link rel="icon" type="image/png" href="/roof-icon-192.png?v=2" />
+<link rel="apple-touch-icon" href="/roof-icon-180.png?v=2" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Hanken+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>{CSS}</style>
+<script type="application/ld+json">
+{json.dumps(ld, ensure_ascii=False, indent=1)}
+</script>
+</head>
+<body>
+<nav class="nav" aria-label="One Roof">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/roof-icon-192.png?v=2" alt="" width="30" height="30" /> <span>One Roof</span></a>
+    <span class="nav-links"><a href="/#features">Features</a><a href="/#faq">FAQ</a></span>
+    <a class="btn" href="#download">{e(L['nav_cta'])}</a>
+  </div>
+</nav>
+<main>
+<header class="wrap vs-head">
+  <p class="crumbs"><a href="/">One Roof</a> › Compare</p>
+  <h1 class="display">{e(P['h1'])}</h1>
+  <p class="sub">{e(P['lead'])}</p>
+  {badges}
+  <p class="free">{e(L['free_note'])}</p>
+</header>
+
+<section class="band" id="compare">
+  <div class="wrap">
+    <h2 class="display">What each app covers</h2>
+    <p class="sub">The same {n} things families ask for, checked in each app.</p>
+    <div class="boards">{boards}</div>
+    <p class="legend"><span><i class="lg y"></i>Has it</span><span><i class="lg p"></i>Partly</span><span><i class="lg n"></i>Not listed on {e(them)}'s site</span></p>
+    {only_cards('en')}
+    <h3 class="edge-h">Feature by feature</h3>
+    <div class="table-wrap mx vsx"><table>
+      <thead><tr><th scope="col">Feature</th><th scope="col">One Roof</th><th scope="col">{e(them)}</th></tr></thead>
+      <tbody>
+{trs}
+      </tbody>
+    </table></div>
+    <div class="prices"><div class="us"><p class="bname">One Roof</p><p>{e(P['price'][1])}</p></div><div><p class="bname">{e(them)}</p><p>{e(P['price'][0])}</p></div></div>
+    <p class="fine">{e(them)} details are from {src}, checked {VS_CHECKED}. "Not listed" means their site doesn't list it. Features and prices change; check their site for the latest.</p>
+  </div>
+</section>
+
+<section class="wrap" id="pick">
+  <h2 class="display">Which one fits your family?</h2>
+  <div class="pick">
+    <article><h3>{e(P['name'])} may suit you if…</h3><p>{e(P['pick_them'])}</p></article>
+    <article class="us"><h3>One Roof may suit you if…</h3><p>{e(P['pick_us'])}</p></article>
+  </div>
+</section>
+
+<section class="wrap" id="faq">
+  <div class="faq-grid">
+    <div><h2 class="display">Questions</h2></div>
+    <div class="faq">
+{faq}
+    </div>
+  </div>
+</section>
+
+<section class="wrap flush" id="download">
+  <div class="final">
+    <img class="icon" src="/roof-icon-192.png?v=2" alt="One Roof app icon" width="76" height="76" loading="lazy" />
+    <h2 class="display">{e(L['cta_h2'])}</h2>
+    {badges}
+    <p class="free">{e(L['free_note'])}</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Also compare: {others} · <a href="/">One Roof home</a></p>
+    <p><a href="/privacy.html">{e(L['privacy_link'])}</a> · <a href="/support.html">{e(L['support_link'])}</a> · <a href="{APP_STORE}">App Store</a> · <a href="{PLAY}">Google Play</a></p>
+    <p>{e(P['name'])} is a trademark of its owner. One Roof is not affiliated with or endorsed by {e(P['name'])}.</p>
     <p>{e(L['footer'])}</p>
   </div>
 </footer>
@@ -396,6 +567,9 @@ def write(rel, text):
 
 for L in LANGS:
     write('index.html' if L['path'] == '/' else f'public{L["path"]}index.html', no_emoji(page(L)))
+
+for P in VS_PAGES:
+    write(f'public/vs/{P["slug"]}/index.html', no_emoji(vs_page(P)))
 
 write('public/robots.txt', f'''# One Roof — search engines and AI assistants are welcome on the public pages.
 User-agent: *
@@ -414,7 +588,7 @@ urls = ''.join(f'''  <url>
 {''.join(f'    <xhtml:link rel="alternate" hreflang="{x["lang"]}" href="{SITE + x["path"]}"/>{chr(10)}' for x in LANGS)}    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE}/"/>
   </url>
 ''' for L in LANGS)
-urls += ''.join(f'  <url><loc>{SITE}/{p}</loc><lastmod>{TODAY}</lastmod></url>\n' for p in ('privacy.html', 'support.html'))
+urls += ''.join(f'  <url><loc>{SITE}/{p}</loc><lastmod>{TODAY}</lastmod></url>\n' for p in ('privacy.html', 'support.html', *(f'vs/{P["slug"]}/' for P in VS_PAGES)))
 write('public/sitemap.xml', f'''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 {urls}</urlset>
@@ -446,4 +620,5 @@ Families often combine several apps: Cozi or TimeTree for a shared calendar, Any
 ## Pages
 - [Privacy policy]({SITE}/privacy.html)
 - [Support]({SITE}/support.html)
+{chr(10).join(f'- [One Roof vs {P["name"]}]({SITE}/vs/{P["slug"]}/)' for P in VS_PAGES)}
 ''')

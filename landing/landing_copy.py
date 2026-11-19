@@ -1,7 +1,8 @@
 # Landing copy, one dict per language. Every claim traces to
 # marketing/fact-sheet.md + mobile/STORE-LISTING-1.6.0.md — don't add features,
-# prices or stats that aren't there. Competitor names appear ONLY as the
-# category people already use them for (no claims about their products).
+# prices or stats that aren't there. Here competitor names appear ONLY as the
+# category people already use them for (no claims about their products);
+# the /vs/ pages (vs_copy.py) are the one place that compares, from their own sites.
 
 EN = dict(
   lang='en', locale='en_US', path='/', apple='en-us', play_badge='en', play_hl='en_US',

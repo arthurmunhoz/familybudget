@@ -1,0 +1,97 @@
+# "Only in One Roof" cards + the checkmark table on the landing's #compare
+# section and on the /vs/ pages (owner, 2026-11-18: show better what we have
+# that competitors don't). Competitor marks come ONLY from their own sites,
+# checked November 2026 (see vs_copy.py for the sources): 'n' = not listed on
+# their site, 'p' = partly (with the note). One Roof marks trace to the
+# landing copy / fact sheet. Order of cells: One Roof, Cozi, FamilyWall.
+COLS = ('One Roof', 'Cozi', 'FamilyWall')
+
+EDGE = {
+'en': dict(
+  only_h3='Only in One Roof',
+  only=[
+    ('🎙', '#6d63f5', 'Roof, a voice assistant that does it', 'Say "Hey Roof, milk and eggs on the list" or "I spent 50 at the supermarket". It does it and shows what changed, with Undo.'),
+    ('🧾', '#1fa873', 'Receipts fill in the budget', 'Photograph a receipt: amount, date and category fill in, and the app offers to tick what you bought off your lists.'),
+    ('🐾', '#f2793d', 'Pet care', 'A shared feeding routine so nobody feeds the dog twice, vet visits and a reminder before the next vaccine.'),
+    ('📺', '#2d8fe0', 'A family screen you already own', 'Home Mode turns a spare tablet, laptop or TV browser into the family\'s home screen. No device to buy.'),
+    ('🎲', '#f2645a', 'Family games', 'Hangman, Battleship and a buzzer quiz, each person playing on their own phone.'),
+    ('✏', '#d99a00', 'Hand-drawn notes', 'Draw a note with your finger and send it to the family, like the paper on the fridge.'),
+  ],
+  matrix_h3='Side by side',
+  rows=[
+    ('Shared family calendar', 'y', 'y', 'y'),
+    ('Google Calendar sync', ('y', 'Two-way · Plus'), ('p', 'Read-only'), 'y'),
+    ('Shopping & grocery lists', 'y', 'y', 'y'),
+    ('Household budget', 'y', 'n', 'y'),
+    ('AI receipt scanning', 'y', 'n', 'n'),
+    ('Voice assistant', 'y', 'n', 'n'),
+    ('Pet care & vaccine reminders', 'y', 'n', 'n'),
+    ('Family location map', ('p', 'iPhone'), 'n', 'y'),
+    ('Documents', 'y', 'n', 'y'),
+    ('Family games', 'y', 'n', 'n'),
+    ('Family screen on a device you own', 'y', 'n', 'n'),
+    ('Meal planner', 'n', 'y', 'y'),
+  ],
+  yes='Yes', no='Not listed', part='Partly',
+  note='"Only in One Roof" and the marks compare One Roof with Cozi and FamilyWall, from their own websites, November 2026. "Not listed" means their site doesn\'t list it.',
+  links='Full comparisons:',
+),
+'pt': dict(
+  only_h3='Só no One Roof',
+  only=[
+    ('🎙', '#6d63f5', 'Roof, um assistente de voz que faz', 'Diga "Oi Casa, leite e ovos na lista" ou "gastei 50 no mercado". Ele faz e mostra o que mudou, com Desfazer.'),
+    ('🧾', '#1fa873', 'O recibo preenche o orçamento', 'Fotografe um recibo: valor, data e categoria se preenchem, e o app oferece riscar das listas o que você comprou.'),
+    ('🐾', '#f2793d', 'Cuidados com pets', 'Rotina de ração compartilhada para ninguém alimentar o cachorro duas vezes, consultas e lembrete antes da próxima vacina.'),
+    ('📺', '#2d8fe0', 'Uma tela da família que você já tem', 'O Modo Casa transforma um tablet, notebook ou navegador de TV parado na tela inicial da família. Sem aparelho para comprar.'),
+    ('🎲', '#f2645a', 'Jogos em família', 'Forca, Batalha Naval e um quiz de campainha, cada um jogando no próprio celular.'),
+    ('✏', '#d99a00', 'Recados à mão', 'Desenhe um recado com o dedo e mande para a família, como o papel na geladeira.'),
+  ],
+  matrix_h3='Lado a lado',
+  rows=[
+    ('Agenda da família compartilhada', 'y', 'y', 'y'),
+    ('Sincroniza com o Google Agenda', ('y', 'Nos dois sentidos · Plus'), ('p', 'Só leitura'), 'y'),
+    ('Lista de compras', 'y', 'y', 'y'),
+    ('Orçamento da casa', 'y', 'n', 'y'),
+    ('Leitura de recibo com IA', 'y', 'n', 'n'),
+    ('Assistente de voz', 'y', 'n', 'n'),
+    ('Pets e lembrete de vacina', 'y', 'n', 'n'),
+    ('Mapa da família', ('p', 'iPhone'), 'n', 'y'),
+    ('Documentos', 'y', 'n', 'y'),
+    ('Jogos em família', 'y', 'n', 'n'),
+    ('Tela da família num aparelho que você já tem', 'y', 'n', 'n'),
+    ('Planejador de refeições', 'n', 'y', 'y'),
+  ],
+  yes='Sim', no='Não aparece', part='Em parte',
+  note='"Só no One Roof" e as marcações comparam o One Roof com o Cozi e o FamilyWall, pelos sites deles, em novembro de 2026. "Não aparece" quer dizer que o site deles não menciona.',
+  links='Comparações completas (em inglês):',
+),
+'es': dict(
+  only_h3='Solo en One Roof',
+  only=[
+    ('🎙', '#6d63f5', 'Roof, un asistente de voz que lo hace', 'Di "Oye Casa, leche y huevos a la lista" o "gasté 50 en el súper". Lo hace y muestra qué cambió, con Deshacer.'),
+    ('🧾', '#1fa873', 'El recibo llena el presupuesto', 'Toma una foto del recibo: monto, fecha y categoría se llenan solos, y la app ofrece tachar de tus listas lo que compraste.'),
+    ('🐾', '#f2793d', 'Cuidado de mascotas', 'Una rutina de comida compartida para que nadie alimente al perro dos veces, visitas al veterinario y un aviso antes de la próxima vacuna.'),
+    ('📺', '#2d8fe0', 'Una pantalla familiar que ya tienes', 'El Modo Casa convierte una tablet, laptop o navegador de TV que no usas en la pantalla de inicio de la familia. Sin aparato que comprar.'),
+    ('🎲', '#f2645a', 'Juegos en familia', 'Ahorcado, Batalla Naval y un quiz de timbre, cada quien jugando en su propio teléfono.'),
+    ('✏', '#d99a00', 'Notas a mano', 'Dibuja una nota con el dedo y mándala a la familia, como el papel en el refri.'),
+  ],
+  matrix_h3='Lado a lado',
+  rows=[
+    ('Calendario familiar compartido', 'y', 'y', 'y'),
+    ('Sincroniza con Google Calendar', ('y', 'En ambos sentidos · Plus'), ('p', 'Solo lectura'), 'y'),
+    ('Lista de compras', 'y', 'y', 'y'),
+    ('Presupuesto del hogar', 'y', 'n', 'y'),
+    ('Lectura de recibos con IA', 'y', 'n', 'n'),
+    ('Asistente de voz', 'y', 'n', 'n'),
+    ('Mascotas y aviso de vacunas', 'y', 'n', 'n'),
+    ('Mapa familiar', ('p', 'iPhone'), 'n', 'y'),
+    ('Documentos', 'y', 'n', 'y'),
+    ('Juegos en familia', 'y', 'n', 'n'),
+    ('Pantalla familiar en un aparato que ya tienes', 'y', 'n', 'n'),
+    ('Planificador de comidas', 'n', 'y', 'y'),
+  ],
+  yes='Sí', no='No aparece', part='En parte',
+  note='"Solo en One Roof" y las marcas comparan One Roof con Cozi y FamilyWall, según sus propios sitios, noviembre de 2026. "No aparece" significa que su sitio no lo menciona.',
+  links='Comparaciones completas (en inglés):',
+),
+}

@@ -362,6 +362,88 @@ footer a{color:var(--muted)}
 }}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
 @media (max-width:440px){.brand span{display:none}.pill{display:none}}
+
+/* comparison pages (/vs/<slug>/) */
+.vs-links{margin-top:18px;font-weight:700}
+.vs-head{padding-top:clamp(40px,7vw,88px);padding-bottom:clamp(32px,5vw,56px)}
+.vs-head .sub{max-width:44em}
+.vs-head .cta-row{margin-top:26px}
+.crumbs{font-size:.86rem;color:var(--muted);margin-bottom:10px}
+.pick{display:grid;gap:18px;margin-top:28px}
+.pick article{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:24px}
+.pick article.us{background:color-mix(in srgb,var(--accent) 9%,var(--card))}
+.pick h3{font-size:1.14rem;margin-bottom:6px}
+.pick p{color:var(--muted)}
+@media (min-width:800px){.pick{grid-template-columns:1fr 1fr}}
+
+/* compare: only-in-One-Roof cards + checkmark matrix */
+.edge-h{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:clamp(1.3rem,2.6vw,1.7rem);margin:40px 0 0}
+.onlys{display:grid;gap:14px;margin-top:18px}
+@media (min-width:640px){.onlys{grid-template-columns:1fr 1fr}}
+@media (min-width:980px){.onlys{grid-template-columns:repeat(3,1fr)}}
+.only{position:relative;background:var(--card);border:1px solid var(--border);border-radius:22px;padding:22px 22px 20px;overflow:hidden}
+.only::before{content:'';position:absolute;inset:0 0 auto;height:4px;background:var(--tint)}
+.only .tile{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:13px;background:color-mix(in srgb,var(--tint) 16%,var(--card));margin-bottom:12px}
+.only h4{font-size:1.08rem;margin-bottom:4px}
+.only p{color:var(--muted);font-size:.95rem}
+.mx table{font-size:.95rem}
+.mx th,.mx td{padding:12px 16px;vertical-align:middle}
+.mx thead th{text-align:center}.mx thead th:first-child{text-align:left}
+.mx td{text-align:center;font-weight:400}
+.mx td:nth-child(2){background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(--text)}
+.mx thead th:nth-child(2){color:var(--accent)}
+.mx th:last-child,.mx td:last-child{background:none;font-weight:400}
+.mx thead th:last-child{color:var(--muted)}
+.mk{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;vertical-align:middle}
+.mk svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.mk.y{background:#1fa873;color:#fff}
+.mk.p{background:color-mix(in srgb,#d99a00 22%,var(--card));color:#a37400}
+.mk.n{background:var(--bg2);color:var(--muted)}
+.mx small{display:block;font-size:.74rem;color:var(--muted);margin-top:3px;line-height:1.3}
+@media (prefers-color-scheme:dark){.mk.p{color:#f0c050}}
+@media (max-width:640px){
+  .mx thead{position:static;clip-path:none;width:auto;height:auto;display:table-header-group}
+  .mx tr{display:table-row;padding:0}
+  .mx th,.mx td{display:table-cell;padding:10px 6px;border-bottom:1px solid var(--border)}
+  .mx td::before{content:none}
+  .mx td:last-child{margin:0;border-radius:0}
+  .mx tbody th{font-size:.86rem;margin:0}
+  .mx thead th{font-size:.62rem;letter-spacing:.04em}
+  .mx .mk{width:22px;height:22px}
+}
+
+/* /vs/ pages: scoreboard */
+.boards{display:grid;gap:16px;margin-top:28px}
+@media (min-width:860px){.boards{grid-template-columns:1fr 1fr}}
+.board{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:22px}
+.board.us{border:2px solid var(--accent);box-shadow:var(--shadow)}
+.bname{font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.board.us .bname{color:var(--accent)}
+.bcount{font-size:1rem;color:var(--muted);margin-top:2px}
+.bcount b{font-family:'Fraunces',Georgia,serif;font-size:2.6rem;color:var(--text);margin-right:4px}
+.bbar{height:10px;border-radius:99px;background:var(--bg2);margin:10px 0 16px;overflow:hidden}
+.bbar i{display:block;height:100%;border-radius:99px;background:var(--muted)}
+.board.us .bbar i{background:linear-gradient(90deg,#1fa873,#2d8fe0)}
+.bchips{list-style:none;display:flex;flex-wrap:wrap;gap:7px}
+.bchips li{display:flex;align-items:center;gap:6px;font-size:.84rem;font-weight:600;padding:6px 11px 6px 8px;border-radius:99px;background:color-mix(in srgb,#1fa873 13%,var(--card));color:var(--text)}
+.bchips li .ico{width:16px;height:16px;color:#1fa873}
+.bchips li.p{background:color-mix(in srgb,#d99a00 16%,var(--card))}.bchips li.p .ico{color:#b98200}
+.bchips li.n{background:none;border:1px dashed var(--border);color:var(--muted);text-decoration:line-through;opacity:.75}
+.bchips li.n .ico{color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:.84rem;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.lg{width:12px;height:12px;border-radius:50%;display:inline-block}
+.lg.y{background:#1fa873}.lg.p{background:#d99a00}.lg.n{border:1px dashed var(--muted)}
+.fi .ico{width:18px;height:18px;margin-right:8px;vertical-align:-3px;color:var(--muted)}
+.vsx tbody th{font-weight:600}
+.vsx tr.win th,.vsx tr.win td:nth-child(2){background:color-mix(in srgb,#1fa873 10%,var(--card))}
+.win-b{display:inline-block;font-style:normal;font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#1fa873;border-radius:99px;padding:2px 8px;margin-left:8px;vertical-align:2px}
+.prices{display:grid;gap:12px;margin-top:16px}
+@media (min-width:700px){.prices{grid-template-columns:1fr 1fr}}
+.prices>div{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px 18px}
+.prices .us{border-color:var(--accent)}.prices .us .bname{color:var(--accent)}
+.prices p:last-child{margin-top:4px}
+@media (max-width:640px){.win-b{display:block;width:max-content;margin:4px 0 0 26px}.vsx .fi .ico{margin-right:6px}}
 </style>
 <script type="application/ld+json">
 {
@@ -402,7 +484,7 @@ footer a{color:var(--muted)}
     }
    ],
    "primaryImageOfPage": "https://getoneroof.app/img/og-pt.jpg",
-   "dateModified": "2026-11-17"
+   "dateModified": "2026-11-18"
   },
   {
    "@type": "MobileApplication",
@@ -747,17 +829,27 @@ footer a{color:var(--muted)}
   <div class="wrap">
     <h2 class="display">Usando Cozi, TimeTree, AnyList e Life360 ao mesmo tempo?</h2>
     <p class="sub">A maioria das casas acaba com um app para a agenda, outro para o mercado, outro para a localização e uma planilha para o dinheiro. O One Roof junta tudo debaixo do mesmo teto — um convite para todos, um plano por casa.</p>
-    <div class="table-wrap"><table>
-      <thead><tr><th scope="col">O que a família precisa</th><th scope="col">O que muita gente usa</th><th scope="col">No One Roof</th></tr></thead>
-      <tbody>
-<tr><th scope="row">Agenda familiar compartilhada</th><td data-l="O que muita gente usa">Cozi, TimeTree, Google Agenda</td><td data-l="No One Roof">Agenda com sincronização com o Google (Plus)</td></tr>
-<tr><th scope="row">Lista de compras</th><td data-l="O que muita gente usa">AnyList, OurGroceries, app de notas</td><td data-l="No One Roof">Listas por loja, ao vivo em todos os celulares</td></tr>
-<tr><th scope="row">Localização da família</th><td data-l="O que muita gente usa">Life360, Buscar</td><td data-l="No One Roof">Localização (iPhone, opcional)</td></tr>
-<tr><th scope="row">Orçamento da casa</th><td data-l="O que muita gente usa">Planilha ou app de finanças</td><td data-l="No One Roof">Dinheiro, com leitura de recibos</td></tr>
-<tr><th scope="row">Agenda da família numa tela em casa</th><td data-l="O que muita gente usa">Skylight Calendar, calendário de parede</td><td data-l="No One Roof">Modo Casa em qualquer tablet, notebook ou TV que você já tem</td></tr>
-<tr><th scope="row">Central da família</th><td data-l="O que muita gente usa">FamilyWall, grupo de WhatsApp</td><td data-l="No One Roof">Tudo isso, mais pets, documentos e o Roof</td></tr>
-      </tbody>
-    </table></div>
+    <h3 class="edge-h">Só no One Roof</h3>
+<div class="onlys"><article class="only" style="--tint:#6d63f5"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></span><h4>Roof, um assistente de voz que faz</h4><p>Diga &quot;Oi Casa, leite e ovos na lista&quot; ou &quot;gastei 50 no mercado&quot;. Ele faz e mostra o que mudou, com Desfazer.</p></article><article class="only" style="--tint:#1fa873"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span><h4>O recibo preenche o orçamento</h4><p>Fotografe um recibo: valor, data e categoria se preenchem, e o app oferece riscar das listas o que você comprou.</p></article><article class="only" style="--tint:#f2793d"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg></span><h4>Cuidados com pets</h4><p>Rotina de ração compartilhada para ninguém alimentar o cachorro duas vezes, consultas e lembrete antes da próxima vacina.</p></article><article class="only" style="--tint:#2d8fe0"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg></span><h4>Uma tela da família que você já tem</h4><p>O Modo Casa transforma um tablet, notebook ou navegador de TV parado na tela inicial da família. Sem aparelho para comprar.</p></article><article class="only" style="--tint:#f2645a"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg></span><h4>Jogos em família</h4><p>Forca, Batalha Naval e um quiz de campainha, cada um jogando no próprio celular.</p></article><article class="only" style="--tint:#d99a00"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span><h4>Recados à mão</h4><p>Desenhe um recado com o dedo e mande para a família, como o papel na geladeira.</p></article></div>
+    <h3 class="edge-h">Lado a lado</h3>
+<div class="table-wrap mx"><table>
+<thead><tr><th scope="col"></th><th scope="col">One Roof</th><th scope="col">Cozi</th><th scope="col">FamilyWall</th></tr></thead>
+<tbody>
+<tr><th scope="row">Agenda da família compartilhada</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="FamilyWall" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td></tr>
+<tr><th scope="row">Sincroniza com o Google Agenda</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><small>Nos dois sentidos · Plus</small></td><td data-l="Cozi" class="p"><span class="mk p" role="img" aria-label="Em parte"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><small>Só leitura</small></td><td data-l="FamilyWall" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td></tr>
+<tr><th scope="row">Lista de compras</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="FamilyWall" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td></tr>
+<tr><th scope="row">Orçamento da casa</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td></tr>
+<tr><th scope="row">Leitura de recibo com IA</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td></tr>
+<tr><th scope="row">Assistente de voz</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td></tr>
+<tr><th scope="row">Pets e lembrete de vacina</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td></tr>
+<tr><th scope="row">Mapa da família</th><td data-l="One Roof" class="p"><span class="mk p" role="img" aria-label="Em parte"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><small>iPhone</small></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td></tr>
+<tr><th scope="row">Documentos</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td></tr>
+<tr><th scope="row">Jogos em família</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td></tr>
+<tr><th scope="row">Tela da família num aparelho que você já tem</th><td data-l="One Roof" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="Cozi" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="FamilyWall" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td></tr>
+<tr><th scope="row">Planejador de refeições</th><td data-l="One Roof" class="n"><span class="mk n" role="img" aria-label="Não aparece"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></span></td><td data-l="Cozi" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td><td data-l="FamilyWall" class="y"><span class="mk y" role="img" aria-label="Sim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></td></tr>
+</tbody></table></div>
+<p class="fine">&quot;Só no One Roof&quot; e as marcações comparam o One Roof com o Cozi e o FamilyWall, pelos sites deles, em novembro de 2026. &quot;Não aparece&quot; quer dizer que o site deles não menciona.</p>
+    <p class="vs-links">Comparações completas (em inglês): <a href="/vs/cozi/">One Roof vs Cozi</a> · <a href="/vs/familywall/">One Roof vs FamilyWall</a></p>
     <p class="fine">Cozi, TimeTree, AnyList, OurGroceries, Life360, Buscar, FamilyWall, Skylight, Google Agenda e WhatsApp são marcas de seus respectivos donos. O One Roof não tem afiliação nem endosso deles.</p>
   </div>
 </section>
