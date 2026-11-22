@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- bundled sounds + lazily-loaded native modules (see header) */
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-export type GameSound = 'tap' | 'pop' | 'ready' | 'hit' | 'miss' | 'turn' | 'start' | 'win' | 'lose' | 'trophy' | 'splash' | 'boom' | 'sink' | 'whoosh' | 'buzzer' | 'correct' | 'wrong' | 'tick' | 'applause' | 'splat'
+export type GameSound = 'tap' | 'pop' | 'ready' | 'hit' | 'miss' | 'turn' | 'start' | 'win' | 'lose' | 'trophy' | 'splash' | 'boom' | 'sink' | 'whoosh' | 'buzzer' | 'correct' | 'wrong' | 'tick' | 'applause' | 'splat' | 'rattle' | 'drop' | 'call' | 'dab'
 
 const FILES: Record<GameSound, number> = {
   tap: require('../../../assets/sounds/games/tap.wav'),
@@ -32,6 +32,10 @@ const FILES: Record<GameSound, number> = {
   tick: require('../../../assets/sounds/games/tick.wav'),
   applause: require('../../../assets/sounds/games/applause.wav'),
   splat: require('../../../assets/sounds/games/splat.wav'),
+  rattle: require('../../../assets/sounds/games/rattle.wav'),
+  drop: require('../../../assets/sounds/games/drop.wav'),
+  call: require('../../../assets/sounds/games/call.wav'),
+  dab: require('../../../assets/sounds/games/dab.wav'),
 }
 
 interface Player {
@@ -45,7 +49,7 @@ interface Player {
 // One loaded player per voice. Quick UI sounds get a few voices each, played
 // round-robin: with a single player a second tap that landed while the first
 // was still sounding (or still rewinding) was swallowed (owner, 2026-11).
-const VOICES: Partial<Record<GameSound, number>> = { tap: 4, tick: 3, pop: 2 }
+const VOICES: Partial<Record<GameSound, number>> = { tap: 4, tick: 3, pop: 2, dab: 3 }
 
 interface Voice {
   p: Player
@@ -130,6 +134,42 @@ export function preloadSounds(names: GameSound[] = Object.keys(FILES) as GameSou
   for (const n of names) pool(n)
 }
 
+/** Fade a sound out over `fadeMs` and stop it (a long recording that must
+ *  end when something happens — the bingo cage when the ball comes out). */
+export function stopSound(name: GameSound, fadeMs = 300) {
+  const pl = pools.get(name)
+  if (!pl) return
+  const base = name === 'tap' ? 0.45 : 0.85
+  for (const v of pl.voices) {
+    if (v.rewound) continue
+    const p = v.p
+    const steps = Math.max(1, Math.round(fadeMs / 40))
+    let k = 0
+    const id = setInterval(() => {
+      k++
+      try {
+        p.volume = base * Math.max(0, 1 - k / steps)
+      } catch {
+        // gone
+      }
+      if (k < steps) return
+      clearInterval(id)
+      try {
+        p.pause?.()
+        const r = p.seekTo(0)
+        const done = () => {
+          p.volume = base
+          v.rewound = true
+        }
+        if (r && typeof r.then === 'function') r.then(done, done)
+        else done()
+      } catch {
+        // never let a sound take a turn down
+      }
+    }, 40)
+  }
+}
+
 export function sound(name: GameSound) {
   if (muted) return
   const pl = pool(name)
@@ -196,4 +236,6 @@ export function feedback(name: GameSound) {
   else if (name === 'tick') haptic('select')
   else if (name === 'lose') haptic('error')
   else if (name === 'turn') haptic('medium')
+  else if (name === 'dab') haptic('light')
+  else if (name === 'call') haptic('medium')
 }

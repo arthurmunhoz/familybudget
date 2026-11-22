@@ -266,6 +266,11 @@ export default function Roof({
       // An answer to Roof's own question, settled here (nothing sent or spent).
       const pp = pendingPick.current
       if (pp) {
+        // "2 horas" to "how long?" — before the labels, where "duas" would be
+        // the SECOND option. "Sim" to a yes/no question.
+        const said = pp.byText?.(q)
+        if (said) return carry(() => pp.onPick(said))
+        if (pp.yes && isYes(q)) return carry(() => pp.onPick(pp.yes!))
         const i = pickByVoice(q, pp.options.map((x) => x.label))
         if (i >= 0) return carry(() => pp.onPick(pp.options[i].id))
         if (isNo(q)) return show(plain(t('casa.roof.cancelled')), q)
@@ -813,6 +818,28 @@ function AnswerCard({
       {rows.length ? (
         <ul className={`mt-[clamp(12px,3dvh,1.75rem)] grid gap-[clamp(6px,1.2dvh,10px)] ${twoCol ? 'sm:grid-cols-2' : ''}`}>
           {rows.map((r: AnswerRow, i) => {
+            if (r.head)
+              return (
+                <li key={i} className={`casa-rise text-[clamp(0.85rem,2.2dvh,1.05rem)] font-bold uppercase tracking-[0.12em] opacity-80 ${i ? 'mt-[clamp(6px,1.5dvh,12px)]' : ''} ${twoCol ? 'sm:col-span-2' : ''}`} style={{ ['--i' as string]: Math.min(i, 8) + 2 }}>
+                  {r.title}
+                </li>
+              )
+            if (r.tone)
+              return (
+                <li key={i} className="casa-rise flex items-center gap-4 rounded-[20px] px-3 py-2 sm:px-4" style={{ ['--i' as string]: Math.min(i, 8) + 2, opacity: r.tone === 'prior' ? 0.55 : 1, background: r.tone === 'new' ? soft : undefined }}>
+                  <span
+                    className="inline-flex h-[clamp(2rem,5.2dvh,2.6rem)] w-[clamp(2rem,5.2dvh,2.6rem)] shrink-0 items-center justify-center rounded-full"
+                    style={r.tone === 'new' ? { background: '#1F9E68', color: '#fff' } : { border: `2px solid ${ink}`, color: ink }}
+                    aria-hidden
+                  >
+                    <Check size={20} strokeWidth={3} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[clamp(1.1rem,3.2dvh,1.55rem)] font-semibold leading-tight">{r.title}</span>
+                    {r.sub ? <span className="mt-0.5 block text-[clamp(0.95rem,2.5dvh,1.2rem)] font-semibold opacity-85">{r.sub}</span> : null}
+                  </span>
+                </li>
+              )
             const body = (
               <>
                 {r.emoji ? (

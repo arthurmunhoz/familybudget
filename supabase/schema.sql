@@ -286,3 +286,4 @@ create policy documents_storage_rw on storage.objects
 --   migration-118-admin-utilities-tools.sql (admin_app_usage / admin_app_time return `calc/<tool>` for Utilities paths so the admin names the tool)
 --   migration-117-roof-usage.sql (admin_roof_usage(days): how Roof is used — `roof.asked` web_events grouped by intent / voice-or-typed / phone-or-casa, plus a total row)
 --   migration-116-admin-feed-screens.sql (admin_household_events includes screen_view so the household feed shows screens visited; capped at 400 rows)
+--   migration-121-bingo.sql (Bingo: game 'bingo' with no teams — a card per player, server-drawn balls (bingo_tick), players mark their own numbers (bingo_mark) and call it (bingo_call), host pause; game_create/join/leave/start learn the no-team game)

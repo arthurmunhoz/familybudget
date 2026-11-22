@@ -55,6 +55,16 @@ export function matchStore(name: string, list: ShoppingStore[]): ShoppingStore |
   return list.find((s) => norm(s.name) === wanted || (!!catalog && s.slug === catalog.slug)) ?? null
 }
 
+/** The words name the list with no store ("geral", "na lista geral",
+ *  "anywhere") — or its label in the app's language. Never a real list: the
+ *  caller checks matchStore first. */
+export function isGeneralList(name: string, label = ''): boolean {
+  const f = norm(name).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!f) return false
+  if (label && f === norm(label)) return true
+  return /^(?:(?:n?a|la|en la|the|in the|on the) )?(?:(?:lista|list) )?(?:geral|general)(?: list)?$|^(?:anywhere|any store|qualquer(?: (?:uma|lugar|loja|mercado))?|cualquiera|sem loja|nenhuma(?: loja)?)$/.test(f)
+}
+
 /** A new store (a "new list"), with the catalog's name/logo when known. */
 export async function createStore(name: string): Promise<ShoppingStore> {
   const wanted = norm(name)
@@ -476,44 +486,60 @@ function petsNamed(pets: PetLite[], petName: string): PetLite[] {
 }
 
 export interface PetDoneResult {
-  done: { task: PetCareTask; pet: string }[]
+  /** `inserted`: ticked by THIS action — Undo removes only those, and the
+   *  answer shows the others as "already done" (same as the phone). */
+  done: { task: PetCareTask; pet: string; inserted: boolean }[]
   missing: string[]
   needPet: boolean
 }
 
-/** Mark routine tasks done today, for the pet named (or the only pet that has it). */
+/** Mark routine tasks done today for each pet named ("Lola, Aninha" = both),
+ *  or, with none named, the only pet that has the task. Mirrors the phone's
+ *  petTasksDone / matchPetTasks (lib/assistantActions). */
 export async function petTasksDone(petName: string, said: string[], today: string): Promise<PetDoneResult> {
   const { pets, tasks } = await petsAndTasks()
-  const pet = findPet(pets, petName)
-  const done: PetDoneResult['done'] = []
+  const scope = petName
+    .split(/\s*(?:,|&|\+|\s(?:e|and|y)\s)\s*/i)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((n) => findPet(pets, n))
+    .filter((p, i, a): p is PetLite => !!p && a.findIndex((q) => q?.id === p.id) === i)
+  const find = (pool: PetCareTask[], n: string) => {
+    const exact = pool.filter((t) => norm(t.title) === n)
+    return exact.length ? exact : pool.filter((t) => norm(t.title).includes(n) || n.includes(norm(t.title)))
+  }
+  const hits: PetCareTask[] = []
   const missing: string[] = []
   let needPet = false
   for (const s of said) {
     const n = norm(s)
-    const pool = tasks.filter((t) => !pet || t.pet_id === pet.id)
-    let hits = pool.filter((t) => norm(t.title) === n)
-    if (!hits.length) hits = pool.filter((t) => norm(t.title).includes(n) || n.includes(norm(t.title)))
-    if (!hits.length) {
-      missing.push(s)
+    if (!n) continue
+    if (scope.length) {
+      const per = scope.map((p) => find(tasks.filter((t) => t.pet_id === p.id), n)[0]).filter((t): t is PetCareTask => !!t)
+      if (!per.length) missing.push(s)
+      else hits.push(...per)
       continue
     }
-    if (!pet && new Set(hits.map((t) => t.pet_id)).size > 1) {
-      needPet = true
-      continue
-    }
-    const task = hits[0]
+    const pool = find(tasks, n)
+    if (!pool.length) missing.push(s)
+    else if (new Set(pool.map((t) => t.pet_id)).size > 1) needPet = true
+    else hits.push(pool[0])
+  }
+  const done: PetDoneResult['done'] = []
+  for (const task of hits) {
+    if (done.some((d) => d.task.id === task.id)) continue
     const { error } = await supabase.from('pet_task_done').insert({ task_id: task.id, done_on: today })
     if (error && error.code !== '23505') {
-      missing.push(s)
+      missing.push(task.title)
       continue
     }
-    done.push({ task, pet: pets.find((p) => p.id === task.pet_id)?.name ?? '' })
+    done.push({ task, pet: pets.find((p) => p.id === task.pet_id)?.name ?? '', inserted: !error })
   }
   return { done, missing, needPet }
 }
 
 export async function undoPetTasksDone(done: PetDoneResult['done'], today: string): Promise<void> {
-  for (const d of done) await supabase.from('pet_task_done').delete().eq('task_id', d.task.id).eq('done_on', today)
+  for (const d of done.filter((x) => x.inserted)) await supabase.from('pet_task_done').delete().eq('task_id', d.task.id).eq('done_on', today)
 }
 
 export type PetLogResult = { ok: true; ev: PetEvent; pet: string } | { ok: false }

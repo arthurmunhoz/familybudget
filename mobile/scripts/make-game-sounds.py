@@ -445,3 +445,121 @@ def applause(dur=3.0, people=30, seed=7):
 # CC0 — trimmed to 3.5 s, faded, mono, loudness-matched. Keep it; don't
 # re-enable this line without the owner hearing the result.
 # save('applause', reverb(applause(), 0.08, room=0.5, tail=0.3), BIG * 0.85)
+
+
+# ── bingo (2026-11-22) ─────────────────────────────────────────────────────
+# v2 (owner: "a more real sound"): the first take used marimba notes and read
+# as a toy xylophone. A bingo cage is HOLLOW PLASTIC BALLS on WIRE: each knock
+# is a very short burst of noise ringing in a narrow band around 1.5–3.5 kHz
+# (the ball's shell — a ping-pong "pock"), now and then a thin metallic tick
+# from the wire, over the low roll of the load turning. Each sound has its own
+# Random, so adding them doesn't shift the numbers the sounds above were made
+# with.
+def bp_noise(rnd, dur, freq, q, env):
+    """Noise through one resonant band-pass, shaped by env(t)."""
+    b0, b2, a1, a2 = biquad_bp(freq, q)
+    x1 = x2 = y1 = y2 = 0.0
+    out = []
+    for i in range(int(RATE * dur)):
+        t = i / RATE
+        x = rnd.uniform(-1, 1) * env(t)
+        y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2
+        x2, x1 = x1, x
+        y2, y1 = y1, y
+        out.append(y)
+    return out
+
+
+def pock(rnd, vol, freq=None):
+    """One hollow plastic ball knocking on something."""
+    f = freq or rnd.uniform(1500, 3400)
+    ring = rnd.uniform(0.004, 0.009)
+    body = bp_noise(rnd, 0.05, f, rnd.uniform(4.0, 7.5), lambda t: min(1.0, t / 0.0003) * math.exp(-t / ring))
+    out = []
+    for i, y in enumerate(body):
+        t = i / RATE
+        shell = math.sin(TAU * f * t) * math.exp(-t / (ring * 0.8))          # the pitch of the shell
+        low = math.sin(TAU * f * 0.42 * t) * math.exp(-t / 0.006) * 0.35     # its hollow
+        out.append(vol * (y * 3.0 + shell * 0.45 + low))
+    return out
+
+
+def tink(rnd, vol):
+    """A wire of the cage ringing: thin, high, inharmonic, quick."""
+    f = rnd.uniform(5200, 8200)
+    d = rnd.uniform(0.02, 0.045)
+    return [vol * math.exp(-(i / RATE) / d) * (math.sin(TAU * f * i / RATE) + 0.6 * math.sin(TAU * f * 1.47 * i / RATE))
+            for i in range(int(RATE * 0.12))]
+
+
+def cage(dur=1.6, seed=41):
+    rnd = random.Random(seed)
+    n = int(RATE * (dur + 0.15))
+    buf = [0.0] * n
+
+    def swell(t):                       # the crank gets going, holds, lets go
+        return min(1.0, 0.15 + t / 0.28) * min(1.0, max(0.12, (dur - t) / 0.42))
+
+    def add(samples, t):
+        k = int(t * RATE)
+        for i, v in enumerate(samples):
+            if k + i < n:
+                buf[k + i] += v
+
+    t = 0.0
+    count = 0
+    while t < dur:
+        g = swell(t)
+        # Balls come over the top in waves, about twice a turn.
+        wave = 0.45 + 0.55 * math.sin(TAU * 1.9 * t + 0.6) ** 2
+        add(pock(rnd, g * (0.25 + 0.75 * rnd.random() ** 1.6)), t)
+        count += 1
+        if count % 5 == 0:
+            add(tink(rnd, 0.05 * g * rnd.uniform(0.5, 1.0)), t + rnd.uniform(0, 0.01))
+        t += rnd.expovariate(14 + 62 * g * wave)
+    # the load rolling round: a low, soft rumble under it all
+    rumble = bp_noise(rnd, dur, 260, 0.8, lambda t: swell(t) * (0.7 + 0.3 * math.sin(TAU * 3.8 * t)))
+    for i, v in enumerate(rumble):
+        buf[i] += 0.5 * v
+    return buf
+
+
+# NOT written any more (owner, 2026-11-22): rattle.wav and drop.wav are REAL
+# recordings the owner made of a bingo cage turning and a ball coming out —
+# only the start cut off (the low thump of the tap to record, and the mouse
+# clicks before the cage turns), high-passed at 150 Hz, the rest kept as
+# recorded for the cage (6.0 s); for the ball only its knock and roll
+# (0.54 s — the mouse click before it was the owner's to hear and cut),
+# loudness-matched. The app fades the cage out
+# when the ball comes out (stopSound). Keep them; don't re-enable
+# these lines without the owner hearing the result.
+# save('rattle', reverb(cage(), 0.07, room=0.45, tail=0.18), EVENT * 0.8)
+
+
+# The ball leaving: it rolls down the metal chute, getting faster, lands with
+# a knock and takes three little bounces, each quicker and quieter.
+def chute(seed=57):
+    rnd = random.Random(seed)
+    roll_len = 0.34
+    n = int(RATE * 0.9)
+    buf = [0.0] * n
+    phase = 0.0
+    roll = bp_noise(rnd, roll_len, 1150, 1.6, lambda t: (t / roll_len) ** 1.3)
+    for i, v in enumerate(roll):
+        t = i / RATE
+        phase += TAU * (14 + 55 * (t / roll_len)) / RATE          # the turn of the ball, speeding up
+        buf[i] += 1.5 * v * (0.55 + 0.45 * math.sin(phase))
+    for when, vol, f in ((roll_len, 1.0, 1250), (roll_len + 0.13, 0.5, 1500), (roll_len + 0.215, 0.27, 1700), (roll_len + 0.265, 0.13, 1850)):
+        k = int(when * RATE)
+        for i, v in enumerate(pock(rnd, vol, f)):
+            if k + i < n:
+                buf[k + i] += v
+    return buf
+
+
+# save('drop', reverb(chute(), 0.08, room=0.45, tail=0.2), EVENT * 0.9)
+# The number turning to the room: a hall bell, two notes up.
+save('call', reverb(mix(bell(E6, 0.9, 0.5, ratio=3.5, index=1.6, decay=0.34), bell(A6, 1.1, 0.5, ratio=3.5, index=1.4, decay=0.4),
+                        vibe(A5, 0.7, 0.2), offsets=[0, 0.13, 0.13]), 0.22, tail=0.8), EVENT * 1.05)
+# A dab of ink on the card: a soft, low stamp — felt, with a breath of noise.
+save('dab', mix(felt(hz(57), 0.1, 0.6), felt(hz(69), 0.05, 0.2), noise(0.03, 0.3, 0.012, 0.22)), UI * 1.25)

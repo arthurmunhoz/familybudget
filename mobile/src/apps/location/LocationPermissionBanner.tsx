@@ -6,14 +6,23 @@
 // useLocationSync re-checks on every foreground and feeds this through the
 // store in lib/location; tapping opens the app's page in iOS Settings.
 // Renders nothing while sharing is off or the permission is "Always".
+// Look (2026-11): the Home card shape (GamesBanner / SafetyBanner) with the
+// Location app's own gradient tile — it used to be the old flat row with a
+// red left edge.
 import { useSyncExternalStore } from 'react'
-import { Linking, Pressable, View } from 'react-native'
-import { MapPinOff } from 'lucide-react-native'
+import { Linking, Pressable, StyleSheet, View } from 'react-native'
+import { ChevronRight, MapPinOff } from 'lucide-react-native'
 
 import { Txt } from '@/components/ui'
+import { GradientBox } from '@/components/home/GradientBox'
+import { APP_GRADIENT, shade } from '@/components/home/palette'
 import { useI18n } from '@/hooks/useI18n'
 import { getBgPermissionSnapshot, subscribeBgPermission } from '@/lib/location'
-import { radius, sp, useTheme } from '@/theme/theme'
+import { fonts, sp, useTheme } from '@/theme/theme'
+
+const GRADIENT = APP_GRADIENT.location
+/** The gradient's deep end, darkened until white text reads on it. */
+const SOLID = shade(GRADIENT[1], -0.2)
 
 export default function LocationPermissionBanner() {
   const { c } = useTheme()
@@ -25,41 +34,37 @@ export default function LocationPermissionBanner() {
     <Pressable
       accessibilityRole="button"
       onPress={() => void Linking.openSettings().catch(() => {})}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: sp.md,
-        backgroundColor: c.card,
-        borderRadius: radius.md,
-        borderLeftWidth: 3,
-        borderLeftColor: c.expense,
-        paddingHorizontal: sp.md,
-        paddingVertical: sp.md,
-        marginBottom: sp.md,
-        opacity: pressed ? 0.85 : 1,
-      })}
+      style={({ pressed }) => [styles.card, { backgroundColor: c.card, borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}
     >
-      <View
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: c.surface,
-        }}
-      >
-        <MapPinOff size={18} color={c.expense} />
-      </View>
+      <GradientBox colors={GRADIENT} radius={14} style={styles.icon}>
+        <MapPinOff size={20} color="#fff" />
+      </GradientBox>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt style={{ fontWeight: '700' }} numberOfLines={2}>
+        <Txt style={{ fontFamily: fonts.semibold, fontSize: 15 }} numberOfLines={2}>
           {perm === 'denied' ? t('location.bgperm.offTitle') : t('location.bgperm.title')}
         </Txt>
-        <Txt variant="faint" style={{ fontSize: 12 }} numberOfLines={1}>
+        <Txt variant="muted" style={{ fontSize: 13 }} numberOfLines={2}>
           {t('location.bgperm.body')}
         </Txt>
       </View>
-      <Txt style={{ color: c.accent, fontWeight: '700', fontSize: 13 }}>{t('location.bgperm.action')}</Txt>
+      <View style={[styles.pill, { backgroundColor: SOLID }]}>
+        <Txt style={{ color: '#fff', fontFamily: fonts.semibold, fontSize: 13 }}>{t('location.bgperm.action')}</Txt>
+        <ChevronRight size={14} color="#fff" />
+      </View>
     </Pressable>
   )
 }
+
+const styles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp.md,
+    padding: sp.md,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: sp.sm,
+  },
+  icon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+})

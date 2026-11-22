@@ -22,6 +22,20 @@ async function myEmail(): Promise<string | null> {
   return data.session?.user.email ?? null
 }
 
+/** Fires after a watch is started, edited or stopped on this phone, so the
+ *  Home banner (mounted under Whereabouts) updates at once instead of on its
+ *  next poll — it kept saying "active" after the user turned it off. */
+const watchListeners = new Set<() => void>()
+export function onWatchChange(fn: () => void): () => void {
+  watchListeners.add(fn)
+  return () => {
+    watchListeners.delete(fn)
+  }
+}
+function watchChanged() {
+  watchListeners.forEach((fn) => fn())
+}
+
 /** My active (unexpired) watch, or null. */
 export async function fetchMyWatch(): Promise<SafetyWatch | null> {
   const me = await myEmail()
@@ -144,6 +158,7 @@ export async function startWatch(input: {
     .select('*')
     .single()
   if (error) throw error
+  watchChanged()
   return (data as SafetyWatch) ?? null
 }
 
@@ -151,6 +166,7 @@ export async function stopWatch(): Promise<void> {
   const me = await myEmail()
   if (!me) return
   await supabase.from('safety_watches').delete().eq('owner_email', me)
+  watchChanged()
   await cancelWatchEndedNotice()
 }
 

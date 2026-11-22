@@ -11,7 +11,7 @@ import { AppState } from "react-native";
 import { channelName } from "./realtime";
 import { supabase } from "./supabase";
 
-export type GameKind = "hangman" | "battleship" | "quiz";
+export type GameKind = "hangman" | "battleship" | "quiz" | "bingo";
 export type Team = "A" | "B";
 export type GameStatus = "lobby" | "playing" | "done" | "cancelled";
 
@@ -123,6 +123,30 @@ export interface QuizState {
   left_by?: string;
 }
 
+/** Bingo public state (migration 121) — no teams, a card per player. The
+ *  balls still to come stay on the server. */
+export interface BingoState {
+  order: string[];
+  /** 25 numbers per player, row-major 5×5; 0 = the free centre. */
+  cards: Record<string, number[]>;
+  /** The numbers each player has marked (never done for them). */
+  marks: Record<string, number[]>;
+  drawn: number[];
+  /** When the next ball comes (server clock) / server time at the last one. */
+  next_at: string;
+  now: string;
+  pace: number;
+  goal: "line" | "full";
+  /** Playing for the whole card: who called the first line. */
+  line: { by: string; cells: number[]; at: string } | null;
+  winner: string | null;
+  win: { by: string; kind: "line" | "full"; cells: number[]; at: string } | null;
+  paused: boolean;
+  ended?: "finished" | "abandoned" | "cancelled" | "expired";
+  left_by?: string;
+  rematch?: { id: string; by: string; at: string };
+}
+
 export interface GameSession {
   id: string;
   game: GameKind;
@@ -162,6 +186,8 @@ const KNOWN_ERRORS = [
   "locked_out",
   "no_questions",
   "has_room",
+  "no_bingo",
+  "not_drawn",
 ] as const;
 export type GameError = (typeof KNOWN_ERRORS)[number] | "network";
 
@@ -251,6 +277,18 @@ export const games = {
     next: (id: string) => rpc("quiz_next", { p_session: id }),
     /** This phone has the game on screen (question 1 waits for everyone). */
     ready: (id: string) => rpc("quiz_ready", { p_session: id }),
+  },
+  bingo: {
+    /** The next ball, if the server's clock says it's time (anyone may ask). */
+    tick: (id: string) => rpc("bingo_tick", { p_session: id }),
+    mark: (id: string, n: number) =>
+      rpc("bingo_mark", { p_session: id, p_n: n }),
+    call: (id: string) =>
+      rpc<{ kind: "line" | "full"; won: boolean }>("bingo_call", {
+        p_session: id,
+      }),
+    pause: (id: string, on: boolean) =>
+      rpc("bingo_pause", { p_session: id, p_on: on }),
   },
   /** The server's clock, for a round-trip offset (migration 109). */
   serverNow: () => rpc<string>("game_server_now", {}),

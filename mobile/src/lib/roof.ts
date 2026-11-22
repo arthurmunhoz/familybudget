@@ -154,6 +154,39 @@ async function fetchVoice(text: string, lang: string): Promise<string | null> {
 
 let seq = 0
 
+// One download per sentence: a prefetch and the roofSay that follows share it.
+const fetching = new Map<string, Promise<File | null>>()
+function voiceFile(line: string, lang: string): Promise<File | null> {
+  const key = voiceKey(lang, line)
+  const f = new File(cacheDir(), `${key}.mp3`)
+  if (f.exists) return Promise.resolve(f)
+  let p = fetching.get(key)
+  if (!p) {
+    p = fetchVoice(line, lang)
+      .then((b64) => {
+        if (!b64) return null
+        f.write(b64, { encoding: 'base64' })
+        return f
+      })
+      .catch(() => null)
+      .finally(() => fetching.delete(key))
+    fetching.set(key, p)
+  }
+  return p
+}
+
+/** Start fetching the voice for `text` NOW, before it is time to say it (the
+ *  answer is known but not on screen yet). roofSay then plays it at once. */
+export function roofPrefetch(text: string, lang: string) {
+  const line = speakable(text)
+  if (!line || !requireOptionalNativeModule('ExpoAudio')) return
+  try {
+    void voiceFile(line, lang)
+  } catch {
+    /* the voice is never worth an error */
+  }
+}
+
 /** Say `text` in Roof's voice. Resolves when it finished (or failed — a voice
  *  is never worth an error; the answer is on screen either way). A newer call
  *  cuts off the one playing. */
@@ -164,13 +197,8 @@ export async function roofSay(text: string, lang: string): Promise<void> {
   stopPlayer()
   if (!requireOptionalNativeModule('ExpoAudio')) return
   try {
-    const f = new File(cacheDir(), `${voiceKey(lang, line)}.mp3`)
-    if (!f.exists) {
-      const b64 = await fetchVoice(line, lang)
-      if (!b64 || my !== seq) return
-      f.write(b64, { encoding: 'base64' })
-    }
-    if (my !== seq) return
+    const f = await voiceFile(line, lang)
+    if (!f || my !== seq) return
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createAudioPlayer } = require('expo-audio')
     const p: Player = createAudioPlayer({ uri: f.uri })

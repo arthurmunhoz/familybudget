@@ -16,20 +16,23 @@ import { useBottomGap } from '@/hooks/useBottomGap'
 import { useOnScreen } from '@/lib/onScreen'
 import { useI18n } from '@/hooks/useI18n'
 import { useAuth } from '@/lib/auth'
-import { games, useGameRoom, type GameSession, type Team } from '@/lib/games'
+import { games, useGameRoom, type BingoState, type GameSession, type Team } from '@/lib/games'
 import type { TKey } from '@/lib/i18n'
 import { fonts, sp, useTheme } from '@/theme/theme'
 import { Confetti } from './art/Confetti'
 import { feedback, preloadSounds } from './feedback'
 import { Battleship } from './battleship/Battleship'
 import { Quiz } from './quiz/Quiz'
+import { Bingo } from './bingo/Bingo'
+import { Ball } from './bingo/Ball'
+import { LobbyOpen } from './LobbyOpen'
 import { Hangman } from './hangman/Hangman'
 import { Lobby } from './Lobby'
 import { useMembers } from './members'
-import { GAMES_GRADIENT, TEAM_CONFETTI, TEAM_GRADIENT } from './look'
+import { COVER, GAMES_GRADIENT, TEAM_CONFETTI, TEAM_GRADIENT } from './look'
 import { GameBtn, GameTopBar, LeaveSheet, TeamWash } from './shared'
 
-const TITLE: Record<string, TKey> = { hangman: 'games.hangman', battleship: 'games.battleship', quiz: 'games.quiz' }
+const TITLE: Record<string, TKey> = { hangman: 'games.hangman', battleship: 'games.battleship', quiz: 'games.quiz', bingo: 'games.bingo' }
 
 export function Room({ id }: { id: string }) {
   useOnScreen('games')
@@ -89,7 +92,7 @@ export function Room({ id }: { id: string }) {
   else if (!session) body = <Loader />
   // A sent hangman is always its own one-round screen, finished or not.
   else if (session.mode === 'async') body = <Hangman session={session} players={players} me={me} />
-  else if (session.status === 'lobby') body = <Lobby session={session} players={players} me={me} />
+  else if (session.status === 'lobby') body = session.game === 'bingo' ? <LobbyOpen session={session} players={players} me={me} /> : <Lobby session={session} players={players} me={me} />
   else if (session.status === 'playing') {
     body =
       session.game === 'hangman' ? (
@@ -98,6 +101,8 @@ export function Room({ id }: { id: string }) {
         <Battleship session={session} players={players} me={me} />
       ) : session.game === 'quiz' ? (
         <Quiz session={session} players={players} me={me} />
+      ) : session.game === 'bingo' ? (
+        <Bingo session={session} players={players} me={me} />
       ) : null
   } else if (session.status === 'cancelled') body = <Ended text={t('games.cancelled')} />
   else body = <GameOver session={session} myTeam={players.find((p) => p.email === me)?.team ?? undefined} />
@@ -205,7 +210,10 @@ function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | n
   const tie = scores.A === scores.B
   const winner: Team = scores.A > scores.B ? 'A' : 'B'
   const abandoned = session.state.ended === 'abandoned' || session.state.ended === 'cancelled' || session.state.ended === 'expired'
-  const won = !tie && !abandoned && myTeam === winner
+  // Bingo has no teams: one person wins (or nobody called it).
+  const bingo = session.game === 'bingo' ? (session.state as unknown as BingoState) : null
+  const { session: authed } = useAuth()
+  const won = bingo ? !abandoned && !!bingo.winner && bingo.winner === authed?.user.email : !tie && !abandoned && myTeam === winner
   useEffect(() => {
     // The results get applause, for everyone — no chime (owner, 2026-11).
     if (!abandoned) feedback('applause')
@@ -266,25 +274,55 @@ function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | n
       ) : null}
       <View style={{ flex: 1, padding: sp.lg, gap: sp.lg, justifyContent: 'center' }}>
         <Animated.View entering={ZoomIn.duration(240)} style={{ alignItems: 'center' }}>
-          <GradientBox colors={tie || abandoned ? GAMES_GRADIENT : TEAM_GRADIENT[winner]} radius={60} style={styles.trophy}>
+          <GradientBox colors={bingo ? COVER.bingo : tie || abandoned ? GAMES_GRADIENT : TEAM_GRADIENT[winner]} radius={60} style={styles.trophy}>
             {leftBy ? <DoorOpen size={52} color="#fff" strokeWidth={1.8} /> : <Trophy size={56} color="#fff" strokeWidth={1.8} />}
           </GradientBox>
         </Animated.View>
         <Animated.View entering={FadeInUp.delay(150).duration(240)} style={{ gap: 6 }}>
           <Txt style={{ fontFamily: fonts.display, fontSize: 32, textAlign: 'center', lineHeight: 38 }}>
-            {session.state.ended === 'expired' ? t('games.over.expired') : abandoned ? t('games.over.ended') : tie ? t('games.over.tie') : t('games.over.wins', { team: t(`games.team.${winner}`) })}
+            {session.state.ended === 'expired'
+              ? t('games.over.expired')
+              : abandoned
+                ? t('games.over.ended')
+                : bingo
+                  ? !bingo.winner
+                    ? t('games.bingo.noWinner')
+                    : won
+                      ? t('games.bingo.youWin')
+                      : t('games.bingo.wins', { name: name(bingo.winner) })
+                  : tie
+                    ? t('games.over.tie')
+                    : t('games.over.wins', { team: t(`games.team.${winner}`) })}
           </Txt>
           {leftBy ? (
             <Txt variant="muted" style={{ textAlign: 'center', fontSize: 16 }}>
               {t('games.over.leftBy', { name: name(leftBy) })}
             </Txt>
           ) : null}
-          {!abandoned && !tie ? (
+          {bingo ? (
+            !abandoned && bingo.winner ? (
+              <Txt variant="muted" style={{ textAlign: 'center' }}>
+                {t(bingo.win?.kind === 'line' ? 'games.bingo.wonLine' : 'games.bingo.wonFull', { n: bingo.drawn?.length ?? 0 })}
+              </Txt>
+            ) : null
+          ) : !abandoned && !tie ? (
             <Txt variant="muted" style={{ textAlign: 'center' }}>
               {won ? t('games.over.youWon') : t('games.over.nextTime')}
             </Txt>
           ) : null}
         </Animated.View>
+        {bingo ? (
+          !abandoned && bingo.winner ? (
+            <Animated.View entering={FadeInUp.delay(300).duration(240)} style={{ alignItems: 'center', gap: sp.md }}>
+              <Avatar name={name(bingo.winner)} avatarPath={avatar(bingo.winner)} size={84} />
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {(bingo.drawn ?? []).slice(-6).map((n) => (
+                  <Ball key={n} n={n} size={36} />
+                ))}
+              </View>
+            </Animated.View>
+          ) : null
+        ) : (
         <Animated.View entering={FadeInUp.delay(300).duration(240)} style={{ flexDirection: 'row', gap: sp.md }}>
           {(['A', 'B'] as const).map((tm) => (
             <FinalScore
@@ -297,6 +335,7 @@ function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | n
             />
           ))}
         </Animated.View>
+        )}
       </View>
       <View style={{ paddingHorizontal: sp.lg, paddingBottom: gap, gap: sp.sm }}>
         <GameBtn
@@ -305,7 +344,7 @@ function GameOver({ session, myTeam }: { session: GameSession; myTeam?: Team | n
         />
         <GameBtn title={t('games.backToGames')} variant="secondary" onPress={() => router.replace('/games')} curveBottom />
       </View>
-      <Confetti fire={won || tie ? 1 : 0} colors={won ? TEAM_CONFETTI[winner] : undefined} />
+      <Confetti fire={won || (!bingo && tie) ? 1 : 0} colors={won && !bingo ? TEAM_CONFETTI[winner] : undefined} />
     </View>
   )
 }

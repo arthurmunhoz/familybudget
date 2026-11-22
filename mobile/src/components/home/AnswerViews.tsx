@@ -92,6 +92,11 @@ export interface ActionRowData {
   onPress?: () => void
   /** Which filter chip this row belongs to (a member's email on money lists). */
   group?: string
+  /** A section title inside the panel ("LOLA") — the rows under it belong to it. */
+  head?: boolean
+  /** A tick: 'new' = done by this answer (green check), 'prior' = was already
+   *  done (outlined, faded) — pet tasks. */
+  tone?: 'new' | 'prior'
 }
 
 /** Filter chips over an ActionView's rows ("Todos · Arthur · Ana"). */
@@ -158,6 +163,30 @@ export function ActionView({
       {rows.length ? (
         <Panel>
           {rows.map((r, i) => {
+            if (r.head)
+              return (
+                <View key={i} style={[v.groupHead, i === 0 && { paddingTop: 2 }]}>
+                  {r.emoji ? <Txt style={{ fontSize: 15 }}>{r.emoji}</Txt> : null}
+                  <Txt style={{ fontFamily: fonts.semibold, fontSize: 12.5, letterSpacing: 1, textTransform: 'uppercase', color: c.textMuted }}>{r.title}</Txt>
+                </View>
+              )
+            if (r.tone)
+              return (
+                <View key={i} style={[v.item, r.tone === 'prior' && { opacity: 0.55 }]}>
+                  <View
+                    style={[
+                      v.petTick,
+                      r.tone === 'new' ? { backgroundColor: c.income, borderColor: c.income } : { borderColor: c.textMuted, backgroundColor: 'transparent' },
+                    ]}
+                  >
+                    <Check size={15} color={r.tone === 'new' ? '#fff' : c.textMuted} strokeWidth={3} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 16 }}>{r.title}</Txt>
+                    {r.sub ? <Txt style={{ fontSize: 13.5, fontFamily: fonts.semibold, color: r.tone === 'new' ? c.income : c.textMuted }}>{r.sub}</Txt> : null}
+                  </View>
+                </View>
+              )
             const body = (
               <>
                 {r.emoji ? (
@@ -913,6 +942,7 @@ const v = StyleSheet.create({
   field: { flex: 1, height: 46, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, fontSize: 16 },
   smallBtn: { height: 46, paddingHorizontal: 18, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: sp.md, paddingBottom: 4 },
+  petTick: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   item: { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingVertical: 9 },
   chip: { height: 36, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   tick: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

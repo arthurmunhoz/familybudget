@@ -24,6 +24,8 @@ export const COVER = {
   battleship: ['#38C6F5', '#2563D9'] as Gradient,
   // Strawberry cream for the pie quiz ("Perguntas & Tortadas" in pt, 2026-11-13).
   quiz: ['#FF86B6', '#E2457E'] as Gradient,
+  // Bingo-hall teal into deep green: none of the team colours (it has no teams).
+  bingo: ['#2CCFB0', '#0B8F8A'] as Gradient,
 }
 
 /** Pieces of the hangman house = wrong guesses allowed (server: max_wrong). */

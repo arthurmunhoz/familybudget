@@ -44,8 +44,6 @@ import { pickOn } from '@/theme/contrast'
 import { MemberAvatar, Pulse } from './locationUi'
 import { FeatureButton, GroupLabel, SheetHead } from './sheetParts'
 import { FEATURE } from './onCard'
-import { GradientBox } from '@/components/home/GradientBox'
-import { shade } from '@/components/home/palette'
 
 const CUSTOM = 'custom'
 
@@ -352,22 +350,23 @@ export function SafetyRadiusSheet({
             showsVerticalScrollIndicator={false}
           >
             {watch ? (
-              /* ── Active: a teal hero (who and how long), then each person ── */
+              /* ── Active: the head already names the feature (teal tile) and
+                 says when it ends, so no second teal hero repeating the
+                 shield (owner, 2026-11). What's left — who and how far — is
+                 the section label over the people, with a live dot. ── */
               <>
-                <GradientBox colors={[FEATURE.safety, shade(FEATURE.safety, -0.25)]} radius={22} style={styles.hero}>
-                  <Pulse>
-                    <ShieldCheck size={26} color="#fff" />
-                  </Pulse>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Txt style={{ fontFamily: fonts.display, fontSize: 20, lineHeight: 25, color: '#fff' }}>
-                      {t('location.safety.active', { count: watch.watched.length })}
-                    </Txt>
-                    <Txt style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.88)' }}>
-                      {formatDistance(watch.radius_m)} · {endsInLabel}
+                <View>
+                  {/* A centred chip between the head and the list (owner):
+                      soft Safety wash, live dot, who · how far. */}
+                  <View style={[styles.liveChip, { backgroundColor: FEATURE.safety + (dark ? '2E' : '1A') }]}>
+                    <Pulse>
+                      <View style={[styles.liveDot, { backgroundColor: FEATURE.safety }]} />
+                    </Pulse>
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 13.5, color: FEATURE.safety }}>
+                      {`${t('location.safety.active', { count: watch.watched.length })} · ${formatDistance(watch.radius_m)}`}
                     </Txt>
                   </View>
-                </GradientBox>
-                <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
                   {watch.watched.map((email, i) => {
                     const p = profiles.find((x) => x.email === email)
                     const loc = locByEmail.get(email)
@@ -393,6 +392,7 @@ export function SafetyRadiusSheet({
                       </View>
                     )
                   })}
+                  </View>
                 </View>
               </>
             ) : (
@@ -527,7 +527,17 @@ const styles = StyleSheet.create({
   },
   footer: { paddingHorizontal: sp.lg, paddingTop: sp.sm },
   card: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  hero: { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg },
+  liveChip: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    marginBottom: sp.md,
+  },
+  liveDot: { width: 8, height: 8, borderRadius: 4 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', paddingVertical: sp.md, paddingHorizontal: sp.sm },
   personTile: { width: '25%', alignItems: 'center', gap: 6, paddingVertical: 4 },
   ring: { padding: 3, borderRadius: 34, borderWidth: 2.5 },

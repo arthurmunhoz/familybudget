@@ -100,8 +100,8 @@ const INTENTS = [
   'unknown',
 ] as const
 const APPS = ['calendar', 'shopping', 'budget', 'pets', 'pings', 'location', 'family', 'docs', 'calc', 'frame', 'games', 'settings', '']
-const GAMES = ['hangman', 'battleship', 'quiz', '']
-const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'plus', 'families', 'roof', 'casa', 'other', '']
+const GAMES = ['hangman', 'battleship', 'quiz', 'bingo', '']
+const TOPICS = ['games', 'hangman', 'battleship', 'quiz', 'bingo', 'plus', 'families', 'roof', 'casa', 'other', '']
 const RECURRENCES = ['none', 'daily', 'weekly', 'monthly', 'yearly']
 const EVENT_KINDS = ['event', 'birthday', 'anniversary', 'renewal', 'other']
 const PET_EVENT_TYPES = ['vet', 'vaccine', 'medication', 'grooming', 'other', '']
@@ -136,7 +136,7 @@ const ASSISTANT_SCHEMA = {
         'send_nudge = send a message to family members ("avisa o Léo que chego 19h"); set urgent for help / emergency.',
         'nudge_seen = asks who has seen / read the asker\'s latest nudge ("quem viu meu aviso?").',
         'pets_due = asks about the pets\' CARE ROUTINE or what is left: what a pet needs / what is due or left today ("o que a Lola precisa hoje?", "o que falta para os pets hoje?", "what\'s next for Chloe?", "a Chloe já comeu?") — daily routine items not done yet count; the whole routine ("quais são as rotinas da Lola?", "what is Chloe\'s routine?") is pet_view routine; anything late / overdue ("algum cuidado atrasado?", "tem algo atrasado dos cachorros?") is pet_view overdue.',
-        'pet_done = STATES a pet routine task was done ("já dei comida pra Lola", "passeei com a Chloe"). A question is pets_due.',
+        'pet_done = STATES a pet routine task was done ("já dei comida pra Lola", "passeei com a Chloe", "marca a rotina das cachorras como feita"). A question is pets_due. "Everything / the routine" = the DAILY tasks only (see items).',
         'pet_log = RECORD a vet visit, vaccine, medication or grooming a pet of PETS had TODAY or on a past day — logging it, not scheduling it: "a Chloe tomou a antirrábica hoje, próxima em 1 ano", "a Lola tomou vacina hoje", "registra uma consulta da Lola", and also "marca uma consulta da Chloe (para) hoje" (said at the vet: marca = note it down). A pet named + today / a past day / no day → pet_log, never add_event; only a FUTURE day makes it add_event.',
         'pet_next = asks WHEN a pet\'s next vaccine / vet / medication / grooming / care is due ("quando é a próxima vacina da Lola?", "quais os próximos cuidados das cachorras?", "what care is coming up for the pets?").',
         'pet_weight = record a pet\'s weight ("a Lola está com 8 kg").',
@@ -150,7 +150,7 @@ const ASSISTANT_SCHEMA = {
         'day_summary = asks for an overview of the day ("resumo do meu dia", "o que tenho hoje no geral?"). A plain "what is on the calendar" is agenda.',
         'undo_last = asks to UNDO / take back what was just done ("desfaz isso", "desfaz", "volta atrás", "cancela o que você fez", "undo that", "deshaz eso"). Never remove_items / remove_event for these.',
         'start_game = wants to PLAY / start / open a room / create a match of a game — any phrasing: "começar um jogo de forca", "abre uma sala de batalha naval", "cria uma partida de perguntas e tortadas", "inicia uma partida de", "bora jogar", "vamos jogar", "quero jogar", "joga comigo", "uma rodada de", "let\'s play hangman", "start a battleship game", "open a quiz room", "empezar una partida de ahorcado", "abre una sala de", "vamos a jugar". The game may be named loosely ("o jogo da torta", "o da casinha", "o dos barcos"). With no game named, game "". Questions ABOUT a game (rules, which games exist) are app_help.',
-        'open_app = asks to open a part of the app.',
+        'open_app = asks to open a part of the app. Opening Money / a budget ("abre o orçamento deste mês", "abre o orçamento da casa de outubro", "open the groceries budget"): app budget, budget = the budget named ("" when none) and date = a day inside the period said ("deste mês" / "this month" = today; "de outubro" = the 1st of that month; "" when no period was said).',
         'split_bill = split a bill / restaurant check / total among people ("divide 58,71 em 3", "split the check").',
         'discount = the price after a percentage off ("quanto fica 80 com 30% de desconto").',
         'app_help = asks about One Roof ITSELF: what it can do, what a part or feature is, which games there are, how a game or feature works ("quais jogos tem no app?", "como funciona a forca?", "explica a batalha naval", "o que o Plus dá?", "o que você sabe fazer?"). Answered from the APP GUIDE.',
@@ -176,7 +176,10 @@ const ASSISTANT_SCHEMA = {
       description:
         'add_items: each product as its own short item, capitalised, in the language the user said it ("Leite", "Óleo de cozinha"); keep a quantity the user said in the label ("2 Leites", "Ovos (30)"). ' +
         'move_items: the EXACT labels from OPEN ITEMS being moved. uncheck_items: the items as the user said them. ' +
-        'pet_done: the EXACT task names from PET TASKS that were done (for the pet named). ' +
+        'pet_done: the EXACT task names from PET TASKS that were done (for the pet named), without the "daily:" / "care:" labels or the "(every N days)" note. ' +
+        'Each pet\'s tasks come in two groups: "daily" = the daily routine (food, walk, water…) and "care" = care routines on an interval (medicine, flea pill, bath…). ' +
+        'A request for EVERYTHING ("marca tudo", "todos os itens", "a rotina", "a rotina diária", "mark everything done", "all of today\'s routine", "marca todo") = ONLY the daily tasks — never a care task. ' +
+        'A care task is included only when it is NAMED ("dei o remédio da Lola") or when the CARE group is asked for ("marca os cuidados como feitos", "the care routines are done", "los cuidados") — then only the care tasks, not the daily ones. ' +
         'find_items / check_items / remove_items: the EXACT labels from OPEN ITEMS that the user means — match by meaning in any language ' +
         '("coconut water" = "Agua de coco 🥥", "milk" = "Leite integral"); [] when nothing on the list matches. Empty otherwise.',
     },
@@ -306,7 +309,7 @@ const ASSISTANT_SCHEMA = {
     },
     budget: {
       type: 'string',
-      description: 'add_money / money_summary / list_money: the budget named, matched to KNOWN BUDGETS (exact spelling). "" when none.',
+      description: 'add_money / money_summary / list_money / open_app: the budget named, matched to KNOWN BUDGETS (exact spelling). "" when none.',
     },
     category: {
       type: 'string',
@@ -353,13 +356,13 @@ const ASSISTANT_SCHEMA = {
     game: {
       type: 'string',
       enum: GAMES,
-      description: 'start_game: which game — hangman (forca), battleship (batalha naval), quiz (Perguntas & Tortadas / buzzer quiz / perguntas / quiz / torta). "" otherwise.',
+      description: 'start_game: which game — hangman (forca), battleship (batalha naval), quiz (Perguntas & Tortadas / buzzer quiz / perguntas / quiz / torta), bingo. "" otherwise.',
     },
     topic: {
       type: 'string',
       enum: TOPICS,
       description:
-        'app_help: what it is about — games (which games / games in general), hangman (forca), battleship (batalha naval), quiz (Perguntas & Tortadas / buzzer quiz / perguntas / torta), plus, families (several families per account), roof (the voice assistant), casa (Modo Casa / home mode / using the app on a tablet or screen at home), other. "" otherwise.',
+        'app_help: what it is about — games (which games / games in general), hangman (forca), battleship (batalha naval), quiz (Perguntas & Tortadas / buzzer quiz / perguntas / torta), bingo, plus, families (several families per account), roof (the voice assistant), casa (Modo Casa / home mode / using the app on a tablet or screen at home), other. "" otherwise.',
     },
     gap: {
       type: 'string',
@@ -442,7 +445,7 @@ const GROUPS: Record<string, { keys: string[]; for: string; note?: string }> = {
   },
   money: {
     keys: ['title', 'amount', 'money_type', 'money_sort', 'money_range', 'budget', 'category', 'new_title', 'delta', 'tip_pct'],
-    for: 'add_money, money_summary, list_money, fix_money, remove_money',
+    for: 'add_money, money_summary, list_money, fix_money, remove_money, open_app (a budget named)',
   },
   calc: { keys: ['amount', 'people', 'split_mode', 'tip_pct', 'percent', 'deals'], for: 'split_bill, discount, better_deal' },
   pet: {
@@ -571,8 +574,9 @@ function buildContext(body: any, today: string): string {
     // "Lola (dog)" when the app sends species — "as cachorras" = every dog.
     `PETS: ${petsLine(body)}`,
     `DOCUMENTS: ${strList(body?.documents, 60, 120).join(' | ') || '(none)'}`,
-    // Each pet's routine, "Lola: Comida, Passeio" — pet_done returns these names.
-    `PET TASKS: ${strList(body?.petTasks, 20, 300).join(' | ') || '(none)'}`,
+    // Each pet's routine — "Lola — daily: Comida, Passeio; care: Remédio (every 30 days)"
+    // (1.6.2+; older apps send "Lola: Comida, Passeio") — pet_done returns these names.
+    `PET TASKS: ${strList(body?.petTasks, 20, 400).join(' | ') || '(none)'}`,
     // Spending categories as "id = name" (built-ins + the household's own).
     `CATEGORIES: ${strList(body?.categories, 60).join(', ') || '(defaults)'}`,
     // What's still to buy, as "label @ store" — so questions and "I bought…"
@@ -595,11 +599,12 @@ const APP_GUIDE =
   'Lists (shared live; for groceries by store or anything — chores, a trip, school), Pets (daily routines, vet visits, vaccines, reminders), Documents (family vault; Face ID lock on Plus), ' +
   'Family (each member\'s profile: birthday, phone, sizes, allergies), Utilities (split a bill evenly or by item, better deal per unit, discount, printable cards, photo frame), ' +
   'Nudges (one-tap messages to the family, urgent ones too), Location (family map, places with arrival alerts, safety radius; iPhone only), Games. ' +
-  'GAMES — played live, each person on their own phone, in two teams (Orange and Purple); someone opens a room in Games, the others join and tap ready, the host starts: ' +
+  'GAMES — played live, each person on their own phone, in two teams (Orange and Purple; Bingo has no teams); someone opens a room in Games, the others join and tap ready, the host starts: ' +
   '1) Hangman (Forca): one team picks a word from a category (the hint), the other team guesses letters, one person per turn; each wrong letter adds a piece of the house; ' +
   'guessing the word scores for the guessers, a finished house scores for the word team; teams swap every round. You can also SEND a hangman to one person to solve on their own. ' +
   '2) Battleship (Batalha naval): each team hides its fleet on its own sea; on your turn aim at the other team\'s sea and Fire; a hit shoots again, a miss passes the turn; sink the whole fleet to win. ' +
   '3) Perguntas & Tortadas (in Portuguese; "Buzzer quiz" in English): the same question shows on every phone; first to press the buzzer answers by voice or typing; a wrong answer is out for that question and the others can try; each right answer is a point for the team — and the losing side takes a cream pie in the face on screen (the one who got it wrong, or the other team when someone gets it right). ' +
+  '4) Bingo: no teams, everyone gets their own card (75 balls, B-I-N-G-O, free centre); the globe spins and one ball comes out at a time, the same for everyone; you tap your own numbers — nothing is marked for you — and press BINGO first to win; the room is opened for a line (across, down or diagonal) or for the full card, at a calm, normal or fast pace; whoever opened the room can pause the draw. ' +
   'PLUS (One Roof Plus): unlimited AI scans, calendar sync, split by item, several and private budgets, up to 12 members (free: 4), Face ID on documents, the Roof voice, the assistant without a monthly limit, creating another family. ' +
   'MODO CASA (Home Mode): a spare device at home (an old phone, a tablet, a screen) becomes the family hub — the day, lists, pets, the money behind a PIN, and Roof by voice. Open one-roof-app.vercel.app on it and pair it from the phone: Settings › Modo Casa › Pair a device (type the code it shows or scan its QR). 30 days of everything free from the first device; then, without Plus, it only shows the day; Plus unlocks Roof, actions, the budget and more devices. ' +
   'FAMILIES: one account can be in up to 3 families (join with an invite code, free; create another needs a paid Plus).'
@@ -727,12 +732,88 @@ export async function parseAssistant(
     // A second task in the same breath; the app asks it as its own request.
     then: str(p.then, 200),
   }
+  if (intent === 'pet_done') out.items = petDoneScope(out.items, text, strList(body?.petTasks, 20, 400), out.pet)
   return { out, gap: intent === 'unknown' ? str(p.gap, 160) : '', usage: response.usage }
+}
+
+const foldText = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+
+/** Owner, 2026-11-18: "marca tudo da rotina diária como feito" ticked the
+ *  dogs' medicine and other care routines too. "Everything" means the DAILY
+ *  routine; a care (interval) task is ticked only when it is named or the care
+ *  group is asked for ("os cuidados") — and then the daily ones stay out
+ *  unless they were asked for too. Needs the grouped PET TASKS lines
+ *  ("Lola — daily: …; care: …"); an older app's plain lines are left alone. */
+export function petDoneScope(items: string[], text: string, petTasks: string[], pet = ''): string[] {
+  const daily = new Set<string>()
+  const care = new Set<string>()
+  // Care task names as written, per pet (for "marca os cuidados da Lola").
+  const carePer = new Map<string, string[]>()
+  for (const line of petTasks) {
+    const owner = foldText(line.split(/\s+—\s+|:/)[0] ?? '')
+    for (const part of line.split(';')) {
+      const m = part.match(/\b(daily|care):\s*(.+)$/i)
+      if (!m) continue
+      for (const raw of m[2].split(',')) {
+        const name = foldText(raw.replace(/\(.*?\)/g, ''))
+        if (!name) continue
+        if (m[1].toLowerCase() === 'care') {
+          care.add(name)
+          carePer.set(owner, [...(carePer.get(owner) ?? []), raw.replace(/\(.*?\)/g, '').trim()])
+        } else daily.add(name)
+      }
+    }
+  }
+  if (!care.size) return items
+  const said = foldText(text)
+  const named = (n: string) => said.includes(n)
+  const careGroup = /\bcuidados?\b|\bcare\b/.test(said)
+  const dailyGroup = /\brotinas?\b|\broutines?\b|\brutinas?\b|\bdiari[ao]s?\b|\bdaily\b/.test(said)
+  const kept = items.filter((it) => {
+    const n = foldText(it)
+    if (care.has(n)) return named(n) || careGroup
+    if (daily.has(n) && careGroup && !dailyGroup) return named(n)
+    return true
+  })
+  // The care GROUP was asked for ("os cuidados da Lola") with no care task
+  // named: tick every care routine of the pets named (every pet when none was).
+  if (careGroup && !dailyGroup && ![...care].some(named)) {
+    const names = foldText(pet).split(/\s*(?:,|&|\+|\s(?:e|and|y)\s)\s*/).filter(Boolean)
+    const pick = [...carePer.entries()].filter(([owner]) => !names.length || names.includes(owner)).flatMap(([, list]) => list)
+    return [...new Set(pick)]
+  }
+  return kept
 }
 
 async function assistant(body: any, db: any, household: string | null, res: any, email: string, quota: any) {
   try {
     const t0 = Date.now()
+    // Apps up to 1.6.1 send "Lola: Comida, Remédio" with no daily/care split,
+    // so "marca tudo" ticked the medicine too: rebuild the grouped lines here.
+    const tasksSent = strList(body?.petTasks, 20, 400)
+    if (db && household && tasksSent.length && !tasksSent.some((l) => /\b(daily|care):/.test(l))) {
+      try {
+        // pet_care_tasks has no household_id: it hangs off pets.
+        const pr = await db.from('pets').select('id, name').eq('household_id', household)
+        const ids = ((pr.data ?? []) as { id: string }[]).map((x) => x.id)
+        const tr = ids.length
+          ? await db.from('pet_care_tasks').select('pet_id, title, kind, interval_days, sort_order').in('pet_id', ids).order('sort_order')
+          : { data: [] }
+        const tasks = (tr.data ?? []) as { pet_id: string; title: string; kind: string; interval_days: number | null }[]
+        const lines = ((pr.data ?? []) as { id: string; name: string }[])
+          .map((pet) => {
+            const mine = tasks.filter((x) => x.pet_id === pet.id)
+            const daily = mine.filter((x) => x.kind !== 'interval').map((x) => x.title)
+            const care = mine.filter((x) => x.kind === 'interval').map((x) => (x.interval_days ? `${x.title} (every ${x.interval_days} days)` : x.title))
+            const parts = [daily.length ? `daily: ${daily.join(', ')}` : '', care.length ? `care: ${care.join(', ')}` : ''].filter(Boolean)
+            return parts.length ? `${pet.name} — ${parts.join('; ')}` : ''
+          })
+          .filter(Boolean)
+        if (lines.length) body = { ...body, petTasks: lines }
+      } catch {
+        /* keep what the app sent */
+      }
+    }
     const { out, gap, usage } = await parseAssistant(body, process.env.ASSISTANT_SCHEMA === 'flat' ? 'flat' : 'grouped')
     // How long the understanding took — the number that decides how voice feels.
     console.log(JSON.stringify({ roof_ms: Date.now() - t0, intent: out.intent, in: (usage as any)?.input_tokens ?? 0, out: (usage as any)?.output_tokens ?? 0 }))
@@ -810,16 +891,26 @@ async function speak(body: any, supabaseUrl: string, email: string, res: any) {
   const household: string | null = caller?.household_id ?? null
   if (!household) return res.status(403).json({ error: 'no_household' })
   // Plus gate: an explicit "no" blocks; spoken replies cost real money per call.
-  const { data: plus, error: plusErr } = await db.rpc('household_is_plus', { p_household: household })
+  // The two checks run TOGETHER (2026-11-22): every round trip here is time
+  // the answer sits on screen with no voice.
+  const t0 = Date.now()
+  const [{ data: plus, error: plusErr }, { data: gate, error: gateErr }] = await Promise.all([
+    db.rpc('household_is_plus', { p_household: household }),
+    db.rpc('ai_light_allowed', { p_household: household, p_kind: 'voice', p_cap: VOICE_DAILY_CAP }),
+  ])
   // Fails CLOSED: the voice is a paid Azure call, so a broken plan check
   // must not hand it to everyone.
   if (plusErr || plus !== true) return res.status(plusErr ? 503 : 402).json({ error: plusErr ? 'plan_check' : 'plus_required' })
-  const { data: gate, error: gateErr } = await db.rpc('ai_light_allowed', { p_household: household, p_kind: 'voice', p_cap: VOICE_DAILY_CAP })
   if (!gateErr && gate && gate.allowed === false) return res.status(429).json({ error: 'paused' })
+  const tGate = Date.now()
 
   const ssml =
     `<speak version='1.0' xml:lang='${XML_LANG[lang]}' xmlns='http://www.w3.org/2001/10/synthesis'>` +
     `<voice name='${ROOF_VOICES[lang]}'><lang xml:lang='${XML_LANG[lang]}'>${xmlEscape(text)}</lang></voice></speak>`
+  // Metered WHILE Azure works, not after it (one round trip less before the
+  // audio leaves). A failed synthesis is then counted too — it's an abuse
+  // ceiling and a cost estimate, and failures are rare.
+  const metered = Promise.resolve(db.rpc('ai_light_record', { p_household: household, p_kind: 'voice', p_cost: text.length * VOICE_USD_PER_CHAR })).catch(() => null)
   try {
     const r = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
       method: 'POST',
@@ -831,15 +922,16 @@ async function speak(body: any, supabaseUrl: string, email: string, res: any) {
       },
       body: ssml,
     })
-    if (!r.ok) return res.status(502).json({ error: 'voice_failed' })
-    const audio = Buffer.from(await r.arrayBuffer()).toString('base64')
-    try {
-      await db.rpc('ai_light_record', { p_household: household, p_kind: 'voice', p_cost: text.length * VOICE_USD_PER_CHAR })
-    } catch {
-      /* metering never breaks a good reply */
+    if (!r.ok) {
+      await metered
+      return res.status(502).json({ error: 'voice_failed' })
     }
+    const audio = Buffer.from(await r.arrayBuffer()).toString('base64')
+    await metered
+    console.log(JSON.stringify({ voice_ms: Date.now() - t0, gate_ms: tGate - t0, chars: text.length }))
     return res.status(200).json({ audio, format: 'mp3' })
   } catch {
+    await metered
     return res.status(502).json({ error: 'voice_failed' })
   }
 }

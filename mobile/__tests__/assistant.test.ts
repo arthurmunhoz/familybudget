@@ -622,3 +622,11 @@ describe('a day with nothing matching falls back to the coming weeks (H3, live m
     expect(locateIn(events, 'natação', TODAY, TODAY, 92)).toMatchObject({ ok: false, reason: 'not_found' })
   })
 })
+
+describe('isGeneralList', () => {
+  const { isGeneralList } = require('@/lib/assistant')
+  it.each(['geral', 'Geral', 'na lista geral', 'a geral', 'general', 'the general list', 'anywhere', 'qualquer loja'])('%s is the general list', (x) =>
+    expect(isGeneralList(x, 'Geral')).toBe(true),
+  )
+  it.each(['', 'Costco', 'compras', 'mercado', 'Mercado Geral', 'lista'])('%s is not', (x) => expect(isGeneralList(x, 'Geral')).toBe(false))
+})

@@ -64,7 +64,7 @@ export type Intent =
   /** `view`: the whole routine, or only what's late; absent = what's left today. */
   | { intent: 'pets_due'; pet: string; view?: 'routine' | 'overdue' }
   | { intent: 'family_info'; person: string; field: FamilyField | '' }
-  | { intent: 'open_app'; app: string }
+  | { intent: 'open_app'; app: string; budget?: string; date?: string }
   | { intent: 'start_game'; game: string }
   | { intent: 'split_bill'; amount: number; people: number; mode: 'even' | 'items' | ''; tip: number }
   | { intent: 'discount'; amount: number; percent: number }
@@ -321,7 +321,8 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     case 'family_info':
       return { intent: 'family_info', person: str('person'), field: str('field') as FamilyField | '' }
     case 'open_app':
-      return str('app') ? { intent: 'open_app', app: str('app') } : null
+      // Money: the budget named and a day of the period said, when given.
+      return str('app') ? { intent: 'open_app', app: str('app'), ...(str('budget') ? { budget: str('budget') } : {}), ...(isoOr('date') ? { date: isoOr('date') } : {}) } : null
     case 'start_game':
       return { intent: 'start_game', game: str('game') }
     case 'split_bill': {

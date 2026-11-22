@@ -96,7 +96,7 @@ export type Intent =
   /** `view`: the whole routine, or only what's late; absent = what's left today. */
   | { intent: 'pets_due'; pet: string; view?: 'routine' | 'overdue' }
   | { intent: 'family_info'; person: string; field: FamilyField | '' }
-  | { intent: 'open_app'; app: string }
+  | { intent: 'open_app'; app: string; budget?: string; date?: string }
   | { intent: 'start_game'; game: string }
   | { intent: 'split_bill'; amount: number; people: number; mode: 'even' | 'items' | ''; tip: number }
   | { intent: 'discount'; amount: number; percent: number }
@@ -477,7 +477,8 @@ export function fromServer(j: Record<string, unknown> | null, today: string): In
     case 'family_info':
       return { intent: 'family_info', person: str('person'), field: str('field') as FamilyField | '' }
     case 'open_app':
-      return str('app') ? { intent: 'open_app', app: str('app') } : null
+      // Money: the budget named and a day of the period said, when given.
+      return str('app') ? { intent: 'open_app', app: str('app'), ...(str('budget') ? { budget: str('budget') } : {}), ...(isoOr('date') ? { date: isoOr('date') } : {}) } : null
     case 'start_game':
       return { intent: 'start_game', game: str('game') }
     case 'split_bill': {
@@ -809,6 +810,16 @@ export function matchStore(name: string, stores: ShoppingStore[]): ShoppingStore
   if (!wanted) return null
   const catalog = STORE_CATALOG.find((e) => norm(e.name) === wanted || e.slug === wanted.replace(/[^a-z0-9]/g, ''))
   return stores.find((s) => norm(s.name) === wanted || (catalog && s.slug === catalog.slug)) ?? null
+}
+
+/** The words name the list with no store ("geral", "na lista geral",
+ *  "anywhere") — or its label in the app's language. Never a real list: the
+ *  caller checks matchStore first. */
+export function isGeneralList(name: string, label = ''): boolean {
+  const f = norm(name).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!f) return false
+  if (label && f === norm(label)) return true
+  return /^(?:(?:n?a|la|en la|the|in the|on the) )?(?:(?:lista|list) )?(?:geral|general)(?: list)?$|^(?:anywhere|any store|qualquer(?: (?:uma|lugar|loja|mercado))?|cualquiera|sem loja|nenhuma(?: loja)?)$/.test(f)
 }
 
 /** Make a new store (a "new list"), using the catalog's name/logo when known. */

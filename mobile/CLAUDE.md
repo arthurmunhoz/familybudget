@@ -1391,6 +1391,35 @@ Architecture, systems, remaining setup, and the improvement backlog are in
     large type — never `adjustsFontSizeToFit`, iOS shrank it unreadable), the
     mic opens by itself when you hold the buzzer (`AnswerPanel`), and every
     attempt flashes big on all phones (`AttemptFlash`).
+  - **Bingo** (`apps/games/bingo/`, migration 121, 2026-11-22): the first game
+    with NO teams (`game_players.team` null; lobby = `LobbyOpen`, results =
+    the bingo branch of `GameOver` in Room.tsx; starts with one player too).
+    75 balls, 5×5 card per player in `state.cards[email]` (0 = free centre),
+    the balls still to come in `game_secrets.bag`. The SERVER draws: every
+    phone calls `bingo_tick` when its countdown to `state.next_at` ends (the
+    server checks its own clock, like `quiz_tick`); the host can hold the draw
+    (`bingo_pause`). **Nothing is ever marked for a player** (owner: watching
+    for your numbers IS the game): `bingo_mark` takes one of your numbers and
+    only once it was drawn, `bingo_call` checks what you MARKED and the first
+    valid call wins. Room options: `goal` line | full (playing for the full
+    card, the first line is still called out — `state.line` — and it goes on)
+    and `pace` calm 12 s | normal 9 | fast 6. On screen each new ball gets a
+    show (`Bingo.tsx`: globe whirls 2.6 s → ball rolls out 0.8 s → its number
+    turns; the cage recording is ~6 s and `stopSound` fades it at the drop;
+    `drop` is just the ball's knock and roll, played as the roll starts) and can't be marked until the number shows (`shown`); a phone that
+    missed balls only plays the newest. `Globe.tsx` = a small PHYSICS sim on the UI
+    thread (one `useFrameCallback`, `sim.modify`): gravity, ball–ball and
+    ball–cage collisions, the turning wall dragging what touches it — keep the
+    whirl under ω² < g/R or the balls stick to the wall instead of tumbling.
+    Depth = shaded `Sphere`s whose face slides as they roll, a per-ball
+    near/far drift (scale, zIndex), back wires behind the balls and front
+    wires over them, fixed light on the glass; `logic.ts` = the pure rules (mirrors
+    `bingo_call`, `__tests__/bingo.test.ts`). Sounds `rattle`/`drop`/`call`/
+    `dab` (`rattle` and `drop` are the OWNER'S OWN recordings of a bingo cage
+    and a ball coming out, cleaned and trimmed — see the note in the script;
+    `call`/`dab` are synthesised) come from the bingo block at the END of make-game-sounds.py (its own
+    Random, so the older sounds stay byte-identical). Action colour: the
+    game's teal (`COVER.bingo`), the BINGO button and a called line are gold.
   - Test the SQL before applying: the RPCs were exercised on PGlite
     (`@electric-sql/pglite` ≥0.5 — 0.3 crashes on RAISE) with stubbed
     `auth.jwt()`/`current_household()`.

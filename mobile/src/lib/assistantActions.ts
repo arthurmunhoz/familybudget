@@ -239,15 +239,18 @@ function findPet(pets: PetLite[], name: string): PetLite | null {
   return pets.find((p) => norm(p.name) === n) ?? pets.find((p) => norm(p.name).startsWith(n) || n.startsWith(norm(p.name))) ?? null
 }
 
-/** "Lola: Comida, Passeio" per pet, for the server. */
+/** "Lola — daily: Comida, Passeio; care: Remédio (every 30 days)" per pet,
+ *  for the server: "mark everything done" means the daily group only. */
+export function petTasksLine(name: string, tasks: { title: string; kind: string; interval_days: number | null }[]): string {
+  const daily = tasks.filter((t) => t.kind !== 'interval').map((t) => t.title)
+  const care = tasks.filter((t) => t.kind === 'interval').map((t) => (t.interval_days ? `${t.title} (every ${t.interval_days} days)` : t.title))
+  const parts = [daily.length ? `daily: ${daily.join(', ')}` : '', care.length ? `care: ${care.join(', ')}` : ''].filter(Boolean)
+  return parts.length ? `${name} — ${parts.join('; ')}` : ''
+}
+
 export async function petTasksContext(): Promise<string[]> {
   const { pets, tasks } = await petsAndTasks()
-  return pets
-    .map((p) => {
-      const mine = tasks.filter((t) => t.pet_id === p.id).map((t) => t.title)
-      return mine.length ? `${p.name}: ${mine.join(', ')}` : ''
-    })
-    .filter(Boolean)
+  return pets.map((p) => petTasksLine(p.name, tasks.filter((t) => t.pet_id === p.id))).filter(Boolean)
 }
 
 /** The pets a request named — "Lola", "Lola, Chloe", "Lola e Chloe" — and

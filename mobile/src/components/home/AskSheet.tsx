@@ -55,7 +55,11 @@ import {
   findMember,
   openItemsContext,
   listItems,
+  budgetsWithMonths,
+  isGeneralList,
   matchStore,
+  periodForBudget,
+  pickBudget,
   moneySummary,
   petsDue,
   setDailyDone,
@@ -80,10 +84,10 @@ import {
 } from '@/lib/assistant'
 import type { TKey } from '@/lib/i18n'
 import { CHIME_MS, playChime, useVoice, voiceSupported } from '@/lib/voice'
-import { roofHush, roofSay, useRoofPrefs } from '@/lib/roof'
+import { roofHush, roofPrefetch, roofSay, useRoofPrefs } from '@/lib/roof'
 import { track } from '@/lib/analytics'
 import { isGoodbye, meaningfulRequest } from '@/lib/roofWake'
-import { clockAsk, isNo, isRepeatAsk, isYes, pickByVoice } from '@/lib/assistantTalk'
+import { clockAsk, durationSaid, isNo, isRepeatAsk, isYes, pickByVoice } from '@/lib/assistantTalk'
 import { fonts, radius, sheetRadius, sp, useTheme } from '@/theme/theme'
 import {
   ActionView,
@@ -110,7 +114,9 @@ import { isCapabilitiesAsk, nextTip, type Tip } from './roofTips'
 import { ListeningBars } from './ListeningBars'
 import {
   actMore,
+  durationAsk,
   moneyOverview,
+  overlapAsk,
   eventWho,
   moveAnswer,
   recurrenceLabel,
@@ -676,7 +682,7 @@ export function AskSheet({
         }
         if (isNo(q)) return cancelled
       } else if (last.kind === 'chooseStore') {
-        const create = last.suggested.trim()
+        const create = isGeneralList(last.suggested, t('ask.anyStore')) ? '' : last.suggested.trim()
         const labels = [...last.stores.map((x) => x.name), t('ask.anyStore'), ...(create ? [create] : [])]
         const i = pickByVoice(q, labels)
         if (i >= 0) {
@@ -690,7 +696,11 @@ export function AskSheet({
       } else if (last.kind === 'action') {
         const choices = last.choices ?? []
         const picks = last.rows.filter((r) => r.pick)
-        if (choices.length === 1 && isYes(q)) return choices[0].run()
+        // "2 horas" to "how long?" — before the rows, where "duas" would be
+        // the SECOND row.
+        const mins = last.byMinutes ? durationSaid(q, true) : null
+        if (mins && last.byMinutes) return last.byMinutes(mins)
+        if ((choices.length === 1 || last.confirm) && choices.length && isYes(q)) return choices[0].run()
         const c = pickByVoice(q, choices.map((x) => x.label))
         if (c >= 0) return choices[c].run()
         const r = pickByVoice(q, picks.map((x) => x.title))
@@ -796,6 +806,9 @@ export function AskSheet({
         ok: a.kind !== 'error' && a.kind !== 'unknown' && askedRef.current !== 'unknown' && askedRef.current !== 'none',
         chained: chain,
       })
+      // The voice is fetched from the moment the answer is known — not after
+      // the card is on screen (owner, 2026-11-22: text first, voice later).
+      if (viaVoice.current && !isFree && roof.speak) roofPrefetch(spokenText(a), lang)
       if (held) {
         // The first result gets at least a few seconds on screen in full.
         const wait = 3000 - (Date.now() - shownAt.current)
@@ -1005,7 +1018,10 @@ export function AskSheet({
         // A store that exists → straight in. Otherwise ASK (never invent a
         // list from a word like "compras"), offering to create a named one.
         const store = matchStore(intent.store, stores)
-        if (store || (!intent.store && stores.length === 0)) {
+        // "Geral" SAID (and no list of that name) is the list with no store —
+        // asking again looped forever (owner, 2026-11-22).
+        const general = !store && isGeneralList(intent.store, t('ask.anyStore'))
+        if (store || general || (!intent.store && stores.length === 0)) {
           const res = await addItems(intent.items, store, me?.email ?? '')
           invalidateCache('hub:shopping')
           return { kind: 'added', res, undone: false }
@@ -1028,16 +1044,52 @@ export function AskSheet({
         return { kind: 'agenda', a: await agendaFor(intent.date, intent.end, intent.label, intent.scope, intent.person, me, profiles, today) }
       case 'add_event': {
         const owner = (intent.person && findMember(intent.person, profiles)) || me
-        const ev = await addEvent(intent.title, intent.date, intent.time, owner, intent.opts)
-        invalidateCache('hub:today')
-        // The extras said ("toda terça", "lembrete 1h antes") show on the card.
-        const extras = [
-          owner && owner.email !== me?.email ? owner.display_name : '',
-          recurrenceLabel(t, ev.recurrence),
-          reminderLabel(t, ev.reminder_minutes),
-          ev.location ?? '',
-        ].filter(Boolean)
-        return { kind: 'event', ev, who: extras.length ? extras.join(' · ') : null, undone: false }
+        const create = async (endTime?: string): Promise<Answer> => {
+          const ev = await addEvent(intent.title, intent.date, intent.time, owner, endTime ? { ...intent.opts, endTime } : intent.opts)
+          invalidateCache('hub:today')
+          // The extras said ("toda terça", "lembrete 1h antes") show on the card.
+          const extras = [
+            owner && owner.email !== me?.email ? owner.display_name : '',
+            recurrenceLabel(t, ev.recurrence),
+            reminderLabel(t, ev.reminder_minutes),
+            ev.location ?? '',
+          ].filter(Boolean)
+          return { kind: 'event', ev, who: extras.length ? extras.join(' · ') : null, undone: false }
+        }
+        // All-day, special dates and multi-day spans: as before.
+        const o = intent.opts
+        const timed = /^\d{2}:\d{2}$/.test(intent.time)
+        if (!timed || (o?.kind && o.kind !== 'event') || (o?.end && o.end > intent.date)) return create()
+        const mins = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5))
+        const from = mins(intent.time)
+        // The carry-on of a question is any Answer (the event card), though
+        // the action card's types only know their own kind.
+        const carry = <A extends unknown[]>(f: (...a: A) => Promise<Answer>) => f as unknown as (...a: A) => Promise<ActionAnswer>
+        // Something of theirs (or the whole household's) in that window →
+        // say so and wait for a yes (owner, 2026-11-22).
+        const place = async (endTime: string): Promise<Answer> => {
+          const to = mins(endTime)
+          const agenda = await agendaFor(intent.date, intent.date, '', 'all', '', me, profiles, today)
+          const busy = agenda.rows.filter((r) => {
+            if (r.kind !== 'event' || !r.start) return false
+            if (r.ownerEmail && owner && r.ownerEmail !== owner.email) return false
+            const a = mins(r.start)
+            const b = r.end && mins(r.end) > a ? mins(r.end) : a + 60
+            return a < to && b > from
+          })
+          if (!busy.length) return create(endTime)
+          return overlapAsk(
+            env,
+            intent.title,
+            busy.map((r) => ({ title: r.title, start: r.start!, who: profiles.find((p) => p.email === r.ownerEmail)?.display_name?.split(' ')[0] ?? '' })),
+            carry(() => create(endTime)),
+          )
+        }
+        if (o?.endTime && o.endTime > intent.time) return place(o.endTime)
+        // No end said: ask, instead of a silent 1 h (owner, 2026-11-22).
+        const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+        const when = `${dayWords(intent.date)}, ${formatTime(intent.time, locale)}`
+        return durationAsk(env, intent.title, when, carry((m: number) => place(hm(Math.min(23 * 60 + 59, from + m)))))
       }
       case 'move_event': {
         const who = eventWho(intent.person, profiles)
@@ -1194,11 +1246,41 @@ export function AskSheet({
         // Straight to Games with that game's start sheet open (owner,
         // 2026-11-13: "start a Perguntas & Tortadas match").
         closeSheet()
-        const g = ['hangman', 'battleship', 'quiz'].includes(intent.game) ? intent.game : ''
+        const g = ['hangman', 'battleship', 'quiz', 'bingo'].includes(intent.game) ? intent.game : ''
         router.push((g ? `/games?start=${g}` : '/games') as never)
         return { kind: 'say', text: '' }
       }
       case 'open_app': {
+        // Money opens ON the budget and period asked for — "abre o orçamento
+        // deste mês" used to stop at the list of budgets (owner, 2026-11-22).
+        if (intent.app === 'budget') {
+          const { budgets, months } = await budgetsWithMonths()
+          const pathOf = (b: Budget) => {
+            const m = periodForBudget(b, months, intent.date || today)
+            return m ? `/budget/${b.id}/${m.id}` : `/budget/${b.id}`
+          }
+          const b = pickBudget(budgets, intent.budget ?? '')
+          if (b) {
+            go(pathOf(b))
+            return { kind: 'say', text: '' }
+          }
+          if (budgets.length > 1) {
+            return {
+              kind: 'action',
+              headline: t('ask.whichBudgetOpen'),
+              summary: t('ask.whichBudgetOpen'),
+              undone: false,
+              rows: budgets.map((x) => ({
+                emoji: '💰',
+                title: x.name,
+                pick: (async () => {
+                  go(pathOf(x))
+                  return { kind: 'say', text: '' }
+                }) as unknown as () => Promise<ActionAnswer>,
+              })),
+            }
+          }
+        }
         const route = APP_ROUTE[intent.app]
         if (route) {
           closeSheet()

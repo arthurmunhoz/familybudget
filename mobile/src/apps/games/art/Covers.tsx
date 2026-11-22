@@ -160,3 +160,55 @@ export function QuizCover() {
     </>
   )
 }
+
+/** Bingo: the wire globe with its balls, one ball out front, a card behind. */
+export function BingoCover() {
+  const bob = useBob(1900, 4)
+  const balls: [number, number, string][] = [
+    [96, 112, '#3B82F6'], [116, 120, '#EF4B5A'], [136, 112, '#F5A300'], [106, 96, '#22B07D'], [128, 96, '#8B5CF6'], [118, 78, '#3B82F6'], [142, 92, '#EF4B5A'],
+  ]
+  return (
+    <>
+      <Svg viewBox={VB} style={StyleSheet.absoluteFill}>
+        {/* a card, tilted, behind everything */}
+        <G transform="rotate(8 250 92)" opacity={0.95}>
+          <Rect x={204} y={38} width={96} height={112} rx={12} fill="#FFFDF8" />
+          {[0, 1, 2, 3].map((r) =>
+            [0, 1, 2, 3].map((col) => (
+              <Rect key={`${r}-${col}`} x={212 + col * 21} y={62 + r * 21} width={17} height={17} rx={4} fill={(r + col) % 3 === 0 ? '#FFD88A' : '#EDE6DA'} />
+            )),
+          )}
+          <Rect x={212} y={46} width={80} height={10} rx={5} fill="#0B8F8A" opacity={0.85} />
+          <Circle cx={241.5} cy={91.5} r={7} fill="#EF4B5A" opacity={0.8} />
+          <Circle cx={262.5} cy={112.5} r={7} fill="#3B82F6" opacity={0.8} />
+        </G>
+        {/* the stand */}
+        <Path d="M84 132 L92 158 M152 132 L144 158" stroke="#fff" strokeWidth={5} strokeLinecap="round" />
+        <Rect x={78} y={156} width={80} height={9} rx={4.5} fill="#fff" />
+        <Circle cx={118} cy={92} r={54} fill="rgba(255,255,255,0.18)" />
+        {balls.map(([x, y, fill], i) => (
+          <G key={i}>
+            <Circle cx={x} cy={y} r={11} fill={fill} />
+            <Circle cx={x} cy={y} r={5.5} fill="#fff" opacity={0.95} />
+          </G>
+        ))}
+        <Circle cx={118} cy={92} r={54} stroke="#fff" strokeWidth={4} fill="none" />
+        <Ellipse cx={118} cy={92} rx={22} ry={54} stroke="rgba(255,255,255,0.6)" strokeWidth={2} fill="none" />
+        <Ellipse cx={118} cy={92} rx={54} ry={17} stroke="rgba(255,255,255,0.45)" strokeWidth={2} fill="none" />
+        <Path d="M82 62 Q96 42 118 42" stroke="#fff" strokeWidth={4} strokeLinecap="round" fill="none" opacity={0.9} />
+      </Svg>
+      {/* the ball that just came out */}
+      <Animated.View style={[StyleSheet.absoluteFill, bob]}>
+        <Svg viewBox={VB} style={StyleSheet.absoluteFill}>
+          <Circle cx={36} cy={126} r={26} fill="#F5A300" />
+          <Path d="M14 132 A26 26 0 0 0 58 132 Z" fill="rgba(0,0,0,0.12)" />
+          <Circle cx={36} cy={126} r={16.5} fill="#fff" />
+          <SvgText x={36} y={133} fontSize={19} fontWeight="700" fill="#1E1E22" textAnchor="middle">
+            42
+          </SvgText>
+          <Ellipse cx={26} cy={108} rx={7} ry={4} fill="rgba(255,255,255,0.6)" transform="rotate(-28 26 108)" />
+        </Svg>
+      </Animated.View>
+    </>
+  )
+}

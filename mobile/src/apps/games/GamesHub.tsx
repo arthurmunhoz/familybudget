@@ -25,7 +25,7 @@ import { games, GameRpcError, useChallenges, useOpenGames, type GameKind, type G
 import { Avatar } from '@/apps/family/Avatar'
 import type { TKey } from '@/lib/i18n'
 import { fonts, sheetRadius, sp, useTheme } from '@/theme/theme'
-import { BattleshipCover, HangmanCover, QuizCover } from './art/Covers'
+import { BattleshipCover, BingoCover, HangmanCover, QuizCover } from './art/Covers'
 import { feedback } from './feedback'
 import { GAME_ACTION_SOLID, COVER } from './look'
 import { useMembers } from './members'
@@ -44,9 +44,10 @@ const CARDS: GameCard[] = [
   { id: 'hangman', title: 'games.hangman', sub: 'games.hangmanSub', colors: COVER.hangman, Cover: HangmanCover },
   { id: 'battleship', title: 'games.battleship', sub: 'games.battleshipSub', colors: COVER.battleship, Cover: BattleshipCover },
   { id: 'quiz', title: 'games.quiz', sub: 'games.quizSub', colors: COVER.quiz, Cover: QuizCover },
+  { id: 'bingo', title: 'games.bingo', sub: 'games.bingoSub', colors: COVER.bingo, Cover: BingoCover },
 ]
 
-const GAME_TITLE: Record<GameKind, TKey> = { hangman: 'games.hangman', battleship: 'games.battleship', quiz: 'games.quiz' }
+const GAME_TITLE: Record<GameKind, TKey> = { hangman: 'games.hangman', battleship: 'games.battleship', quiz: 'games.quiz', bingo: 'games.bingo' }
 
 export function GamesHub() {
   useOnScreen('games')
@@ -61,7 +62,7 @@ export function GamesHub() {
   // `?start=quiz` (from Roof: "start a match of …") opens that game's sheet.
   const { start } = useLocalSearchParams<{ start?: string }>()
   useEffect(() => {
-    if (start === 'hangman' || start === 'battleship' || start === 'quiz') setCreating(start as GameKind)
+    if (start === 'hangman' || start === 'battleship' || start === 'quiz' || start === 'bingo') setCreating(start as GameKind)
   }, [start])
   // Phones: one card per row. Tablets/Mac: two or three.
   const cols = width >= 1100 ? 3 : width >= 700 ? 2 : 1
@@ -72,7 +73,7 @@ export function GamesHub() {
         <View style={{ paddingHorizontal: sp.lg }}>
           <GameTopBar
             onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-            right={<RoofExamples variant="pill" examples={['roofEx.games.1', 'roofEx.games.2', 'roofEx.games.3']} />}
+            right={<RoofExamples variant="pill" examples={['roofEx.games.1', 'roofEx.games.2', 'roofEx.games.6']} />}
           />
         </View>
         <ScrollView contentContainerStyle={{ paddingHorizontal: sp.lg, paddingBottom: sp.xxl * 2 }}>
@@ -130,9 +131,9 @@ export function GamesHub() {
       <CreateSheet
         game={creating}
         onClose={() => setCreating(null)}
-        onCreate={async (rounds) => {
+        onCreate={async (rounds, bingo) => {
           if (!creating) return
-          const settings = creating === 'quiz' ? { questions: rounds } : { rounds }
+          const settings = creating === 'bingo' ? bingo : creating === 'quiz' ? { questions: rounds } : { rounds }
           const open = async (replace: boolean) => {
             const id = await games.create(creating, lang, settings, replace)
             setCreating(null)
@@ -294,7 +295,18 @@ function ChallengeRow({ room, me, first }: { room: Room; me: string; first: bool
 const ROUND_OPTIONS = [4, 6, 8, 10]
 const QUESTION_OPTIONS = [5, 10, 15, 20]
 
-function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClose: () => void; onCreate: (rounds: number) => Promise<void> }) {
+const BINGO_GOALS = [
+  { id: 'line', title: 'games.bingo.optLine', sub: 'games.bingo.optLineSub' },
+  { id: 'full', title: 'games.bingo.optFull', sub: 'games.bingo.optFullSub' },
+] as const
+const BINGO_PACES = [
+  { id: 'calm', title: 'games.bingo.paceCalm' },
+  { id: 'normal', title: 'games.bingo.paceNormal' },
+  { id: 'fast', title: 'games.bingo.paceFast' },
+] as const
+type BingoSettings = { goal: 'line' | 'full'; pace: 'calm' | 'normal' | 'fast' }
+
+function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClose: () => void; onCreate: (rounds: number, bingo: BingoSettings) => Promise<void> }) {
   const { c } = useTheme()
   const { t } = useI18n()
   const gap = useBottomGap(sp.lg)
@@ -302,6 +314,7 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
   const [pick, setPick] = useState<number | null>(null)
   const count = pick ?? (game === 'quiz' ? 10 : 6)
   const [busy, setBusy] = useState(false)
+  const [bingo, setBingo] = useState<BingoSettings>({ goal: 'line', pace: 'normal' })
   const theme = game ? COVER[game][1] : GAME_ACTION_SOLID
   return (
     <Modal visible={!!game} transparent animationType="slide" onRequestClose={onClose}>
@@ -315,7 +328,7 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
         <View style={[styles.grabber, { backgroundColor: c.border }]} />
         {game ? (
           <GradientBox colors={COVER[game]} radius={22} style={{ height: 130, marginBottom: sp.lg }}>
-            {game === 'hangman' ? <HangmanCover /> : game === 'battleship' ? <BattleshipCover /> : game === 'quiz' ? <QuizCover /> : null}
+            {game === 'hangman' ? <HangmanCover /> : game === 'battleship' ? <BattleshipCover /> : game === 'quiz' ? <QuizCover /> : game === 'bingo' ? <BingoCover /> : null}
           </GradientBox>
         ) : null}
         <Txt style={{ fontFamily: fonts.display, fontSize: 24 }}>{game ? t(GAME_TITLE[game]) : ''}</Txt>
@@ -376,6 +389,53 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
         </View>
           </>
         ) : null}
+        {game === 'bingo' ? (
+          <>
+            <Txt style={[styles.sectionLabel, { color: c.textMuted, marginTop: sp.xl }]}>{t('games.bingo.optGoal')}</Txt>
+            <View style={{ flexDirection: 'row', gap: sp.sm }}>
+              {BINGO_GOALS.map((g) => {
+                const on = bingo.goal === g.id
+                return (
+                  <Pressable
+                    key={g.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => {
+                      feedback('tap')
+                      setBingo((b) => ({ ...b, goal: g.id }))
+                    }}
+                    style={[styles.bingoOpt, on ? { backgroundColor: theme + '14', borderColor: theme, borderWidth: 2 } : { backgroundColor: c.surface, borderColor: c.border }]}
+                  >
+                    <Txt style={{ fontFamily: fonts.display, fontSize: 18, color: on ? theme : c.text }}>{t(g.title)}</Txt>
+                    <Txt variant="muted" style={{ fontSize: 12.5 }}>
+                      {t(g.sub)}
+                    </Txt>
+                  </Pressable>
+                )
+              })}
+            </View>
+            <Txt style={[styles.sectionLabel, { color: c.textMuted, marginTop: sp.lg }]}>{t('games.bingo.optPace')}</Txt>
+            <View style={{ flexDirection: 'row', gap: sp.sm }}>
+              {BINGO_PACES.map((p) => {
+                const on = bingo.pace === p.id
+                return (
+                  <Pressable
+                    key={p.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => {
+                      feedback('tap')
+                      setBingo((b) => ({ ...b, pace: p.id }))
+                    }}
+                    style={[styles.roundOpt, { height: 48 }, on ? { backgroundColor: theme + '14', borderColor: theme, borderWidth: 2 } : { backgroundColor: c.surface, borderColor: c.border }]}
+                  >
+                    <Txt style={{ fontFamily: fonts.semibold, fontSize: 15, color: on ? theme : c.text }}>{t(p.title)}</Txt>
+                  </Pressable>
+                )
+              })}
+            </View>
+          </>
+        ) : null}
         <GameBtn
           title={t('games.createRoom')}
           // In the game's own colours, like its banner (owner, 2026-11-13).
@@ -385,7 +445,7 @@ function CreateSheet({ game, onClose, onCreate }: { game: GameKind | null; onClo
           onPress={async () => {
             setBusy(true)
             try {
-              await onCreate(count)
+              await onCreate(count, bingo)
             } finally {
               setBusy(false)
             }
@@ -414,5 +474,6 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { width: '100%', maxWidth: 620, alignSelf: 'center', borderTopLeftRadius: sheetRadius, borderTopRightRadius: sheetRadius, padding: sp.lg, paddingTop: sp.sm },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginBottom: sp.md },
+  bingoOpt: { flex: 1, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, paddingVertical: 12, paddingHorizontal: 14, gap: 2 },
   roundOpt: { flex: 1, height: 56, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
 })

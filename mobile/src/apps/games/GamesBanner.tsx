@@ -17,7 +17,7 @@ import { fonts, sp, useTheme } from '@/theme/theme'
 import { GAME_ACTION_SOLID, GAMES_GRADIENT } from './look'
 import { useMembers } from './members'
 
-const TITLE: Record<string, TKey> = { hangman: 'games.hangman', battleship: 'games.battleship', quiz: 'games.quiz' }
+const TITLE: Record<string, TKey> = { hangman: 'games.hangman', battleship: 'games.battleship', quiz: 'games.quiz', bingo: 'games.bingo' }
 
 export default function GamesBanner() {
   const { c } = useTheme()

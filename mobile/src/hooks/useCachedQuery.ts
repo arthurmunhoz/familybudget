@@ -29,6 +29,22 @@ import { AppState } from 'react-native'
  */
 const cache = new Map<string, unknown>()
 
+/** Every mounted `useCachedQuery` for a key, so a value fetched or written by
+ *  ONE of them reaches all of them. Without this each instance kept its own
+ *  copy in state and only the module cache was shared: the Hub's Safety Radius
+ *  banner and the Whereabouts screen both read `location:watch`, Whereabouts
+ *  refetched after the watch was stopped, and the Hub — mounted underneath the
+ *  whole time — kept rendering the stopped watch until its own next poll
+ *  (2026-11-22). Same trap for any two screens sharing a key. */
+const keySubs = new Map<string, Set<(value: unknown) => void>>()
+
+/** Store `value` for `key` and hand it to every mounted query on that key. */
+function publish(key: string, value: unknown): void {
+  cache.set(key, value)
+  const subs = keySubs.get(key)
+  if (subs) for (const fn of [...subs]) fn(value)
+}
+
 /** Callbacks to run when the app comes back from the background. One shared
  *  AppState listener rather than one per query — a busy screen has several. */
 const foregroundSubs = new Set<() => void>()
@@ -75,7 +91,7 @@ export function readCache<T>(key: string): T | undefined {
   return cache.get(key) as T | undefined
 }
 export function writeCache<T>(key: string, value: T): void {
-  cache.set(key, value)
+  publish(key, value)
 }
 /** Wipe the whole cache. Called on sign-out: unlike the PWA (which reloads the
  *  page on logout), the native app keeps its JS context alive, so without this a
@@ -123,11 +139,22 @@ export function useCachedQuery<T>(
   const fetcherRef = useRef(fetcher)
   fetcherRef.current = fetcher
 
+  // Follow the key: whichever instance fetches (or a writeCache) updates this
+  // one too. The functional update keeps an unchanged value from re-rendering.
+  useEffect(() => {
+    const fn = (value: unknown) => setData((prev) => (sameValue(prev, value) ? prev : (value as T)))
+    let subs = keySubs.get(key)
+    if (!subs) keySubs.set(key, (subs = new Set()))
+    subs.add(fn)
+    return () => {
+      subs.delete(fn)
+      if (!subs.size) keySubs.delete(key)
+    }
+  }, [key])
+
   const revalidate = useCallback(async () => {
     const result = await fetcherRef.current()
-    const prev = cache.get(key)
-    cache.set(key, result)
-    if (!sameValue(prev, result)) setData(result)
+    publish(key, result)
     setLoading(false)
   }, [key])
 
@@ -142,9 +169,7 @@ export function useCachedQuery<T>(
     fetcherRef.current()
       .then((result) => {
         if (cancelled) return
-        const prev = cache.get(key)
-        cache.set(key, result)
-        if (!sameValue(prev, result)) setData(result)
+        publish(key, result)
         setLoading(false)
       })
       .catch(() => {

@@ -84,6 +84,10 @@ export interface ActionAnswer {
   /** [main, second]: buttons that carry on (e.g. "Remove the whole series"). */
   choices?: { label: string; run: () => Promise<ActionAnswer> }[]
   open?: { label: string; path: string }
+  /** A "how long?" question: a spoken length ("2 horas") carries on with it. */
+  byMinutes?: (minutes: number) => Promise<ActionAnswer>
+  /** A yes/no question: "sim" = choices[0], whatever else is offered. */
+  confirm?: boolean
   undone: boolean
 }
 
@@ -210,6 +214,39 @@ export async function removeAnswer(env: ActEnv, occ: Occurrence): Promise<Action
   if (r.reason === 'recurring') return recurringChoice(env, 'remove', r.occ.event, r.occ.start)
   if (r.reason === 'external') return say(t('ask.removeExternal', { title: occ.event.title }))
   return say(t('ask.error'))
+}
+
+export const DURATIONS = [30, 60, 120, 180]
+export function durationLabel(t: T, m: number): string {
+  if (m < 60) return t('ask.durMin', { n: m })
+  if (m % 60) return t('ask.durHM', { h: Math.floor(m / 60), m: m % 60 })
+  return m === 60 ? t('ask.durHour') : t('ask.durHours', { n: m / 60 })
+}
+
+/** "How long should X last?" — asked when a timed event came with no end
+ *  (owner, 2026-11-22: it silently became 1 h). Rows to tap, or said. */
+export function durationAsk(env: ActEnv, title: string, when: string, run: (minutes: number) => Promise<ActionAnswer>): ActionAnswer {
+  const { t } = env
+  return say(t('ask.howLong', { title }), {
+    sub: when,
+    rows: DURATIONS.map((m) => ({ emoji: '⏱️', title: durationLabel(t, m), pick: () => run(m) })),
+    byMinutes: run,
+  })
+}
+
+/** "You already have X then. Add anyway?" — never written before a yes. */
+export function overlapAsk(env: ActEnv, title: string, busy: { title: string; start: string; who: string }[], run: () => Promise<ActionAnswer>): ActionAnswer {
+  const { t, locale } = env
+  const at = (b: { title: string; start: string }) => t('ask.overlapAt', { title: b.title, time: formatTime(b.start, locale) })
+  const other = busy.slice(0, 3).map(at).join(', ')
+  return say(busy.length === 1 ? t('ask.overlapOne', { other, title }) : t('ask.overlapMany', { n: busy.length, other, title }), {
+    rows: busy.slice(0, 6).map((b) => ({ emoji: '🗓️', title: b.title, sub: [formatTime(b.start, locale), b.who].filter(Boolean).join(' · ') })),
+    confirm: true,
+    choices: [
+      { label: t('ask.addAnyway'), run },
+      { label: t('ask.dontAdd'), run: async () => say(t('ask.cancelled')) },
+    ],
+  })
 }
 
 /** The answer for "remove/move a recurring event": confirm what to do with
@@ -509,9 +546,22 @@ export async function actMore(intent: Intent, env: ActEnv): Promise<ActionAnswer
         return say(r.needPet ? t('ask.petWhich') : t('ask.petTaskNotFound', { items: intent.tasks.join(', ') }))
       }
       const notFound = [...r.missing, ...(r.unknownPet ? [r.unknownPet] : [])]
-      return say(t('ask.petDoneHead'), {
-        sub: notFound.length ? t('ask.notFoundList', { items: notFound.join(', ') }) : undefined,
-        rows: r.done.map((d) => ({ emoji: '✅', title: d.task.title, sub: d.pet })),
+      // One section per pet; what this answer ticked in green, what was
+      // already done today faded (owner, 2026-11-18).
+      const fresh = r.done.filter((d) => d.inserted).length
+      const before = r.done.length - fresh
+      const rows = [...new Set(r.done.map((d) => d.pet))].flatMap((pet) => [
+        { title: pet, head: true, emoji: '🐾' },
+        ...[...r.done.filter((d) => d.pet === pet && d.inserted), ...r.done.filter((d) => d.pet === pet && !d.inserted)].map((d) => ({
+          title: d.task.title,
+          tone: d.inserted ? ('new' as const) : ('prior' as const),
+          sub: d.inserted ? t('ask.petDoneNow') : t('ask.petDoneBefore'),
+        })),
+      ])
+      const counts = before ? t('ask.petDoneCount', { n: fresh, m: before }) : ''
+      return say(fresh ? t('ask.petDoneHead') : t('ask.petDoneAllBefore'), {
+        sub: [counts, notFound.length ? t('ask.notFoundList', { items: notFound.join(', ') }) : ''].filter(Boolean).join(' · ') || undefined,
+        rows,
         summary: t('ask.sumPetDone', { items: r.done.map((d) => `${d.task.title} (${d.pet})`).join(', ') }),
         // Nothing new written (all already ticked): no Undo to offer.
         undo: r.done.some((d) => d.inserted) ? { run: () => undoPetTasksDone(r.done, today), headline: t('ask.petDoneUndone') } : undefined,

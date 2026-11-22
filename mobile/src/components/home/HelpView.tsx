@@ -4,7 +4,7 @@
 // several families and Roof, a button to the screen that explains it.
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { BellRing, ChevronDown, ChevronRight, House, Ship } from 'lucide-react-native'
+import { BellRing, ChevronDown, ChevronRight, Grid3x3, House, Ship } from 'lucide-react-native'
 
 import { Pressable } from '@/components/Pressable'
 import { Txt } from '@/components/ui'
@@ -15,7 +15,7 @@ import { Headline } from './AnswerViews'
 import { GradientBox } from './GradientBox'
 import type { Gradient } from './palette'
 
-type Game = 'hangman' | 'battleship' | 'quiz'
+type Game = 'hangman' | 'battleship' | 'quiz' | 'bingo'
 
 const GAMES: { id: Game; name: TKey; icon: typeof House; colors: Gradient; rules: TKey[] }[] = [
   {
@@ -38,6 +38,13 @@ const GAMES: { id: Game; name: TKey; icon: typeof House; colors: Gradient; rules
     icon: BellRing,
     colors: ['#A78BFA', '#7C3AED'],
     rules: ['games.quiz.how1', 'games.quiz.howFirst', 'games.quiz.how2', 'games.quiz.howWrong', 'games.quiz.howWin'],
+  },
+  {
+    id: 'bingo',
+    name: 'games.bingo',
+    icon: Grid3x3,
+    colors: ['#2CCFB0', '#0B8F8A'],
+    rules: ['games.bingo.how1', 'games.bingo.howDraw', 'games.bingo.how2', 'games.bingo.howMark', 'games.bingo.howCall', 'games.bingo.howWin'],
   },
 ]
 

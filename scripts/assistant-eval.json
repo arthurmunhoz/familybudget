@@ -24,9 +24,9 @@
       "Aninha"
     ],
     "petTasks": [
-      "Lola: Comida, Passeio, Remédio",
-      "Chloe: Comida, Escovar",
-      "Aninha: Comida, Passeio"
+      "Lola — daily: Comida, Passeio; care: Remédio (every 30 days), Banho (every 15 days)",
+      "Chloe — daily: Comida, Escovar; care: Vermífugo (every 90 days)",
+      "Aninha — daily: Comida, Passeio"
     ],
     "categories": [
       "groceries = Mercado",
@@ -584,6 +584,13 @@
     },
     {
       "text": "abre o orçamento",
+      "expect": {
+        "intent": "open_app",
+        "app": "budget"
+      }
+    },
+    {
+      "text": "abra o orçamento deste mês",
       "expect": {
         "intent": "open_app",
         "app": "budget"
@@ -1684,6 +1691,68 @@
       "expect": {
         "intent": "ask_location",
         "person": "Ana Munhoz"
+      }
+    },
+    {
+      "text": "marca todos os itens da rotina diária das cachorras como feitos",
+      "expect": {
+        "intent": "pet_done",
+        "pet": {
+          "anyOf": [
+            "Lola, Aninha",
+            "Aninha, Lola",
+            "Lola e Aninha",
+            "Aninha e Lola"
+          ]
+        },
+        "items": [
+          "Comida",
+          "Passeio"
+        ]
+      }
+    },
+    {
+      "text": "pode marcar tudo da Lola como feito",
+      "expect": {
+        "intent": "pet_done",
+        "pet": "Lola",
+        "items": [
+          "Comida",
+          "Passeio"
+        ]
+      }
+    },
+    {
+      "text": "marca os cuidados da Lola como feitos",
+      "expect": {
+        "intent": "pet_done",
+        "pet": "Lola",
+        "items": [
+          "Remédio",
+          "Banho"
+        ]
+      }
+    },
+    {
+      "text": "dei o remédio e a comida da Lola",
+      "expect": {
+        "intent": "pet_done",
+        "pet": "Lola",
+        "items": [
+          "Remédio",
+          "Comida"
+        ]
+      }
+    },
+    {
+      "text": "mark everything done for Lola today",
+      "expect": {
+        "intent": "pet_done",
+        "pet": "Lola",
+        "items": [
+          "Comida",
+          "Passeio"
+        ]
       }
     }
   ]

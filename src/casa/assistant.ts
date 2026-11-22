@@ -20,6 +20,7 @@ import { petsDue, setChecked, deleteItems, restoreItems, type HubData, type Memb
 import { cutWrite, fromServer, KNOWN_INTENTS, PET_SWAPPABLE, petsAsked, type Intent } from './intent'
 import * as R from './roofData'
 import { API_BASE, GRAD, LOCALE, dateOf, norm } from './util'
+import { durationSaid } from './talk'
 
 type T = (key: TKey, vars?: Record<string, string | number>) => string
 
@@ -73,6 +74,10 @@ export interface AnswerRow {
   sub?: string
   strong?: boolean
   pick?: () => Promise<Outcome>
+  /** A section title ("LOLA"); the rows under it belong to it. */
+  head?: boolean
+  /** A tick: 'new' = done by this answer, 'prior' = it was already done. */
+  tone?: 'new' | 'prior'
 }
 
 export type Done = {
@@ -92,7 +97,16 @@ export type Done = {
 
 export type Outcome =
   | Done
-  | { kind: 'pick'; question: string; options: PickOption[]; onPick: (id: string) => Promise<Outcome> }
+  | {
+      kind: 'pick'
+      question: string
+      options: PickOption[]
+      onPick: (id: string) => Promise<Outcome>
+      /** A spoken answer that is none of the labels ("2 horas") → an option id. */
+      byText?: (said: string) => string | null
+      /** A yes/no question: the option a "sim" means. */
+      yes?: string
+    }
   /** `say`: said (and shown) before it opens; `money`: an entry to record once the PIN is in. */
   | { kind: 'open'; target: OpenTarget; say?: string; money?: PendingMoney }
   | { kind: 'caps' }
@@ -146,10 +160,14 @@ async function buildContext(env: AskEnv, text: string) {
     budgets: ((budgets.data ?? []) as { name: string }[]).map((b) => b.name),
     pets: data.pets.map((p) => p.name),
     petKinds: data.pets.filter((p) => p.species).map((p) => `${p.name} = ${p.species}`),
+    // Same shape as the phone's petTasksLine: "everything" = the daily group only.
     petTasks: data.pets
       .map((p) => {
-        const mine = data.tasks.filter((x) => x.pet_id === p.id).map((x) => x.title)
-        return mine.length ? `${p.name}: ${mine.join(', ')}` : ''
+        const mine = data.tasks.filter((x) => x.pet_id === p.id)
+        const daily = mine.filter((x) => x.kind !== 'interval').map((x) => x.title)
+        const care = mine.filter((x) => x.kind === 'interval').map((x) => (x.interval_days ? `${x.title} (every ${x.interval_days} days)` : x.title))
+        const parts = [daily.length ? `daily: ${daily.join(', ')}` : '', care.length ? `care: ${care.join(', ')}` : ''].filter(Boolean)
+        return parts.length ? `${p.name} — ${parts.join('; ')}` : ''
       })
       .filter(Boolean),
     openItems: data.open.map((i) => `${i.label} @ ${storeName(i.store_id)}`),
@@ -501,7 +519,9 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
       }
       // A store that exists → straight in. Otherwise ASK which list (never
       // invent one from a word like "compras"), offering to create a named one.
-      if (store || (!intent.store && stores.length === 0)) return put(store)
+      // "Geral" SAID (and no list of that name) is the list with no store —
+      // asking again looped forever (owner, 2026-11-22).
+      if (store || R.isGeneralList(intent.store, general) || (!intent.store && stores.length === 0)) return put(store)
       const options: PickOption[] = []
       const named = intent.store.trim() && !/^(mercado|lista|list|compras|shopping|groceries|geral|general|anywhere|qualquer)$/.test(norm(intent.store))
       if (named) options.push({ id: '+new', label: t('ask.createNamed', { name: intent.store }), gradient: GRAD.orb })
@@ -668,8 +688,8 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
     case 'add_event': {
       const { title, date } = intent
       const time = /^\d{2}:\d{2}$/.test(intent.time) ? intent.time : ''
-      const save = async (owner: string | null): Promise<Outcome> => {
-        const ev = await R.addEvent(title, date, time, owner, intent.opts)
+      const save = async (owner: string | null, endTime?: string): Promise<Outcome> => {
+        const ev = await R.addEvent(title, date, time, owner, endTime ? { ...intent.opts, endTime } : intent.opts)
         env.refresh()
         const when = whenLabel(env, date, date)
         const sentence = t('casa.roof.eventAdded', { title, when: time ? `${when}, ${time}` : when })
@@ -686,11 +706,59 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
       }
       // Birthdays and anniversaries are the household's (as on the phone).
       if (intent.opts?.kind === 'birthday' || intent.opts?.kind === 'anniversary') return save(null)
+      const mins = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5))
+      const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+      // Something of theirs (or everyone's) in that window → say so and wait
+      // for a yes (owner, 2026-11-22; same as the phone).
+      const place = async (owner: string | null, endTime: string): Promise<Outcome> => {
+        const from = mins(time)
+        const to = mins(endTime)
+        const busy = occurrencesInRange(data.events, date, date)
+          .filter((o) => {
+            const ev = o.event
+            if (ev.all_day || !ev.start_time) return false
+            if (owner && ev.owner_email && ev.owner_email !== owner) return false
+            const a = mins(ev.start_time)
+            const b = ev.end_time && mins(ev.end_time) > a ? mins(ev.end_time) : a + 60
+            return a < to && b > from
+          })
+          .sort(compareOccurrences)
+        if (!busy.length) return save(owner, endTime)
+        const other = joinList(busy.slice(0, 3).map((o) => t('ask.overlapAt', { title: o.event.title, time: timeOf(o.event, lang) })), lang)
+        return {
+          kind: 'pick',
+          question: busy.length === 1 ? t('ask.overlapOne', { other, title }) : t('ask.overlapMany', { n: busy.length, other, title }),
+          options: [
+            { id: 'yes', label: t('ask.addAnyway'), gradient: GRAD.calendar },
+            { id: 'no', label: t('ask.dontAdd'), gradient: GRAD.orb },
+          ],
+          yes: 'yes',
+          onPick: async (id) => (id === 'yes' ? save(owner, endTime) : say('orb', t('casa.roof.cancelled'))),
+        }
+      }
+      // No end said: ask, instead of a silent 1 h. All-day, special dates and
+      // multi-day spans: as before.
+      const plan = async (owner: string | null): Promise<Outcome> => {
+        const o = intent.opts
+        if (!time || (o?.kind && o.kind !== 'event') || (o?.end && o.end > date)) return save(owner)
+        if (o?.endTime && o.endTime > time) return place(owner, o.endTime)
+        const label = (m: number) => (m < 60 ? t('ask.durMin', { n: m }) : m === 60 ? t('ask.durHour') : t('ask.durHours', { n: m / 60 }))
+        return {
+          kind: 'pick',
+          question: t('ask.howLong', { title }),
+          options: [30, 60, 120, 180].map((m) => ({ id: String(m), label: label(m), gradient: GRAD.calendar })),
+          byText: (said) => {
+            const m = durationSaid(said, true)
+            return m ? String(m) : null
+          },
+          onPick: async (id) => place(owner, hm(Math.min(23 * 60 + 59, mins(time) + Number(id)))),
+        }
+      }
       const who = R.findMember(intent.person, data.members)
-      if (who) return save(who.email)
-      if (data.members.length <= 1) return save(data.members[0]?.email ?? null)
+      if (who) return plan(who.email)
+      if (data.members.length <= 1) return plan(data.members[0]?.email ?? null)
       // A shared screen: ask whose it is (the phone assumes the asker).
-      return { kind: 'pick', question: t('casa.who.title'), options: memberOptions(data.members, t('casa.who.everyone')), onPick: (id) => save(id === '*' ? null : id) }
+      return { kind: 'pick', question: t('casa.who.title'), options: memberOptions(data.members, t('casa.who.everyone')), onPick: (id) => plan(id === '*' ? null : id) }
     }
     case 'move_event': {
       const who = R.eventWho(intent.person, data.members)
@@ -861,15 +929,38 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
       const r = await R.petTasksDone(intent.pet, intent.tasks, today)
       env.refresh()
       if (!r.done.length) return say('pets', r.needPet ? t('ask.petWhich') : t('ask.petTaskNotFound', { items: intent.tasks.join(', ') }), { view: 'pets' })
-      return say('pets', t('casa.roof.petDone', { tasks: joinList(r.done.map((d) => d.task.title.toLowerCase()), lang), pet: joinList([...new Set(r.done.map((d) => d.pet))], lang) }), {
-        sub: r.missing.length ? t('ask.notFoundList', { items: r.missing.join(', ') }) : undefined,
-        check: true,
-        view: 'pets',
-        undo: async () => {
-          await R.undoPetTasksDone(r.done, today)
-          env.refresh()
+      // One section per pet: ticked now in green, already done faded.
+      const fresh = r.done.filter((d) => d.inserted)
+      const before = r.done.length - fresh.length
+      const rows: AnswerRow[] = [...new Set(r.done.map((d) => d.pet))].flatMap((pet) => [
+        { title: pet, head: true },
+        ...[...r.done.filter((d) => d.pet === pet && d.inserted), ...r.done.filter((d) => d.pet === pet && !d.inserted)].map((d) => ({
+          title: d.task.title,
+          tone: d.inserted ? ('new' as const) : ('prior' as const),
+          sub: d.inserted ? t('ask.petDoneNow') : t('ask.petDoneBefore'),
+        })),
+      ])
+      const said = fresh.length ? fresh : r.done
+      return say(
+        'pets',
+        fresh.length
+          ? t('casa.roof.petDone', { tasks: joinList(said.map((d) => d.task.title.toLowerCase()), lang), pet: joinList([...new Set(said.map((d) => d.pet))], lang) })
+          : t('ask.petDoneAllBefore'),
+        {
+          sub: [before && fresh.length ? t('ask.petDoneCount', { n: fresh.length, m: before }) : '', r.missing.length ? t('ask.notFoundList', { items: r.missing.join(', ') }) : '']
+            .filter(Boolean)
+            .join(' · ') || undefined,
+          rows,
+          check: true,
+          view: 'pets',
+          undo: fresh.length
+            ? async () => {
+                await R.undoPetTasksDone(r.done, today)
+                env.refresh()
+              }
+            : undefined,
         },
-      })
+      )
     }
     case 'pet_log': {
       const r = await R.logPetEvent(intent.pet, intent.type, intent.title || t(`ask.petType.${intent.type}` as TKey), intent.date, intent.next, me.email)
@@ -1014,7 +1105,7 @@ export async function act(env: AskEnv, intent: Intent, full: boolean): Promise<O
     case 'app_help':
       // About Roof itself → the capabilities screen, not a paragraph (as on the phone).
       if (intent.topic === 'roof') return { kind: 'caps' }
-      if (['games', 'hangman', 'battleship', 'quiz'].includes(intent.topic))
+      if (['games', 'hangman', 'battleship', 'quiz', 'bingo'].includes(intent.topic))
         return say('orb', intent.reply || t('casa.ra.gamesPhone'), { sub: intent.reply ? t('casa.ra.gamesPhone') : undefined })
       return say('orb', intent.reply || t('casa.roof.notSure'))
     case 'undo_last':

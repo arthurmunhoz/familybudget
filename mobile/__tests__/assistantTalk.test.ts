@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-import { clockAsk, isNo, isRepeatAsk, isUndoAsk, isYes, pickByVoice } from '@/lib/assistantTalk'
+import { clockAsk, durationSaid, isNo, isRepeatAsk, isUndoAsk, isYes, pickByVoice } from '@/lib/assistantTalk'
 
 const root = join(__dirname, '..', '..')
 
@@ -46,6 +46,10 @@ describe('pickByVoice', () => {
     ['tarefas por favor', 3],
     ['the third one', 2],
     ['cost', 1],
+    ['geral', 4],
+    ['coloca na geral', 4],
+    ['na lista geral', 4],
+    ['põe no Costco', 1],
   ])('%s → %i', (said, i) => expect(pickByVoice(said, lists)).toBe(i))
   it.each(['põe leite e ovos no Costco e no Walmart', 'o sexto', 'padaria', '', 'o que tem na agenda amanhã'])('%s → none', (said) =>
     expect(pickByVoice(said, lists)).toBe(-1),
@@ -78,4 +82,36 @@ describe('undo, repeat, clock', () => {
     ['que horas é o dentista', null],
     ['bom dia, põe leite na lista', null],
   ])('%s → %s', (x, k) => expect(clockAsk(x)).toBe(k))
+})
+
+describe('durationSaid', () => {
+  it.each([
+    ['2 horas', 120],
+    ['duas horas', 120],
+    ['uma hora', 60],
+    ['1 hora', 60],
+    ['uma hora e meia', 90],
+    ['hora e meia', 90],
+    ['2 horas e meia', 150],
+    ['meia hora', 30],
+    ['45 minutos', 45],
+    ['1h30', 90],
+    ['1 hora e 20 minutos', 80],
+    ['umas 3 horas', 180],
+    ['vai durar duas horas', 120],
+    ['1,5 hora', 90],
+    ['two hours', 120],
+    ['an hour and a half', 90],
+    ['half an hour', 30],
+    ['2 and a half hours', 150],
+    ['dos horas', 120],
+    ['hora y media', 90],
+  ])('%s → %i', (said, m) => expect(durationSaid(said)).toBe(m))
+  it.each(['duas', 'o segundo', 'sim', 'cancela', 'às 5 horas da tarde', 'marca dentista amanhã às 3', '', '900 horas'])('%s → none', (said) =>
+    expect(durationSaid(said)).toBeNull(),
+  )
+  it('a bare number is hours only when asked how long', () => {
+    expect(durationSaid('duas', true)).toBe(120)
+    expect(durationSaid('3', true)).toBe(180)
+  })
 })
