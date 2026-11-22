@@ -72,8 +72,8 @@ invent features, stats, or anecdotes.
   comparison, discount math.
 - Privacy: no ads, no tracking SDKs, no selling data. Per-household isolation
   enforced at the database level (RLS).
-- Platform: iOS App Store (Android/Play in progress, see the Android note
-  below). Languages: English, Spanish, Portuguese.
+- Platform: iOS App Store and Google Play (Play listing public, checked
+  2026-11-17; see the Android note below). Languages: English, Spanish, Portuguese.
 
 ## Do NOT claim (real gaps / rules)
 
@@ -81,12 +81,11 @@ invent features, stats, or anecdotes.
 - NO price-history tracking on groceries (unit-price compare ≠ price tracker).
 - NO meal planning.
 - NO location history / breadcrumb trails (live + last position only).
-- Android: the Play listing is IN PROGRESS as of 2026-08-17 (closed testing
-  first — see `mobile/PLAY-STORE-RELEASE.md`). Until it is public, still say
-  "Android coming soon" and NEVER mention or link the PWA. Once it is live,
-  Android copy must drop the iOS-only claims: Home-Screen widgets and Apple
-  Calendar sync don't exist there, and "Face ID lock" is a fingerprint/face
-  unlock.
+- Android: the Play listing is PUBLIC (checked 2026-11-17: Install button,
+  "Updated on Nov 16, 2026", 10+ downloads), so "Android coming soon" is
+  retired. Still NEVER mention or link the PWA. Android copy must drop the
+  iOS-only claims: Home-Screen widgets and Apple Calendar sync don't exist
+  there, and "Face ID lock" is a fingerprint/face unlock.
 - Don't quote free-vs-Plus limits or prices without checking with Arthur.
 - Never invent usage stats ("cut our texts by 80%"), trial anecdotes ("Notion
   lasted three weeks for us"), or experiences Arthur didn't describe.

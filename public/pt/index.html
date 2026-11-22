@@ -444,6 +444,14 @@ footer a{color:var(--muted)}
 .prices .us{border-color:var(--accent)}.prices .us .bname{color:var(--accent)}
 .prices p:last-child{margin-top:4px}
 @media (max-width:640px){.win-b{display:block;width:max-content;margin:4px 0 0 26px}.vsx .fi .ico{margin-right:6px}}
+
+/* Modo Casa right under the facts: a tablet on the table (light), 2026-11-18 */
+#modo-casa{padding-top:clamp(36px,6vw,72px)}
+.casa2{display:grid;gap:clamp(24px,4vw,48px);align-items:center}
+.casa2-copy p{color:var(--muted);font-size:1.06rem;max-width:30em;margin-top:10px}
+.casa2-copy .btn{margin-top:22px}
+.casa2-art{width:100%;height:auto;border-radius:clamp(22px,3vw,36px);box-shadow:var(--shadow)}
+@media (min-width:900px){.casa2{grid-template-columns:.8fr 1.5fr}}
 </style>
 <script type="application/ld+json">
 {
@@ -733,6 +741,18 @@ footer a{color:var(--muted)}
   <div class="wrap"><dl><div><dt>Preço</dt><dd>Grátis · Plus opcional, um plano por casa</dd></div><div><dt>Funciona em</dt><dd>iPhone e Android</dd></div><div><dt>Idiomas</dt><dd>Português, espanhol e inglês</dd></div><div><dt>Privacidade</dt><dd>Sem anúncios, sem rastreamento</dd></div></dl></div>
 </section>
 
+<section class="wrap" id="modo-casa">
+  <div class="casa2">
+    <div class="casa2-copy">
+      <p class="eyebrow">Para a cozinha, o corredor, a TV</p>
+      <h2 class="display">Modo Casa</h2>
+      <p>Transforme um tablet ou notebook parado na tela inicial da família: agenda, listas, dinheiro e fotos num relance.</p>
+      <a class="btn" href="/casa">Abrir o Modo Casa →</a>
+    </div>
+    <img class="casa2-art" src="/img/casa-table-pt.webp" alt="Modo Casa num tablet em cima da mesa: agenda de hoje, listas e pets no modo claro" width="1600" height="1100" loading="lazy" decoding="async" />
+  </div>
+</section>
+
 <section class="wrap" id="features">
   <div class="center">
     <h2 class="display">Tudo o que um app de família deveria fazer, num só lugar</h2>
@@ -797,18 +817,6 @@ footer a{color:var(--muted)}
     <h2 class="display">IA que digita por você</h2>
     <p class="sub">O One Roof usa IA onde ela poupa trabalho de verdade, não como enfeite.</p>
     <div class="grid"><article class="card"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg></span><h3>Roof, o assistente com IA</h3><p>Peça com as suas palavras. O Roof adiciona à lista, lança um gasto ou consulta a agenda, e mostra o que mudou, com Desfazer.</p></article><article class="card"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span><h3>Leitura de recibo com IA</h3><p>Fotografe um recibo e o valor, a data e a categoria se preenchem sozinhos.</p></article><article class="card"><span class="tile" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></span><h3>Divida a conta por foto</h3><p>Tire uma foto da conta e a IA divide por item. No Plus.</p></article></div>
-  </div>
-</section>
-
-<section class="wrap flush" id="modo-casa">
-  <div class="casa">
-    <div>
-      <p class="eyebrow">Para a cozinha, o corredor, a TV</p>
-      <h2 class="display">Modo Casa</h2>
-      <p>Transforme um tablet ou notebook parado na tela inicial da família: agenda, listas, dinheiro e fotos num relance.</p>
-      <a class="btn" href="/casa">Abrir o Modo Casa →</a>
-    </div>
-    <div class="screen"><div class="screen-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="/img/casa-web.webp" alt="Modo Casa: a tela inicial da família num notebook, com agenda, listas e pets" width="1600" height="1000" loading="lazy" decoding="async" /></div>
   </div>
 </section>
 

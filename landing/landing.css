@@ -400,3 +400,11 @@ footer a{color:var(--muted)}
 .prices .us{border-color:var(--accent)}.prices .us .bname{color:var(--accent)}
 .prices p:last-child{margin-top:4px}
 @media (max-width:640px){.win-b{display:block;width:max-content;margin:4px 0 0 26px}.vsx .fi .ico{margin-right:6px}}
+
+/* Modo Casa right under the facts: a tablet on the table (light), 2026-11-18 */
+#modo-casa{padding-top:clamp(36px,6vw,72px)}
+.casa2{display:grid;gap:clamp(24px,4vw,48px);align-items:center}
+.casa2-copy p{color:var(--muted);font-size:1.06rem;max-width:30em;margin-top:10px}
+.casa2-copy .btn{margin-top:22px}
+.casa2-art{width:100%;height:auto;border-radius:clamp(22px,3vw,36px);box-shadow:var(--shadow)}
+@media (min-width:900px){.casa2{grid-template-columns:.8fr 1.5fr}}

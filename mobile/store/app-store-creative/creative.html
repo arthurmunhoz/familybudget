@@ -95,6 +95,11 @@ const ICON = {
   bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>',
   ball: '<circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M2 12h20"/>',
 };
+Object.assign(ICON, {
+  calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
+});
 const svg = (n) => `<svg viewBox="0 0 24 24">${ICON[n]}</svg>`;
 
 // Placements. S = Apple's art safe area [x, y, w, h].
@@ -102,6 +107,26 @@ const V = {
   header:    { W: 3840, H: 1646, S: [1097, 493, 1646, 661], core: 'wide',    card: 0.78 },
   search:    { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'wide',    card: 1.0 },
   universal: { W: 5244, H: 2950, S: [1921, 660, 1402, 962], core: 'compact', card: 0.72 },
+  // 2026-11-18 (owner): the search art reads tiny on a phone — a closer cut:
+  // one big phone with Roof answering, a bigger title, fewer and larger cards.
+  // The title stays in the safe area; the phone and cards run past it.
+  close:     { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'close',   card: 1.0 },
+  // 2026-11-18 (owner): Roof alone reads as "a voice app" — a fan of the
+  // app's screens + Modo Casa on a tablet, Roof as one screen among them.
+  fan:       { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'fan',     card: 1.0 },
+  // 2026-11-18 (owner): screenshots are noise at thumbnail size — six big
+  // feature tiles in each app's own gradient, readable on a phone.
+  tiles:     { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'tiles',   card: 1.0 },
+  // Owner's pass on 'tiles': the house as a tilted sticker, Roof as a line
+  // under the title (not a tile), features as tall columns that each show a
+  // little of what they do.
+  cols:      { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'cols',    card: 1.0 },
+  // Owner, 2026-11-18: back to the orange; the Home (every app) on the phone
+  // in front, and around it CROPS of real screens that show one feature each.
+  home:      { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'home',    card: 1.0 },
+  // Owner, 2026-11-18: the site's hero arrangement — Pets left, the Home big in
+  // the middle, Money right — with Roof as the AI assistant line + a request.
+  trio:      { W: 3840, H: 2560, S: [836, 765, 2168, 1030], core: 'trio',    card: 1.0 },
 };
 const v = new URLSearchParams(location.search).get('v') || 'search';
 const P = V[v];
@@ -135,6 +160,163 @@ if (P.core === 'wide') {
     + casa(1100, 120, 860, -3, 46)
     + phone(1840, 190, 318, 5)
     + `<div class="bubble" style="--fs:56px;left:1020px;top:770px;transform:rotate(-2deg);z-index:4"><b></b>“What’s on today?”</div>`;
+} else if (P.core === 'close') {
+  CW = P.W; CH = P.H;
+  const pw = 1180, ph = pw * 2868 / 1320 + 2 * pw * 0.035;
+  html = orb(880, 640, 250)
+    + `<div class="title" style="--fs:340px;left:860px;top:930px">Hey Roof</div>`
+    + `<div class="sub" style="--fs:132px;left:870px;top:1310px">Your family’s home,<br>run by voice.</div>`
+    + `<div class="device" style="left:2420px;top:250px;width:${pw}px;height:${ph}px;border-radius:${pw * 0.17}px;padding:${pw * 0.035}px;transform:rotate(4deg);z-index:3">
+         <img src="roof.png" style="border-radius:${pw * 0.14}px"></div>`;
+} else if (P.core === 'fan') {
+  CW = P.W; CH = P.H;
+  const pw = 690, ph = pw * 2868 / 1320 + 2 * pw * 0.035;
+  // Phones fan out from a pivot far below the canvas; the middle one in front.
+  const fan = [['lists', -12], ['calendar', -6], ['money', 6], ['pets', 12], ['roof', 0]]
+  const piv = [2700, 4250]
+  const fanned = fan.map(([img, a], i) => `
+    <div class="device" style="left:${piv[0] - pw / 2}px;top:${piv[1] - 3400}px;width:${pw}px;height:${ph}px;border-radius:${pw * 0.17}px;padding:${pw * 0.035}px;
+      transform-origin:${pw / 2}px 3400px;transform:rotate(${a}deg);z-index:${img === 'roof' ? 9 : 5 - Math.abs(a) / 6}">
+      <img src="${img}.png" style="border-radius:${pw * 0.14}px"></div>`).join('')
+  const chip = (t) => `<span style="display:inline-block;background:rgba(255,255,255,.22);border:3px solid rgba(255,255,255,.5);border-radius:999px;padding:.18em .7em;margin:0 .3em .45em 0">${t}</span>`
+  html = `<div class="title" style="--fs:250px;left:200px;top:190px;line-height:1.02">Your whole home,<br>in one app.</div>`
+    + `<div class="sub" style="--fs:82px;left:205px;top:760px;white-space:normal;width:1900px">${['Calendar', 'Lists', 'Money', 'Pets', 'Roof'].map(chip).join('')}</div>`
+    + casa(110, 1420, 1720, -3, 66)
+    + fanned
+    + `<div class="bubble" style="--fs:72px;left:2060px;top:2330px;transform:rotate(-3deg);z-index:12"><b></b>“Hey Roof, milk on the list”</div>`;
+} else if (P.core === 'tiles') {
+  CW = P.W; CH = P.H;
+  document.body.style.background = 'linear-gradient(160deg, #FFF8F0 0%, #FBEFE4 100%)';
+  const T = [
+    ['calendar', 'Calendar', 'Everyone’s week in one place', ['#FF5F6D', '#FF2E63']],
+    ['cart', 'Lists', 'Groceries & to-dos, live', ['#FFC93C', '#FF9A1F']],
+    ['wallet', 'Money', 'Budgets + receipt scan', ['#2BD99A', '#0FA37F']],
+    ['paw', 'Pets', 'Feeding, vet & vaccines', ['#FF9B6A', '#F2603A']],
+    ['spark', 'Roof', 'Just ask: “Hey Roof…”', ['#8B6CFF', '#20B8A6']],
+    ['monitor', 'Home Mode', 'A family screen on any tablet', ['#E58A63', '#B9532F']],
+  ];
+  const m = 190, gap = 80, top = 720;
+  const tw = (P.W - 2 * m - 2 * gap) / 3, th = (P.H - top - m + 40 - gap) / 2;
+  html = `<div style="position:absolute;left:0;top:150px;width:${P.W}px;text-align:center;font:800 210px/1.04 'Nunito';color:#2B2521;letter-spacing:-.02em">
+      <img src="icon.png" style="width:200px;height:200px;border-radius:46px;vertical-align:-30px;margin-right:46px;box-shadow:0 20px 40px -12px rgba(120,50,20,.35)">Everything your family<br>shares, in one app.</div>`
+    + T.map(([ic, name, line, g], i) => {
+      const x = m + (i % 3) * (tw + gap), y = top + Math.floor(i / 3) * (th + gap);
+      return `<div style="position:absolute;left:${x}px;top:${y}px;width:${tw}px;height:${th}px;border-radius:84px;padding:70px 76px;
+          background:linear-gradient(140deg, ${g[0]}, ${g[1]});box-shadow:0 40px 80px -30px ${g[1]}">
+        <div style="width:230px;height:230px;border-radius:64px;background:rgba(255,255,255,.24);display:flex;align-items:center;justify-content:center">
+          <svg viewBox="0 0 24 24" style="width:140px;height:140px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round">${ICON[ic]}</svg></div>
+        <div style="font:800 150px/1 'Nunito';margin-top:66px;white-space:nowrap">${name}</div>
+        <div style="font:700 72px/1.15 'Nunito';margin-top:22px;opacity:.94">${line}</div>
+      </div>`;
+    }).join('');
+} else if (P.core === 'cols') {
+  CW = P.W; CH = P.H;
+  document.body.style.background = 'linear-gradient(160deg, #FFF8F0 0%, #FBEDE0 100%)';
+  const ink = '#2B2521', mute = '#8A7F76';
+  const row = (inner, extra = '') => `<div style="display:flex;align-items:center;gap:26px;padding:22px 0;border-bottom:3px solid #F1E9E1;${extra}">${inner}</div>`;
+  const dot = (c) => `<i style="flex:none;width:26px;height:26px;border-radius:50%;background:${c}"></i>`;
+  const box = (on) => `<i style="flex:none;width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;${on ? 'background:#1FA873' : 'border:5px solid #D8CFC6'}">${on ? `<svg viewBox="0 0 24 24" style="width:36px;height:36px;fill:none;stroke:#fff;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round">${ICON.check}</svg>` : ''}</i>`;
+  const t1 = (x, extra = '') => `<span style="font:700 60px/1.1 'Nunito';color:${ink};${extra}">${x}</span>`;
+  const t2 = (x) => `<span style="margin-left:auto;font:600 46px 'Hanken';color:${mute};white-space:nowrap">${x}</span>`;
+  const peek = {
+    calendar: row(dot('#FF2E63') + `<span>${t1('Vet checkup')}<br><span style="font:600 44px 'Hanken';color:${mute}">Lola · 4:30 PM</span></span>`)
+      + row(dot('#1FA873') + `<span>${t1('Soccer')}<br><span style="font:600 44px 'Hanken';color:${mute}">Alex · 6:00 PM</span></span>`)
+      + row(dot('#8B4DF2') + `<span>${t1('Grandma’s birthday')}<br><span style="font:600 44px 'Hanken';color:${mute}">Saturday</span></span>`)
+      + row(dot('#38A3F5') + `<span>${t1('Trash night')}<br><span style="font:600 44px 'Hanken';color:${mute}">Sunday · 8 PM</span></span>`, 'border:0'),
+    lists: row(box(false) + t1('Milk') + `<em style="margin-left:auto;font:700 38px 'Hanken';color:#1F9E68;background:#E2F6EC;border-radius:99px;padding:8px 20px;font-style:normal">NEW</em>`)
+      + row(box(false) + t1('Eggs'))
+      + row(box(true) + t1('Bananas', 'color:#B3A79C;text-decoration:line-through'))
+      + row(box(false) + t1('Fold the laundry'))
+      + row(box(false) + t1('Ice cream'), 'border:0'),
+    money: `<div style="font:600 46px 'Hanken';color:${mute};margin-top:10px">This month</div>
+      <div style="font:800 118px/1.05 'Nunito';color:${ink};margin:6px 0 30px">$4,701</div>
+      <div style="height:30px;border-radius:15px;background:#1FA873;width:100%"></div>
+      <div style="height:30px;border-radius:15px;background:#E4554A;width:56%;margin-top:16px"></div>`
+      + row(t1('Groceries') + t2('$255'), 'margin-top:20px') + row(t1('Transport') + t2('$101')) + row(t1('Dining') + t2('$98'), 'border:0'),
+    pets: `<div style="display:flex;align-items:center;gap:22px;margin:4px 0 8px"><span style="width:92px;height:92px;border-radius:50%;background:#FFE0D2;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:54px;height:54px;fill:none;stroke:#E2552F;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round">${ICON.paw}</svg></span>${t1('Lola', 'font-size:72px;font-weight:800')}</div>`
+      + row(box(true) + t1('Breakfast')) + row(box(true) + t1('Medicine')) + row(box(false) + t1('Evening walk'))
+      + row(`<i style="flex:none;width:58px;height:58px;border-radius:50%;background:#FFF1E6;display:flex;align-items:center;justify-content:center;font:800 34px 'Nunito';color:#F2603A">17</i>` + `<span>${t1('Vaccine')}<br><span style="font:600 44px 'Hanken';color:${mute}">in 17 days</span></span>`, 'border:0'),
+    casa: `<div style="margin:14px auto 0;width:96%;aspect-ratio:1.45;border-radius:42px;background:#1E1A17;padding:22px;box-shadow:0 20px 40px -14px rgba(0,0,0,.35)">
+        <div style="height:100%;border-radius:24px;background:linear-gradient(150deg,#2E2925,#171412);padding:26px;display:flex;flex-direction:column;gap:18px">
+          <div style="font:800 96px/1 'Nunito';color:#fff">3:26<span style="font-size:40px;opacity:.7"> PM</span></div>
+          <div style="display:flex;gap:16px;flex:1">
+            <div style="flex:1;border-radius:18px;background:rgba(255,255,255,.1);padding:16px"><div style="height:14px;width:70%;border-radius:7px;background:#FF5F6D"></div><div style="height:12px;width:90%;border-radius:6px;background:rgba(255,255,255,.35);margin-top:14px"></div><div style="height:12px;width:60%;border-radius:6px;background:rgba(255,255,255,.35);margin-top:12px"></div></div>
+            <div style="flex:1;border-radius:18px;background:rgba(255,255,255,.1);padding:16px"><div style="height:14px;width:60%;border-radius:7px;background:#FFC93C"></div><div style="height:12px;width:80%;border-radius:6px;background:rgba(255,255,255,.35);margin-top:14px"></div><div style="height:12px;width:70%;border-radius:6px;background:rgba(255,255,255,.35);margin-top:12px"></div></div>
+          </div></div></div>
+      <div style="font:700 56px/1.2 'Nunito';color:${ink};margin-top:40px;text-align:center">On any tablet<br>you already have</div>`,
+  };
+  const C = [
+    ['calendar', 'calendar', 'Calendar', ['#FF5F6D', '#FF2E63']],
+    ['cart', 'lists', 'Lists', ['#FFC93C', '#FF9A1F']],
+    ['wallet', 'money', 'Money', ['#2BD99A', '#0FA37F']],
+    ['paw', 'pets', 'Pets', ['#FF9B6A', '#F2603A']],
+    ['monitor', 'casa', 'Home Mode', ['#E58A63', '#B9532F']],
+  ];
+  const m = 150, gap = 56, top = 880, bottom = 130;
+  // Columns run off the bottom edge: no empty card bottoms, and they read as
+  // lists that go on.
+  const cw = (P.W - 2 * m - 4 * gap) / 5, chh = P.H - top + 200;
+  // The house as a sticker: no icon square, a white outline + orange shadow, tilted.
+  html = `<img src="house.png" style="position:absolute;left:230px;top:120px;width:560px;transform:rotate(-10deg);
+        filter:drop-shadow(0 0 3px #F2843F) drop-shadow(0 0 3px #F2843F) drop-shadow(0 30px 30px rgba(242,100,63,.6))">`
+    + `<div style="position:absolute;left:900px;top:190px;font:800 196px/1.02 'Nunito';color:${ink};letter-spacing:-.02em">Everything your family<br>shares, in one app.</div>`
+    + `<div style="position:absolute;left:906px;top:640px;font:700 92px/1 'Nunito';color:#8A5A44;display:flex;align-items:center;gap:26px">
+        <span style="width:96px;height:96px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:radial-gradient(circle at 32% 28%, #A890FF 0%, #8B6CFF 35%, #3FB7B0 78%, #20C3A6 100%)">
+          <svg viewBox="0 0 24 24" style="width:54px;height:54px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round">${ICON.spark}</svg></span>
+        with the help of Roof, your AI assistant</div>`
+    + C.map(([ic, key, name, g], i) => `
+      <div style="position:absolute;left:${m + i * (cw + gap)}px;top:${top}px;width:${cw}px;height:${chh}px;border-radius:70px;overflow:hidden;
+          background:#fff;box-shadow:0 40px 80px -36px ${g[1]}, 0 0 0 4px ${g[0]}33">
+        <div style="height:250px;padding:0 44px;display:flex;align-items:center;gap:26px;background:linear-gradient(140deg, ${g[0]}, ${g[1]})">
+          <span style="flex:none;width:${name.length > 6 ? 112 : 130}px;height:${name.length > 6 ? 112 : 130}px;border-radius:36px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 24 24" style="width:80px;height:80px;fill:none;stroke:#fff;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round">${ICON[ic]}</svg></span>
+          <span style="font:800 ${name.length > 6 ? 76 : 100}px/1 'Nunito';color:#fff;white-space:nowrap">${name}</span></div>
+        <div style="padding:30px 40px;zoom:1.3">${peek[key]}</div>
+      </div>`).join('');
+} else if (P.core === 'trio') {
+  CW = P.W; CH = P.H;
+  const dev = (img, w, x, y, rot, z) => {
+    const h = w * 2868 / 1320 + 2 * w * 0.035
+    return `<div class="device" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border-radius:${w * 0.17}px;padding:${w * 0.035}px;transform:rotate(${rot}deg);transform-origin:50% 100%;z-index:${z}">
+      <img src="${img}" style="border-radius:${w * 0.14}px"></div>`
+  }
+  const cx = P.W / 2, wc = 1000, ws = 820
+  html = `<div class="title" style="--fs:200px;left:0;width:${P.W}px;text-align:center;top:110px">Your family’s home, in one app.</div>`
+    + `<div style="position:absolute;left:0;width:${P.W}px;top:370px;display:flex;justify-content:center">
+        <div style="display:flex;align-items:center;gap:30px;background:rgba(255,255,255,.18);border:4px solid rgba(255,255,255,.4);border-radius:999px;padding:22px 56px 22px 24px;font:700 84px/1 'Nunito'">
+        <span style="width:120px;height:120px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 10px rgba(255,255,255,.22);background:radial-gradient(circle at 32% 28%, #A890FF 0%, #8B6CFF 35%, #3FB7B0 78%, #20C3A6 100%)">
+          <svg viewBox="0 0 24 24" style="width:66px;height:66px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round">${ICON.spark}</svg></span>
+        with Roof, your AI assistant</div></div>`
+    + dev('pets.png', ws, cx - 1.24 * ws, 820, -7, 4)
+    + dev('money.png', ws, cx + 0.24 * ws, 820, 7, 4)
+    + dev('hero.png', wc, cx - wc / 2, 640, 0, 6)
+    + `<div class="bubble" style="--fs:70px;left:110px;top:1960px;transform:rotate(-4deg);z-index:9"><b></b>“Hey Roof, add milk to the list”</div>`
+    + `<div class="bubble" style="--fs:78px;left:2560px;top:2160px;transform:rotate(3deg);z-index:9"><b></b>“What’s on today?”</div>`;
+} else if (P.core === 'home') {
+  CW = P.W; CH = P.H;
+  // A crop of a real screen on a white card, with the feature's name on a pill.
+  const crop = (img, x, y, w, ar, rot, label, ic, g, z = 4) => `
+    <div style="position:absolute;left:${x}px;top:${y}px;width:${w}px;transform:rotate(${rot}deg);z-index:${z}">
+      <div style="position:relative;border-radius:56px;overflow:hidden;background:#fff;aspect-ratio:${ar};box-shadow:0 50px 100px -30px rgba(70,10,40,.55),0 16px 36px rgba(70,10,40,.22)">
+        <img src="${img}" style="display:block;width:100%;height:100%;object-fit:cover"></div>
+      <div style="position:absolute;left:44px;top:-84px;display:flex;align-items:center;gap:22px;background:#fff;border-radius:999px;padding:16px 38px 16px 18px;
+          font:800 64px/1 'Nunito';color:#2B2521;box-shadow:0 18px 40px -8px rgba(80,20,30,.4)">
+        <i style="width:88px;height:88px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]})">
+          <svg viewBox="0 0 24 24" style="width:54px;height:54px;fill:none;stroke:#fff;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round">${ICON[ic]}</svg></i>${label}</div>
+    </div>`;
+  const pw = 880, ph = pw * 2868 / 1320 + 2 * pw * 0.035;
+  html = `<div class="title" style="--fs:196px;left:0;width:${P.W}px;text-align:center;top:120px">Your family’s home, in one app.</div>`
+    + `<div style="position:absolute;left:0;width:${P.W}px;top:370px;display:flex;justify-content:center;align-items:center;gap:30px;font:700 86px/1 'Nunito'">
+        <span style="width:110px;height:110px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 10px rgba(255,255,255,.22);background:radial-gradient(circle at 32% 28%, #A890FF 0%, #8B6CFF 35%, #3FB7B0 78%, #20C3A6 100%)">
+          <svg viewBox="0 0 24 24" style="width:62px;height:62px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round">${ICON.spark}</svg></span>
+        with the help of Roof, your AI assistant</div>`
+    + `<div class="device" style="left:${(P.W - pw) / 2}px;top:600px;width:${pw}px;height:${ph}px;border-radius:${pw * 0.17}px;padding:${pw * 0.035}px;z-index:9">
+         <img src="hero.png" style="border-radius:${pw * 0.14}px"></div>`
+    + crop('crop-roof.png', 230, 720, 1080, '1200/920', -4, 'Roof', 'spark', ['#8B6CFF', '#20B8A6'], 5)
+    + casa(150, 1860, 1240, -3, 70)
+    + crop('crop-lists.png', 2560, 720, 1080, '1240/640', 4, 'Lists', 'cart', ['#FFC93C', '#FF9A1F'])
+    + crop('crop-money.png', 2600, 1400, 1000, '1240/850', -3, 'Money', 'wallet', ['#2BD99A', '#0FA37F'])
+    + crop('crop-pets.png', 2500, 2180, 1060, '1280/770', 3, 'Pets', 'paw', ['#FF9B6A', '#F2603A'], 6);
 } else {
   CW = 1400; CH = 960;
   html = orb(150, 18, 150)
@@ -150,8 +332,9 @@ core.innerHTML = html;
 // Fit inside the safe area with a small inset (rotation + shadows stay in).
 const [sx, sy, sw, sh] = P.S;
 const inset = 0.03;
-const k = Math.min(sw * (1 - 2 * inset) / CW, sh * (1 - 2 * inset) / CH);
-const ox = sx + (sw - CW * k) / 2, oy = sy + (sh - CH * k) / 2;
+const k = ['close', 'fan', 'tiles', 'cols', 'home', 'trio'].includes(P.core) ? 1 : Math.min(sw * (1 - 2 * inset) / CW, sh * (1 - 2 * inset) / CH);
+const flat = ['close', 'fan', 'tiles', 'cols', 'home', 'trio'].includes(P.core)
+const ox = flat ? 0 : sx + (sw - CW * k) / 2, oy = flat ? 0 : sy + (sh - CH * k) / 2;
 core.style.transform = `translate(${ox}px, ${oy}px) scale(${k})`;
 
 // ---- glows ----
@@ -160,7 +343,7 @@ const glows = [
   [0.38, 0.30, 0.45, '#FFB27A', .35], [0.85, 0.02, 0.40, '#FF6F8E', .35], [0.05, 0.75, 0.45, '#FF9D5C', .4],
 ];
 const big = Math.max(P.W, P.H);
-document.getElementById('glows').innerHTML = glows.map(([x, y, s, c, o]) =>
+if (P.core !== 'tiles' && P.core !== 'cols') document.getElementById('glows').innerHTML = glows.map(([x, y, s, c, o]) =>
   `<div class="glow" style="left:${x * P.W - s * big / 2}px;top:${y * P.H - s * big / 2}px;width:${s * big}px;height:${s * big}px;background:radial-gradient(circle, ${c} 0%, transparent 65%);opacity:${o}"></div>`).join('');
 
 // ---- floating cards (auxiliary art) ----
@@ -189,6 +372,14 @@ const AUX = {
     ['sport', .89, .16, 1, 5, .95, 0], ['routine', .90, .82, 1, -4, .92, 1],
     ['bday', .42, .08, .8, -3, .6, 5], ['nudge', .60, .93, .8, 3, .6, 5],
   ],
+  fan: [],
+  tiles: [],
+  cols: [],
+  home: [],
+  trio: [],
+  close: [
+    ['pet', .15, .17, 1.45, -6, .97, 0], ['routine', .17, .82, 1.5, 4, .97, 0],
+  ],
   universal: [
     ['pet', .25, .22, 1.2, -6, .95, 0], ['list', .25, .62, 1.2, 4, .92, 1],
     ['sport', .75, .21, 1.2, 5, .95, 0], ['routine', .76, .60, 1.2, -4, .92, 1],
@@ -212,7 +403,9 @@ for (const [id, cx, cy, s, rot, op, blur] of AUX[v]) {
 
 // ---- voice rings out of the orb ----
 requestAnimationFrame(() => {
-  const r = document.getElementById('orb').getBoundingClientRect();
+  const o = document.getElementById('orb');
+  if (!o) { document.title = 'ready'; return; }
+  const r = o.getBoundingClientRect();
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   const far = Math.hypot(Math.max(cx, P.W - cx), Math.max(cy, P.H - cy));
   let out = '';

@@ -290,6 +290,18 @@ def page(L):
   <div class="wrap"><dl>{facts}</dl></div>
 </section>
 
+<section class="wrap" id="modo-casa">
+  <div class="casa2">
+    <div class="casa2-copy">
+      <p class="eyebrow">{e(L['casa_eyebrow'])}</p>
+      <h2 class="display">{e(casa[1])}</h2>
+      <p>{e(casa[2])}</p>
+      <a class="btn" href="/casa">{e(L['casa_cta'])} →</a>
+    </div>
+    <img class="casa2-art" src="/img/casa-table-{short}.webp" alt="{e(A['casa'])}" width="1600" height="1100" loading="lazy" decoding="async" />
+  </div>
+</section>
+
 <section class="wrap" id="features">
   <div class="center">
     <h2 class="display">{e(L['feat_h2'])}</h2>
@@ -305,18 +317,6 @@ def page(L):
     <h2 class="display">{e(L['ai_h2'])}</h2>
     <p class="sub">{e(L['ai_sub'])}</p>
     <div class="grid">{aicards}</div>
-  </div>
-</section>
-
-<section class="wrap flush" id="modo-casa">
-  <div class="casa">
-    <div>
-      <p class="eyebrow">{e(L['casa_eyebrow'])}</p>
-      <h2 class="display">{e(casa[1])}</h2>
-      <p>{e(casa[2])}</p>
-      <a class="btn" href="/casa">{e(L['casa_cta'])} →</a>
-    </div>
-    <div class="screen"><div class="screen-bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="/img/casa-web.webp" alt="{e(A['casa'])}" width="1600" height="1000" loading="lazy" decoding="async" /></div>
   </div>
 </section>
 

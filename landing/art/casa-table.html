@@ -1,0 +1,46 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Landing art (owner, 2026-11-18): Modo Casa on a tablet standing on a table
+     top (no legs), light theme. Rendered by landing/art/render.sh, one per
+     language: casa-table.html?shot=<capture png> -> public/img/casa-table-<lang>.webp -->
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:1600px; height:1100px; overflow:hidden; }
+body { position:relative; background:linear-gradient(180deg, #FBF3EA 0%, #F6E8DA 62%, #EBD7C3 100%); }
+/* a soft window light on the wall */
+.light { position:absolute; left:-200px; top:-300px; width:1300px; height:1100px; background:radial-gradient(closest-side, rgba(255,255,255,.85), transparent); }
+/* the table top: a lighter surface seen from slightly above, then its front edge */
+.top { position:absolute; left:-40px; right:-40px; top:770px; height:240px;
+  background:linear-gradient(180deg, #E9C9A4 0%, #DDB68C 55%, #D2A77A 100%); }
+.top::before { content:''; position:absolute; inset:0; opacity:.35;
+  background:repeating-linear-gradient(178deg, transparent 0 22px, rgba(150,95,45,.18) 22px 24px, transparent 24px 46px); }
+.edge { position:absolute; left:-40px; right:-40px; top:1010px; height:90px; background:linear-gradient(180deg, #B98656, #9C6B3F); box-shadow:0 -2px 0 rgba(255,255,255,.25) inset; }
+/* tablet on a stand */
+.tablet { position:absolute; left:300px; top:150px; width:1000px; height:740px; border-radius:58px; padding:30px;
+  background:linear-gradient(145deg, #3a3633, #161412 45%, #2b2724); box-shadow:0 0 0 3px #57514c inset, 0 40px 60px -20px rgba(80,40,10,.45); z-index:3; }
+.tablet img { display:block; width:100%; height:100%; object-fit:cover; object-position:top left; border-radius:30px; }
+.stand { position:absolute; left:720px; top:820px; width:160px; height:70px; border-radius:0 0 18px 18px; background:linear-gradient(180deg,#cfc7bf,#a9a199); z-index:2; }
+.shadow { position:absolute; left:330px; top:868px; width:940px; height:60px; border-radius:50%; background:radial-gradient(closest-side, rgba(90,50,20,.35), transparent); filter:blur(6px); z-index:1; }
+/* props for warmth */
+.mug { position:absolute; left:1330px; top:820px; width:120px; height:120px; border-radius:14px 14px 34px 34px; background:linear-gradient(90deg,#F3EEE8,#FFFFFF 40%,#E3DCD4); z-index:4; box-shadow:0 18px 26px -12px rgba(90,50,20,.45); }
+.mug::after { content:''; position:absolute; right:-42px; top:26px; width:52px; height:58px; border:14px solid #ECE6DF; border-left:0; border-radius:0 30px 30px 0; }
+.mug i { position:absolute; left:10px; right:10px; top:6px; height:16px; border-radius:50%; background:#6B3E22; }
+.plant { position:absolute; left:130px; top:700px; width:150px; height:150px; z-index:4; }
+.pot { position:absolute; left:150px; top:800px; width:120px; height:120px; border-radius:10px 10px 36px 36px; background:linear-gradient(90deg,#D9734A,#F08A5D 45%,#C9623B); z-index:4; box-shadow:0 18px 26px -12px rgba(90,50,20,.45); }
+.leaf { position:absolute; width:70px; height:150px; border-radius:50% 50% 50% 50% / 60% 60% 40% 40%; background:linear-gradient(160deg,#5DBB7E,#2E8B57); transform-origin:50% 100%; z-index:3; }
+</style></head>
+<body>
+<div class="light"></div>
+<div class="top"></div><div class="edge"></div>
+<div class="shadow"></div>
+<div class="stand"></div>
+<div class="tablet"><img id="shot"></div>
+<div class="leaf" style="left:175px;top:660px;transform:rotate(-28deg)"></div>
+<div class="leaf" style="left:208px;top:630px;transform:rotate(-4deg)"></div>
+<div class="leaf" style="left:240px;top:665px;transform:rotate(24deg)"></div>
+<div class="pot"></div>
+<div class="mug"><i></i></div>
+<script>
+document.getElementById('shot').src = new URLSearchParams(location.search).get('shot') || 'casa.png'
+</script>
+</body></html>
