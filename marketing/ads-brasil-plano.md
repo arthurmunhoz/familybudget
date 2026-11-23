@@ -4,6 +4,18 @@ Escrito em 22/11/2026. Base: a campanha dos EUA ("Busca US - One Roof", no ar
 desde 21/11), os números do Posto Certo no Brasil e os dados de palavras-chave
 já levantados (Apple Ads popularity + Google Trends).
 
+## Status (23/11/2026)
+
+- Campanha **"Busca BR - One Roof"** criada no Apple Ads (conta Blue Devils
+  Software), ad group "Palavras exatas": US$ 3/dia, lance padrão US$ 0,40,
+  Search Match desligado, as 8 palavras EXATAS abaixo e 13 negativas
+  (cozi, familywall, timetree, listonic, bring, google agenda, mercado livre,
+  ifood, rappi, nota fiscal, cpf na nota, receita, cardápio).
+- Fica em "Country or region eligibility issue" até a 1.6.2 (com a ficha
+  pt-BR) ser aprovada; depois disso a Apple libera sozinha. A partir daí
+  contam os 7/14 dias.
+- Ficha pt-BR: App Store na 1.6.2 (em revisão); Google Play já no ar.
+
 ## 0. Pré-requisito: a ficha em português
 
 Hoje as duas lojas só têm a ficha em inglês. Quem busca "lista de compras" no
