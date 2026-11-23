@@ -45,7 +45,7 @@ WHAT'S INSIDE
 • LISTS — groceries by store, chores, a trip, school. Add an item and it appears on everyone's phone; tick things off as you go.
 • SHARED CALENDAR — day, week and month views, color-coded by person, with birthdays, anniversaries and reminders. Two-way Google and Apple Calendar sync.
 • MONEY — budgets by month, week or day. Photograph a receipt and the amount, date and category fill themselves in.
-• FAMILY GAMES — Hangman challenges, Battleship and a buzzer quiz, each person on their own phone.
+• FAMILY GAMES — Bingo, Hangman challenges, Battleship and a buzzer quiz, each person on their own phone.
 • PET CARE — a shared daily routine with times, vet visits and vaccines, with reminders before anything is due.
 • DOCUMENTS — IDs, insurance and records in a Face ID–locked vault, with PDF previews.
 • WHEREABOUTS — see your family on a live map, with alerts when someone reaches home or work. Off by default, visible only to your household.
@@ -94,7 +94,7 @@ WHAT'S INSIDE
 
 • MONEY — shared budgets by month, week or day, with categories you control. Photograph a receipt and the amount, date and category are filled in for you.
 
-• FAMILY GAMES — Hangman challenges, Battleship and a buzzer quiz, each person playing on their own phone.
+• FAMILY GAMES — Bingo, Hangman challenges, Battleship and a buzzer quiz, each person playing on their own phone.
 
 • PET CARE — a shared daily routine with times, so "did anyone feed the dog?" stops being a question. Vet visits and vaccines, with a reminder before the next one is due.
 

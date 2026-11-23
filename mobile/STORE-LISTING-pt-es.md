@@ -58,7 +58,7 @@ O QUE TEM NO APP
 • LISTAS — mercado por loja, tarefas, uma viagem, a escola. Um item adicionado aparece no celular de todo mundo; vá riscando enquanto compra.
 • AGENDA COMPARTILHADA — visão de dia, semana e mês, com uma cor por pessoa, aniversários, datas especiais e lembretes. Sincroniza nos dois sentidos com o Google Agenda e o Calendário da Apple.
 • DINHEIRO — orçamentos por mês, semana ou dia. Fotografe um recibo e o valor, a data e a categoria se preenchem sozinhos.
-• JOGOS EM FAMÍLIA — desafios de Forca, Batalha Naval e um quiz de campainha, cada um no próprio celular.
+• JOGOS EM FAMÍLIA — Bingo, desafios de Forca, Batalha Naval e um quiz de campainha, cada um no próprio celular.
 • PETS — uma rotina diária compartilhada com horários, consultas e vacinas, com lembrete antes de vencer.
 • DOCUMENTOS — RG, seguro e registros num cofre com Face ID, com prévia de PDF.
 • LOCALIZAÇÃO — veja a família num mapa ao vivo, com aviso quando alguém chega em casa ou no trabalho. Desligado por padrão e visível só para a sua casa.
@@ -108,7 +108,7 @@ O QUE TEM NO APP
 
 • DINHEIRO — orçamentos compartilhados por mês, semana ou dia, com as suas categorias. Fotografe um recibo e o valor, a data e a categoria são preenchidos para você.
 
-• JOGOS EM FAMÍLIA — desafios de Forca, Batalha Naval e um quiz de campainha, cada um jogando no próprio celular.
+• JOGOS EM FAMÍLIA — Bingo, desafios de Forca, Batalha Naval e um quiz de campainha, cada um jogando no próprio celular.
 
 • PETS — uma rotina diária compartilhada com horários, para "alguém deu comida para o cachorro?" deixar de ser pergunta. Consultas e vacinas, com lembrete antes da próxima.
 
@@ -194,7 +194,7 @@ QUÉ INCLUYE
 • LISTAS — el súper por tienda, tareas, un viaje, la escuela. Lo que agregas aparece en el teléfono de todos; ve tachando mientras compras.
 • AGENDA COMPARTIDA — vista de día, semana y mes, con un color por persona, cumpleaños, aniversarios y recordatorios. Sincroniza en ambos sentidos con Google Calendar y el Calendario de Apple.
 • DINERO — presupuestos por mes, semana o día. Toma una foto del recibo y el monto, la fecha y la categoría se llenan solos.
-• JUEGOS EN FAMILIA — retos de Ahorcado, Batalla Naval y un quiz de timbre, cada quien en su propio teléfono.
+• JUEGOS EN FAMILIA — Bingo, retos de Ahorcado, Batalla Naval y un quiz de timbre, cada quien en su propio teléfono.
 • MASCOTAS — una rutina diaria compartida con horarios, visitas al veterinario y vacunas, con recordatorio antes de que venzan.
 • DOCUMENTOS — identificaciones, seguros y registros en una bóveda con Face ID, con vista previa de PDF.
 • UBICACIÓN — ve a tu familia en un mapa en vivo, con aviso cuando alguien llega a casa o al trabajo. Apagado por defecto y visible solo para tu hogar.
@@ -244,7 +244,7 @@ QUÉ INCLUYE
 
 • DINERO — presupuestos compartidos por mes, semana o día, con tus propias categorías. Toma una foto del recibo y el monto, la fecha y la categoría se llenan por ti.
 
-• JUEGOS EN FAMILIA — retos de Ahorcado, Batalla Naval y un quiz de timbre, cada quien jugando en su propio teléfono.
+• JUEGOS EN FAMILIA — Bingo, retos de Ahorcado, Batalla Naval y un quiz de timbre, cada quien jugando en su propio teléfono.
 
 • MASCOTAS — una rutina diaria compartida con horarios, para que "¿alguien le dio de comer al perro?" deje de ser pregunta. Visitas al veterinario y vacunas, con recordatorio antes de la siguiente.
 
