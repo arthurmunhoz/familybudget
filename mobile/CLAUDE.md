@@ -826,6 +826,16 @@ Architecture, systems, remaining setup, and the improvement backlog are in
   rings and soft app cards that may be cropped. `out/crop-check/` = the safe
   area outlined + the tightest crops that hold it. Check ASC's Preview before
   uploading.
+  **Trio set (1.6.2, 2026-11-23):** `creative.html?v=trio|triohead` +
+  `render-trio.sh <lang> [trio|triohead]` → `out/trio-3840x2560-<lang>.png`
+  (search) and `out/triohead-3840x1646-<lang>.png` (header): Lists · Home ·
+  Calendar phones, site-hero look. pt uses fresh captures in
+  `app-store-v4/shots/pt/` (the Preview Family demo data is in Portuguese
+  since then). Once a version is approved its page can't take uploads (Upload
+  disabled, only "Browse Assets"): upload to **Asset Library** (+ → Upload
+  Creative Assets), "Add for Review" each into one draft, Submit for Review,
+  then select the approved asset per localization with Browse Assets.
+  Removing a header from the version page takes it off the live page at once.
 - **`@/components/PhotoHero`** — the full-bleed, swipeable photo header used
   by Pet Care and Family (one page per pet / member; name + badge on the photo,
   side arrows with a tiny avatar of the neighbour, page dots, shrinks with a
