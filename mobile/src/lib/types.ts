@@ -296,6 +296,11 @@ export interface CalendarEvent {
   google_calendar_id: string | null
   /** The device (EventKit) event id for source='apple' rows — dedups re-imports. */
   apple_event_id: string | null
+  /** Google details for the event details sheet (migration 122) — names only,
+   *  written by the sync; null/absent on One Roof and Apple rows. */
+  attendees?: { name: string; status: string; organizer?: true }[] | null
+  organizer?: string | null
+  meeting_url?: string | null
   synced_at: string | null
   created_by: string | null
   created_at: string

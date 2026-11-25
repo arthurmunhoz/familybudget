@@ -11,11 +11,14 @@
 // Tapping an event opens the editor; tapping an empty slot in Day/Week creates
 // an event at that half hour (the all-day strip → an all-day event).
 // Recurrence is expanded via occurrencesByDay; events are coloured by owner.
-// Google/Apple-sourced rows (source !== 'oneroof') render read-only.
+// Google/Apple-sourced rows (source !== 'oneroof') are editable only by the
+// member whose account they came from (Apple: on an iPhone with Apple Calendar
+// linked) — the edit goes back to the source (EventForm `external`); everyone
+// else sees them read-only.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { APP_GRADIENT } from '@/components/home/palette'
 import { RoofExamples } from '@/components/RoofExamples'
-import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { CalendarDays, ChevronLeft, ChevronRight, MapPin } from 'lucide-react-native'
@@ -32,6 +35,7 @@ import {
   addDays,
   compareOccurrences,
   eventColor,
+  memberColor,
   formatTime,
   KIND_EMOJI,
   occurrencesByDay,
@@ -44,14 +48,17 @@ import { supabase } from '@/lib/supabase'
 import { channelName } from '@/lib/realtime'
 import type { CalendarEvent } from '@/lib/types'
 import { fonts, radius, sp, useTheme } from '@/theme/theme'
-import { getGoogleConnection } from '@/lib/googleCalendar'
-import { getAppleConnection, isAppleCalendarAvailable, syncAppleCalendar } from '@/lib/appleCalendar'
+import { getGoogleConnection, syncGoogleCalendar } from '@/lib/googleCalendar'
+import { deleteAppleEvent, getAppleConnection, isAppleCalendarAvailable, syncAppleCalendar } from '@/lib/appleCalendar'
 import EventForm, { type EventDraft } from './EventForm'
+import EventDetails from './EventDetails'
 import { GoogleIcon } from './GoogleIcon'
 import { AppleIcon } from './AppleIcon'
 import { minutesToHHMM, weekStart } from './calendarLayout'
 import { SwipePager, type PagerHandle } from './SwipePager'
 import { TimeGrid } from './TimeGrid'
+import { WhoFilter, type WhoSel } from './WhoFilter'
+import { syncEventReminders } from '@/lib/eventReminders'
 
 // App language → BCP-47 locale for Intl date/time formatting.
 const LOCALES: Record<string, string> = { en: 'en', es: 'es', pt: 'pt-BR' }
@@ -81,7 +88,7 @@ function emptyDraft(start: string, owner: string | null): EventDraft {
     owner,
     kind: 'event',
     repeat: 'none',
-    remind: false,
+    remindMin: null,
     location: '',
     notes: '',
   }
@@ -109,6 +116,18 @@ export default function Calendar() {
     return (data ?? []) as CalendarEvent[]
   })
 
+  // Any change to the calendar (mine, or someone's via Realtime) may move this
+  // phone's event reminders.
+  // (Keyed on the reminder-relevant fields: `events` is a fresh [] each render
+  // until the first load.)
+  const reminderKey = events
+    .filter((e) => e.reminder_minutes != null)
+    .map((e) => `${e.id}|${e.reminder_minutes}|${e.start_date}|${e.start_time}|${e.recurrence}|${e.owner_email}|${e.title}`)
+    .join(';')
+  useEffect(() => {
+    void syncEventReminders()
+  }, [reminderKey])
+
   useEffect(() => {
     // Realtime: refetch when any household row changes (RLS scopes the stream).
     const channel = supabase
@@ -129,10 +148,14 @@ export default function Calendar() {
       getGoogleConnection().then((v) => {
         if (active) setGoogleConnected(!!v)
       })
+      // Back from connecting Google (or any other screen): the connect step's
+      // first sync filled the table while this screen sat mounted underneath,
+      // and a bulk import doesn't reliably reach us over realtime — so re-read.
+      load()
       return () => {
         active = false
       }
-    }, []),
+    }, [load]),
   )
 
   // Apple Calendar is on-device (EventKit). Color the header button, and when
@@ -160,8 +183,16 @@ export default function Calendar() {
 
   // `?date=YYYY-MM-DD` opens on that day (the assistant's "Open in Calendar"
   // for "what's on tomorrow" landed on today, 2026-11) — in the Day view.
-  const { date: dateParam } = useLocalSearchParams<{ date?: string }>()
+  // `&family=1` (Home's "See the family's day"): everyone's events, zoomed so
+  // the hours holding that day's events fill the screen. (There was a
+  // "Family = everyone but me" view; it read as including me — removed,
+  // owner 2026-11-25. Pick people one by one instead.)
+  const { date: dateParam, family: familyParam } = useLocalSearchParams<{ date?: string; family?: string }>()
   const deepDay = typeof dateParam === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null
+  const familyDay = familyParam === '1' ? deepDay : null
+  // Day view filter (WhoFilter): ['all'] | ['me'] | the members picked
+  const [who, setWho] = useState<WhoSel>(['all'])
+  const [fitDay, setFitDay] = useState<string | null>(familyDay)
   const [selected, setSelected] = useState(deepDay ?? today)
   const [mode, setMode] = useState<Mode>(deepDay ? 'day' : 'month')
   // A second deep link while the screen is already mounted (Calendar → Home →
@@ -172,7 +203,9 @@ export default function Calendar() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelected(deepDay)
     setMode('day')
-  }, [deepDay])
+    setFitDay(familyDay)
+    if (familyDay) setWho(['all'])
+  }, [deepDay, familyDay])
   const pager = useRef<PagerHandle>(null)
 
   // --- the visible period ---
@@ -187,7 +220,14 @@ export default function Calendar() {
   // Occurrences (recurrence expanded + multi-day spread). Month needs the month;
   // Week and Day need the week (Day's strip shows the week's dots).
   const [rangeStart, rangeEnd] = mode === 'month' ? [monthStart, monthEnd] : [ws, weekDays[6]]
-  const byDay = useMemo(() => occurrencesByDay(events, rangeStart, rangeEnd), [events, rangeStart, rangeEnd])
+  const me = profile?.email ?? null
+  const dayEvents = useMemo(() => {
+    const w = who[0]
+    if (mode !== 'day' || w === 'all') return events
+    if (who.length === 1 && w === 'me') return events.filter((e) => !e.owner_email || e.owner_email === me)
+    return events.filter((e) => !!e.owner_email && who.includes(e.owner_email))
+  }, [events, mode, who, me])
+  const byDay = useMemo(() => occurrencesByDay(dayEvents, rangeStart, rangeEnd), [dayEvents, rangeStart, rangeEnd])
   const dayOccs: Occurrence[] = useMemo(() => [...(byDay.get(selected) ?? [])].sort(compareOccurrences), [byDay, selected])
 
   // the faded state line under the title: how the next week looks
@@ -240,10 +280,37 @@ export default function Calendar() {
     setShowForm(true)
   }
 
+  /** 'google' / 'apple' when `ev` is one of MY pulled events I can edit here. */
+  function externalKind(ev: CalendarEvent): 'google' | 'apple' | null {
+    if (!profile?.email || ev.owner_email !== profile.email) return null
+    if (ev.source === 'google' && ev.google_event_id) return 'google'
+    if (ev.source === 'apple' && isAppleCalendarAvailable && appleConnected && ev.apple_event_id) return 'apple'
+    return null
+  }
+
+  /** Push a change to Google right away instead of waiting for the cron. */
+  function pushToGoogle() {
+    if (!googleConnected) return
+    syncGoogleCalendar()
+      .then(() => load())
+      .catch(() => {})
+  }
+
+  // Tapping an event: Google / Apple rows open their details (whoever's they
+  // are — EventDetails); One Roof rows open the editor as before.
+  const [details, setDetails] = useState<CalendarEvent | null>(null)
   function openEdit(ev: CalendarEvent) {
-    // Externally-sourced rows (Google / Apple device calendar) are read-only —
-    // surface them but don't open the editor.
-    if (ev.source !== 'oneroof') return
+    if (ev.source !== 'oneroof') {
+      setDetails(ev)
+      return
+    }
+    startEdit(ev)
+  }
+
+  function startEdit(ev: CalendarEvent) {
+    // Externally-sourced rows (Google / Apple device calendar): only their
+    // owner can edit, and Apple only where the device calendar is linked.
+    if (ev.source !== 'oneroof' && !externalKind(ev)) return
     setEditing(ev)
     setDraft({
       title: ev.title,
@@ -255,7 +322,7 @@ export default function Calendar() {
       owner: ev.owner_email,
       kind: ev.kind,
       repeat: ev.recurrence,
-      remind: ev.reminder_minutes != null,
+      remindMin: ev.reminder_minutes,
       location: ev.location ?? '',
       notes: ev.notes ?? '',
     })
@@ -268,9 +335,28 @@ export default function Calendar() {
   }
 
   async function remove(ev: CalendarEvent) {
+    if (ev.source === 'apple') {
+      try {
+        await deleteAppleEvent(ev)
+      } catch {
+        Alert.alert(t('calendar.externalDeleteFailed'))
+        return
+      }
+    }
+    // Synced to Google (pushed by us, or pulled from there): tombstone it so
+    // the sync deletes it on Google too — the row itself is gone after this.
+    if (ev.google_event_id) {
+      await supabase.from('calendar_deletions').insert({
+        // Pulled events have no created_by — the owner's connection did it.
+        user_email: ev.created_by ?? ev.owner_email,
+        google_event_id: ev.google_event_id,
+        google_calendar_id: ev.google_calendar_id,
+      })
+    }
     await supabase.from('calendar_events').delete().eq('id', ev.id)
-    track('calendar.deleted', { title: ev.title })
+    track('calendar.deleted', { title: ev.title, source: ev.source })
     load()
+    if (ev.google_event_id) pushToGoogle()
   }
 
   const red = APP_GRADIENT.calendar as [string, string]
@@ -417,9 +503,25 @@ export default function Calendar() {
     </View>
   )
 
+  const fit = mode === 'day' && !!fitDay && selected === fitDay
+  const others = profiles.filter((p) => p.email !== me)
+  const whoChips =
+    profiles.length > 1 && me ? (
+      <WhoFilter
+        value={who}
+        members={others.map((p) => ({
+          email: p.email,
+          name: p.display_name || p.email,
+          color: memberColor(p.email, memberEmails),
+        }))}
+        onChange={setWho}
+      />
+    ) : null
+
   const grid = (days: string[], compact: boolean) => (
     <TimeGrid
-      key={mode}
+      key={`${mode}${fit ? ':fit' : ''}`}
+      fit={fit}
       days={days}
       byDay={byDay}
       today={today}
@@ -552,6 +654,7 @@ export default function Calendar() {
           </View>
 
           {mode === 'day' ? weekStrip : null}
+          {mode === 'day' ? whoChips : null}
 
           <SwipePager ref={pager} pageKey={pageKey} onShift={shift}>
             {mode === 'month' ? (
@@ -581,6 +684,22 @@ export default function Calendar() {
           stays pinned to the bottom and the content ends AT it, never under it. */}
       <NewItemButton label={t('calendar.addBtn')} onPress={() => openNew()} colors={APP_GRADIENT.calendar} />
 
+      {details ? (
+        <EventDetails
+          event={details}
+          profiles={profiles}
+          memberEmails={memberEmails}
+          locale={locale}
+          canEdit={!!externalKind(details)}
+          onClose={() => setDetails(null)}
+          onEdit={() => {
+            const ev = details
+            setDetails(null)
+            // Let the details sheet slide out before the editor slides in.
+            setTimeout(() => startEdit(ev), 350)
+          }}
+        />
+      ) : null}
       {showForm && (
         <EventForm
           draft={draft}
@@ -594,8 +713,10 @@ export default function Calendar() {
             setSelected(savedStart)
             closeForm()
             load()
+            pushToGoogle()
           }}
           onDelete={remove}
+          external={editing ? externalKind(editing) : null}
         />
       )}
     </SafeAreaView>

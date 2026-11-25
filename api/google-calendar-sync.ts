@@ -59,6 +59,30 @@ type Mapped = {
   end_time: string | null
   location: string | null
   notes: string | null
+  attendees: { name: string; status: string; organizer?: true }[] | null
+  organizer: string | null
+  meeting_url: string | null
+}
+
+/** Names only — the household reads these rows (migration 122). */
+function attendeesFrom(item: any): Mapped['attendees'] {
+  const list = Array.isArray(item.attendees) ? item.attendees : []
+  if (!list.length) return null
+  return list
+    .filter((a: any) => !a.resource)
+    .slice(0, 50)
+    .map((a: any) => ({
+      name: String(a.displayName || a.email || '?'),
+      status: String(a.responseStatus || 'needsAction'),
+      ...(a.organizer ? { organizer: true as const } : {}),
+    }))
+}
+
+function meetingUrlFrom(item: any): string | null {
+  if (typeof item.hangoutLink === 'string') return item.hangoutLink
+  const eps = item.conferenceData?.entryPoints
+  const video = Array.isArray(eps) ? eps.find((e: any) => e.entryPointType === 'video' && e.uri) : null
+  return video ? String(video.uri) : null
 }
 
 function mapFromGoogle(item: any): Mapped {
@@ -89,6 +113,9 @@ function mapFromGoogle(item: any): Mapped {
     end_time,
     location: item.location ?? null,
     notes: item.description ?? null,
+    attendees: attendeesFrom(item),
+    organizer: item.organizer ? String(item.organizer.displayName || item.organizer.email || '') || null : null,
+    meeting_url: meetingUrlFrom(item),
   }
 }
 
@@ -220,6 +247,19 @@ async function patchEvent(
   return (await r.json()).id
 }
 
+/** PATCH a Google-owned event the user edited in One Roof; returns Google's
+ *  updated item, or null when Google refuses (e.g. a meeting the user doesn't
+ *  organise → 403) or the event is gone. */
+async function patchPulled(access: string, calendarId: string, eventId: string, body: any): Promise<any | null> {
+  const r = await fetch(`${API}/calendars/${enc(calendarId)}/events/${enc(eventId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!r.ok) return null
+  return r.json()
+}
+
 async function deleteEvent(access: string, calendarId: string, eventId: string): Promise<void> {
   const r = await fetch(`${API}/calendars/${enc(calendarId)}/events/${enc(eventId)}`, {
     method: 'DELETE',
@@ -240,7 +280,10 @@ function pullChanged(cur: any, m: Mapped): boolean {
     t(cur.start_time) !== m.start_time ||
     t(cur.end_time) !== m.end_time ||
     (cur.location ?? null) !== m.location ||
-    (cur.notes ?? null) !== m.notes
+    (cur.notes ?? null) !== m.notes ||
+    JSON.stringify(cur.attendees ?? null) !== JSON.stringify(m.attendees) ||
+    (cur.organizer ?? null) !== m.organizer ||
+    (cur.meeting_url ?? null) !== m.meeting_url
   )
 }
 
@@ -308,6 +351,34 @@ async function syncConnection(db: any, conn: Conn, clientId: string, clientSecre
     deleted++
   }
 
+  // Google events this user EDITED in One Roof (the app bumps updated_at on
+  // save; sync writes only touch synced_at). A 2 s margin skips rows whose
+  // insert-default updated_at landed a few ms after synced_at. Google's reply
+  // replaces the pre-push copy in rawItems so the PULL below doesn't revert it.
+  const { data: editedPulled } = await db
+    .from('calendar_events')
+    .select('id, title, start_date, end_date, all_day, start_time, end_time, location, notes, google_event_id, google_calendar_id, synced_at, updated_at')
+    .eq('household_id', conn.household_id)
+    .eq('source', 'google')
+    .eq('owner_email', conn.user_email)
+    .not('google_event_id', 'is', null)
+  let pushedEdits = 0
+  let refusedEdits = 0
+  for (const ev of editedPulled ?? []) {
+    if (!ev.updated_at || (ev.synced_at && Date.parse(ev.updated_at) <= Date.parse(ev.synced_at) + 2000)) continue
+    const body = mapToGoogle({ ...ev, recurrence: 'none' }, tz)
+    const item = await patchPulled(access, ev.google_calendar_id || conn.calendar_id, ev.google_event_id, body)
+    if (item) {
+      const i = rawItems.findIndex((it) => it.id === item.id)
+      if (i >= 0) rawItems[i] = item
+      pushedEdits++
+    } else {
+      // Refused: mark synced so the PULL restores Google's version.
+      refusedEdits++
+    }
+    await db.from('calendar_events').update({ synced_at: new Date().toISOString() }).eq('id', ev.id)
+  }
+
   // ---- PULL: Google → One Roof -------------------------------------------
   // Skip our own pushed events (and their recurring instances) to avoid echo.
   const { data: ownPushed } = await db
@@ -334,7 +405,7 @@ async function syncConnection(db: any, conn: Conn, clientId: string, clientSecre
 
   const { data: existing } = await db
     .from('calendar_events')
-    .select('id, google_event_id, title, start_date, end_date, all_day, start_time, end_time, location, notes')
+    .select('id, google_event_id, title, start_date, end_date, all_day, start_time, end_time, location, notes, attendees, organizer, meeting_url')
     .eq('household_id', conn.household_id)
     .eq('source', 'google')
     .eq('owner_email', conn.user_email)
@@ -350,11 +421,22 @@ async function syncConnection(db: any, conn: Conn, clientId: string, clientSecre
       source: 'google',
       google_calendar_id: conn.calendar_id,
       synced_at: now,
+      // Same instant as synced_at, so an imported row never looks "edited in
+      // One Roof" to the push above (the column default would land later).
+      updated_at: now,
     }
     if (!cur) inserts.push({ household_id: conn.household_id, ...row })
-    else if (pullChanged(cur, m)) await db.from('calendar_events').update(row).eq('id', cur.id)
+    else if (pullChanged(cur, m)) {
+      const { error } = await db.from('calendar_events').update(row).eq('id', cur.id)
+      if (error) throw new Error(`update: ${error.message}`)
+    }
   }
-  if (inserts.length) await db.from('calendar_events').insert(inserts)
+  // supabase-js never throws — a rejected insert used to vanish, leaving the
+  // connection "synced" with nothing imported. Surface it via last_error.
+  if (inserts.length) {
+    const { error } = await db.from('calendar_events').insert(inserts)
+    if (error) throw new Error(`insert: ${error.message}`)
+  }
 
   const stale = (existing ?? [])
     .filter(
@@ -368,7 +450,15 @@ async function syncConnection(db: any, conn: Conn, clientId: string, clientSecre
     .update({ last_synced_at: now, last_error: null, time_zone: tz })
     .eq('user_email', conn.user_email)
 
-  return { pushed, deleted, pulled: mapped.length, inserted: inserts.length, pruned: stale.length }
+  return {
+    pushed,
+    pushedEdits,
+    refusedEdits,
+    deleted,
+    pulled: mapped.length,
+    inserted: inserts.length,
+    pruned: stale.length,
+  }
 }
 
 export default async function handler(req: any, res: any) {
@@ -428,6 +518,11 @@ export default async function handler(req: any, res: any) {
   for (const conn of connections) {
     try {
       if (!(await householdIsPlus(conn.household_id))) {
+        // Record it, or the app shows a healthy connection that never syncs.
+        await db
+          .from('google_calendar_connections')
+          .update({ last_error: 'NOT_PLUS' })
+          .eq('user_email', conn.user_email)
         results.push({ user: conn.user_email, skipped: 'not_plus' })
         continue
       }
@@ -440,5 +535,8 @@ export default async function handler(req: any, res: any) {
       results.push({ user: conn.user_email, error: String(e?.message ?? e).slice(0, 200) })
     }
   }
+  // Counts only (no emails) so a "nothing showed up" report can be read from
+  // the Vercel runtime logs.
+  console.log('gcal-sync', JSON.stringify(results.map((r) => ({ ...r, user: undefined }))))
   return res.status(200).json({ ok: true, synced: results.length, results })
 }

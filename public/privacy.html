@@ -22,7 +22,7 @@
   </head>
   <body>
     <h1>One Roof — Privacy Policy</h1>
-    <p class="muted">Last updated: 17 November 2026</p>
+    <p class="muted">Last updated: 24 November 2026</p>
 
     <p>
       One Roof ("the app", "we") is a private family organizer — a shared space for your
@@ -64,11 +64,42 @@
       train their models. Scanning is optional — you can always add entries by hand.
     </p>
 
+    <h2>Google Calendar (optional)</h2>
+    <p>
+      If you choose <strong>Connect Google Calendar</strong> in the Calendar settings, you sign in with
+      Google and grant One Roof the <code>calendar.events</code> permission ("View and edit events on all
+      your calendars"). We use it only to keep your One Roof family calendar and your Google Calendar in
+      two-way sync:
+    </p>
+    <ul>
+      <li><strong>Read</strong> — events on the Google calendar you connect (from 30 days ago to 180 days
+        ahead) are copied into your household's One Roof calendar, shown in your color, so your family
+        sees them.</li>
+      <li><strong>Write</strong> — events you create in One Roof are added to that Google calendar, and kept
+        up to date (edits and deletions) there.</li>
+    </ul>
+    <p>
+      We store the Google OAuth tokens needed for this sync on our server; they are never readable by the
+      app or by other users. We do not read your Gmail, contacts or any other Google data, and we do not
+      use Google Calendar data for advertising, AI or model training, or any purpose other than this sync.
+      It is never sold or shared with third parties.
+    </p>
+    <p>
+      You can disconnect at any time in the app (Calendar → the Google button at the top → Disconnect). Disconnecting
+      deletes the stored tokens and the events imported from Google; deleting your account does the same.
+      You can also revoke access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+    </p>
+    <p>
+      One Roof's use and transfer of information received from Google APIs adheres to the
+      <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User
+      Data Policy</a>, including the Limited Use requirements.
+    </p>
+
     <h2>Who we share data with</h2>
     <ul>
       <li><strong>Your household</strong> — content you add is shared with the members of your household.</li>
       <li><strong>Service providers</strong> that operate the app on our behalf: Supabase (database &amp;
-        file storage), Anthropic (AI extraction, as above), Apple &amp; Google (sign-in), Expo
+        file storage), Anthropic (AI extraction, as above), Apple &amp; Google (sign-in, and Google Calendar sync if you connect it), Expo
         (push-notification delivery), and Vercel (hosting). We share only what's needed to provide
         the service.</li>
     </ul>

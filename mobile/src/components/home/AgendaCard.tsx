@@ -16,6 +16,7 @@ import {
   Briefcase,
   Cake,
   CalendarDays,
+  Check,
   Dumbbell,
   GraduationCap,
   Heart,
@@ -66,7 +67,19 @@ export type AgendaFace =
   | { type: 'member'; name: string; avatarPath: string | null; color: string }
 
 /** A pet's round photo (signed URL, cached), falling back to its emoji. */
-function PetAvatar({ photoPath, emoji, color }: { photoPath: string | null; emoji: string; color: string | null }) {
+export function PetAvatar({
+  photoPath,
+  emoji,
+  color,
+  size = AVATAR,
+  ring = true,
+}: {
+  photoPath: string | null
+  emoji: string
+  color: string | null
+  size?: number
+  ring?: boolean
+}) {
   // Keyed by path so a changed / removed photo never shows the old one.
   const [signed, setSigned] = useState<{ path: string; url: string | null } | null>(null)
   const url = photoPath && signed?.path === photoPath ? signed.url : null
@@ -83,10 +96,10 @@ function PetAvatar({ photoPath, emoji, color }: { photoPath: string | null; emoj
   return (
     <View
       style={{
-        width: AVATAR,
-        height: AVATAR,
-        borderRadius: AVATAR / 2,
-        borderWidth: 2,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: ring ? 2 : 0,
         borderColor: RING,
         backgroundColor: color ?? 'rgba(255,255,255,0.25)',
         alignItems: 'center',
@@ -95,9 +108,9 @@ function PetAvatar({ photoPath, emoji, color }: { photoPath: string | null; emoj
       }}
     >
       {url ? (
-        <Image source={{ uri: url }} style={{ width: AVATAR, height: AVATAR }} contentFit="cover" transition={160} />
+        <Image source={{ uri: url }} style={{ width: size, height: size }} contentFit="cover" transition={160} />
       ) : (
-        <Txt style={{ fontSize: 20, lineHeight: 24 }}>{emoji}</Txt>
+        <Txt style={{ fontSize: size / 2, lineHeight: size * 0.6 }}>{emoji}</Txt>
       )}
     </View>
   )
@@ -112,6 +125,7 @@ export function AgendaCard({
   sub,
   face,
   index,
+  ended,
   onPress,
 }: {
   colors: Gradient
@@ -123,6 +137,10 @@ export function AgendaCard({
   face: AgendaFace | null
   /** Position in the row — staggers the entrance. */
   index: number
+  /** Set when it's already over (2026-11-25, owner): the card fades back and
+   *  its time becomes a "✓ Ended" tag — sorted last, it otherwise read as
+   *  still to come. The text is the tag. */
+  ended?: string
   onPress: () => void
 }) {
   const reduce = useReducedMotion()
@@ -164,8 +182,8 @@ export function AgendaCard({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={[label, time, title, sub].filter(Boolean).join(', ')}
-        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+        accessibilityLabel={[label, ended ?? time, title, sub].filter(Boolean).join(', ')}
+        style={({ pressed }) => ({ opacity: (ended ? 0.45 : 1) * (pressed ? 0.85 : 1) })}
       >
         <GradientBox
           colors={colors}
@@ -200,16 +218,33 @@ export function AgendaCard({
             >
               {label}
             </Txt>
-            <Txt
-              style={{
-                color: 'rgba(255,255,255,0.95)',
-                fontSize: 12.5,
-                fontFamily: fonts.semibold,
-                fontVariant: ['tabular-nums'],
-              }}
-            >
-              {time}
-            </Txt>
+            {ended ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  height: 22,
+                  borderRadius: 11,
+                  backgroundColor: 'rgba(0,0,0,0.22)',
+                }}
+              >
+                <Check size={12} color="#fff" strokeWidth={3} />
+                <Txt style={{ color: '#fff', fontSize: 12, fontFamily: fonts.semibold }}>{ended}</Txt>
+              </View>
+            ) : (
+              <Txt
+                style={{
+                  color: 'rgba(255,255,255,0.95)',
+                  fontSize: 12.5,
+                  fontFamily: fonts.semibold,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {time}
+              </Txt>
+            )}
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>

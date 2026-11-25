@@ -8,6 +8,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent } from 'react-native'
 
+import { Check } from 'lucide-react-native'
+
 import { Txt } from '@/components/ui'
 import { useI18n } from '@/hooks/useI18n'
 import { eventColor, formatTime, KIND_EMOJI, type Occurrence } from '@/lib/calendar'
@@ -17,7 +19,25 @@ import { allDayRows, layoutColumns, timedBlocks } from './calendarLayout'
 
 const ALLDAY_ROW = 24
 const ALLDAY_MAX_ROWS = 3
-const TOP_PAD = 10 // room for the 00:00 label above the first line
+const TOP_PAD = 10
+/** One line of title + padding. */
+const BLOCK_MIN_PX = 24 // room for the 00:00 label above the first line
+
+const hm = (t: string | null) => {
+  if (!t) return 0
+  const [h, m] = t.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+/** "✓ Ended" — the note on a block that's already over. */
+function EndedTag({ label, color }: { label: string; color: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+      <Check size={11} color={color} strokeWidth={3} />
+      <Txt style={{ fontSize: 11.5, lineHeight: 15, fontFamily: fonts.semibold, color }}>{label}</Txt>
+    </View>
+  )
+}
 
 function nowMinutes() {
   const d = new Date()
@@ -47,6 +67,7 @@ export function TimeGrid({
   onSlotPress,
   onAllDayPress,
   onDayPress,
+  fit,
 }: {
   days: string[]
   byDay: Map<string, Occurrence[]>
@@ -62,6 +83,9 @@ export function TimeGrid({
   onAllDayPress: (day: string) => void
   /** Week only: tap a day header → open that day */
   onDayPress?: (day: string) => void
+  /** Day only (Home's "family's day"): shrink the hours so the span holding
+   *  the timed events fits the screen, and open scrolled to its start. */
+  fit?: boolean
 }) {
   const { c, dark } = useTheme()
   const { t, lang } = useI18n()
@@ -69,7 +93,7 @@ export function TimeGrid({
   const gutter = compact ? 40 : 52
   const multi = days.length > 1
   const showNow = days.includes(today)
-  const H = hourHeight
+  const [viewH, setViewH] = useState(0)
 
   // --- all-day bars across the visible days ---
   const allDay = useMemo(() => {
@@ -85,13 +109,35 @@ export function TimeGrid({
   const stripRows = overflow ? ALLDAY_MAX_ROWS : rowCount
 
   // --- timed blocks per day ---
-  const columns = useMemo(() => days.map((d) => layoutColumns(timedBlocks(byDay.get(d) ?? [], d))), [days, byDay])
+  const baseBlocks = useMemo(() => days.map((d) => timedBlocks(byDay.get(d) ?? [], d)), [days, byDay])
+
+  // --- fit: the whole hours from the first event's start to the last's end ---
+  const fitSpan = useMemo(() => {
+    if (!fit) return null
+    const all = baseBlocks.flat()
+    if (!all.length) return null
+    const from = Math.floor(Math.min(...all.map((b) => b.start)) / 60) * 60
+    const to = Math.ceil(Math.max(...all.map((b) => b.end)) / 60) * 60
+    return { from, to: Math.max(to, from + 60) }
+  }, [fit, baseBlocks])
+  const H =
+    fitSpan && viewH
+      ? Math.max(26, Math.min(hourHeight, (viewH - TOP_PAD * 2) / ((fitSpan.to - fitSpan.from) / 60)))
+      : hourHeight
+  // The shortest a block is drawn: enough for one line of title (BLOCK_MIN_PX),
+  // so a 30-min meeting on a squeezed grid isn't cut in half.
+  const minMin = Math.max(30, Math.ceil((BLOCK_MIN_PX / H) * 60))
+  const columns = useMemo(
+    () => days.map((d) => layoutColumns(timedBlocks(byDay.get(d) ?? [], d, minMin))),
+    [days, byDay, minMin],
+  )
 
   // --- first scroll: an hour and a half before now on today, else just before
   //     the first event of the period, else 7:00 ---
   const scrollRef = useRef<ScrollView>(null)
   const scrolled = useRef(false)
   const initialY = (() => {
+    if (fitSpan) return Math.max(0, (fitSpan.from / 60) * H)
     let min: number
     if (days.includes(today)) min = now - 90
     else {
@@ -100,6 +146,17 @@ export function TimeGrid({
     }
     return Math.max(0, (Math.min(min, 16 * 60) / 60) * H)
   })()
+
+  // Fit mode: scroll once the viewport is measured (H may not change the
+  // content size, so onContentSizeChange can't be relied on for it).
+  // Re-runs while the layout settles (the first measure can be taller than the
+  // final one), until the person scrolls by hand.
+  const dragged = useRef(false)
+  useEffect(() => {
+    if (!fitSpan || !viewH || dragged.current) return
+    scrolled.current = true
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: initialY, animated: false }))
+  }, [fitSpan, viewH, initialY])
 
   const hourLabel = (h: number) => {
     if (lang === 'en') {
@@ -218,8 +275,15 @@ export function TimeGrid({
         ref={scrollRef}
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
+        onLayout={(e) => {
+          if (fit) setViewH(e.nativeEvent.layout.height)
+        }}
+        onScrollBeginDrag={() => {
+          dragged.current = true
+        }}
         onContentSizeChange={() => {
           if (scrolled.current) return
+          if (fitSpan && !viewH) return
           scrolled.current = true
           scrollRef.current?.scrollTo({ y: initialY, animated: false })
         }}
@@ -258,12 +322,18 @@ export function TimeGrid({
                       const ev = b.occ.event
                       const color = eventColor(ev, memberEmails)
                       const top = (b.start / 60) * H
-                      const height = Math.max(18, ((b.end - b.start) / 60) * H - 2)
-                      const showTime = !compact && height >= 34
+                      const height = Math.max(BLOCK_MIN_PX - 2, ((b.end - b.start) / 60) * H - 2)
+                      const oneLine = !compact && height < 38
+                      const showTime = !compact && height >= 38
                       const showPlace = !compact && height >= 54 && !!ev.location
                       const timeText = ev.start_time
                         ? `${formatTime(ev.start_time, locale)}${ev.end_time ? ` – ${formatTime(ev.end_time, locale)}` : ''}`
                         : ''
+                      // Day view: what's already over fades back with a
+                      // "✓ Ended" note (owner, 2026-11-25 — same as the Home
+                      // cards). The REAL end, not the drawn (min-height) one.
+                      const realEnd = b.occ.end > d ? 1440 : hm(ev.end_time ?? ev.start_time)
+                      const over = !multi && (d < today || (d === today && realEnd <= now))
                       return (
                         <View
                           key={`${ev.id}:${b.occ.start}`}
@@ -281,18 +351,36 @@ export function TimeGrid({
                             onPress={() => onEventPress(ev)}
                             accessibilityRole="button"
                             accessibilityLabel={`${ev.title}${timeText ? `, ${timeText}` : ''}`}
-                            style={({ pressed }) => ({ flex: 1, borderRadius: compact ? 5 : 8, overflow: 'hidden', backgroundColor: c.sheet, opacity: pressed ? 0.7 : 1 })}
+                            style={({ pressed }) => ({ flex: 1, borderRadius: compact ? 5 : 8, overflow: 'hidden', backgroundColor: c.sheet, opacity: (over ? 0.45 : 1) * (pressed ? 0.7 : 1) })}
                           >
                             <View style={{ flex: 1, flexDirection: 'row', backgroundColor: blockFill(color) }}>
                               <View style={{ width: compact ? 2 : 3, backgroundColor: color }} />
-                              <View style={{ flex: 1, minWidth: 0, paddingHorizontal: compact ? 2 : 6, paddingVertical: compact ? 2 : 4 }}>
+                              <View
+                                style={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  paddingHorizontal: compact ? 2 : 6,
+                                  paddingVertical: compact ? 2 : oneLine ? 2 : 4,
+                                  justifyContent: oneLine ? 'center' : 'flex-start',
+                                }}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <Txt
-                                  numberOfLines={compact ? Math.max(1, Math.floor((height - 4) / 13)) : height < 34 ? 1 : 2}
-                                  style={{ fontSize: compact ? 10 : 13, lineHeight: compact ? 12.5 : 16, fontFamily: fonts.semibold, color: c.text }}
+                                  numberOfLines={compact ? Math.max(1, Math.floor((height - 4) / 13)) : oneLine ? 1 : 2}
+                                  style={{ flexShrink: 1, fontSize: compact ? 10 : oneLine ? 12.5 : 13, lineHeight: compact ? 12.5 : oneLine ? 15 : 16, fontFamily: fonts.semibold, color: c.text }}
                                 >
                                   {title(ev)}
                                 </Txt>
-                                {showTime ? (
+                                {over && oneLine ? <EndedTag label={t('home.ended')} color={c.textMuted} /> : null}
+                                </View>
+                                {over && showTime ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <EndedTag label={t('home.ended')} color={c.textMuted} />
+                                    <Txt numberOfLines={1} style={{ flexShrink: 1, fontSize: 11.5, lineHeight: 15, color: c.textMuted }}>
+                                      · {timeText}
+                                    </Txt>
+                                  </View>
+                                ) : showTime ? (
                                   <Txt numberOfLines={1} style={{ fontSize: 11.5, lineHeight: 15, color: c.textMuted }}>
                                     {timeText}
                                   </Txt>

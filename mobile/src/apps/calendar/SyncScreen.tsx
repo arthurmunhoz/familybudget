@@ -32,6 +32,7 @@ export function SyncScreen({
   busy,
   onDisconnect,
   disconnectLabel,
+  busyNote,
 }: {
   logo: ReactNode
   title: string
@@ -45,6 +46,8 @@ export function SyncScreen({
   /** Present when connected. */
   onDisconnect?: () => void
   disconnectLabel?: string
+  /** Shown under the button while busy — a first import takes a few seconds. */
+  busyNote?: string
 }) {
   const { c } = useTheme()
   const { t } = useI18n()
@@ -100,6 +103,11 @@ export function SyncScreen({
             <View style={{ gap: sp.sm }}>
               {action && onAction ? (
                 <TintButton tint={red[0]} title={busy ? t('calendar.syncing') : action} onPress={onAction} disabled={busy} />
+              ) : null}
+              {busy && busyNote ? (
+                <Txt variant="muted" style={{ fontSize: 13.5, textAlign: 'center' }}>
+                  {busyNote}
+                </Txt>
               ) : null}
               {onDisconnect ? (
                 <Pressable onPress={onDisconnect} disabled={busy} style={{ paddingVertical: sp.md, alignItems: 'center' }}>

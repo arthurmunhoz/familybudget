@@ -40,7 +40,10 @@ export const toMinutes = (hhmm: string | null | undefined): number | null => {
   return h * 60 + (Number.isNaN(m) ? 0 : m)
 }
 
-export function timedBlocks(occs: Occurrence[], day: string): TimedBlock[] {
+/** `minMin`: the shortest a block may be drawn, in minutes — the grid raises
+ *  it when hours are short so a one-line title always fits (and blocks that
+ *  would then touch sit side by side instead of covering each other). */
+export function timedBlocks(occs: Occurrence[], day: string, minMin: number = MIN_BLOCK_MIN): TimedBlock[] {
   const out: TimedBlock[] = []
   for (const occ of occs) {
     const ev = occ.event
@@ -59,8 +62,8 @@ export function timedBlocks(occs: Occurrence[], day: string): TimedBlock[] {
     } else {
       end = 1440
     }
-    start = Math.max(0, Math.min(start, 1440 - MIN_BLOCK_MIN))
-    end = Math.min(1440, Math.max(end, start + MIN_BLOCK_MIN))
+    start = Math.max(0, Math.min(start, 1440 - minMin))
+    end = Math.min(1440, Math.max(end, start + minMin))
     out.push({ occ, start, end })
   }
   return out

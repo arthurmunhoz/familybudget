@@ -133,6 +133,7 @@ export default function GoogleCalendarScreen() {
       action={conn ? t('calendar.syncNow') : t('calendar.connectGoogle')}
       onAction={conn ? sync : connect}
       busy={busy}
+      busyNote={t('calendar.importing')}
       onDisconnect={conn ? disconnect : undefined}
       disconnectLabel={t('calendar.disconnect')}
     />

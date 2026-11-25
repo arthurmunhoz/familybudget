@@ -142,6 +142,7 @@ export default function AppleCalendarScreen() {
       action={conn ? t('calendar.syncNow') : t('calendar.connectApple')}
       onAction={conn ? sync : connect}
       busy={busy}
+      busyNote={t('calendar.importing')}
       onDisconnect={conn ? disconnect : undefined}
       disconnectLabel={t('calendar.disconnect')}
     />

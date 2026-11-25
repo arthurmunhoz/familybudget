@@ -391,6 +391,40 @@ function eventToDeviceDetails(ev: CalendarEvent): EventDetails {
   return details
 }
 
+// ── Editing a pulled (source='apple') event ──────────────────────────────────
+// The row mirrors a device event: apple_event_id = "<EventKit id>#<instance
+// start ISO>". Edits and deletes go to the device FIRST (only that occurrence,
+// never the rest of a series), so the next pull doesn't revert them.
+function splitAppleId(ev: CalendarEvent): { id: string; instanceStartDate: Date } | null {
+  const raw = ev.apple_event_id
+  if (!raw) return null
+  const cut = raw.lastIndexOf('#')
+  if (cut <= 0) return null
+  const instanceStartDate = new Date(raw.slice(cut + 1))
+  if (isNaN(instanceStartDate.getTime())) return null
+  return { id: raw.slice(0, cut), instanceStartDate }
+}
+
+/** Apply an edit to the device event; returns the row's new apple_event_id
+ *  (the occurrence is keyed by its start, which may have moved). Throws when
+ *  the device refuses (read-only calendar, event gone, no permission). */
+export async function updateAppleEvent(ev: CalendarEvent, next: CalendarEvent): Promise<string> {
+  const ref = splitAppleId(ev)
+  if (!ref) throw new Error('not an Apple event')
+  const details = eventToDeviceDetails({ ...next, recurrence: 'none', reminder_minutes: null })
+  // Never touch the series' rule or alarms from here.
+  delete details.recurrenceRule
+  delete details.alarms
+  await Calendar.updateEventAsync(ref.id, details, { instanceStartDate: ref.instanceStartDate, futureEvents: false })
+  return `${ref.id}#${new Date(details.startDate as Date).toISOString()}`
+}
+
+export async function deleteAppleEvent(ev: CalendarEvent): Promise<void> {
+  const ref = splitAppleId(ev)
+  if (!ref) throw new Error('not an Apple event')
+  await Calendar.deleteEventAsync(ref.id, { instanceStartDate: ref.instanceStartDate, futureEvents: false })
+}
+
 // ── Status / disconnect ──────────────────────────────────────────────────────
 export async function getAppleConnection(): Promise<AppleConnection | null> {
   if (!isAppleCalendarAvailable) return null

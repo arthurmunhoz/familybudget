@@ -2,8 +2,12 @@
 // sheet: title, type/kind, all-day toggle, start/end date, start/end time when
 // timed, owner (member or whole household), recurrence, reminder toggle,
 // location, notes. Inserts/updates calendar_events (household_id/created_by are
-// stamped by column defaults under RLS). Google-sourced rows are read-only and
-// never reach this form.
+// stamped by column defaults under RLS).
+//
+// External rows (2026-11): MY events pulled from Google / Apple open here too
+// (`external`), without Type / Repeats / Who — those belong to the source. A
+// Google edit is pushed by the next sync (updated_at bump); an Apple edit is
+// written to the device first (EventKit, this occurrence only).
 //
 // 2026-11 redesign (components/form): grouped rows instead of labelled boxes
 // and chip walls. Type, Who and Repeats are SelectRows (value in the row, list
@@ -17,6 +21,13 @@ import { useState } from 'react'
 import { Alert, Keyboard, Modal, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { Bell, CalendarCheck, CalendarDays, MapPin, Repeat, StickyNote, Sun, Users, X, type LucideIcon } from 'lucide-react-native'
 
+import {
+  ALL_DAY_REMINDER_OPTIONS,
+  DEFAULT_ALL_DAY_REMINDER,
+  DEFAULT_TIMED_REMINDER,
+  TIMED_REMINDER_OPTIONS,
+} from '@/lib/eventReminderPlan'
+import { ensureReminderPermission } from '@/lib/petReminders'
 import { FormSection, RowIcon, SelectRow, ToggleRow } from '@/components/form'
 import { GradientBox } from '@/components/home/GradientBox'
 import { APP_GRADIENT } from '@/components/home/palette'
@@ -29,6 +40,7 @@ import type { TKey } from '@/lib/i18n'
 import { HOUSEHOLD_COLOR, KIND_EMOJI, memberColor } from '@/lib/calendar'
 import { fieldsUsed, track } from '@/lib/analytics'
 import { supabase } from '@/lib/supabase'
+import { updateAppleEvent } from '@/lib/appleCalendar'
 import type { CalendarEvent, EventKind, EventRecurrence, Profile } from '@/lib/types'
 import { useBottomGap } from '@/hooks/useBottomGap'
 import { useSheetLift } from '@/hooks/useSheetLift'
@@ -51,9 +63,38 @@ export interface EventDraft {
   owner: string | null
   kind: EventKind
   repeat: EventRecurrence
-  remind: boolean
+  /** minutes before the start to remind; null = no reminder */
+  remindMin: number | null
   location: string
   notes: string
+}
+
+/** The "Remind me" choices: minutes before for a timed event; for an all-day
+ *  one, 9:00 on the day / days before (eventReminderPlan). A value set some
+ *  other way (the assistant's "45 min before") stays listed. */
+function reminderLabel(min: number, allDay: boolean, t: (k: TKey, v?: Record<string, string | number>) => string): string {
+  if (allDay) {
+    if (min <= 0) return t('calendar.remindDayOf')
+    if (min === 10080) return t('calendar.remindWeekBefore9')
+    const d = Math.round(min / 1440)
+    return d === 1 ? t('calendar.remindDayBefore9') : t('calendar.remindDaysBefore9', { n: d })
+  }
+  if (min <= 0) return t('calendar.remindAtStart')
+  if (min < 60) return t('calendar.remindMin', { n: min })
+  if (min === 60) return t('calendar.remindHour')
+  if (min < 1440) return t('calendar.remindHours', { n: Math.round(min / 60) })
+  return min === 1440 ? t('calendar.remindDay') : t('calendar.remindDaysBefore9', { n: Math.round(min / 1440) })
+}
+
+function reminderOptions(
+  allDay: boolean,
+  current: number | null,
+  t: (k: TKey, v?: Record<string, string | number>) => string,
+): { value: string; label: string }[] {
+  const list: number[] = [...(allDay ? ALL_DAY_REMINDER_OPTIONS : TIMED_REMINDER_OPTIONS)]
+  if (current != null && !list.includes(current)) list.push(current)
+  list.sort((a, b) => a - b)
+  return [{ value: 'off', label: t('calendar.remindOff') }, ...list.map((m) => ({ value: String(m), label: reminderLabel(m, allDay, t) }))]
 }
 
 const isoToDate = (iso: string): Date | undefined => {
@@ -134,6 +175,7 @@ export default function EventForm({
   onClose,
   onSaved,
   onDelete,
+  external = null,
 }: {
   draft: EventDraft
   setDraft: (d: EventDraft) => void
@@ -144,6 +186,8 @@ export default function EventForm({
   onClose: () => void
   onSaved: (savedStart: string) => void
   onDelete: (ev: CalendarEvent) => void
+  /** Editing one of MY Google/Apple-pulled events (see header). */
+  external?: 'google' | 'apple' | null
 }) {
   const { c, dark } = useTheme()
   const bottomGap = useBottomGap(sp.xs)
@@ -158,21 +202,31 @@ export default function EventForm({
     if (!canSave) return
     setSaving(true)
     const end = draft.end < draft.start ? draft.start : draft.end
-    const fields = {
+    const base = {
       title: draft.title.trim(),
       start_date: draft.start,
       end_date: end,
       all_day: draft.allDay,
       start_time: draft.allDay ? null : `${draft.startTime}:00`,
       end_time: draft.allDay ? null : `${draft.endTime}:00`,
-      owner_email: draft.owner,
-      kind: draft.kind,
-      recurrence: draft.repeat,
-      reminder_minutes: draft.remind ? 0 : null,
+      reminder_minutes: draft.remindMin,
       location: draft.location.trim() || null,
       notes: draft.notes.trim() || null,
-      // Bump on every edit so a future Google sync push knows this row changed.
+      // Bump on every edit so the Google sync push knows this row changed.
       updated_at: new Date().toISOString(),
+    }
+    // Owner / kind / repeat stay the source's for an external event.
+    const fields: Record<string, unknown> = external
+      ? { ...base }
+      : { ...base, owner_email: draft.owner, kind: draft.kind, recurrence: draft.repeat }
+    if (external === 'apple' && editing) {
+      try {
+        fields.apple_event_id = await updateAppleEvent(editing, { ...editing, ...base })
+      } catch {
+        setSaving(false)
+        Alert.alert(t('calendar.externalSaveFailed'))
+        return
+      }
     }
     const { error } = editing
       ? await supabase.from('calendar_events').update(fields).eq('id', editing.id)
@@ -183,13 +237,14 @@ export default function EventForm({
       return
     }
     track(editing ? 'calendar.updated' : 'calendar.created', {
-      title: fields.title,
+      title: base.title,
+      ...(external ? { source: external } : {}),
       kind: draft.kind,
       allDay: draft.allDay,
       multiDay: end > draft.start,
       repeat: draft.repeat,
       forWhom: draft.owner ? 'member' : 'household',
-      ...fieldsUsed({ reminder: draft.remind, location: fields.location, notes: fields.notes }),
+      ...fieldsUsed({ reminder: draft.remindMin != null, location: base.location, notes: base.notes }),
     })
     onSaved(draft.start)
   }
@@ -268,7 +323,14 @@ export default function EventForm({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {external ? (
+              <Txt variant="muted" style={{ fontSize: 13.5, lineHeight: 19 }}>
+                {t(external === 'google' ? 'calendar.externalNoteGoogle' : 'calendar.externalNoteApple')}
+              </Txt>
+            ) : null}
+
             {/* kind: chips with their emoji */}
+            {external ? null : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: sp.sm }} keyboardShouldPersistTaps="handled">
               {KINDS.map((k) => {
                 const on = draft.kind === k
@@ -296,12 +358,27 @@ export default function EventForm({
                 )
               })}
             </ScrollView>
+            )}
 
             {/* when */}
             <View>
               <Txt style={[styles.label, { color: c.textMuted }]}>{t('calendar.whenLabel')}</Txt>
               <FormSection>
-                <ToggleRow icon={ri(Sun)} tint={tint} label={t('calendar.allDay')} value={draft.allDay} onValueChange={(v) => set({ allDay: v })} />
+                <ToggleRow
+                  icon={ri(Sun)}
+                  tint={tint}
+                  label={t('calendar.allDay')}
+                  value={draft.allDay}
+                  // A reminder carries over as the other kind's default ("10 min
+                  // before" means nothing for an all-day event).
+                  onValueChange={(v) =>
+                    set({
+                      allDay: v,
+                      remindMin:
+                        draft.remindMin == null ? null : v ? DEFAULT_ALL_DAY_REMINDER : DEFAULT_TIMED_REMINDER,
+                    })
+                  }
+                />
                 <DateTimeRow
                   tint={tint}
                   icon={ri(CalendarDays)}
@@ -323,6 +400,7 @@ export default function EventForm({
                   onDate={(v) => set({ end: v })}
                   onTime={(v) => set({ endTime: v })}
                 />
+                {external ? null : (
                 <SelectRow
                   icon={ri(Repeat)}
                   label={t('calendar.repeatLabel')}
@@ -332,15 +410,28 @@ export default function EventForm({
                     if (v) set({ repeat: v })
                   }}
                 />
-                <ToggleRow icon={ri(Bell)} tint={tint} label={t('calendar.remind')} value={draft.remind} onValueChange={(v) => set({ remind: v })} />
+                )}
+                <SelectRow
+                  icon={ri(Bell)}
+                  label={t('calendar.remind')}
+                  value={draft.remindMin == null ? 'off' : String(draft.remindMin)}
+                  options={reminderOptions(draft.allDay, draft.remindMin, t)}
+                  onChange={(v) => {
+                    if (!v) return
+                    set({ remindMin: v === 'off' ? null : Number(v) })
+                    if (v !== 'off') void ensureReminderPermission()
+                  }}
+                />
               </FormSection>
             </View>
 
             {/* who */}
-            <View>
-              <Txt style={[styles.label, { color: c.textMuted }]}>{t('calendar.ownerLabel')}</Txt>
-              <WhoPicker owner={draft.owner} profiles={profiles} memberEmails={memberEmails} onChange={(owner) => set({ owner })} />
-            </View>
+            {external ? null : (
+              <View>
+                <Txt style={[styles.label, { color: c.textMuted }]}>{t('calendar.ownerLabel')}</Txt>
+                <WhoPicker owner={draft.owner} profiles={profiles} memberEmails={memberEmails} onChange={(owner) => set({ owner })} />
+              </View>
+            )}
 
             <FormSection>
               <InputRow

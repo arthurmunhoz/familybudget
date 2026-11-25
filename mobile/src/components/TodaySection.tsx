@@ -23,6 +23,7 @@ import {
 import { Txt } from './ui'
 import { AGENDA_GRADIENT } from './home/palette'
 import { AgendaCard, CARD_H, CARD_W, type AgendaFace } from './home/AgendaCard'
+import { FamilyToday, type FamilyLane, type FamilyPetLine } from './home/FamilyToday'
 import { Skeleton } from './Skeleton'
 import { CityPickerSheet } from './CityPickerSheet'
 import { useCachedQuery, useRevalidateOnForeground } from '../hooks/useCachedQuery'
@@ -155,7 +156,11 @@ export default function TodaySection({
         members: (mp.data ?? []) as MemberLite[],
       }
     })
-  const { profiles } = useAuth()
+  const { profile, profiles } = useAuth()
+  const me = profile?.email ?? null
+  // The clock for "Now" / what's still ahead today — refreshed on focus, not
+  // read during render.
+  const [nowHM, setNowHM] = useState(() => new Date().toTimeString().slice(0, 5))
 
   // Keep it fresh when returning to the Hub (e.g. after adding an event or
   // setting the home city in Settings).
@@ -163,6 +168,7 @@ export default function TodaySection({
     useCallback(() => {
       void reloadWeather()
       void revalidate()
+      setNowHM(new Date().toTimeString().slice(0, 5))
     }, [reloadWeather, revalidate]),
   )
 
@@ -222,10 +228,123 @@ export default function TodaySection({
   // "Westchase, Florida, US" → "Westchase" for the compact city line.
   const cityShort = location?.city.split(',')[0].trim() ?? ''
   const totalItems = todaysOcc.length + petDue.length
-  // Cards: calendar first (in time order), then pet care, up to MAX_CARDS.
-  const shownOcc = todaysOcc.slice(0, MAX_CARDS)
-  const shownPet = petDue.slice(0, Math.max(0, MAX_CARDS - shownOcc.length))
-  const overflow = totalItems - (shownOcc.length + shownPet.length)
+
+  // 2026-11: with other people in the family, the cards are only MINE ("For
+  // you": my events + the whole household's); everyone else's — and the pets —
+  // fold into the "Family today" card, one row per person. Alone, it's the
+  // old single row of cards.
+  const solo = profiles.length <= 1 || !me
+  const isMine = (ev: CalendarEvent) => !ev.owner_email || ev.owner_email === me
+  // What's over by now drops behind what's still ahead.
+  const ended = (ev: CalendarEvent) => !ev.all_day && (ev.end_time ?? ev.start_time ?? '99').slice(0, 5) <= nowHM
+  const live = (ev: CalendarEvent) =>
+    !ev.all_day && !!ev.start_time && ev.start_time.slice(0, 5) <= nowHM && !ended(ev)
+  const aheadFirst = <T extends { event: CalendarEvent }>(list: T[]) => [
+    ...list.filter((o) => !ended(o.event)),
+    ...list.filter((o) => ended(o.event)),
+  ]
+  const mineOcc = aheadFirst(solo ? todaysOcc : todaysOcc.filter((o) => isMine(o.event)))
+  const mineCount = mineOcc.length + (solo ? petDue.length : 0)
+  const cardMax = solo ? MAX_CARDS : 4
+  // Cards: calendar first (time order, what's ahead first), then pet care.
+  const shownOcc = mineOcc.slice(0, cardMax)
+  const shownPet = solo ? petDue.slice(0, Math.max(0, cardMax - shownOcc.length)) : []
+  const overflow = mineCount - (shownOcc.length + shownPet.length)
+
+  // Everyone else's day as a summary (FamilyToday): one lane per person with
+  // their timed events, the span of the day that holds them, what's on now /
+  // next, and the pets' care due.
+  const family = useMemo(() => {
+    const empty = { lanes: [] as FamilyLane[], count: 0, span: null as { from: number; to: number } | null, nowLine: null as string | null, nextLine: null as string | null, pets: [] as FamilyPetLine[] }
+    if (solo) return empty
+    const theirs = todaysOcc.filter((o) => o.event.owner_email && o.event.owner_email !== me)
+    const toMin = (hm: string | null | undefined) => (hm ? Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5)) : null)
+    const nowM = toMin(nowHM) ?? 0
+    // a timed event's minutes on TODAY (multi-day spans clip to the day)
+    const minutes = (o: (typeof theirs)[number]) => {
+      const ev = o.event
+      if (ev.all_day) return null
+      const s0 = o.start === today ? (toMin(ev.start_time) ?? 0) : 0
+      let e0 = o.end === today ? toMin(ev.end_time) : 1440
+      if (e0 == null || e0 <= s0) e0 = Math.min(1440, s0 + 60)
+      return { start: s0, end: e0 }
+    }
+    const firstName = (email: string) => (profiles.find((x) => x.email === email)?.display_name || email).trim().split(/\s+/)[0]
+    const byOwner = new Map<string, typeof theirs>()
+    for (const o of theirs) byOwner.set(o.event.owner_email!, [...(byOwner.get(o.event.owner_email!) ?? []), o])
+    let from = 1440
+    let to = 0
+    const lanes: FamilyLane[] = [...byOwner.entries()].map(([email, occ]) => {
+      const blocks = occ.map(minutes).filter((x): x is { start: number; end: number } => !!x)
+      for (const b of blocks) {
+        from = Math.min(from, b.start)
+        to = Math.max(to, b.end)
+      }
+      const p = profiles.find((x) => x.email === email)
+      const color = memberColor(email, memberEmails)
+      return {
+        key: email,
+        face: { type: 'member' as const, name: p?.display_name || email, avatarPath: memberMeta[email]?.avatar_path ?? null, color },
+        color,
+        blocks,
+        allDay: occ.some((o) => o.event.all_day),
+      }
+    })
+    // lanes in order of each person's first event
+    lanes.sort((a, b) => (a.blocks[0]?.start ?? 9999) - (b.blocks[0]?.start ?? 9999))
+    let span: { from: number; to: number } | null = null
+    if (to > from) {
+      let f = Math.floor(from / 60) * 60
+      let tt = Math.ceil(to / 60) * 60
+      // at least 4 hours wide, so one short meeting isn't a full bar
+      while (tt - f < 240) {
+        if (f > 0) f -= 60
+        if (tt - f < 240 && tt < 1440) tt += 60
+        if (f === 0 && tt === 1440) break
+      }
+      span = { from: f, to: tt }
+    }
+    const fmt = (m: number) => formatTime(`${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`, locale)
+    const timed = theirs
+      .map((o) => ({ o, m: minutes(o) }))
+      .filter((x): x is { o: (typeof theirs)[number]; m: { start: number; end: number } } => !!x.m)
+      .sort((a, b) => a.m.start - b.m.start)
+    const nowOne = timed.find((x) => x.m.start <= nowM && x.m.end > nowM)
+    const nextOne = timed.find((x) => x.m.start > nowM)
+    const nowLine = nowOne
+      ? t('home.familyNowLine', { name: firstName(nowOne.o.event.owner_email!), title: nowOne.o.event.title, time: fmt(nowOne.m.end) })
+      : null
+    const nextLine = nextOne
+      ? t('home.familyNextLine', { name: firstName(nextOne.o.event.owner_email!), title: nextOne.o.event.title, time: fmt(nextOne.m.start) })
+      : timed.length
+        ? t('home.familyDone')
+        : null
+    const pets: FamilyPetLine[] = petDue
+      .map((e) => {
+        const overdue = (e.next_due ?? '') < today
+        const pet = petById[e.pet_id]
+        return {
+          key: e.id,
+          text: `${pet ? `${pet.name} · ` : ''}${e.title} · ${overdue ? t('home.overdue') : t('home.dueToday')}`,
+          alert: overdue,
+        }
+      })
+      .sort((a, b) => Number(b.alert) - Number(a.alert))
+      .slice(0, 3)
+    return { lanes, count: theirs.length, span, nowLine, nextLine, pets }
+  }, [solo, todaysOcc, petDue, profiles, me, nowHM, memberMeta, memberEmails, petById, locale, t, today])
+  const familySummary = [
+    family.count === 1 ? t('home.familyEventsOne') : family.count > 1 ? t('home.familyEvents', { n: family.count }) : null,
+    family.span
+      ? t('home.familySpan', {
+          from: formatTime(`${String(family.span.from / 60).padStart(2, '0')}:00`, locale),
+          to: formatTime(`${String((family.span.to / 60) % 24).padStart(2, '0')}:00`, locale),
+        })
+      : null,
+    !family.count && family.pets.length ? family.pets[0].text : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   // Home-screen "Today" widget: same agenda + weather, written to the App Group.
   const widgetItems: TodayWidgetItem[] = useMemo(() => {
@@ -373,9 +492,9 @@ export default function TodaySection({
       {below}
 
       {/* today's agenda as cards */}
-      {totalItems > 0 ? (
+      {mineCount > 0 ? (
         <>
-          <SectionLabel text={t('home.needsYou')} />
+          <SectionLabel text={solo ? t('home.needsYou') : t('home.forYou')} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -408,6 +527,7 @@ export default function TodaySection({
                     : (ev.location ?? '')
               const kindLabel = t(`home.kind.${cls.kind}` as TKey)
               const who = face ? face.name.trim().split(/\s+/)[0] : ''
+              const timeLabel = live(ev) ? `${t('home.now')} · ${time}` : time
               return (
                 <AgendaCard
                   key={`${ev.id}:${o.start}`}
@@ -415,10 +535,11 @@ export default function TodaySection({
                   colors={AGENDA_GRADIENT[cls.kind]}
                   icon={cls.icon}
                   label={who ? t('home.kindWho', { kind: kindLabel, name: who }) : kindLabel}
-                  time={time}
+                  time={timeLabel}
                   title={ev.title}
                   sub={sub}
                   face={face}
+                  ended={ended(ev) ? t('home.ended') : undefined}
                   onPress={() => router.push('/calendar')}
                 />
               )
@@ -460,6 +581,23 @@ export default function TodaySection({
             ) : null}
           </ScrollView>
         </>
+      ) : null}
+
+      {/* everyone else's day — one row per person / pet */}
+      {family.lanes.length || family.pets.length ? (
+        <View style={{ marginTop: mineCount > 0 ? sp.lg : sp.xl }}>
+          <FamilyToday
+            lanes={family.lanes}
+            summary={familySummary}
+            span={family.span}
+            nowMin={Number(nowHM.slice(0, 2)) * 60 + Number(nowHM.slice(3, 5))}
+            nowLine={family.nowLine}
+            nextLine={family.nextLine}
+            pets={family.pets}
+            onOpenDay={() => router.push({ pathname: '/calendar', params: { date: today, family: '1' } })}
+            onOpenPets={() => router.push('/pets')}
+          />
+        </View>
       ) : null}
 
       {pickingCity ? (

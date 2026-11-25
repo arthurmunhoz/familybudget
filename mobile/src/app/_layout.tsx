@@ -35,6 +35,7 @@ import { useGeofenceSync } from '@/hooks/useGeofenceSync';
 import { useLocationSync } from '@/hooks/useLocationSync';
 import { useSyncPushToken } from '@/hooks/useSyncPushToken';
 import { usePetReminders } from '@/hooks/usePetReminders';
+import { useEventReminders } from '@/hooks/useEventReminders';
 import { ThemePrefProvider, useThemePref } from '@/theme/theme-pref';
 import { SchemePrefProvider, useSchemePref } from '@/theme/scheme-pref';
 import { GLASS, GlassWash } from '@/theme/glass';
@@ -113,6 +114,7 @@ function Chrome() {
   useSyncPushToken();
   // Pet routine reminders: local notifications, re-synced on login/foreground.
   usePetReminders();
+  useEventReminders();
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <AnalyticsBridge />
