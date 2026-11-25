@@ -310,15 +310,17 @@ if (P.core === 'wide') {
       <img src="${img}" style="border-radius:${w * 0.14}px"></div>`
   }
   const words = TT[0].replace(/,? in one app\.|,? num app só\.|,? en una app\./, m => (m.startsWith(',') ? ',' : '') + '<br>' + m.replace(/^,?\s*/, ''))
-  const pc = 2330, wc = 430, ws = 350
-  html = `<div class="title" style="--fs:76px;left:1115px;top:680px;line-height:1.06">${words}</div>`
-    + `<div style="position:absolute;left:1115px;top:870px;display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.18);border:3px solid rgba(255,255,255,.4);border-radius:999px;padding:10px 26px 10px 10px;font:700 34px/1 'Nunito'">
+  // Owner, 2026-11-25: the group read off to the right on the phone crop —
+  // laid out loosely here, then measured and centred on the canvas (below).
+  const pc = 2330, wc = 590, ws = 470
+  html = `<div class="title" data-g="t" style="--fs:114px;left:1115px;top:600px;line-height:1.06">${words}</div>`
+    + `<div data-g="t" style="position:absolute;left:1115px;top:890px;transform:scale(1.38);transform-origin:0 0;display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.18);border:3px solid rgba(255,255,255,.4);border-radius:999px;padding:10px 26px 10px 10px;font:700 34px/1 'Nunito'">
         <span style="width:52px;height:52px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 5px rgba(255,255,255,.22);background:radial-gradient(circle at 32% 28%, #A890FF 0%, #8B6CFF 35%, #3FB7B0 78%, #20C3A6 100%)">
           <svg viewBox="0 0 24 24" style="width:30px;height:30px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round">${ICON.spark}</svg></span>
         ${TT[1]}</div>`
-    + dev('lists.png', ws, pc - 1.22 * ws, 560, -7, 4)
-    + dev('calendar.png', ws, pc + 0.22 * ws, 560, 7, 4)
-    + dev('hero.png', wc, pc - wc / 2, 480, 0, 6);
+    + dev('lists.png', ws, pc - 1.22 * ws, 250, -7, 4)
+    + dev('calendar.png', ws, pc + 0.22 * ws, 250, 7, 4)
+    + dev('hero.png', wc, pc - wc / 2, 140, 0, 6);
 } else if (P.core === 'home') {
   CW = P.W; CH = P.H;
   // A crop of a real screen on a white card, with the feature's name on a pill.
@@ -363,6 +365,25 @@ const k = ['close', 'fan', 'tiles', 'cols', 'home', 'trio', 'trioh'].includes(P.
 const flat = ['close', 'fan', 'tiles', 'cols', 'home', 'trio', 'trioh'].includes(P.core)
 const ox = flat ? 0 : sx + (sw - CW * k) / 2, oy = flat ? 0 : sy + (sh - CH * k) / 2;
 core.style.transform = `translate(${ox}px, ${oy}px) scale(${k})`;
+if (P.core === 'trioh') {
+  // Pull the phones to a fixed gap after the text, then centre text + phones
+  // as ONE group on the canvas (= on Apple's safe area, which is centred).
+  const box = els => els.reduce((b, e) => { const r = e.getBoundingClientRect()
+    return { l: Math.min(b.l, r.left), r: Math.max(b.r, r.right), t: Math.min(b.t, r.top), b: Math.max(b.b, r.bottom) } },
+    { l: 1e9, r: -1e9, t: 1e9, b: -1e9 })
+  const text = [...core.querySelectorAll('[data-g="t"]')]
+  const devs = [...core.querySelectorAll('.device')]
+  const tb = box(text), db = box(devs)
+  const shift = tb.r + 90 - db.l
+  devs.forEach(d => { d.style.left = (parseFloat(d.style.left) + shift) + 'px' })
+  const g = box([...text, ...devs])
+  // phones' visual middle (the screens, not the drop shadow) on the canvas middle
+  core.style.transform = `translate(${P.W / 2 - (g.l + g.r) / 2}px, 0px)`
+  // text vertically centred on the middle phone
+  const hb = devs[2].getBoundingClientRect(), mid = (hb.top + hb.bottom) / 2
+  const dy = mid - (tb.t + tb.b) / 2
+  text.forEach(e => { e.style.top = (parseFloat(e.style.top) + dy) + 'px' })
+}
 
 // ---- glows ----
 const glows = [
