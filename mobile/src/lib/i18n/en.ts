@@ -744,6 +744,7 @@ export const en = {
   'calendar.rem.tomorrow': "Tomorrow",
   'calendar.rem.inDays': "In {n} days",
   'calendar.saveEvent': 'Save event',
+  'common.tapAgainToDelete': 'Tap again to delete',
   'calendar.deleteEvent': 'Delete event',
   'calendar.deleteConfirm': 'Delete “{title}”?',
   'calendar.saveFailed': 'Could not save — please try again.',

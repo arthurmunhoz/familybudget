@@ -737,6 +737,7 @@ export const es: Record<keyof typeof en, string> = {
   'calendar.rem.tomorrow': "Mañana",
   'calendar.rem.inDays': "En {n} días",
   'calendar.saveEvent': 'Guardar evento',
+  'common.tapAgainToDelete': 'Toca de nuevo para eliminar',
   'calendar.deleteEvent': 'Eliminar evento',
   'calendar.deleteConfirm': '¿Eliminar “{title}”?',
   'calendar.saveFailed': 'No se pudo guardar — inténtalo de nuevo.',

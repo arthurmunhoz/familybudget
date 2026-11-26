@@ -15,7 +15,7 @@
 // Pickers open in their own sheet, never inline (PickerSheet), and every
 // sheet is rendered inside the row's tree so it NESTS in the open form modal
 // instead of sitting beside it (a sibling Modal fails to present on iOS).
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { TextInput, View, type TextInputProps } from 'react-native'
 import { X } from 'lucide-react-native'
 
@@ -234,14 +234,33 @@ export function DayRow({
 /** A destructive action as a centred row (put it in its own FormSection at
  *  the end of the form, iOS-style, so the docked button stays the only CTA). */
 export function DangerRow({ label, onPress }: { label: string; onPress: () => void }) {
+  // Two taps in the SAME place (owner, 2026-11-25): the first turns the row
+  // into a solid red "Tap again to delete", the second does it. A stray touch
+  // while scrolling a form used to delete an event outright. Disarms by itself.
   const { c } = useTheme()
+  const { t } = useI18n()
+  const [armed, setArmed] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        if (timer.current) clearTimeout(timer.current)
+        if (armed) { setArmed(false); onPress(); return }
+        setArmed(true)
+        timer.current = setTimeout(() => setArmed(false), 4000)
+      }}
       accessibilityRole="button"
-      style={({ pressed }) => ({ minHeight: 50, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
+      accessibilityLabel={armed ? t('common.tapAgainToDelete') : label}
+      style={({ pressed }) => ({
+        minHeight: 50, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: armed ? c.expense : 'transparent',
+        opacity: pressed ? 0.7 : 1,
+      })}
     >
-      <Txt style={{ fontSize: 15, color: c.expense, fontFamily: fonts.semibold }}>{label}</Txt>
+      <Txt style={{ fontSize: 15, color: armed ? '#fff' : c.expense, fontFamily: fonts.semibold }}>
+        {armed ? t('common.tapAgainToDelete') : label}
+      </Txt>
     </Pressable>
   )
 }
