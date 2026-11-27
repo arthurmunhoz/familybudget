@@ -226,7 +226,7 @@ const LAYOUT = {
       <span class="icon" style="width:52px;height:52px;border-radius:16px;background:#FFE6DA;color:${T.accent}">${icon('stethoscope', 26)}</span>
       <div><div class="t1">${esc(P.title)}</div><div style="font:600 16px Hanken;color:#D2582F">${esc(P.due)}</div></div></div>`
   },
-  utilities() { return phone('utilities') + notif(1190, 2, P.msg, P.from) },
+  utilities() { return phone('utilities') + (P.msg ? notif(1190, 2, P.msg, P.from) : '') },
 }
 stage.innerHTML = html + `<div class="body">${LAYOUT[id]()}</div>`
 
